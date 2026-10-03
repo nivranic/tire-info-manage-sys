@@ -495,7 +495,7 @@ def test_backup_replay_keeps_every_original_column_and_row(tmp_path):
             if name != 'tire_schema_versions':
                 assert before[name] == after[name], name
         assert {row[0] for row in connection.execute('SELECT version FROM tire_schema_versions')} == (
-            before_versions | {'005_variant_identity_contract', '006_source_settings', '007_monitor_tasks', '008_recall_discovery_monitoring', '009_ai_streaming', '010_offline_packs', '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers'})
+            before_versions | {'005_variant_identity_contract', '006_source_settings', '007_monitor_tasks', '008_recall_discovery_monitoring', '009_ai_streaming', '010_offline_packs', '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers', '014_local_sessions_user'})
         assert connection.execute('SELECT COUNT(*) FROM snapshots WHERE identity_contract_version IS NOT NULL').fetchone()[0] == 0
     final_sha = hashlib.sha256(backup.read_bytes()).hexdigest()
     assert final_sha == original_sha

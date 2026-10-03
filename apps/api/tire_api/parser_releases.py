@@ -770,17 +770,23 @@ def register_parser_release_routes(app: FastAPI):
                 'history_truncated': current.revision > len(history)}
 
     @app.post('/v1/parser-deployments/{source_id}/bootstrap', status_code=201)
-    def bootstrap(source_id: str, payload: SignedAction, db: Session = Depends(get_db)):
+    def bootstrap(source_id: str, payload: SignedAction, request: Request, db: Session = Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return deployment_view(bootstrap_source(db, source_id, payload.operator, payload.reason), db)
 
     @app.post('/v1/parser-deployments/{source_id}/transitions', status_code=201)
     def transition(source_id: str, payload: DeploymentTransition, request: Request,
                    idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db: Session = Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return transition_deployment(db, source_id, payload, request.state.session_id, idempotency_key)
 
     @app.post('/v1/parser-evaluations', status_code=201)
     def evaluate(payload: EvaluationCreate, request: Request,
                  idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db: Session = Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return create_evaluation(db, payload, request.state.session_id, idempotency_key)
 
     @app.get('/v1/parser-evaluations')
@@ -819,6 +825,8 @@ def register_parser_release_routes(app: FastAPI):
 
     @app.post('/v1/parser-evaluations/{evaluation_id}/reviews', status_code=201)
     def review(evaluation_id: str, payload: EvaluationReviewCreate, request: Request, db: Session = Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return review_evaluation(db, evaluation_id, payload, request.state.session_id)
 
 

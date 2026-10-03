@@ -461,7 +461,7 @@ def test_legacy_schema_upgrade_preserves_evidence_facts_and_watchlist(tmp_path):
             assert connection.execute(text("SELECT etag FROM verifications")).scalar() is None
             assert connection.execute(text("SELECT parser_identity FROM verifications")).scalar() is None
             assert set(connection.execute(text("SELECT version FROM tire_schema_versions")).scalars()) == {
-                "001_verification_validators", "002_monitor_rule_conditions", "003_parser_release_provenance", "004_query_selection_filters", "005_variant_identity_contract", "006_source_settings", "007_monitor_tasks", "008_recall_discovery_monitoring", "009_ai_streaming", "010_offline_packs", "011_query_fallback_policies", "012_device_ai_preparations", "013_device_ai_ledger_triggers"}
+                "001_verification_validators", "002_monitor_rule_conditions", "003_parser_release_provenance", "004_query_selection_filters", "005_variant_identity_contract", "006_source_settings", "007_monitor_tasks", "008_recall_discovery_monitoring", "009_ai_streaming", "010_offline_packs", "011_query_fallback_policies", "012_device_ai_preparations", "013_device_ai_ledger_triggers", "014_local_sessions_user"}
         # Idempotent startup; no repeated mutation or loss of old observations.
         db.initialize()
         assert count(db, Snapshot) == 1

@@ -1,8 +1,8 @@
-# COHS 风险登记 — r52（2026-10-03）
+# COHS 风险登记 — r54（2026-10-03）
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r52
+register_version: r54
 updated: 2026-10-03
 
 risks:
@@ -115,3 +115,25 @@ risks:
     compensating_control: 属长期路线而非本轮缺陷；HANDOFF §6 P2 清单为权威清单
     reassess_trigger: 每轮推进后对照更新
     status: open-roadmap
+
+  - id: R-012
+    asset: 本机多用户账户（apps/api/tire_api/auth.py，ADR-2026-057）
+    finding: 本机账户不是安全边界——local accounts 不防御本机恶意进程（cookie 与本机 SQLite 对本地进程可读）；服务器部署前必须重新设计鉴权，不得直接沿用
+    impact: high
+    likelihood: low（当前无部署；服务 loopback 绑定，密钥/数据均不出本机）
+    priority: high-at-deployment
+    owner: user
+    compensating_control: 服务维持 loopback 绑定；ADR-2026-057 边界原文与代码注释双锚定（auth.py / db.py User docstring）；docs/DEPLOYMENT-KEY-POLICY.md 部署前置检查清单，部署轮必须逐项执行；与 R-011 联动复评
+    reassess_trigger: 任何"部署到服务器"工作启动时
+    status: open-guarded
+
+  - id: R-013
+    asset: hash 路由与三端导航（ADR-2026-056）
+    finding: 移动返回键链（backRequested→consumeMobileBack→workbenchBack）与 hash 浏览历史两套机制并存，交互回归面扩大；桌面 brand 链接 href="/" 会整页回根而非 hash 切换
+    impact: medium
+    likelihood: low（波次3验收已覆盖主路径）
+    priority: low
+    owner: engineering
+    compensating_control: 波次3浏览器验收（深链直达/前进后退/刷新存活/compare 占位回填/移动返回链）+ 三端构建门禁（共享文件禁入 next/* 构件）；route-hash.test.ts 纯函数编解码锚
+    reassess_trigger: 任何导航结构改动或新增平台壳时
+    status: open-accepted

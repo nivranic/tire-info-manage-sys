@@ -273,14 +273,14 @@ def _anchor(db, kind, job_id, cursor):
         _reset()
 
 
-def _visible_job(db, kind, job_id, session_id):
+def _visible_job(db, kind, job_id, scope):
     job_model, _ = _models(kind)
     statement = select(job_model).where(job_model.id == job_id)
     if kind in {'recall', 'recall_discovery'}:
         rule_model = RecallMonitorRule if kind == 'recall' else RecallDiscoveryRule
-        statement = statement.where(job_model.session_id == session_id,
+        statement = statement.where(job_model.session_id.in_(scope),
             exists(select(rule_model.id).where(rule_model.job_id == job_model.id,
-                                               rule_model.session_id == session_id)))
+                                               rule_model.session_id.in_(scope))))
     else:
         statement = statement.where(exists(select(AlertRule.id).where(AlertRule.job_id == job_model.id)))
     job = db.scalar(statement)
@@ -307,7 +307,7 @@ def _attempt_view(db, row):
         'source_access_generation': row.source_access_generation}
 
 
-def _rules(db, kind, job_id, session_id):
+def _rules(db, kind, job_id, scope):
     if kind == 'tire':
         from .monitoring import current_rules
         statement = current_rules(db, job_id)
@@ -315,12 +315,12 @@ def _rules(db, kind, job_id, session_id):
     elif kind == 'recall':
         from .recall_monitoring import current_rules
         statement = current_rules().where(RecallMonitorRule.job_id == job_id,
-                                          RecallMonitorRule.session_id == session_id)
+                                          RecallMonitorRule.session_id.in_(scope))
         rule_model = RecallMonitorRule
     else:
         from .recall_discovery_monitoring import current_rules
         statement = current_rules().where(RecallDiscoveryRule.job_id == job_id,
-                                          RecallDiscoveryRule.session_id == session_id)
+                                          RecallDiscoveryRule.session_id.in_(scope))
         rule_model = RecallDiscoveryRule
     total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
     rows = db.execute(statement.order_by(rule_model.id).limit(50)).all()
@@ -333,9 +333,9 @@ def _legacy_view(row):
         'started_at': timestamp(row.started_at), 'finished_at': timestamp(row.finished_at), 'legacy': True}
 
 
-def task_view(db, kind, job, session_id, *, now=None):
+def task_view(db, kind, job, scope, *, now=None):
     now = now or utcnow()
-    rules, total = _rules(db, kind, job.id, session_id)
+    rules, total = _rules(db, kind, job.id, scope)
     attempt_model, event_model = journal_models(kind)
     event = _latest_event(db, kind, job.id)
     attempt = db.get(attempt_model, event.attempt_id) if event else None
@@ -388,7 +388,7 @@ def _state_expression(db, kind, job_model, run_model, now):
         (last_result.is_not(None), 'failed'), else_='never_run')
 
 
-def task_list(db, session_id, *, kind=None, source_id=None, rule_id=None, state=None, offset=0, limit=20):
+def task_list(db, scope, *, kind=None, source_id=None, rule_id=None, state=None, offset=0, limit=20):
     now = utcnow()
     statements = []
     for lane in ([kind] if kind else ['tire', 'recall', 'recall_discovery']):
@@ -398,10 +398,10 @@ def task_list(db, session_id, *, kind=None, source_id=None, rule_id=None, state=
         if rule_id:
             rule_clause = rule_clause.where(rule_model.id == rule_id)
         if lane != 'tire':
-            rule_clause = rule_clause.where(rule_model.session_id == session_id)
+            rule_clause = rule_clause.where(rule_model.session_id.in_(scope))
         statement = select(literal(lane).label('kind'), job_model.id.label('job_id')).where(exists(rule_clause))
         if lane != 'tire':
-            statement = statement.where(job_model.session_id == session_id)
+            statement = statement.where(job_model.session_id.in_(scope))
             if source_id and source_id != SOURCE_ID:
                 statement = statement.where(literal(False))
         elif source_id:
@@ -412,15 +412,15 @@ def task_list(db, session_id, *, kind=None, source_id=None, rule_id=None, state=
     candidates = union_all(*statements).subquery()
     total = db.scalar(select(func.count()).select_from(candidates)) or 0
     rows = db.execute(select(candidates).order_by(candidates.c.kind, candidates.c.job_id).offset(offset).limit(limit)).all()
-    items = [task_view(db, lane, _visible_job(db, lane, job_id, session_id), session_id, now=now)
+    items = [task_view(db, lane, _visible_job(db, lane, job_id, scope), scope, now=now)
              for lane, job_id in rows]
     return {'schema': SCHEMA, 'items': items, 'total': total, 'offset': offset, 'limit': limit,
             'server_time': timestamp(now)}
 
 
-def task_detail(db, kind, job_id, session_id, *, attempt_offset=0, attempt_limit=20,
+def task_detail(db, kind, job_id, scope, *, attempt_offset=0, attempt_limit=20,
                 legacy_offset=0, legacy_limit=20):
-    job = _visible_job(db, kind, job_id, session_id)
+    job = _visible_job(db, kind, job_id, scope)
     attempt_model, event_model = journal_models(kind)
     # Capture the stream watermark BEFORE reading projections. The client may
     # see newer projection data, but replay from this anchor cannot miss events.
@@ -437,7 +437,7 @@ def task_detail(db, kind, job_id, session_id, *, attempt_offset=0, attempt_limit
     legacy_total = db.scalar(select(func.count()).select_from(legacy_statement.subquery())) or 0
     legacy_rows = db.scalars(legacy_statement.order_by(desc(run_model.finished_at), desc(run_model.id))
                             .offset(legacy_offset).limit(legacy_limit)).all()
-    return {'schema': SCHEMA, 'task': task_view(db, kind, job, session_id),
+    return {'schema': SCHEMA, 'task': task_view(db, kind, job, scope),
         'attempts': [_attempt_view(db, row) for row in rows], 'attempts_total': total,
         'attempt_offset': attempt_offset, 'attempt_limit': attempt_limit, 'cursor': cursor,
         'legacy_runs': [_legacy_view(row) for row in legacy_rows], 'legacy_runs_total': legacy_total,
@@ -445,9 +445,9 @@ def task_detail(db, kind, job_id, session_id, *, attempt_offset=0, attempt_limit
         'server_time': timestamp(utcnow())}
 
 
-def event_page(db, kind, job_id, session_id, *, cursor=None, limit=50):
+def event_page(db, kind, job_id, scope, *, cursor=None, limit=50):
     _, event_model = journal_models(kind)
-    _visible_job(db, kind, job_id, session_id)
+    _visible_job(db, kind, job_id, scope)
     sequence = _anchor(db, kind, job_id, cursor)
     latest = _latest_event(db, kind, job_id)
     upper = latest.sequence if latest else 0
@@ -466,7 +466,7 @@ def _frame(event, data, cursor=None):
         data, ensure_ascii=False, separators=(',', ':')) + '\n\n'
 
 
-async def stream_events(database, request, kind, job_id, session_id, cursor):
+async def stream_events(database, request, kind, job_id, scope, cursor):
     started = heartbeat = time.monotonic()
     delivered = 0
     while time.monotonic() - started < STREAM_SECONDS and delivered < MAX_STREAM_EVENTS:
@@ -475,7 +475,7 @@ async def stream_events(database, request, kind, job_id, session_id, cursor):
 
         def read_page():
             with database.sessions() as db:
-                return event_page(db, kind, job_id, session_id, cursor=cursor, limit=100)
+                return event_page(db, kind, job_id, scope, cursor=cursor, limit=100)
 
         try:
             page = await asyncio.to_thread(read_page)
@@ -505,7 +505,8 @@ def register_monitor_task_routes(app: FastAPI):
                 state: TaskState | None = None, offset: int = Query(0, ge=0, le=100000),
                 limit: int = Query(20, ge=1, le=50)):
         with app.state.database.sessions() as db:
-            return task_list(db, request.state.session_id, kind=kind, source_id=source_id,
+            from .auth import session_scope
+            return task_list(db, session_scope(db, request.state.session_id), kind=kind, source_id=source_id,
                              rule_id=rule_id, state=state, offset=offset, limit=limit)
 
     @app.get('/v1/monitor-tasks/{kind}/{job_id}')
@@ -513,7 +514,8 @@ def register_monitor_task_routes(app: FastAPI):
                attempt_offset: int = Query(0, ge=0, le=100000), attempt_limit: int = Query(20, ge=1, le=100),
                legacy_offset: int = Query(0, ge=0, le=100000), legacy_limit: int = Query(20, ge=1, le=100)):
         with app.state.database.sessions() as db:
-            return task_detail(db, kind, job_id, request.state.session_id,
+            from .auth import session_scope
+            return task_detail(db, kind, job_id, session_scope(db, request.state.session_id),
                 attempt_offset=attempt_offset, attempt_limit=attempt_limit,
                 legacy_offset=legacy_offset, legacy_limit=legacy_limit)
 
@@ -521,18 +523,21 @@ def register_monitor_task_routes(app: FastAPI):
     def events(kind: Kind, job_id: str, request: Request, cursor: str | None = Query(None, max_length=512),
                limit: int = Query(50, ge=1, le=100)):
         with app.state.database.sessions() as db:
-            return event_page(db, kind, job_id, request.state.session_id, cursor=cursor, limit=limit)
+            from .auth import session_scope
+            return event_page(db, kind, job_id, session_scope(db, request.state.session_id), cursor=cursor, limit=limit)
 
     @app.get('/v1/monitor-tasks/{kind}/{job_id}/events/stream')
     def stream(kind: Kind, job_id: str, request: Request, cursor: str | None = Query(None, max_length=512),
                last_event_id: str | None = Header(None, alias='Last-Event-ID', max_length=512)):
         with app.state.database.sessions() as db:
-            _visible_job(db, kind, job_id, request.state.session_id)
+            from .auth import session_scope
+            scope = session_scope(db, request.state.session_id)
+            _visible_job(db, kind, job_id, scope)
             if cursor is not None and last_event_id is not None and cursor != last_event_id:
                 _reset()
             cursor = last_event_id or cursor
-            event_page(db, kind, job_id, request.state.session_id, cursor=cursor, limit=1)
+            event_page(db, kind, job_id, scope, cursor=cursor, limit=1)
             cursor = cursor or _cursor(kind, job_id)
         return StreamingResponse(stream_events(app.state.database, request, kind, job_id,
-            request.state.session_id, cursor), media_type='text/event-stream', headers={
+            scope, cursor), media_type='text/event-stream', headers={
                 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no', 'X-Content-Type-Options': 'nosniff'})

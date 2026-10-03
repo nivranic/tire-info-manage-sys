@@ -147,6 +147,8 @@ def relation_setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'relations.sqlite').as_posix(), NoNetworkRegistry())
     with TestClient(app) as client:
         client.get('/health')
+        assert client.post('/v1/auth/register',
+                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
         session_id = client.cookies['tire_local_session']
         database = app.state.database
         vehicle = seed_vehicle(database, session_id)

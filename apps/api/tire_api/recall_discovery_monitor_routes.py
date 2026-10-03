@@ -205,7 +205,8 @@ def register_recall_discovery_monitor_routes(app: FastAPI):
     @app.get('/v1/recall-discovery-rules')
     def listing(request: Request, archived: bool = False, offset: int = Query(0, ge=0, le=100000),
                 limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
-        statement = current_rules().where(RecallDiscoveryRule.session_id == request.state.session_id,
+        from .auth import session_scope
+        statement = current_rules().where(RecallDiscoveryRule.session_id.in_(session_scope(db, request.state.session_id)),
                                           RecallDiscoveryRuleRevision.archived == archived)
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = db.execute(statement.order_by(desc(RecallDiscoveryRule.created_at), RecallDiscoveryRule.id)
@@ -271,13 +272,15 @@ def register_recall_discovery_monitor_routes(app: FastAPI):
     @app.get('/v1/recall-discovery-notifications')
     def notifications(request: Request, unread_only: bool = False, offset: int = Query(0, ge=0, le=100000),
                       limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
+        from .auth import session_scope
+        scope = session_scope(db, request.state.session_id)
         statement = (select(RecallDiscoveryNotification, RecallDiscoveryRuleRevision,
                             RecallDiscoveryCandidate, RecallDiscoveryJob)
             .join(RecallDiscoveryRuleRevision, RecallDiscoveryRuleRevision.id == RecallDiscoveryNotification.rule_revision_id)
             .join(RecallDiscoveryCandidate, RecallDiscoveryCandidate.id == RecallDiscoveryNotification.candidate_id)
             .join(RecallDiscoveryJob, RecallDiscoveryJob.id == RecallDiscoveryCandidate.job_id)
-            .where(RecallDiscoveryNotification.session_id == request.state.session_id,
-                   RecallDiscoveryJob.session_id == request.state.session_id))
+            .where(RecallDiscoveryNotification.session_id.in_(scope),
+                   RecallDiscoveryJob.session_id.in_(scope)))
         if unread_only:
             statement = statement.where(RecallDiscoveryNotification.read_at.is_(None))
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0

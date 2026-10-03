@@ -73,6 +73,8 @@ def setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'policy.sqlite').as_posix(), registry)
     with TestClient(app) as client:
         client.get('/v1/source-settings')  # Explicit normal bootstrap before owned policy API.
+        assert client.post('/v1/auth/register',
+                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
         yield client, registry, app.state.database
 
 

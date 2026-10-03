@@ -101,16 +101,17 @@ def test_nine_additive_tables_preserve_all_old_schema_rows_and_cursors(predecess
     for table in before['tables'] - {'tire_schema_versions'}:
         assert after['rows'][table] == before['rows'][table], table
     assert set(before['rows']['tire_schema_versions']) < set(after['rows']['tire_schema_versions'])
-    assert len(after['rows']['tire_schema_versions']) == 13
+    assert len(after['rows']['tire_schema_versions']) == 14
     for table in NEW_TABLES:
         assert after['rows'][table] == [], table
     with database.sessions() as db:
+        scope = [owner]
         for kind, job_id, cursor, run_id in histories:
-            page = tasks.event_page(db, kind, job_id, owner, cursor=cursor)
+            page = tasks.event_page(db, kind, job_id, scope, cursor=cursor)
             assert [row['phase'] for row in page['items']] == ['running', 'finished']
             assert page['items'][-1]['run_id'] == run_id
-        assert tasks.task_list(db, owner, kind='recall_discovery')['total'] == 0
-        assert tasks.task_list(db, owner)['total'] == 2
+        assert tasks.task_list(db, scope, kind='recall_discovery')['total'] == 0
+        assert tasks.task_list(db, scope)['total'] == 2
     with database.engine.connect() as connection:
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         checks = inspect(connection).get_check_constraints('monitor_task_attempts')
@@ -140,7 +141,7 @@ def test_additive_initialize_failure_rolls_back_schema_and_version(predecessor, 
     assert snapshot(database)['tables'] - before['tables'] == NEW_TABLES
     with database.sessions() as db:
         for kind, job_id, cursor, _ in histories:
-            assert len(tasks.event_page(db, kind, job_id, owner, cursor=cursor)['items']) == 2
+            assert len(tasks.event_page(db, kind, job_id, [owner], cursor=cursor)['items']) == 2
 
 
 def test_old_journal_kind_check_still_rejects_new_kind(predecessor):

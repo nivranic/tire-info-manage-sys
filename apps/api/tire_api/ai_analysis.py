@@ -418,11 +418,12 @@ def register_ai_routes(app: FastAPI):
 
     @app.get('/v1/ai/analyses')
     def history(request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
+        from .auth import session_scope
         rows = db.execute(select(AIRequest, AICompletion)
             .outerjoin(AICompletion, AICompletion.request_id == AIRequest.id)
             .options(load_only(AICompletion.request_id, AICompletion.state, AICompletion.error_code,
                                AICompletion.usage, AICompletion.created_at))
-            .where(AIRequest.actor_session_id == request.state.session_id)
+            .where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)))
             .where(or_(AIRequest.request_contract['purpose'].as_string().is_(None),
                        AIRequest.request_contract['purpose'].as_string() != 'rule_draft'))
             .order_by(desc(AIRequest.created_at), desc(AIRequest.id)).limit(20)).all()

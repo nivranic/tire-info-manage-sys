@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { QuarantineEvidence, QuarantineRecord, Source, SourceHealthRecord, SourceHealthResult } from "@tire/domain-types";
 import { tireApi } from "@tire/api-client";
 import { Icon } from "./icons";
+import { useWorkbenchAuth } from "./auth";
 import CaptureJournal from "./capture-journal";
 import EvidenceDocuments from "./evidence-documents";
 import ParserReleases from "./parser-releases";
@@ -52,6 +53,9 @@ function QualityReason({ code }: { code: string }) {
 }
 
 export default function SourceQuality({ sources, sessionReady }: { sources: Source[]; sessionReady: boolean }) {
+  const auth = useWorkbenchAuth();
+  // 会话未就绪（ready=false，如首帧或桌面宿主未注入）时不禁用，避免误伤只读浏览。
+  const adminBlocked = auth.ready && (!auth.state.authenticated || !auth.state.user?.is_admin);
   const [health, setHealth] = useState<SourceHealthResult | null>(null);
   const [healthError, setHealthError] = useState("");
   const [healthLoading, setHealthLoading] = useState(true);
@@ -172,6 +176,7 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
     </section>
     <FieldConflictCenter sources={sources} sessionReady={sessionReady} />
     <GoldenSets sources={sources} sessionReady={sessionReady} />
+    {adminBlocked ? <p className="review-warning" role="status">管理写操作（解析器发布与切换、身份迁移应用、隔离复核审批）需要管理员账户登录；提交将被服务端拒绝，浏览与核对不受影响。</p> : null}
     <ParserReleases sources={sources} sessionReady={sessionReady} />
     <IdentityMigration sessionReady={sessionReady} />
     <IdentityDirectory sessionReady={sessionReady} />
@@ -181,6 +186,8 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
 }
 
 function QuarantineDetail({ detail, name }: { detail: QuarantineEvidence; name: string }) {
+  const auth = useWorkbenchAuth();
+  const adminBlocked = auth.ready && (!auth.state.authenticated || !auth.state.user?.is_admin);
   const url = safeUrl(detail.source_url);
   return <div className="quarantine-detail-content">
     <dl className="quality-detail-meta"><div><dt>来源</dt><dd>{name}</dd></div><div><dt>原观察时间</dt><dd>{formatTime(detail.observed_at)}</dd></div><div><dt>原始页面</dt><dd>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{detail.source_url}<Icon name="external" size={13} /></a> : detail.source_url}</dd></div><div><dt>未采纳原因</dt><dd><ul className="quality-reason-list">{detail.reason_codes.map(code => <li key={code}><QualityReason code={code} /></li>)}</ul></dd></div></dl>
@@ -188,6 +195,6 @@ function QuarantineDetail({ detail, name }: { detail: QuarantineEvidence; name: 
     {detail.quality?.groups ? <section className="vehicle-quality-groups" aria-label="车型分组质量检查"><h4>按资料类型分别检查</h4><p className="quality-intro">任一分组的记录或已知字段缺失达到 30% 即隔离，合计比例不替代分组判断。</p>{Object.entries(detail.quality.groups).map(([key, group]) => <div key={key}><h5>{{ vehicle: "车型信息", trims: "配置版本", fitments: "轮毂与轴位" }[key] || key}</h5><div className="quality-loss-metrics"><div><span>记录缺失</span><strong>{group.lost_rows} / {group.baseline_rows}</strong><small>{formatRatio(group.row_loss_ratio)}</small></div><div><span>已知字段缺失</span><strong>{group.lost_field_count} / {group.known_fields}</strong><small>{formatRatio(group.field_loss_ratio)}</small></div></div>{group.reason_codes.length ? <ul className="quality-reason-list">{group.reason_codes.map(code => <li key={code}><QualityReason code={code} /></li>)}</ul> : null}</div>)}</section> : null}
     <details className="quality-technical"><summary>查看记录校验信息</summary><dl className="quality-detail-meta"><div><dt>解析器版本</dt><dd>{detail.parser_version}</dd></div><div><dt>SHA-256</dt><dd className="mono">{detail.raw_hash}</dd></div><div><dt>对照快照</dt><dd className="mono">{detail.previous_snapshot_id || "无适用基线（未形成合格参数）"}</dd></div><div><dt>隔离记录</dt><dd className="mono">{detail.id}</dd></div></dl></details>
     <details className="raw-evidence"><summary>展开纯文本原文<span className="mono">TEXT</span></summary><p>仅作为待核验证据展示，不执行来源脚本或指令。内容类型：{detail.content_type}</p><pre>{detail.body}</pre></details>
-    {detail.kind === "field_loss" ? <QuarantineReview key={detail.id} id={detail.id} /> : <p className="quality-intro">解析或结构校验失败须先修复解析器，不能人工跳过。</p>}
+    {detail.kind === "field_loss" ? <>{adminBlocked ? <p className="review-warning" role="status">隔离复核审批需要管理员账户登录；提交将被服务端拒绝，核对与浏览不受影响。</p> : null}<QuarantineReview key={detail.id} id={detail.id} /></> : <p className="quality-intro">解析或结构校验失败须先修复解析器，不能人工跳过。</p>}
   </div>;
 }

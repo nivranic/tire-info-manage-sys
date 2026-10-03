@@ -38,6 +38,8 @@ import QueryFilters, { describeFilter, parseFilterDrafts, QuerySelectionCounts, 
 import type { TireFilter, TireFilterCatalog } from "@tire/domain-types";
 import { browserPlatform, WorkbenchPlatformContext, useWorkbenchPlatform, type WorkbenchPlatform } from "./workbench-platform";
 import { ToastProvider, useToast } from "./toast";
+import { AuthProvider, useWorkbenchAuth } from "./auth";
+import AccountDialog from "./account-dialog";
 import InlineConfirm from "./inline-confirm";
 import CommandPalette, { type CommandItem } from "./command-palette";
 import { parseRouteHash, serializeRouteHash, type RouteState } from "./route-hash";
@@ -196,7 +198,7 @@ function TireDrawing() {
 }
 
 export default function Workbench({ platform = browserPlatform, pwa = platform.kind === "web" }: { platform?: WorkbenchPlatform; pwa?: boolean } = {}) {
-  return <WorkbenchPlatformContext.Provider value={platform}><DeviceSyncLifecycle platform={platform} /><SourceAccessProvider><ToastProvider><WorkbenchContent pwa={pwa} /></ToastProvider></SourceAccessProvider></WorkbenchPlatformContext.Provider>;
+  return <WorkbenchPlatformContext.Provider value={platform}><DeviceSyncLifecycle platform={platform} /><AuthProvider><SourceAccessProvider><ToastProvider><WorkbenchContent pwa={pwa} /></ToastProvider></SourceAccessProvider></AuthProvider></WorkbenchPlatformContext.Provider>;
 }
 
 function WorkbenchContent({ pwa }: { pwa: boolean }) {
@@ -204,6 +206,8 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
   const refreshSources = sourceAccess.refresh;
   const platform = useWorkbenchPlatform();
   const toast = useToast();
+  const auth = useWorkbenchAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
   const [view, setView] = useState<View>("query");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sources, setSources] = useState<Source[]>([]);
@@ -658,6 +662,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     { id: "open:ai", label: "打开 AI 知识应用", hint: "证据分析", run: () => { setAiTarget(null); setAiOpen(true); } },
     { id: "open:reports", label: "打开证据报告库", hint: "历史报告", run: () => { setReportId(undefined); setReportsOpen(true); } },
     { id: "open:recalls", label: "查询与监控召回公告", hint: "NHTSA", run: () => setRecallsOpen(true) },
+    { id: "open:account", label: "打开账户", hint: "AUTH", run: () => setAccountOpen(true) },
   ];
 
   return <div className="app-shell" data-theme={theme}>
@@ -666,7 +671,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
       <a className="brand" href="/" aria-label="胎迹首页"><span className="brand-symbol"><span /><span /><span /></span><span><strong>胎迹<span className="brand-period">.</span></strong><small>TIRE INTELLIGENCE</small></span></a>
       <div className="workspace-label"><span className="status-dot" />研究工作台 <span className="mono">01</span></div>
       <nav className="main-nav" aria-label="主导航">{navigation.map(item => <button type="button" key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} aria-current={view === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><Icon name={item.icon} /><span>{item.label}<small>{item.english}</small></span>{item.id === "compare" && compared.length > 0 ? <b className="nav-count">{compared.length}</b> : null}</button>)}</nav>
-      <div className="sidebar-bottom"><OfflineLibraryEntry platform={platform} className="future-note text-button" /><DeviceAiEntry platform={platform} className="future-note text-button" /><div className="phase-note"><span className="eyebrow">BUILD IN PROGRESS</span><p>每一个参数，<br />都应该有据可查。</p><span className="phase-label">数据 PoC · 本地工作区</span></div><button type="button" className="future-note text-button" onClick={() => setKnowledgeOpen(true)}><span>历史证据检索</span><span className="tag quiet">知识库</span></button><button type="button" className="future-note text-button" onClick={() => { setAiTarget(null); setAiOpen(true); }}><span>AI 知识应用</span><span className="tag quiet">证据分析</span></button><button type="button" className="future-note text-button" onClick={() => { setReportId(undefined); setReportsOpen(true); }}><span>证据报告库</span><span className="tag quiet">历史报告</span></button><div className="sidebar-foot"><span className="avatar">研</span><span>个人研究空间<small>当前无云端账户同步</small></span></div></div>
+      <div className="sidebar-bottom"><OfflineLibraryEntry platform={platform} className="future-note text-button" /><DeviceAiEntry platform={platform} className="future-note text-button" /><div className="phase-note"><span className="eyebrow">BUILD IN PROGRESS</span><p>每一个参数，<br />都应该有据可查。</p><span className="phase-label">数据 PoC · 本地工作区</span></div><button type="button" className="future-note text-button" onClick={() => setKnowledgeOpen(true)}><span>历史证据检索</span><span className="tag quiet">知识库</span></button><button type="button" className="future-note text-button" onClick={() => { setAiTarget(null); setAiOpen(true); }}><span>AI 知识应用</span><span className="tag quiet">证据分析</span></button><button type="button" className="future-note text-button" onClick={() => { setReportId(undefined); setReportsOpen(true); }}><span>证据报告库</span><span className="tag quiet">历史报告</span></button><button type="button" className="sidebar-foot text-button" onClick={() => setAccountOpen(true)}>{auth.state.user ? <><span className="avatar">{(auth.state.user.display_name || auth.state.user.username).slice(0, 1) || "研"}</span><span>{auth.state.user.display_name || auth.state.user.username}<small>{auth.state.user.is_admin ? "管理员 · 本机工作台" : "研究员 · 本机工作台"}</small></span></> : <><span className="avatar">研</span><span>个人研究空间<small>未登录 · 点击登录本机账户</small></span></>}</button></div>
     </aside>
 
     <div className="workspace">
@@ -742,6 +747,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
       </div>
     </div>
     {compared.length && view === "query" ? <div className="comparison-tray"><Icon name="compare" size={18} /><span>已选 <strong>{compared.length}</strong> 项规格</span><button className="primary-button compact" onClick={() => navigate("compare")}>查看比较<Icon name="arrow" size={15} /></button></div> : null}
+    {accountOpen ? <AccountDialog onClose={() => setAccountOpen(false)} /> : null}
     {recallsOpen ? <RecallDialog sessionReady={!booting} initialCampaign={recallCampaign} onAnalyze={target => { setAiTarget(target); setAiOpen(true); }} onClose={() => setRecallsOpen(false)} /> : null}
     <nav className="mobile-nav" aria-label="移动导航">{navigation.map(item => <button key={item.id} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => { navigate(item.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}><Icon name={item.icon} size={20} /><span>{item.label}</span></button>)}</nav>
     <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />

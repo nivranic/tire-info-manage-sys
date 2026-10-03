@@ -88,6 +88,9 @@ def setup():
     app = create_app("sqlite://", OfflineTireRegistry())
     register_vehicle_routes(app, adapter)
     with TestClient(app) as client:
+        # vehicle_setup 的导入方含隔离复核流程，管理写需要管理员。
+        assert client.post("/v1/auth/register",
+                           json={"username": "admin", "password": "fixture-admin-pw"}).status_code == 200
         yield client, adapter, app.state.database
 
 

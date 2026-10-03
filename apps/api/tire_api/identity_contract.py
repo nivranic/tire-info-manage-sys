@@ -423,6 +423,8 @@ def register_identity_contract_routes(app: FastAPI):
     @app.post('/v1/identity-contract/migration-applications', status_code=201)
     def apply(payload: MigrationApply, request: Request,
               idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return apply_migration(db, payload, request.state.session_id, idempotency_key)
 
     @app.get('/v1/identity-contract/migration-applications')

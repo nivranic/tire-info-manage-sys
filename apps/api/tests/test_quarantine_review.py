@@ -209,12 +209,16 @@ def verify_concurrent_review(url):
     registry = FixtureRegistry()
     app = create_app(url, registry)
     with TestClient(app) as seed:
+        assert seed.post('/v1/auth/register',
+                         json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
         baseline_counts = {model: count(app.state.database, model)
                            for model in (QuarantineApprovalUse, QuarantineReview, Snapshot)}
         qid = rejected(seed, registry)
         barrier = Barrier(2)
         def review(_):
             with TestClient(create_app(url, registry)) as client:
+                assert client.post('/v1/auth/login',
+                                   json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
                 barrier.wait(timeout=10)
                 return decide(client, qid).status_code
         with ThreadPoolExecutor(max_workers=2) as pool:

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Evidence, FactReview, FieldValue, RevisionAction, Variant } from "@tire/domain-types";
 import { ApiError, tireApi } from "@tire/api-client";
+import { useWorkbenchAuth } from "./auth";
 import { IdentityContractBadge } from "./identity-contract";
 import { Icon } from "./icons";
 
@@ -18,6 +19,7 @@ export default function FactReviewDialog({ variant, sourceId, initialField, onCl
   const dialog = useRef<HTMLDialogElement>(null);
   const saveController = useRef<AbortController | null>(null);
   const evidenceController = useRef<AbortController | null>(null);
+  const auth = useWorkbenchAuth();
   const [review, setReview] = useState<FactReview | null>(null);
   const [reload, setReload] = useState(0);
   const [error, setError] = useState("");
@@ -49,6 +51,12 @@ export default function FactReviewDialog({ variant, sourceId, initialField, onCl
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, []);
+
+  // 已登录时预填署名；仅在署名为空时填入，保持可编辑（仅本地预填，不锁定输入）。
+  useEffect(() => {
+    const name = auth.state.user?.display_name?.trim();
+    if (auth.ready && auth.state.authenticated && name && !operator.trim()) setOperator(name);
+  }, [auth.ready, auth.state.authenticated, auth.state.user, operator]);
 
   useEffect(() => {
     const controller = new AbortController();

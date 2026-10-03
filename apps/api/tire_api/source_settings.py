@@ -325,5 +325,7 @@ def register_source_setting_routes(app: FastAPI):
     @app.post('/v1/source-settings/{source_id}/revisions', status_code=201)
     def revise(source_id: str, payload: SourceSettingDecision, request: Request,
                idempotency_key: str = Header(alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return append_source_setting(db, source_id, payload, request.state.session_id,
                                      idempotency_key, registry=app.state.registry)

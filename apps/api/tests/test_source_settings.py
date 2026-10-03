@@ -20,6 +20,8 @@ def setup(monkeypatch):
     monkeypatch.delenv('TI_DISABLED_SOURCES', raising=False)
     app = create_app('sqlite://')
     with TestClient(app) as client:
+        assert client.post('/v1/auth/register',
+                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
         yield client, app.state.database
 
 

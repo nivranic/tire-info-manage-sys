@@ -163,7 +163,8 @@ def test_additive_migration_preserves_legacy_rows_without_rewriting_them(tmp_pat
                 '001_verification_validators', '002_monitor_rule_conditions', '003_parser_release_provenance',
                 '004_query_selection_filters', '005_variant_identity_contract', '006_source_settings',
                 '007_monitor_tasks', '008_recall_discovery_monitoring', '009_ai_streaming', '010_offline_packs',
-                '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers'}
+                '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers',
+                '014_local_sessions_user'}
         restarted.state.database.initialize()
         assert edit(client, detail, name='new revision').json()['conditions'] == {}
 

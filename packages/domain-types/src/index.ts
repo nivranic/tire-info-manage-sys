@@ -870,3 +870,5 @@ export interface DrivingPreferenceState {
   history_truncated: boolean; notice: string;
   history: { revision: number; weights: DrivingWeights | null; created_at: string }[];
 }
+export interface AuthUser { id: string; username: string; display_name: string; is_admin: boolean; }
+export interface AuthState { authenticated: boolean; user: AuthUser | null; }

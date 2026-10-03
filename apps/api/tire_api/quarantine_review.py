@@ -159,6 +159,8 @@ def register_review_routes(app: FastAPI):
 
     @app.post('/v1/quarantines/{quarantine_id}/reviews', status_code=201)
     def decide(quarantine_id: str, payload: ReviewRequest, request: Request, db: Session = Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         from .service import QueryService
         service = QueryService(db, None)
         service.lock_ingestion()

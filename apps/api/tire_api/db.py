@@ -38,6 +38,23 @@ class UserSession(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # 多用户账户（014 迁移）：NULL = 匿名会话；绑定后读取作用域聚合到该用户全部会话。
+    user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+
+class User(Base):
+    """本机多用户账户。口令为 stdlib scrypt（见 auth.py）；首个注册用户自动成为管理员。
+
+    威胁模型：这是 loopback 单进程服务上的工作台角色分级，不防御本机恶意进程
+    （cookie 与本机数据库对本地进程可读）；服务器部署前须先读 DEPLOYMENT-KEY-POLICY。
+    """
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
+    username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(80))
+    password_hash: Mapped[str] = mapped_column(String(256))
+    is_admin: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class QueryRun(Base):

@@ -134,6 +134,8 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
     app.state.database = database
     app.state.registry = adapter_registry
     app.state.telemetry = telemetry
+    from .auth import register_auth_routes
+    register_auth_routes(app)
     from .source_settings import register_source_setting_routes
     register_source_setting_routes(app)
     from .vehicles import register_vehicle_routes
@@ -362,7 +364,9 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
 
     @app.get("/v1/watchlists")
     def watches(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
-        items = db.scalars(select(WatchItem).where(WatchItem.session_id == request.state.session_id)
+        from .auth import session_scope
+        scope = session_scope(db, request.state.session_id)
+        items = db.scalars(select(WatchItem).where(WatchItem.session_id.in_(scope))
                           .order_by(desc(WatchItem.created_at))).all()
         service = QueryService(db, adapter_registry)
         from .identity_contract import contract_metadata
@@ -390,9 +394,10 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
 
     @app.delete("/v1/watchlists/{watch_id}", status_code=204)
     def remove_watch(watch_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
+        from .auth import session_scope
         item = db.get(WatchItem, watch_id)
-        if not item or item.session_id != request.state.session_id:
-            raise HTTPException(404, "当前会话不存在此关注项")
+        if not item or item.session_id not in session_scope(db, request.state.session_id):
+            raise HTTPException(404, "当前账户不存在此关注项")
         QueryService(db, adapter_registry).audit(request.state.session_id, "watch_removed", variant_id=item.variant_id)
         db.delete(item)
         db.commit()
@@ -401,8 +406,10 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
     @app.get("/v1/changes")
     def changes(request: Request, limit: int = Query(default=50, ge=1, le=200),
                 db: Session = Depends(get_db)) -> dict[str, Any]:
+        from .auth import session_scope
+        scope = session_scope(db, request.state.session_id)
         rows = db.scalars(select(ChangeEvent).join(WatchItem, WatchItem.variant_id == ChangeEvent.variant_id)
-                          .where(WatchItem.session_id == request.state.session_id)
+                          .where(WatchItem.session_id.in_(scope))
                           .order_by(desc(ChangeEvent.observed_at)).limit(limit)).all()
         from .identity_contract import contract_metadata
         return {"data_state": "local_snapshot", "items": [

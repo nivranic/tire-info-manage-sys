@@ -251,12 +251,13 @@ def register_report_routes(app: FastAPI):
     @app.get('/v1/reports')
     def listing(request: Request, mode: Literal['history'] = Query(...), archived: bool = False,
                 offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+        from .auth import session_scope
         heads = select(ResearchReportRevision.report_id, func.max(ResearchReportRevision.revision).label('revision')).group_by(
             ResearchReportRevision.report_id).subquery()
         statement = select(ResearchReport, ResearchReportRevision).join(ResearchReportRevision,
             ResearchReportRevision.report_id == ResearchReport.id).join(heads,
             (heads.c.report_id == ResearchReport.id) & (heads.c.revision == ResearchReportRevision.revision)).where(
-                ResearchReport.actor_session_id == request.state.session_id, ResearchReportRevision.archived == archived)
+                ResearchReport.actor_session_id.in_(session_scope(db, request.state.session_id)), ResearchReportRevision.archived == archived)
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = db.execute(statement.options(load_only(*[getattr(ResearchReport, column.name)
             for column in ResearchReport.__table__.columns if column.name != 'body']))

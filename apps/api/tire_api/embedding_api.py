@@ -213,11 +213,12 @@ def register_embedding_routes(app: FastAPI):
 
     @app.get('/v1/knowledge/embedding-runs')
     def history(request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
+        from .auth import session_scope
         rows = db.execute(select(EmbeddingRequest, EmbeddingCompletion).outerjoin(EmbeddingCompletion,
             EmbeddingCompletion.request_id == EmbeddingRequest.id).options(load_only(
                 EmbeddingCompletion.request_id, EmbeddingCompletion.state, EmbeddingCompletion.error_code,
                 EmbeddingCompletion.usage, EmbeddingCompletion.created_at))
-            .where(EmbeddingRequest.actor_session_id == request.state.session_id)
+            .where(EmbeddingRequest.actor_session_id.in_(session_scope(db, request.state.session_id)))
             .order_by(desc(EmbeddingRequest.created_at), desc(EmbeddingRequest.id)).limit(20)).all()
         return {'scope': 'browser_session', 'items': [run_view(db, row, completion, prefetched=True, include_result=False)
                                                      for row, completion in rows]}

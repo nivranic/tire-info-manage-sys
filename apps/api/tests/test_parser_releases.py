@@ -97,6 +97,8 @@ def setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'releases.db').as_posix(), adapter)
     with TestClient(app) as client:
         client.get('/health')
+        assert client.post('/v1/auth/register',
+                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
         yield client, app.state.database, adapter, source
 
 
@@ -382,6 +384,8 @@ def verify_parser_release_persistence(url, directory):
         adapter = RecordedRegistry()
         app = create_app(url, adapter)
         with TestClient(app) as client:
+            assert client.post('/v1/auth/register',
+                               json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
             first = live(client)
             assert first['data_state'] == 'live'
             first_id = adapter.calls[-1]['bundle_id']

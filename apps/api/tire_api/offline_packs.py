@@ -462,9 +462,10 @@ def register_offline_routes(app):
     @app.get('/v1/offline-packs')
     def list_packs(request: Request, response: Response, mode: Literal['history'] = Query(...),
                    limit: int = Query(50, ge=1, le=100)):
+        from .auth import session_scope
         response.headers['Cache-Control'] = 'no-store'
         with app.state.database.sessions() as db:
-            rows = db.scalars(select(OfflinePack).where(OfflinePack.actor_session_id == request.state.session_id)
+            rows = db.scalars(select(OfflinePack).where(OfflinePack.actor_session_id.in_(session_scope(db, request.state.session_id)))
                 .order_by(desc(OfflinePack.created_at), desc(OfflinePack.id)).limit(limit)).all()
             return {'items': [row.descriptor for row in rows]}
 

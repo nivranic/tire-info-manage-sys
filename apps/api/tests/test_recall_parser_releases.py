@@ -128,6 +128,8 @@ def setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'recall-release.db').as_posix(), FixtureRegistry())
     app.state.recall_adapter = adapter
     with TestClient(app) as client:
+        assert client.post('/v1/auth/register',
+                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
         yield client, app.state.database, adapter, source
 
 
@@ -290,6 +292,8 @@ def verify_recall_parser_persistence(url, directory):
         app = create_app(url, FixtureRegistry())
         app.state.recall_adapter = adapter
         with TestClient(app) as client:
+            assert client.post('/v1/auth/register',
+                               json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
             checkpoint = run_lifecycle(client, app.state.database, adapter, source, PERSIST_QUERIES)
             checkpoint['bundle_root'] = str(directory / 'sealed')
         assert_recall_parser_checkpoint(url, checkpoint)

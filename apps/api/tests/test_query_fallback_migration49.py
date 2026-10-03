@@ -53,7 +53,7 @@ def test_three_additive_tables_and_011_preserve_every_predecessor_schema_and_row
     # 013 adds device-ledger triggers; their DDL is asserted in test_device_ai_migration013.py.
     assert [row for row in after['schema'] if row[2] in before['tables'] and row[0] != 'trigger'] == before['schema']
     assert all(before['rows'][table] == after['rows'][table] for table in before['tables'] - {'tire_schema_versions'})
-    assert len(after['rows']['tire_schema_versions']) == 13
+    assert len(after['rows']['tire_schema_versions']) == 14
     assert all(not after['rows'][table] for table in NEW_TABLES)
     with predecessor.engine.connect() as connection:
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []

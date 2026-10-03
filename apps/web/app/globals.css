@@ -1424,3 +1424,12 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
 .chart-bar-warn { fill: var(--accent); opacity: .8; }
 .insight-note { color: var(--muted); font-size: 10px; line-height: 1.7; margin: 8px 0 0; }
 @media (max-width: 767px) { .insight-panel { padding: 14px; } }
+
+/* 波次4 · 本机多用户账户：侧栏底部作为按钮时与原 div 版本视觉一致。 */
+.sidebar-foot.text-button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 17px 4px 0; background: transparent; border: none; border-top: 1px solid var(--border); text-align: left; cursor: pointer; color: inherit; font: inherit; font-size: 11px; text-decoration: none; min-height: 0; }
+.sidebar-foot.text-button:hover { color: var(--ink); }
+.account-dialog .account-summary { display: flex; align-items: center; gap: 12px; margin: 2px 0 18px; }
+.account-summary strong { font-size: 14px; }
+.account-summary small { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+.account-form-switch { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
+.account-note { color: var(--muted); font-size: 10px; line-height: 1.7; margin: 18px 0 0; }

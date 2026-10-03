@@ -62,6 +62,9 @@ def setup():
     registry = FixtureRegistry()
     app = create_app("sqlite://", registry)
     with TestClient(app) as client:
+        # 隔离复核等管理写操作需要管理员（auth.py 守卫）；首个注册用户即管理员。
+        assert client.post("/v1/auth/register",
+                           json={"username": "admin", "password": "fixture-admin-pw"}).status_code == 200
         yield client, registry, app.state.database
 
 

@@ -204,7 +204,8 @@ def register_recall_monitoring_routes(app: FastAPI):
     @app.get("/v1/recall-monitor-rules")
     def listing(request: Request, archived: bool = False, offset: int = Query(0, ge=0),
                 limit: int = Query(50, ge=1, le=100), db: Session = Depends(get_db)):
-        statement = current_rules().where(RecallMonitorRule.session_id == request.state.session_id,
+        from .auth import session_scope
+        statement = current_rules().where(RecallMonitorRule.session_id.in_(session_scope(db, request.state.session_id)),
                                           RecallRuleRevision.archived == archived)
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = db.execute(statement.order_by(desc(RecallMonitorRule.created_at), RecallMonitorRule.id)
@@ -244,11 +245,12 @@ def register_recall_monitoring_routes(app: FastAPI):
     @app.get("/v1/recall-notifications")
     def notifications(request: Request, mode: Literal["history"] = Query(...), unread: bool = False,
                       offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100), db: Session = Depends(get_db)):
+        from .auth import session_scope
         statement = (select(RecallNotification, RecallRuleRevision, RecallEvent, RecallRevision)
             .join(RecallRuleRevision, RecallRuleRevision.id == RecallNotification.rule_revision_id)
             .join(RecallEvent, RecallEvent.id == RecallNotification.event_id)
             .join(RecallRevision, RecallRevision.id == RecallEvent.revision_id)
-            .where(RecallNotification.session_id == request.state.session_id))
+            .where(RecallNotification.session_id.in_(session_scope(db, request.state.session_id))))
         if unread:
             statement = statement.where(RecallNotification.read_at.is_(None))
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0

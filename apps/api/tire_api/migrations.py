@@ -181,3 +181,13 @@ def upgrade(connection: Connection) -> None:
         connection.execute(text(
             "INSERT INTO tire_schema_versions (version) VALUES (:version)"
         ), {"version": "013_device_ai_ledger_triggers"})
+    if "014_local_sessions_user" not in applied:
+        # 多用户账户：local_sessions 加可空 user_id（照 006 先例，裸列不带 FK 约束）。
+        # users 表由 create_all 以 ORM 模型建出；既有会话保持 NULL（匿名）。
+        columns = {column["name"] for column in inspect(connection).get_columns("local_sessions")}
+        if "user_id" not in columns:
+            # Column names are fixed program constants, never external input.
+            connection.exec_driver_sql("ALTER TABLE local_sessions ADD COLUMN user_id VARCHAR(64)")
+        connection.execute(text(
+            "INSERT INTO tire_schema_versions (version) VALUES (:version)"
+        ), {"version": "014_local_sessions_user"})

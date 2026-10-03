@@ -72,10 +72,10 @@ def test_only_two_new_tables_and_one_version_preserve_every_old_schema_and_row(p
     for table in before['tables'] - {'tire_schema_versions'}:
         assert before['rows'][table] == after['rows'][table], table
     assert set(before['rows']['tire_schema_versions']) < set(after['rows']['tire_schema_versions'])
-    assert len(after['rows']['tire_schema_versions']) == len(OLD_VERSIONS) + 5
+    assert len(after['rows']['tire_schema_versions']) == len(OLD_VERSIONS) + 6
     assert all(after['rows'][name] == [] for name in NEW_TABLES)
     with database.engine.connect() as connection:
-        assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(OLD_VERSIONS) | {'009_ai_streaming', '010_offline_packs', '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers'}
+        assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(OLD_VERSIONS) | {'009_ai_streaming', '010_offline_packs', '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers', '014_local_sessions_user'}
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         assert inspect(connection).get_check_constraints('ai_completions') == []
 
