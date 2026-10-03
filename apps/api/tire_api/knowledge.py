@@ -76,6 +76,7 @@ class KnowledgeSearch(StrictModel):
     text: str = Field(default='', max_length=500)
     filters: SearchFilters = Field(default_factory=SearchFilters)
     limit: StrictInt = Field(default=12, ge=1, le=30)
+    offset: StrictInt = Field(default=0, ge=0, le=2000)
 
     @model_validator(mode='after')
     def useful_query(self):
@@ -294,7 +295,8 @@ def search_history(db, registry, payload: KnowledgeSearch):
              'documents': state.documents, 'version': state.version}
     ranked = render_ranked(lexical_candidates(db, filters, terms, sufficient), filters, terms, sufficient)
     total = len(ranked)
-    has_more = total > payload.limit
+    end = payload.offset + payload.limit
+    has_more = total > end
     stages = [
         {'name': 'structured', 'state': 'succeeded' if filters else 'not_needed',
          'reason': '已执行精确筛选与保守别名解析' if filters else '无结构化筛选条件'},
@@ -306,14 +308,14 @@ def search_history(db, registry, payload: KnowledgeSearch):
     ]
     return {'mode': 'history', 'data_state': 'local_snapshot', 'text': payload.text,
             'applied_filters': filters, 'inferred_filters': inferred,
-            'items': attach_field_resolutions(db, attach_identity_contracts(db, ranked[:payload.limit])),
-            'total': total, 'has_more': has_more,
+            'items': attach_field_resolutions(db, attach_identity_contracts(db, ranked[payload.offset:end])),
+            'total': total, 'has_more': has_more, 'offset': payload.offset, 'limit': payload.limit,
             'index': index, 'stages': stages,
             'notice': '显式历史检索：来自各查询最新正式核验快照、有效测试修订及最新非空召回历史内容；召回空观察独立保留，'
                       '不表示解除或无风险，也不刷新旧公告时间。不同查询的历史范围可能重叠，'
                       '不保证覆盖当前完整目录。已执行字段规则排序；本次未使用向量或混合检索，可另行授权混合路径。'
                       '语义重排模型尚未接入。'
-                      + (f'共有 {total} 条匹配，仅展示前 {payload.limit} 条；请缩小筛选范围。' if has_more else '')}
+                      + (f'共 {total} 条匹配，当前展示第 {payload.offset + 1}–{min(end, total)} 条；可用 offset 继续加载。' if has_more else '')}
 
 
 def register_knowledge_routes(app: FastAPI):

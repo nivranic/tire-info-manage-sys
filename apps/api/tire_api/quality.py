@@ -11,7 +11,7 @@ duplicate key is ambiguous and fails closed once an accepted baseline exists.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Callable, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -233,6 +233,46 @@ def source_health(db: Session, registry: Any, vehicle_source_ids: tuple[str, ...
     return {"window": {"kind": "rolling_24h", "since": timestamp(since), "until": timestamp(until)}, "sources": sources}
 
 
+def health_trends(db: Session, registry: Any, days: int, vehicle_source_ids: tuple[str, ...] = ()) -> dict:
+    """按 UTC 日聚合的来源成功率趋势（只读，原始数据来自 query_runs / rejected_observations）。
+
+    逐日 Python 聚合避免 SQL 方言差异；空日补零，保证前端拿到连续日期序列。
+    """
+    until = utcnow()
+    since_day = until.date() - timedelta(days=days - 1)
+    since = datetime(since_day.year, since_day.month, since_day.day)
+    day_keys = {since_day + timedelta(days=offset) for offset in range(days)}
+    source_ids = list(dict.fromkeys([row["id"] for row in registry.sources()] + list(vehicle_source_ids)))
+    runs = db.execute(select(QueryRun.source_id, QueryRun.state, QueryRun.created_at)
+                      .where(QueryRun.source_id.in_(source_ids), QueryRun.created_at >= since)).all()
+    rejected = db.execute(select(RejectedObservation.source_id, RejectedObservation.observed_at)
+                          .where(RejectedObservation.observed_at >= since,
+                                 RejectedObservation.source_id.in_(source_ids))).all()
+    buckets: dict[str, dict[Any, dict[str, int]]] = {source_id: {day: {"attempts": 0, "successes": 0, "failures": 0, "rejected": 0}
+                                                                for day in day_keys} for source_id in source_ids}
+    for row in runs:
+        bucket = buckets.get(row.source_id, {}).get(row.created_at.date())
+        if bucket is None:
+            continue
+        bucket["attempts"] += 1
+        if row.state in SUCCESS_STATES:
+            bucket["successes"] += 1
+        elif row.state in FAILURE_STATES:
+            bucket["failures"] += 1
+    for row in rejected:
+        bucket = buckets.get(row.source_id, {}).get(row.observed_at.date())
+        if bucket is not None:
+            bucket["rejected"] += 1
+    sources = []
+    for source_id in source_ids:
+        sources.append({"source_id": source_id,
+                        "days": [{"date": (since_day + timedelta(days=offset)).isoformat(),
+                                  **buckets[source_id][since_day + timedelta(days=offset)]}
+                                 for offset in range(days)]})
+    return {"window": {"kind": "daily", "days": days, "since_date": since_day.isoformat(),
+                       "until_date": (since_day + timedelta(days=days - 1)).isoformat()}, "sources": sources}
+
+
 def register_quality_routes(app: FastAPI) -> None:
     from .vehicles import VehicleQuarantine
     from .adapters import xiaomi
@@ -243,6 +283,10 @@ def register_quality_routes(app: FastAPI) -> None:
     @app.get("/v1/source-health")
     def health(db: Session = Depends(get_db)) -> dict:
         return source_health(db, app.state.registry, (xiaomi.SOURCE_ID,))
+
+    @app.get("/v1/source-health/trends")
+    def trends(days: int = Query(default=14, ge=1, le=90), db: Session = Depends(get_db)) -> dict:
+        return health_trends(db, app.state.registry, days, (xiaomi.SOURCE_ID,))
 
     @app.get("/v1/quarantines")
     def quarantines(request: Request, source_id: str | None = Query(default=None, max_length=80),

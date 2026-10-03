@@ -369,6 +369,11 @@ def register_ai_routes(app: FastAPI):
                              'selected_recall_announcement_facts'],
                 'notice': '配置状态不等于已连接验证。金额未估算；token 预算不是供应商账单金额上限。'}
 
+    @app.get('/v1/ai/usage/history')
+    def usage_history(days: int = Query(default=14, ge=1, le=90), db: Session = Depends(get_db)):
+        from .embedding_budget import budget_history
+        return budget_history(db, days)
+
     @app.post('/v1/ai/evidence-packs')
     async def prepare(payload: PreparePack, request: Request, db: Session = Depends(get_db)):
         return await prepare_pack(db, app.state.registry, payload, request.state.session_id,

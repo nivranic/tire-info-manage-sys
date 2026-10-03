@@ -1,4 +1,4 @@
-import type { ChangeItem, Evidence, Health, QuarantineEvidence, QuarantineRecord, QueryResult, Source, SourceHealthResult, TireQuery, Variant, VehicleCandidate, VehicleFitmentResult, WatchItem } from "@tire/domain-types";
+import type { ChangeItem, Evidence, Health, QuarantineEvidence, QuarantineRecord, QueryResult, Source, SourceHealthResult, SourceHealthTrends, AIUsageHistory, TireQuery, Variant, VehicleCandidate, VehicleFitmentResult, WatchItem } from "@tire/domain-types";
 import type { ExcludedVariant, FactReview, FactRevisionRequest, LifecycleRequest, LifecycleReview, RawCaptureEvidence, RawCaptureRecord } from "@tire/domain-types";
 import type { GarageDetail, GarageList, GarageProfile, GarageRecord } from "@tire/domain-types";
 import type { ComparisonView, DrivingPreferenceState, DrivingWeights, SaveComparisonRequest, SavedComparisonDetail, SavedComparisonRecord } from "@tire/domain-types";
@@ -489,6 +489,8 @@ export const tireApi = {
   reviseSourceSetting: (id: string, payload: import("@tire/domain-types").SourceSettingRevisionRequest, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").SourceSettingRevisionResult>(`/v1/source-settings/${encodeURIComponent(id)}/revisions`, { method: "POST", body: JSON.stringify(payload), headers: { "Idempotency-Key": key }, signal }),
   health: (signal?: AbortSignal) => request<Health>("/health", { signal }),
   sourceHealth: (signal?: AbortSignal) => request<SourceHealthResult>("/v1/source-health", { signal }),
+  sourceHealthTrends: (days = 14, signal?: AbortSignal) => request<SourceHealthTrends>(`/v1/source-health/trends?days=${days}`, { signal }),
+  aiUsageHistory: (days = 14, signal?: AbortSignal) => request<AIUsageHistory>(`/v1/ai/usage/history?days=${days}`, { signal }),
   quarantines: (sourceId: string, signal?: AbortSignal) => request<{ data_state: "local_snapshot"; items: QuarantineRecord[]; source_ids: string[] }>(`/v1/quarantines?limit=50${sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""}`, { signal }),
   quarantineEvidence: (id: string, signal?: AbortSignal) => request<QuarantineEvidence>(`/v1/quarantines/${encodeURIComponent(id)}?mode=history`, { signal }),
   testEvents: (signal?: AbortSignal, offset = 0) => request<{ items: import("@tire/domain-types").TestEventRecord[]; total: number }>(`/v1/test-events?mode=history&offset=${offset}`, { signal }),

@@ -70,7 +70,7 @@ export interface KnowledgeFilters {
   source_id?: string; variant_id?: string; technology?: string; field?: string; campaign_number?: string;
 }
 export interface KnowledgeSearchRequest {
-  mode: "history"; text: string; filters: KnowledgeFilters; limit?: number;
+  mode: "history"; text: string; filters: KnowledgeFilters; limit?: number; offset?: number;
 }
 export interface KnowledgeSearchItem {
   recall?: {
@@ -89,7 +89,7 @@ export interface KnowledgeSearchItem {
 export interface KnowledgeSearchResult {
   mode: "history"; data_state: "local_snapshot"; text: string;
   applied_filters: KnowledgeFilters; inferred_filters: KnowledgeFilters;
-  items: KnowledgeSearchItem[]; total: number; has_more: boolean;
+  items: KnowledgeSearchItem[]; total: number; has_more: boolean; offset?: number; limit?: number;
   index: { engine: string; documents: number; version: string };
   stages: { name: string; state: "succeeded" | "not_needed" | "unavailable"; reason: string }[];
   notice: string;
@@ -559,6 +559,18 @@ export interface SourceHealthRecord {
 export interface SourceHealthResult {
   window: { kind: "rolling_24h"; since: string; until: string };
   sources: SourceHealthRecord[];
+}
+
+export interface SourceHealthTrendDay {
+  date: string; attempts: number; successes: number; failures: number; rejected: number;
+}
+export interface SourceHealthTrends {
+  window: { kind: "daily"; days: number; since_date: string; until_date: string };
+  sources: { source_id: string; days: SourceHealthTrendDay[] }[];
+}
+export interface AIUsageHistory {
+  since_date: string; until_date: string; accounting: string;
+  days: { date: string; requests: number; accounted_tokens: number }[];
 }
 
 export interface QualityMetrics {

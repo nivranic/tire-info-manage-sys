@@ -10,6 +10,7 @@ import { Icon, type IconName } from "./icons";
 import VehicleFitments from "./vehicle-fitments";
 import SourceQuality from "./source-quality";
 import SourceManagement from "./source-management";
+import SourceInsight from "./insight-panel";
 import MonitorTaskCenter from "./task-center";
 import { canFetchSource, canQuerySource } from "./source-management-values";
 import { SourceAccessProvider, useSourceAccess } from "./source-status";
@@ -681,7 +682,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
 
           {view === "compare" ? <div className="ai-entry compare-toolbar"><button className="secondary-button" onClick={() => setKnowledgeOpen(true)}>检索历史证据</button><button className="secondary-button" onClick={() => { setAiTarget(null); setAiOpen(true); }}>AI 调用记录与配置</button></div> : null}
           {view === "compare" ? <TestEvents sessionReady={!booting} /> : null}
-          {view === "sources" ? <><section className="quarantine-panel"><div className="panel-title"><span>轮胎安全召回</span><button type="button" data-recall-entry className="secondary-button" disabled={booting} onClick={() => setRecallsOpen(true)}>查询与监控召回公告</button></div><p className="quality-intro">NHTSA 美国监管公告 · 在线检索候选，核对官方范围与补救措施。</p></section><SourceManagement /><MonitorTaskCenter /><SourceQuality sources={sources} sessionReady={!booting} /><div className="method-note"><Icon name="shield" size={24} /><div><h3>证据保留原貌，事实保留版本</h3><p>每份快照记录来源 URL、观察时间、解析器版本和 SHA-256。选择查询结果中的「查看证据」，即可在右侧核对原始内容。</p><p>远端页面只作为纯文本证据展示，不执行其中的脚本或指令。</p></div></div></> : null}
+          {view === "sources" ? <><section className="quarantine-panel"><div className="panel-title"><span>轮胎安全召回</span><button type="button" data-recall-entry className="secondary-button" disabled={booting} onClick={() => setRecallsOpen(true)}>查询与监控召回公告</button></div><p className="quality-intro">NHTSA 美国监管公告 · 在线检索候选，核对官方范围与补救措施。</p></section><SourceInsight sources={sources} /><SourceManagement /><MonitorTaskCenter /><SourceQuality sources={sources} sessionReady={!booting} /><div className="method-note"><Icon name="shield" size={24} /><div><h3>证据保留原貌，事实保留版本</h3><p>每份快照记录来源 URL、观察时间、解析器版本和 SHA-256。选择查询结果中的「查看证据」，即可在右侧核对原始内容。</p><p>远端页面只作为纯文本证据展示，不执行其中的脚本或指令。</p></div></div></> : null}
 
           {savingSelection ? <SaveComparisonDialog selection={savingSelection} onClose={() => setSavingSelection(null)} onRefresh={() => { setSavingSelection(null); setComparisonRevision(value => value + 1); }} onSaved={() => { setSavingSelection(null); setSavedComparisonsRevision(value => value + 1); toast("已固定保存本次比较与引用证据。", "success"); }} /> : null}
           {garageTire ? <AssignTireDialog variant={garageTire} onClose={() => setGarageTire(null)} onSaved={() => { setGarageTire(null); setView("garage"); toast("已保存当前轮胎记录，请核对前后轴。", "success"); }} /> : null}

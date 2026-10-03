@@ -432,3 +432,24 @@ def verify_knowledge_persistence(url):
             assert db.execute(text("SELECT count(*) FROM pg_indexes WHERE tablename = 'knowledge_documents' "
                                    "AND indexname = 'ix_knowledge_search_vector' AND indexdef LIKE '%USING gin%'")).scalar() == 1
     return {'request': request, 'references': references}
+
+
+def test_offset_pages_through_ranked_results_without_overlap(setup):
+    client, _, database = setup
+    marker = 'offsetpaging' + uuid4().hex
+    rows = [{**VARIANT, 'id': f'{marker}-{index}', 'manufacturer_product_code': f'OFF-{index}',
+             'facts': {'description': '分页检索 ' + marker}} for index in range(13)]
+    seed(database, rows)
+    seen, pages = [], []
+    for offset in (0, 5, 10):
+        result = search(client, '分页检索 ' + marker, None, limit=5, offset=offset).json()
+        assert result['total'] == 13
+        assert result['offset'] == offset and result['limit'] == 5
+        assert result['has_more'] == (offset + 5 < 13)
+        pages.append([item['id'] for item in result['items']])
+        seen.extend(pages[-1])
+    assert [len(page) for page in pages] == [5, 5, 3]
+    assert len(set(seen)) == 13  # 无重叠、无遗漏
+    assert search(client, '分页检索 ' + marker, None, limit=5, offset=13).json()['items'] == []
+    assert search(client, '分页检索 ' + marker, None, limit=5, offset=2001).status_code == 422
+    assert search(client, '分页检索 ' + marker, None, limit=5, offset=-1).status_code == 422

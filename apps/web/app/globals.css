@@ -1407,3 +1407,20 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
 .ai-budget-value { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
 .ai-budget-note { color: var(--muted); line-height: 1.7; }
 .device-ai-budget { margin: 0 0 12px; display: grid; gap: 8px; }
+
+/* —— 运行洞察面板（波次2）—— */
+.insight-panel { margin-top: 24px; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; box-shadow: var(--shadow); }
+.insight-grid { display: grid; gap: 18px; }
+.insight-block-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.insight-block-heading label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 500; }
+.insight-block-heading select { min-height: 36px; width: auto; padding: 6px 10px; font-size: 11px; }
+.insight-chart { width: 100%; height: auto; display: block; }
+.chart-gridline { stroke: var(--border); stroke-width: 1; }
+.chart-label { fill: var(--muted); font-size: 9px; font-family: "IBM Plex Mono", monospace; }
+.chart-line { fill: none; stroke: var(--green); stroke-width: 2; }
+.chart-dot { fill: var(--green); }
+.chart-dot:hover { fill: var(--accent); }
+.chart-bar { fill: var(--green); opacity: .85; }
+.chart-bar-warn { fill: var(--accent); opacity: .8; }
+.insight-note { color: var(--muted); font-size: 10px; line-height: 1.7; margin: 8px 0 0; }
+@media (max-width: 767px) { .insight-panel { padding: 14px; } }
