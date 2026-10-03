@@ -563,6 +563,16 @@ public final class DeviceAiHostTest {
     }
 
     @Test
+    public void prepareBodyRejectsExpectedByteCountAboveMaxPackageBytes() {
+        // D4 (decoder-spec 4.3-2): expected_byte_count is bounded 1..MAX_PACKAGE_BYTES
+        // (object_store.py MAX_OBJECT_BYTES parity) — the inclusive bound passes and
+        // 8,388,609 fails closed at the Host assert layer instead of the server 422.
+        DeviceAiHost.assertPrepareBody(with(prepareBodyFixture(), "expected_byte_count", DeviceAiHost.MAX_PACKAGE_BYTES));
+        assertHostFail("device_ai_host_invalid_argument", () ->
+            DeviceAiHost.assertPrepareBody(with(prepareBodyFixture(), "expected_byte_count", DeviceAiHost.MAX_PACKAGE_BYTES + 1)));
+    }
+
+    @Test
     public void prepareBodyClosureItemsCarryClosedSelectorShape() {
         // I24 approved_closure items carry the same closed selector shape:
         // a tire closure item with record_index fails like a requested one.

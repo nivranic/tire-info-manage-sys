@@ -1,0 +1,117 @@
+# COHS 风险登记 — r52（2026-10-03）
+# 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
+# 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
+
+register_version: r52
+updated: 2026-10-03
+
+risks:
+  - id: R-001
+    asset: AI 域（三通道：OpenAI Responses / openai_chat / anthropic）
+    finding: anthropic 通道已真实连通并过适配器级验收（GLM glm-5.3 @ open.bigmodel.cn，2026-10-03：非流+流式 SMOKE OK、合同遵循、thinking 跳过、usage 入账，回执 ai-real-smoke-r55.log）；剩余=完整浏览器端到端语义评测（真证据包经 API 全管线+Web UI）。openai_chat 与 openai_responses 通道仍无真实端点（用户未配）
+    impact: medium
+    likelihood: n/a
+    priority: medium
+    owner: user
+    compensating_control: 预算护栏生效（日 20 请求/100k token）；GLM 思考计入输出 token 已识别（TI_AI_MAX_OUTPUT_TOKENS=8192）；anthropic schema 嵌入 system 已固化并有测试锚
+    reassess_trigger: 用户发起浏览器端到端轮或配置其余 Provider
+    status: partially-closed
+
+  - id: R-002
+    asset: 来源采集（EPREL 及其余 P0/P1/P2）
+    finding: 真实来源外联采集未获用户授权（P2 明确未选）
+    impact: medium
+    likelihood: n/a
+    priority: deferred
+    owner: user
+    compensating_control: 外联白名单 + 无授权不发起；既有发现仅限已授权来源
+    reassess_trigger: 用户授权任一新来源
+    status: open
+
+  - id: R-003
+    asset: Python 全量测试套件
+    finding: 真实 parser 子进程预算测试（8s墙钟/5s CPU，§8 禁止放宽）对机器间歇负载敏感——r52 三次运行共 21 个失败实例在隔离重跑中 100% 转绿（受害测试轮转换人），零确定性失败；负载源含常驻模拟器、Defender、海量测试临时文件 churn
+    impact: low
+    likelihood: medium（本机全量运行必遇若干）
+    priority: low
+    owner: engineering
+    compensating_control: 全量套件空闲机器串行执行+关模拟器；失败先文件级隔离重跑鉴别再判回归（r52 已验证该协议）；测试本身行为正确（预算耗尽即 fail-closed 是被测属性）
+    reassess_trigger: 下次全量套件运行；长期可评估给预算测试加"负载防护标记"（pytest marker）而非放宽预算
+    status: open-accepted
+
+  - id: R-004
+    asset: device-ai wire 冻结
+    finding: 统一 closed-decoder fixtures（decoder-fixtures-a）——已于 2026-10-03 第三批实施落地（25 用例四端 runner 全绿，SHA 0e8998c9…5495 封存）；实施中发现并经 Root 裁决 D9 闭合嵌套键集分歧（ts/jv 运行时下沉，见 ADR-2026-053）。冻结前置至此全部闭合，仅剩冻结工程本身（draft b 迁移 domain-types + wire_frozen=true + 全量回归）
+    impact: medium
+    likelihood: n/a
+    priority: medium
+    owner: engineering
+    compensating_control: 四端各层最小负例 + 统一 fixtures 双保险；fixtures expected 变更须走新版本号（decoder-spec 4.3-9）
+    reassess_trigger: 冻结工程轮启动时
+    status: closed-for-freeze-precondition
+
+  - id: R-005
+    asset: E1 canonical 向量
+    finding: 8MiB 包字节界无向量覆盖（最大向量 ~0.5MB 明细 16.5KiB）；多成员闭包向量缺权威对拍（仅单 tire 成员 + 合成探针）
+    impact: low
+    likelihood: low
+    priority: low
+    owner: engineering
+    compensating_control: 服务端 8MiB 硬门 + r52 起 Host 层同界收紧（D4）；闭包 route 层等值测试已补（E6）
+    reassess_trigger: fixtures 工程轮（可并入 R-004）
+    status: open
+
+  - id: R-006
+    asset: Windows 原生离线档案
+    finding: F1 修复（owner_epoch 初始=1）之前创建的既有档案 epoch=0，与 SDK ≥1 冲突，首用即坏
+    impact: low
+    likelihood: certain（仅限旧档案）
+    priority: low
+    owner: user
+    compensating_control: 修复后新档案不受影响；旧档案需一次 reset_session（用户操作，不代做）
+    reassess_trigger: 用户下次使用 Windows 端时
+    status: open
+
+  - id: R-007
+    asset: packages/api-client 测试
+    finding: 仓库内自测（r52 迁入）以只读相对路径引用 .artifacts 密封向量库，CI 需携带 .artifacts 目录
+    impact: low
+    likelihood: certain
+    priority: low
+    owner: engineering
+    compensating_control: 向量库为只读引用不复制（保密封存证据）；本地与带 .artifacts 的 CI 均可运行
+    reassess_trigger: 建立正式 CI 时（向量库可随冻结轮一并产品化）
+    status: open-accepted
+
+  - id: R-008
+    asset: 静态安全扫描
+    finding: Mimosa deep 扫描 144 项（79 HIGH/65 MEDIUM）经抽样三级核实全部为 QA 脚本启发式与压缩 bundle 噪声，产品源码 0 确认；扫描自评 inconclusive（覆盖缺口）
+    impact: info
+    likelihood: n/a
+    priority: info
+    owner: engineering
+    compensating_control: 抽样证据存 evidence/round-52；scripts/ 为开发态验收工装非生产面；凭据模式独立扫描 0 命中
+    reassess_trigger: 下一轮全面扫描或新增 scripts 时
+    status: triaged
+
+  - id: R-011
+    asset: AI Provider 密钥治理（部署边界）
+    finding: 当前 GLM 密钥为用户 Coding Plan 专用（2026-10-03 用户明确约束）——仅限本地开发/验收；任何服务器部署使用该密钥会触发封禁
+    impact: high
+    likelihood: low（当前无部署；密钥仅在本地 User 环境变量，仓库零字面量）
+    priority: high-at-deployment
+    owner: user
+    compensating_control: 密钥只存 HKCU\Environment 不入仓库/配置/镜像；docs/DEPLOYMENT-KEY-POLICY.md 部署前置检查清单（独立计费key+制品扫描零命中+预算重设）；部署轮必须逐项执行该清单
+    reassess_trigger: 任何"部署到服务器"工作启动时（P2 生产部署项）
+    status: open-guarded
+
+  - id: R-009
+    asset: 整体发布 Gate（原规格 10 项）
+    finding: P0 来源 provenance 100%、Golden 0 错合并、六平台 E2E、WCAG2.2 AA 等 10 项 V1 Gate 仍多项未满足（明细见 HANDOFF §7）
+    impact: high
+    likelihood: n/a
+    priority: roadmap
+    owner: roadmap
+    compensating_control: 属长期路线而非本轮缺陷；HANDOFF §6 P2 清单为权威清单
+    reassess_trigger: 每轮推进后对照更新
+    status: open-roadmap

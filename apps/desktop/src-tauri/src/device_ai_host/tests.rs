@@ -520,6 +520,26 @@ fn closed_dto_serialization_shapes_match_server_field_lists() {
     assert!(serde_json::from_value::<DeviceAiStreamSubmission>(bad).is_err());
 }
 
+// D4 (decoder-spec 4.3-2): expected_byte_count follows the server
+// object_store MAX_OBJECT_BYTES ceiling (1..=8,388,608) at the Host assert
+// layer instead of deferring oversized counts to a server 422; one byte over
+// the bound fails closed even though it is still a safe integer.
+#[test]
+fn prepare_body_expected_byte_count_rejects_above_object_store_bound() {
+    let mut body: DeviceAiPrepareBody = serde_json::from_value(valid_prepare_json()).unwrap();
+    body.expected_byte_count = DEVICE_AI_MAX_PACKAGE_BYTES as u64;
+    assert_device_ai_prepare_body(&body).unwrap();
+    body.expected_byte_count = 8_388_609;
+    assert!(
+        8_388_609 <= DEVICE_AI_SAFE_INTEGER,
+        "over the object-store bound but still a safe integer"
+    );
+    assert_eq!(
+        assert_device_ai_prepare_body(&body).unwrap_err(),
+        DeviceAiHostErrorCode::InvalidArgument
+    );
+}
+
 // ---------------------------------------------------------------------------
 // P1-4c: four-domain selector wire + prepare mode/closure gates, mirroring the
 // server DeviceSelector/DeviceAIPrepareRequest validator semantics verbatim
@@ -2058,4 +2078,164 @@ async fn ipc_resolve_unknown_four_branches_and_wire_kinds() {
             "{label} server must never receive a submit"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// Unified closed-decoder fixtures replay (decoder-spec section 4.3-3). The
+// Root decision parks the authoritative M1-M10 matrix vectors at
+// `.artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json`; this
+// runner replays every case through the Rust Host decoder layer named by the
+// case's `message`:
+//   * "prepare_body"     — payload -> serde_json::DeviceAiPrepareBody
+//                          (deny_unknown_fields over the struct, selector and
+//                          reference enum is the rs unknown-field fence)
+//                          -> assert_device_ai_prepare_body;
+//   * "provider_consent" — payload -> DeviceAiProviderConsentBody ->
+//                          assert_consent (the consent decode of
+//                          build_analysis_request_body).
+// accept verdicts must clear both layers (and canonicalize both prepare
+// UUIDs); reject verdicts compare the observed outcome token against
+// `expected.rs`: a serde deserialization failure is `serde_deserialize_error`
+// (the fixtures' name for the rs wire-shape fence, before the assert layer),
+// an assert failure is its closed `DeviceAiHostErrorCode` string, and a clean
+// pass is `accept` (a registered divergence recorded by the fixtures).
+// ---------------------------------------------------------------------------
+
+const DECODER_FIXTURES_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../.artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json"
+);
+
+#[test]
+fn decoder_fixtures_replay_all_cases() {
+    let raw = std::fs::read_to_string(DECODER_FIXTURES_PATH).unwrap_or_else(|error| {
+        panic!("read decoder fixtures {DECODER_FIXTURES_PATH}: {error}")
+    });
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|error| panic!("parse decoder fixtures: {error}"));
+    assert_eq!(
+        doc["schema"].as_str(),
+        Some("device-ai-decoder-fixtures@1"),
+        "fixtures schema id"
+    );
+    let cases = doc["cases"].as_array().expect("cases array");
+    assert!(!cases.is_empty(), "fixtures must carry at least one case");
+    assert_eq!(
+        cases.len() as u64,
+        doc["counts"]["total"].as_u64().expect("counts.total"),
+        "case total must match the file's own counts"
+    );
+
+    let mut accepted_count = 0usize;
+    let mut rejected_count = 0usize;
+    for case in cases {
+        let id = case["id"].as_str().unwrap_or_else(|| panic!("case id missing"));
+        let verdict = case["verdict"].as_str().expect("case verdict");
+        let message = case["message"].as_str().expect("case message");
+        let payload = &case["payload"];
+        assert!(payload.is_object(), "[{id}] payload must be a JSON object");
+        let expected_rs: Option<String> = match verdict {
+            "accept" => {
+                accepted_count += 1;
+                // accept 时四端 expectation 恒 null。
+                assert!(
+                    case["expected"]["rs"].is_null(),
+                    "[{id}] accept case must carry a null rs expectation"
+                );
+                None
+            }
+            "reject" => {
+                rejected_count += 1;
+                Some(
+                    case["expected"]["rs"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] reject case must carry expected.rs"))
+                        .to_owned(),
+                )
+            }
+            other => panic!("[{id}] unknown verdict {other}"),
+        };
+
+        match message {
+            "prepare_body" => {
+                let outcome = match serde_json::from_value::<DeviceAiPrepareBody>(payload.clone())
+                {
+                    Err(_) => "serde_deserialize_error".to_owned(),
+                    Ok(body) => match assert_device_ai_prepare_body(&body) {
+                        Ok(()) => {
+                            if verdict == "accept" {
+                                // Optional canonicalization coverage: the
+                                // dispatched wire carries both UUIDs in the
+                                // canonical lowercase hyphenated form
+                                // (uppercase/braced spellings are inputs).
+                                let wire = canonicalize_prepare_body(&body).unwrap_or_else(
+                                    |error| panic!("[{id}] canonicalize: {error}"),
+                                );
+                                let canonical_receipt = canonical_device_ai_uuid(
+                                    &body.host_receipt_id,
+                                )
+                                .unwrap_or_else(|error| {
+                                    panic!("[{id}] host_receipt_id canonical: {error}")
+                                });
+                                let canonical_intent = canonical_device_ai_uuid(&body.intent_id)
+                                    .unwrap_or_else(|error| {
+                                        panic!("[{id}] intent_id canonical: {error}")
+                                    });
+                                assert_eq!(
+                                    wire["host_receipt_id"].as_str(),
+                                    Some(canonical_receipt.as_str()),
+                                    "[{id}] canonical host_receipt_id"
+                                );
+                                assert_eq!(
+                                    wire["intent_id"].as_str(),
+                                    Some(canonical_intent.as_str()),
+                                    "[{id}] canonical intent_id"
+                                );
+                            }
+                            "accept".to_owned()
+                        }
+                        Err(code) => code.as_str().to_owned(),
+                    },
+                };
+                if let Some(expected) = expected_rs {
+                    assert_eq!(outcome, expected, "[{id}] observed rs decoder outcome");
+                } else {
+                    assert_eq!(outcome, "accept", "[{id}] accept case must assert clean");
+                }
+            }
+            "provider_consent" => {
+                let outcome = match serde_json::from_value::<DeviceAiProviderConsentBody>(
+                    payload.clone(),
+                ) {
+                    Err(_) => "serde_deserialize_error".to_owned(),
+                    Ok(consent) => match assert_consent(&consent) {
+                        Ok(()) => "accept".to_owned(),
+                        Err(code) => code.as_str().to_owned(),
+                    },
+                };
+                if let Some(expected) = expected_rs {
+                    assert_eq!(outcome, expected, "[{id}] observed rs decoder outcome");
+                } else {
+                    assert_eq!(outcome, "accept", "[{id}] accept case must assert clean");
+                }
+            }
+            other => panic!("[{id}] unknown message family {other}"),
+        }
+    }
+
+    assert_eq!(
+        accepted_count as u64,
+        doc["counts"]["accept"].as_u64().expect("counts.accept"),
+        "accepted count"
+    );
+    assert_eq!(
+        rejected_count as u64,
+        doc["counts"]["reject"].as_u64().expect("counts.reject"),
+        "rejected count"
+    );
+    assert_eq!(
+        accepted_count + rejected_count,
+        cases.len(),
+        "every fixture case must have been replayed exactly once"
+    );
 }

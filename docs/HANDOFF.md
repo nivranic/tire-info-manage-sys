@@ -17,6 +17,7 @@
    - [round49-closeout-plan-a.md](E:/Mix/project/tire-info-manage-sys/.artifacts/runtime/round49-closeout-plan-a.md)（正常库 011+012 收尾前置审查：129 条 DDL 全部纯 additive；**口径更正 107 表→112 表**；旧 verify 脚本不可直接重跑，需新写 precheck49/checkpoint49/verify49 三脚本）。
 5. **不变项声明**：Android 凭据保留审批仍无用户答复，`continuous_policies=false` 不变；正常库 011/012 应用仍未执行，本文不额外授权的原则不变。
 6. **§5.1"尚未获得的授权"Android 段——已于 2026-10-03 获用户批准并完成目标验收**：用户答复"允许保留并继续"，三个 androidTest cleanup 补丁应用（保留合成 QA 资料/Keystore 别名，两个销毁凭据测试 @Ignore 标注"user approval 2026-10-03"）；模拟器（Pixel 5/API 34/emulator-5554）仪器测试 OK（41 tests，0 失败，2 项按批准跳过）、Keystore 保留验证（offline-v1 profile 15→57、61 个 sealed blob 与 catalog 留存）与主入口 smoke 均通过，回执见 [android-native-acceptance-a/verification.json](E:/Mix/project/tire-info-manage-sys/.artifacts/device-ai50/android-native-acceptance-a/verification.json)。第 49 轮 Android 收尾完成；上文第 5 条中"Android 凭据保留审批仍无用户答复"表述已过时。
+7. **2026-10-03 核查轮（第 52 轮）后续进展**：第 5.2 节"尚未实现的整链"与第 6 节 P1 各项已在第 51 轮基本完成（见计划文档第 51 轮记录）；第 52 轮完成从头核查（四端新鲜全绿、完整 API 套件重跑、E6 route 闭包测试补齐、Root 第二批裁决 D8/D1-D4/D7 与冻结前置口径、两个销毁测试以自建材料方式恢复并通过仪器验证 43/0、tauri NSIS 与含新前端的 Android APK 打包验收、Mimosa 静态扫描分级），COHS 实例载体建于 [docs/assurance/](E:/Mix/project/tire-info-manage-sys/docs/assurance/README.md)。剩余待办以 [risk-register.yaml](E:/Mix/project/tire-info-manage-sys/docs/assurance/risk-register.yaml) 与计划文档第 52 轮"未验证与待办"为准。
 
 ## 1. 接手时先知道这几件事
 

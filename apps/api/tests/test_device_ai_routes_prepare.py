@@ -520,3 +520,165 @@ def test_outbound_budget_vector_minimal_assembly_far_below_48k_gate_without_trun
         assert row.projection_byte_count == len(projection.canonical_bytes)
         assert pack.fingerprint == digest(pack.payload)
         assert len(pack.payload['device_context']['projection_sha256']) == 64
+
+
+# ---- frozen_decision_closure 闭包重算精确集合等值（decoder-spec 4.2 前置6 / handoff E6）----
+# 投影核语义（device_ai_projection.py:728-749）：服务器在闭包模式下遍历所选成员
+# field 候选的归档回执（_candidate_origin 唯一命中）重算依赖闭包（同 variant 依赖
+# 成员并入 resolved），approved_closure 必须与重算闭包做 canonical 精确集合相等
+#（:745 长度相等 + :748 集合相等，双断言，非子集）；多出/缺失/跨域成员一律封闭为
+# device_ai_closure_consent_required，路由层不在 _PROJECTION_REJECTED
+#（device_ai_routes.py:54）故映射 409（:160-163），且先于期望投影摘要比对（:164）。
+# 夹具构造：保留少量 field 控制投影容量（全量闭包曾超 44KB），给保留 field 追加一条
+# 指向克隆回执成员 B 的候选实现依赖扩张；B 与原件同 snapshot/variant、仅
+# verification_id 不同；可选成员 C 是无候选可及的同 variant 回执——合法成员但不进
+# 重算闭包（负例A 的"集合之外成员"）。
+
+DEPENDENCY_VERIFICATION = '11111111-1111-4111-8111-111111111111'
+OUTSIDE_VERIFICATION = '22222222-2222-4222-8222-222222222222'
+
+
+def closure_fixture(envelope, *, keep_fields=2, with_extra=False):
+    """闭包夹具：截断 tire field + 追加依赖回执成员 B（候选可及，闭包必扩张）与
+    可选的集合之外成员 C（合法 selector 目标但重算闭包不含）。"""
+    tire = tire_member(envelope)
+    resolution = tire['payload']['field_resolution']
+    resolution['fields'] = deepcopy(resolution['fields'][:keep_fields])
+    clones = []
+    for verification in [DEPENDENCY_VERIFICATION] + ([OUTSIDE_VERIFICATION] if with_extra else []):
+        clone = deepcopy(tire)
+        clone['reference']['verification_id'] = verification
+        clone['source']['verification_id'] = verification
+        clone['key'] = hashlib.sha256(json.dumps(clone['reference'], sort_keys=True,
+                                                 separators=(',', ':')).encode()).hexdigest()
+        envelope['members'].append(clone)
+        clones.append(clone)
+    for field in resolution['fields']:
+        alternate = deepcopy(field['candidates'][0])
+        alternate['id'] = hashlib.sha256((alternate['id'] + ':alternate-receipt').encode()).hexdigest()
+        alternate['verification_id'] = DEPENDENCY_VERIFICATION
+        field['candidates'].append(alternate)
+    for clone in clones:
+        clone['payload']['field_resolution'] = deepcopy(resolution)
+    return tire, clones[0], clones[1] if with_extra else None
+
+
+def member_by_verification(envelope, verification_id):
+    return next(member for member in envelope['members']
+                if member['reference']['kind'] == 'tire'
+                and member['reference']['verification_id'] == verification_id)
+
+
+def member_selector(member):
+    return {'kind': member['reference']['kind'], 'member_key': member['key'],
+            'document_id': None, 'record_index': None, 'reference': deepcopy(member['reference'])}
+
+
+def closure_body(seeded, requested, approved, **overrides):
+    """frozen_decision_closure 请求体：期望投影摘要按同参数预览重算；负例投影必被
+    拒时占位 0*64——若实现把摘要比对提前于闭包断言，将得到 projection_mismatch 而
+    非封闭码，用例即失败，顺带钉住 gate 顺序。"""
+    raw, descriptor, envelope = seeded
+    binding = FrozenPackBinding(descriptor['id'], descriptor['owner_scope_id'], descriptor['sha256'],
+                                descriptor['byte_count'], envelope['schema'])
+    try:
+        expected = project_offline_pack(raw, binding, [deepcopy(item) for item in requested],
+                                        mode='frozen_decision_closure',
+                                        approved_closure=[deepcopy(item) for item in approved]).sha256
+    except ProjectionError:
+        expected = '0' * 64
+    value = {'package_id': descriptor['id'], 'expected_sha256': descriptor['sha256'],
+             'expected_byte_count': descriptor['byte_count'], 'expected_schema': envelope['schema'],
+             'expected_owner_scope_id': descriptor['owner_scope_id'],
+             'selectors': [deepcopy(item) for item in requested],
+             'projection_mode': 'frozen_decision_closure',
+             'approved_closure': [deepcopy(item) for item in approved],
+             'expected_projection_sha256': expected,
+             'question_sha256': hashlib.sha256(QUESTION.encode('utf-8')).hexdigest(),
+             'host_receipt_id': str(uuid4()), 'intent_id': str(uuid4())}
+    value.update(overrides)
+    return value
+
+
+def test_prepare_closure_expansion_exact_set_creates_preparation_rows(env):
+    """正例：approved_closure 与服务器重算闭包精确相等（含依赖成员扩张）→ 201 落行。"""
+    seeded = env.seed(mutate=lambda envelope: closure_fixture(envelope))
+    _raw, _descriptor, envelope = seeded
+    origin = tire_member(envelope)
+    dependency = member_by_verification(envelope, DEPENDENCY_VERIFICATION)
+    requested = [member_selector(origin)]
+    approved = [member_selector(origin), member_selector(dependency)]
+    binding = FrozenPackBinding(seeded[1]['id'], seeded[1]['owner_scope_id'], seeded[1]['sha256'],
+                                seeded[1]['byte_count'], envelope['schema'])
+    projection = project_offline_pack(seeded[0], binding, [deepcopy(item) for item in requested],
+                                      mode='frozen_decision_closure',
+                                      approved_closure=[deepcopy(item) for item in approved])
+    assert projection.member_count == 2  # 依赖扩张真实发生：闭包 ⊋ 直接选择
+    response = env.post(closure_body(seeded, requested, approved))
+    assert response.status_code == 201, response.text
+    value = response.json()
+    assert value['replayed'] is False
+    assert value['projection_sha256'] == projection.sha256
+    assert value['projection_byte_count'] == len(projection.canonical_bytes)
+    with env.app.state.database.sessions() as db:
+        row = db.get(DeviceAIPreparation, value['id'])
+        assert row is not None and row.offline_pack_id == seeded[1]['id']
+        assert row.projection_hash == projection.sha256
+        # contract 收全集含依赖成员（撤销 gate 消费 member_keys/variant_ids）。
+        assert sorted(row.contract['member_keys']) == sorted([origin['key'], dependency['key']])
+        assert set(row.contract['variant_ids']) == {origin['reference']['variant_id']}
+        pack = db.get(AIEvidencePack, row.ai_pack_id)
+        assert len(pack.payload['evidence']) == 2
+        assert pack.payload['device_context']['member_count'] == 2
+        assert pack.fingerprint == digest(pack.payload)
+    # 无截断：落对象与本地重算 canonical 逐字节一致；扩张成员以 decision_dependency 入投影。
+    stored = env.app.state.database.object_store.get(projection.sha256, len(projection.canonical_bytes))
+    assert stored == projection.canonical_bytes
+    observations = parse_exact_json(stored)['observations']
+    assert {item['selector']['member_key'] for item in observations} == {origin['key'], dependency['key']}
+    assert {item['selection_reason'] for item in observations} == {'requested', 'decision_dependency'}
+
+
+@pytest.mark.parametrize('variant', ['superset', 'same_length_swap'])
+def test_prepare_closure_extra_member_outside_recomputed_set_is_rejected_closed(env, variant):
+    """负例A：approved_closure 含重算集合之外的成员——超集触发长度断言
+    （device_ai_projection.py:745），等长替换触发集合相等断言（:748）。"""
+    seeded = env.seed(mutate=lambda envelope: closure_fixture(envelope, with_extra=True))
+    _raw, _descriptor, envelope = seeded
+    origin = tire_member(envelope)
+    dependency = member_by_verification(envelope, DEPENDENCY_VERIFICATION)
+    outside = member_by_verification(envelope, OUTSIDE_VERIFICATION)
+    requested = [member_selector(origin)]
+    if variant == 'superset':
+        approved = [member_selector(origin), member_selector(dependency), member_selector(outside)]
+    else:
+        approved = [member_selector(origin), member_selector(outside)]
+    response = env.post(closure_body(seeded, requested, approved))
+    assert response.status_code == 409
+    assert response.json()['detail']['code'] == 'device_ai_closure_consent_required'
+    assert env.count(DeviceAIPreparation) == 0 and env.count(AIEvidencePack) == 0
+
+
+def test_prepare_closure_missing_dependency_member_is_rejected_closed(env):
+    """负例B：approved_closure 缺少重算闭包必需的依赖成员 → 长度断言拒绝（:745）。"""
+    seeded = env.seed(mutate=lambda envelope: closure_fixture(envelope))
+    _raw, _descriptor, envelope = seeded
+    requested = [member_selector(tire_member(envelope))]
+    approved = [member_selector(tire_member(envelope))]  # 只回显直接选择，未含扩张成员
+    response = env.post(closure_body(seeded, requested, approved))
+    assert response.status_code == 409
+    assert response.json()['detail']['code'] == 'device_ai_closure_consent_required'
+    assert env.count(DeviceAIPreparation) == 0 and env.count(AIEvidencePack) == 0
+
+
+def test_prepare_closure_with_non_tire_member_is_rejected_closed(env):
+    """负例C：闭包清单混入非 tire 域成员（vehicle）→ 等长集合比对拒绝（:748）。"""
+    seeded = env.seed(mutate=lambda envelope: closure_fixture(envelope))
+    _raw, _descriptor, envelope = seeded
+    vehicle = next(member for member in envelope['members'] if member['reference']['kind'] == 'vehicle')
+    requested = [member_selector(tire_member(envelope))]
+    approved = [member_selector(tire_member(envelope)), member_selector(vehicle)]
+    response = env.post(closure_body(seeded, requested, approved))
+    assert response.status_code == 409
+    assert response.json()['detail']['code'] == 'device_ai_closure_consent_required'
+    assert env.count(DeviceAIPreparation) == 0 and env.count(AIEvidencePack) == 0

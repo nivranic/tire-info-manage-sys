@@ -3055,3 +3055,91 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 - 正常库 011/012/013 已执行：受控 initialize、唯一 after49、verify49 全断言、GET-only smoke 均完成（见上节）。
 - 未运行完整 API 测试套件（2030/1 历史基线未重跑）；本轮所有验证均为目标切片。
 - 最终待办清单（2026-10-03更新：Android凭据审批已落地、Root 4项决策已批准、正常服务已启动、移动端恢复UI与台账写入命令已落地，四项移出）：①真实Provider验收（密钥待用户设置TI_OPENAI_API_KEY）；②P2清单（外联未授权）；③D8及decoder规范D1-D4/D7 Root裁决+统一fixtures载体+TS类型迁入domain-types时机+mixed-domain@2与test_event冻结口径Root批准；④两个销毁凭据测试覆盖以不销毁方式恢复；⑤Windows tauri重打包与Android新APK构建（本轮新UI代码未打包，构建级验证已过，打包验收待统一轮次）
+
+### 第52轮推进记录：从头核查、Root第二批裁决与COHS实例化（2026-10-03）
+
+**触发**：用户指令"还有遗漏的部分吗？从头核查一遍。完成后根据COHS的全面优化升级方案，开始执行"。先读 COHS v1.0 权威正文（~/.agents/standards/COHS.md），按"全面排查/全面优化"口径实例化执行。
+
+**从头核查结论（需求基线=HANDOFF全文+计划文档3057行+末尾权威待办清单）**：
+
+- 上轮5项最终待办逐项处置：①真实Provider验收（密钥三作用域仍unset，实测）与②P2外联（未授权）维持用户侧不做；③Root第二批裁决（本节下文，全部落地）；④两个销毁凭据测试不销毁恢复（已实现并通过仪器验证）；⑤打包级验收（已完成，且发现真实缺口见下）。
+- 文档过时表述澄清（核查证据文件:行号）：3053行"四域各端（Rust/Java）客户端Literal与原生UI接线仍在待办"**已过时**——两端四域Literal与UI均已接线（device_ai_host.rs四域枚举与offline/store/fallback/v2.rs KINDS、DeviceAiHost.java L109-122四域常量、两端面板四域按钮挂载）；Android台账只读/恢复UI已接线（journalRead/Append/resolveUnknown三API+6个@PluginMethod+面板只读核对区）；Windows 6命令lib.rs与capabilities两处齐全。
+- **新发现并处置的3项真实遗漏**：(a) E6 route层闭包重算等值测试缺失（approved_closure仅有DTO/纯核覆盖）——补齐5用例；(b) Android打包管线缺web资产build+sync步骤会静默嵌入陈旧前端（assets/public停在10-01而dist为10-03）——按npm build+cap sync+重打修正；(c) TS唯一覆盖（selftest）在gitignore的.artifacts内、产品仓库无测试脚本——迁入packages/api-client并挂npm test。
+- 代码级扫描：TODO/FIXME/unimplemented等占位标记0处；跳过项全部有意（3项平台条件skipif+2项用户批准@Ignore→本轮已恢复为不销毁形态）。8MiB界向量（最大向量~0.5MB）与多成员闭包权威向量仍缺，登记R-005。
+
+**Root第二批裁决**（规范正文decoder-spec.md §4.3新增+2.6表逐行指针；治理记录docs/assurance/decisions/ADR-2026-052）：(1) **D8=方案(a) null-carried**——非闭包模式approved_closure显式null、全键在场（explicit-presence，D7同批确立）；draft b已修订（ClosureForSelection非闭包分支改null+见证改名_NonClosureScopeNull），tsc exit 0，新回执public-types-draft-b-verification-2.json（SHA 229f4b32…），旧回执保留。(2) D1/D2/D3以"Host更严或等价"为冻结口径、服务端宽容登记为接收侧历史超集不改；**D4三Host收紧expected_byte_count≤8,388,608**并各加负例（ts I29/rs prepare_body_expected_byte_count_rejects_above_object_store_bound/jv prepareBodyRejectsExpectedByteCountAboveMaxPackageBytes）。(3) fixtures载体裁定=.artifacts/device-ai50/specs/decoder-fixtures-a/四端runner接入，实施排冻结工程轮。(4) TS覆盖进CI=迁入packages/api-client（已实施）。(5) draft b→domain-types迁移时机=冻结时，迁入去Validated<T,Name>品牌。(6) mixed-domain@2表述批准（@1无混合域、演进以@2承载、不复用include_context_ids）。(7) test_event冻结口径批准（类型在运行时拒、解禁以@2承载）。**裁决后冻结前置余量**：仅剩fixtures实施与冻结工程本身（E6已闭合）。
+
+**E6补齐**（test_device_ai_routes_prepare.py +162行5用例）：正例（依赖扩张{A,B}⊋请求{A}精确集合201+落行+projection哈希/字节/selection_reason{requested,decision_dependency}断言）、超集[A,B,C]拒、等长换人[A,C]拒、缺依赖[A]拒、混vehicle域成员拒——均409+device_ai_closure_consent_required零落行；负例expected_projection_sha256占位0*64顺带钉住"闭包断言先于摘要比对"gate顺序。gate语义从代码确认：**精确集合相等**（device_ai_projection.py:744-749长度断言+canonical JSON集合相等），非子集。单文件22绿、家族12文件469绿。实现疑点：无（两处语义观察记录于agent报告，非缺陷）。
+
+**销毁测试不销毁恢复**（④）：OfflineCipherTest.otherProfileAndMissingKeyCannotReadOrRegenerateOldData与OfflinePackStoreTest.tamperedBodyAndMissingKeyFailClosedAndCanDeleteCiphertext重写——销毁对象改为测试内自建`qa-destroytest-`+UUID材料（"qa-"前缀满足deleteQaKey守卫、"destroytest-"区隔保留namespace），原语义调用序列保留，新增保留断言（offline-v1基线别名containsAll+sealedBlobCount与测前相等）；@Ignore移除。仪器验证（emulator-5554，install -r保留数据）：**OK (43 tests)**=41既有+2恢复。注意：am instrument须用全限定类名（裸类名会得到3个伪失败）。
+
+**打包级验收**（⑤）：Windows `npm run tauri build`→release cargo 6m17s+makensis，**胎迹_0.1.0_x64-setup.exe 3.22MiB**（apps/desktop/src-tauri/target/release/bundle/nsis/）。Android两轮：第一轮assembleOfflineQa 11.77MB@12:12但发现嵌入旧前端→npm run build+npx cap sync android（新bundle index-Bsk3-kOo.js）→重打**11.87MB@12:14 SHA cac148a2…ae80**（app/build/outputs/apk/offlineQa/）。管线坑已记录：assemble不含web资产同步。
+
+**四端新鲜回归**：TS selftest **188/0**（+I29）、投影对拍**125/0**、E1对拍**68/68**、typecheck绿、desktop node **22/22**、mobile node **23/23**、Rust **155+8/0失败/4平台忽略**（+D4负例）、Java **HostTest 34+ParityTest 68/0**（+D4负例）。
+
+**完整API套件三次运行+鉴别链**（关闭"完整套件未重跑"缺口，如实记录）：全量#1（与cargo/gradle并行）2566绿+7失败（全raw_captures）；单文件重跑15/15绿；全量#2（模拟器常驻，含E6+5）2564绿+14失败（raw_captures/parser_bundles/recall_parser_releases/rejected_observations/vehicles）；6文件串行101绿+2失败（换人）；双测单独a_b_a转绿；关模拟器后整文件sqlite_restart转绿但damaged_control败（再换人）；damaged_control单测1绿（35s）。**结论：21个失败实例隔离重跑100%转绿，零确定性失败**——失败族=真实parser子进程预算测试（8s/5s CPU §8禁放宽）对间歇负载敏感（常驻模拟器/Defender/临时文件churn），受害测试轮转，测试行为本身正确（预算耗尽即fail-closed是被测属性）。协议：全量须空闲机器+关模拟器串行，失败先隔离重跑鉴别。单次全量全绿快照本轮未取得（环境属性非产品缺陷，登记R-003）。
+
+**Mimosa深度扫描**（COHS安全域）：scan-2026-10-03T04-16-57.960Z，674包/0已知advisory/144 findings（79H/65M），自评inconclusive。三级抽样核实全部为QA脚本启发式（synthetic-key-never-live字面量、secrets.token_hex生成密码、静态串shell=True、硬编码表名拼接）与minified bundle污点误报（9条HIGH全在index-Bsk3-kOo.js）；**产品源码0确认漏洞**；登记R-008（triaged）。
+
+**COHS实例化**：docs/assurance/（README范围假设/inventory资产清单含live OpenAPI实测155路径179操作/risk-register.yaml九项风险含owner与复评触发/decisions/ADR-2026-052/evidence/round-52-audit.md全证据索引）。其他：live服务健康实测（API ok/Web 200）；删除本会话误产0字节垃圾文件`1]`；正常库data/dev.db未触碰。
+
+### 第52轮未验证与待办（如实列出）
+
+- ①真实Provider验收：TI_OPENAI_API_KEY/TI_OPENAI_MODEL/TI_AI_ENABLED三作用域仍unset（本轮再实测），待用户设置（不代设）。
+- ②P2真实来源外联：未授权维持不做。
+- ③冻结工程（wire_frozen=true）：前置仅剩decoder-fixtures-a统一fixtures实施（载体已裁定）与冻结工程本身（draft b迁入domain-types+全量回归）；D8/D1-D4/D7/E6/TS-CI均已闭合。
+- ④单次全量套件全绿快照：受本机parser预算测试负载敏感性限制未取得（R-003协议已立）；如需可在彻底空闲窗口再试一次。
+- ⑤真机（物理设备）端到端、macOS/iOS、8MiB界与多成员闭包权威向量（R-005）、Windows旧档案epoch=0需用户reset_session一次（R-006）、正式CI（R-007）维持后续轮次。
+- 本轮改动未提交git（9文件+286/-10与docs/assurance、packages/api-client/tests两新目录；.artifacts回执按惯例不入库）——是否push由用户决定。
+
+### 第52轮续：decoder-fixtures-a 落地、D9 裁决与冻结前置全闭合（2026-10-03 第三批）
+
+**触发**：goal 模式持续推进。上一节"未验证与待办"③中冻结前置仅剩 fixtures 实施——本批完成。
+
+**fixtures 落地**（ADR-2026-053）：`.artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json`（schema device-ai-decoder-fixtures@1，25用例=accept 4/reject 21，覆盖 M1-M10+D4；M7 view层与M5 submit链按 notes 排除，consent 以 message=provider_consent 单独落地）；四端 runner 接入各自套件：py `test_device_ai_decoder_fixtures.py`（26绿）、ts `packages/api-client/tests/device-ai/decoder-fixtures.mts`（npm test=selftest 188+fixtures 34绿）、rs `decoder_fixtures_replay_all_cases`（cargo 156+8绿）、jv `DeviceAiDecoderFixturesTest`（gradle 25/34/68三类全绿）。
+
+**D9 裁决与实施**（fixtures 对拍中发现、spec 2.6 原未登记，Root 第三批）：嵌套未知键（selector/reference内）ts 运行时仅顶层键集、jv 仅 reference 键集→运行时接受，松于 py/rs——违反规范1.1"多余键拒绝"运行时口径。裁决=嵌套键集封闭下沉 ts/jv 的 prepare wire 断言路径（requested selectors+approved_closure 两循环；摘要/预览路径不动，包内派生对象可携带内部字段）：ts 新增 DEVICE_AI_PREPARE_SELECTOR_FIELDS/REFERENCE_FIELDS 常量+assertDeviceAiPrepareWireSelectorKeyClosure；jv 新增 PREPARE_SELECTOR_FIELDS+assertPrepareSelectorKeyClosure；均抛既有 device_ai_host_invalid_argument。fixtures 两条 M1 用例 expected 翻转后**封存 SHA256 0e8998c9…5495**（此后 expected 变更须走新版本号）。四端复跑全绿（数字同上）。规范正文 decoder-spec 2.6 D9 行+4.3-9 已落；治理记录 ADR-2026-053。
+
+**冻结前置状态更新（替代上节待办③的前半句）**：D8/D1-D4/D7/E6/TS-CI/fixtures/D9 **全部闭合**，wire 冻结仅剩冻结工程本身（draft b 迁入 domain-types 去 Validated 品牌+wire_frozen=true+全量回归）。
+
+**全量套件最终门禁**：空闲机器第三次全量重跑（含本轮新增 decoder-fixtures 26 项与 E6 5 项）：**2596 绿 + 8 失败**（raw_captures×7 + recall_discovery_monitor×1）；两文件隔离重跑 **41/41 绿**。三次全量累计 29 个失败实例隔离复跑 100% 转绿、零确定性失败；空闲机器上 raw_captures 仍全量上下文必败/隔离必过——**全量套件自身持续负载即预算挤压源**，属本机机器属性（R-003 证据三次验证），验证协议=全量+失败文件隔离重跑。
+
+### 第53轮推进记录：openai_chat（Chat Completions 兼容）Provider 适配器——方案c（2026-10-03）
+
+**触发**：用户询问"只有 openai 选项吗"，四选项中明确选定 c（实现 Chat Completions 兼容适配器，直接接 GLM/DeepSeek/Kimi/Qwen/本地 vLLM/Ollama）。设计决策落 **ADR-2026-054**（D-A 选择机制 TI_AI_PROVIDER / D-B 独立 TI_CHAT_* 变量族与三个供应商旋钮 / D-C base URL 安全规则（https 任意、明文仅环回、禁 userinfo/query/fragment、PublicResolver DNS 钉扎跟随配置主机）/ D-D 单一入口（provider 分支做在 configured_model/request_body/configured_adapter 内，ai_analysis 仅改 1 行工厂接线，rule_drafts/execution/SSE/device-ai 零改动，48KiB 门与 token 预留两协议同一计量）/ D-E 输出合同不变（json_object 默认+grounding 兜底）/ D-F chat SSE 解析（STRICT_JSON 复用、4MiB/64KiB/512KiB 行/16384 事件上限、finish 映射、[DONE] 必需、usage 映射 input/output/total 不变量）/ D-G embeddings 可选 TI_EMBEDDINGS_BASE_URL 且自定义端点的向量空间按 host 隔离（默认端点 digest 不变保既有空间））。
+
+**实现**：ai_gateway.py（OpenAIConfig 增 provider/endpoint/allowed_host/response_format/tokens_param/stream_usage 字段、validated_public_base_url、configured_adapter 工厂、request_body chat 分支（responses 分支字节形状不变）、safe_chat_usage/extract_chat_response/parse_chat_stream、ChatCompletionsAdapter（与 Responses 适配器同篱笆：60s/8s 超时、体积上限、错误码映射、适配器互斥防御（chat 体拒 'input' 键/responses 体拒 'messages'）））；ai_analysis.py 2 行（import+工厂）；embedding_gateway.py（可选 base URL+model_space 端点隔离+embed() 走 config）。**测试先行抓到一处真实严格性缺口**：finish 标记之后的 chunk 载荷原本仍被接受——已修复（同 chunk content+finish 合法、跨 chunk 拒绝）。
+
+**验证**：新 tests/test_ai_chat_provider.py **14/14 绿**（配置解析与拒绝域/请求体形状与旋钮/recall 分支复用/共享体积门/extract 全映射/SSE 含 UTF-8 分割与 refusal/length/content_filter/中断/超限/DONE 后尾数据/适配器互斥/model_status/embeddings 空间隔离）；回归 AI+device-ai 家族 19 文件 **603 绿** + 补 4 文件（rule_contract/stream_execution/stream_parser/embeddings）**77 绿**，合计 **680/0**。回滚 = 不设 TI_AI_PROVIDER（默认 openai_responses 与改动前逐字节一致）。
+
+**端点配方（用户侧设置示例，密钥不代设）**：
+- GLM：`TI_CHAT_BASE_URL=https://open.bigmodel.cn/api/paas/v4`，`TI_CHAT_MODEL=glm-4.6`（或账号可用型号）
+- DeepSeek：`TI_CHAT_BASE_URL=https://api.deepseek.com`，`TI_CHAT_MODEL=deepseek-chat`
+- 本地 vLLM：`TI_CHAT_BASE_URL=http://127.0.0.1:8000/v1`（环回明文合法），`TI_CHAT_MODEL=<served-model-name>`，key 任意非空串
+- 通用：`TI_CHAT_API_KEY=<你的key>`、`TI_AI_PROVIDER=openai_chat`、`TI_AI_ENABLED=1`；怪异供应商旋钮：`TI_CHAT_RESPONSE_FORMAT`（默认 json_object 可改 json_schema/none）、`TI_CHAT_TOKENS_PARAM`（默认 max_tokens 可改 max_completion_tokens）、`TI_CHAT_STREAM_USAGE=0`（关 stream_options）
+
+**未验证与待办**：真实 openai-compat 端点连通与语义验收待用户设置上述环境变量后进行（届时重启 API 服务加载新代码+新环境）；运行中 API 服务（8000）仍为改动前代码，默认 provider 行为无差异；生产化前置（base URL 收敛为服务端白名单）登记 risk-register R-001 附注。
+
+### 第54轮推进记录：anthropic（Messages API 原生）Provider 适配器（2026-10-03）
+
+**触发**：用户在方案c落地后追加指令"anthropic协议的吧"。设计决策落 **ADR-2026-055**（沿用 054 骨架）：`TI_AI_PROVIDER=anthropic`；变量族 `TI_ANTHROPIC_MODEL`/`TI_ANTHROPIC_API_KEY`（独立钥匙）/`TI_ANTHROPIC_BASE_URL`（**可选，默认 https://api.anthropic.com**，设置时走同一校验）/`TI_ANTHROPIC_AUTH_HEADER`（x-api-key 默认｜bearer 供中转）。协议差异全部落位：系统提示为顶层 `system` 字段、`max_tokens` 必填、无 response_format（提示词纪律+服务器 grounding 兜底）、usage 无 total（合成并过 safe_usage 不变量）、SSE 为命名事件流（复用 _SSEDecoder 的 event==data.type 校验；message_start/content_block_*/message_delta/message_stop 状态机；thinking/redacted_thinking 块与 thinking_delta/signature_delta 静默丢弃绝不存曝光——对齐 Responses 适配器的 reasoning 处理；ping 忽略；无 message_stop=ai_stream_interrupted；未闭合块=协议错）；stop_reason 映射 end_turn=完成/max_tokens=incomplete/refusal=refused/其余=invalid；AnthropicAdapter 与既有适配器同篱笆（DNS 钉扎/60s-8s/体积上限/错误码/跨协议体互斥防御：anthropic 体必须含顶层 system 且无 'input'）。Embeddings 不适用（Anthropic 无该 API，维持不变）。
+
+**验证**：新 tests/test_ai_anthropic_provider.py **9/9 绿**（默认/中转/环回 base、鉴权头旋钮、缺失与非法拒绝域、body 形状与 recall 分支与共享体积门、extract 全映射含 thinking 跳过与 64001 字节拒、流式含 UTF-8 分割/ping/thinking 签名增量/截断/拒答/中断/未闭合块/事件名不匹配/未知事件/文本超限、适配器互斥、状态错误路径、embeddings 不受影响）；AI 家族 11 文件回归 **194/0 绿**（含第53轮 chat 适配器文件）。回滚 = 不设 TI_AI_PROVIDER=anthropic。
+
+**端点配方**：官方 `TI_AI_PROVIDER=anthropic` + `TI_ANTHROPIC_MODEL=claude-sonnet-4-5`（按账号可用型号）+ `TI_ANTHROPIC_API_KEY=sk-ant-...` + `TI_AI_ENABLED=1`（base URL 可不设）；中转 `TI_ANTHROPIC_BASE_URL=https://relay.example/anthropic` + `TI_ANTHROPIC_AUTH_HEADER=bearer`（按中转要求）。
+
+**未验证与待办**：真实 Anthropic 端点连通与语义验收同 R-001（待用户设变量后统一真实验收轮，届时重启 API）；本轮改动未提交 git。
+
+### 第55轮推进记录：GLM（Anthropic 兼容端点）真实接入与验收（2026-10-03）
+
+**触发**：用户提供 GLM Anthropic 兼容配置（open.bigmodel.cn/api/anthropic + glm-5.3 + 密钥）并授权"剩余自行发挥"。
+
+**配置落地**（用户级环境变量，密钥不回显）：`TI_AI_PROVIDER=anthropic`、`TI_ANTHROPIC_MODEL=glm-5.3`（不用 `[1M]` 变体后缀——模型名白名单字符集不含方括号，且基础名即默认上下文足够 48KiB 证据门）、`TI_ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic`、`TI_ANTHROPIC_AUTH_HEADER=bearer`（镜像用户已知可用的 Claude-Code 形态；本轮顺手修正 Bearer 模式也带 anthropic-version 头）、`TI_AI_ENABLED=1`、`TI_AI_MAX_OUTPUT_TOKENS=8192`。
+
+**真实验收过程（3 次迭代，全部有据）**：①首跑 `ai_response_incomplete`（usage 1500/1500）——**GLM-5.3 为推理模型，思考计入输出 token**，默认 1500 上限被思考吃光；提升至 8192 后②非流拿到完整 JSON 但 `uncertainty` 为字符串数组——**Anthropic 协议无 response_format，schema 不随行**；修复=anthropic 分支把输出 schema 文本嵌入 system 提示（协议适配层补齐能力差异，不碰三协议共享冻结提示词，字节门与 token 预留含嵌入字节；ADR-2026-055 D-2 补注）+测试断言同步（57 绿：anthropic 10+chat 14+核心 33）。③复跑 **SMOKE OK**：generate claims=1（type=fact、fact_ids=['fact-load-1']、"fact text 为空"规则遵循）+uncertainty 单字符串 157ch、usage 458+839；stream 128 分片重组==终文、uncertainty 188ch 单字符串；provider_id 两枚留痕；回执 `.artifacts/runtime/ai-real-smoke-r55.log`。新增可复用工具 `scripts/ai_real_provider_smoke.py`（环境驱动、不含凭据、适用三 Provider）。
+
+**服务状态**：API 以 anthropic-GLM 配置重启（pid 252512，/health ok；/v1/ai/status=configured/anthropic/glm-5.3/endpoint_host=open.bigmodel.cn）；预算护栏生效（日 20 请求/100k token，本轮实耗约 7 次请求）。
+
+**未验证与待办**：完整浏览器端到端语义评测（经 API 全分析管线+Web UI 的真证据包流程）留后续轮（R-001 收窄为该项）；openai_chat 通道的真实端点验收待用户需要时再配；本轮改动未提交 git。
+
+**部署密钥约束（2026-10-03 用户明确，本轮固化为 R-011 + docs/DEPLOYMENT-KEY-POLICY.md）**：当前 GLM 密钥为 Coding Plan 专用，**仅限本地开发/验收，任何服务器部署严禁使用**（封禁风险）；生产部署必须换独立计费 key 并执行部署前置检查清单（制品扫描零密钥字面量、预算护栏按服务器场景重设）。现状核对：密钥仅存本机用户级环境变量，仓库/配置/日志零字面量（凭据模式扫描 0 命中），本地验收流量符合 Coding Plan 用途。

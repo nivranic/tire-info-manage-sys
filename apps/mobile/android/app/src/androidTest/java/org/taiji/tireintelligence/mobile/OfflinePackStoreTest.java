@@ -14,9 +14,13 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -27,7 +31,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -142,6 +145,23 @@ public final class OfflinePackStoreTest {
         return result;
     }
 
+    /** Read-only snapshot of the OfflineCipher alias family; never deletes or creates credentials. */
+    private static Set<String> offlineKeyAliases() throws Exception {
+        KeyStore store=KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        Set<String> names=new TreeSet<>();
+        for(Enumeration<String> aliases=store.aliases();aliases.hasMoreElements();) {
+            String alias=aliases.nextElement();
+            if(alias.startsWith("tire.offline.v1.")) names.add(alias);
+        }
+        return names;
+    }
+    private int sealedBlobCount() {
+        int count=0;
+        for(File file:allFiles(new File(context.getNoBackupFilesDir(),"offline-v1"))) if(file.getName().endsWith(".sealed")) count++;
+        return count;
+    }
+
     @Test public void deletionTombstoneAndStaleCasNeverResetGeneration() throws Exception {
         OfflinePackStore store=store(); String slot=UUID.randomUUID().toString();
         store.install(installRequest(slot,0),descriptor,raw);
@@ -172,20 +192,28 @@ public final class OfflinePackStoreTest {
         assertTrue(store.remove(slotRequest(slot,1)).getBoolean("removed"));
     }
 
-    @Ignore("Destroys a QA Keystore alias mid-test; retained-evidence policy per user approval 2026-10-03.")
+    /** Destroys only run-scoped destroytest- material; retained QA aliases and sealed blobs are asserted untouched. */
     @Test public void tamperedBodyAndMissingKeyFailClosedAndCanDeleteCiphertext() throws Exception {
-        String namespace=namespace(),slot=UUID.randomUUID().toString(); OfflinePackStore store=store(namespace);
+        Set<String> retainedAliases=offlineKeyAliases(); int retainedBlobs=sealedBlobCount();
+        String namespace="qa-destroytest-"+UUID.randomUUID(); namespaces.add(namespace);
+        OfflinePackStore store=store(namespace); String slot=UUID.randomUUID().toString();
         store.install(installRequest(slot,0),descriptor,raw);
+        assertEquals(retainedBlobs+1,sealedBlobCount());
         File[] bodies=new File(directory(namespace),"blobs").listFiles(); assertNotNull(bodies); assertEquals(1,bodies.length);
         byte[] sealed; try(InputStream input=new FileInputStream(bodies[0])) { sealed=readBytes(input); }
         sealed[sealed.length-1]^=1;
         try(FileOutputStream output=new FileOutputStream(bodies[0])) { output.write(sealed); output.getFD().sync(); }
         fails("OFFLINE_CORRUPT",()->store.search(search(slot,1,"")));
-        new OfflineCipher(context,namespace).deleteQaKey();
+        OfflineCipher destroyed=new OfflineCipher(context,namespace);
+        assertTrue(destroyed.hasKey());
+        destroyed.deleteQaKey();
+        assertFalse("run-scoped destroytest key must be gone",destroyed.hasKey());
         fails("OFFLINE_KEY_MISSING",()->store.search(search(slot,1,"")));
         fails("OFFLINE_KEY_MISSING",()->store.install(installRequest(UUID.randomUUID().toString(),0),descriptor,raw));
         assertTrue(store.remove(slotRequest(slot,1)).getBoolean("removed"));
         assertEquals(0,new File(directory(namespace),"blobs").listFiles().length);
+        assertTrue(offlineKeyAliases().containsAll(retainedAliases));
+        assertEquals(retainedBlobs,sealedBlobCount());
     }
 
     @Test public void installCommitCancellationPreservesPreviousGenerationAndOneCipher() throws Exception {

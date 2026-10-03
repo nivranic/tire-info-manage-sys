@@ -4,5 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {".": "./src/index.ts"},
+  "scripts": {"test": "node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/device-ai-host-selftest.mts && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/decoder-fixtures.mts"},
   "dependencies": {"@tire/domain-types": "0.1.0"}
 }

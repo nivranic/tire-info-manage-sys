@@ -64,6 +64,14 @@ export const DEVICE_AI_LOCAL_PREVIEW_NAMESPACE = "device-ai-local-preview@1";
 export const DEVICE_AI_JOURNAL_SCHEMA = "device-ai-journal@1";
 export const DEVICE_AI_JOURNAL_ENTRY_SCHEMA = "device-ai-journal-entry@1";
 export const DEVICE_AI_PROJECTION_POLICY_VERSION = "device-ai-projection@1";
+/**
+ * D4 (decoder-spec 4.3-2): prepare-assert upper bound for expected_byte_count,
+ * mirroring the server object store cap (apps/api/tire_api/object_store.py
+ * MAX_OBJECT_BYTES = 8 * 1024 * 1024, checked as 0 < size <= MAX) so the Host
+ * assert layer accepts exactly 1..8,388,608 inclusive and is never looser
+ * than the closed server check.
+ */
+export const DEVICE_AI_MAX_PACKAGE_BYTES = 8_388_608;
 
 /** Closed server DTO field lists (apps/api/tire_api/device_ai.py, verbatim). */
 export const DEVICE_AI_PREPARE_REQUEST_FIELDS = [
@@ -285,6 +293,23 @@ export const DEVICE_AI_PREPARE_DOMAIN_MODES: Readonly<Record<DeviceAiPrepareSele
   recall: "complete_formal_observation",
   recall_search: "candidate_page_context",
 };
+/**
+ * D9 (decoder-spec 4.3-9): the prepare-wire selector key set and the per-kind
+ * reference field lists of the four open domains (device_ai.py selector /
+ * reference models). Used only by the prepare WIRE assertion below — py rejects
+ * nested unknown keys through recursive extra=forbid and rs through recursive
+ * deny_unknown_fields, so the runtime wire assert must not be looser (TS types
+ * only fence SDK-built payloads, not third-party objects).
+ */
+export const DEVICE_AI_PREPARE_SELECTOR_FIELDS = [
+  "kind", "member_key", "document_id", "record_index", "reference",
+] as const;
+export const DEVICE_AI_PREPARE_REFERENCE_FIELDS: Readonly<Record<DeviceAiPrepareSelectorWire["kind"], readonly string[]>> = {
+  tire: ["kind", "snapshot_id", "variant_id", "verification_id"],
+  vehicle: ["kind", "snapshot_id", "verification_id"],
+  recall: ["kind", "snapshot_id", "recall_revision_id", "verification_id"],
+  recall_search: ["kind", "snapshot_id", "verification_id"],
+};
 
 export function assertDeviceAiSelector(selector: DeviceAiTireSelectorWire): void {
   if (!selector || selector.kind !== "tire") hostFail("device_ai_host_invalid_argument");
@@ -346,6 +371,29 @@ export function assertDeviceAiPrepareSelector(selector: DeviceAiPrepareSelectorW
   assertDeviceAiAnySelector(selector);
   if (selector.document_id === null && selector.record_index !== null) hostFail("device_ai_host_invalid_argument");
   if ((selector.kind === "tire" || selector.kind === "vehicle") && selector.record_index !== null) hostFail("device_ai_host_invalid_argument");
+}
+
+/**
+ * D9 (decoder-spec 4.3-9): prepare-wire nested key-set closure. A wire selector
+ * carries exactly the five-key set DEVICE_AI_PREPARE_SELECTOR_FIELDS and its
+ * reference exactly the per-kind DEVICE_AI_PREPARE_REFERENCE_FIELDS list —
+ * EXTRA-key rejection only, so a missing key keeps this layer's existing rules
+ * (ts already fails absent keys through the field checks). Deliberately NOT
+ * part of assertDeviceAiAnySelector: the digest/preview layers consume
+ * package-derived selector objects that may legitimately carry internal fields.
+ */
+export function assertDeviceAiPrepareWireSelectorKeyClosure(selector: DeviceAiPrepareSelectorWire): void {
+  const wireKeys = DEVICE_AI_PREPARE_SELECTOR_FIELDS as readonly string[];
+  for (const key of Object.keys(selector)) {
+    if (!wireKeys.includes(key)) hostFail("device_ai_host_invalid_argument");
+  }
+  const referenceKeys = DEVICE_AI_PREPARE_REFERENCE_FIELDS[selector.kind];
+  const reference = selector.reference as unknown as Record<string, unknown> | null | undefined;
+  if (reference) {
+    for (const key of Object.keys(reference)) {
+      if (!referenceKeys.includes(key)) hostFail("device_ai_host_invalid_argument");
+    }
+  }
 }
 
 const metaInt = (value: number): DeviceAiJsonNumber => {
@@ -1022,24 +1070,39 @@ const assertClosedFields = (body: object, fields: readonly string[], label: stri
  * P1-4a server DTO semantics verbatim (device_ai.py): four open domains,
  * five prepare modes (no complete_event_context), approved_closure required
  * and 1..SELECTOR_CAPACITY(6) exactly in frozen_decision_closure, null in
- * every other mode, requested selector member_keys unique.
+ * every other mode, requested selector member_keys unique. D9 (decoder-spec
+ * 4.3-9): selector/reference nested key sets are closed here (extra keys
+ * rejected), matching py/rs recursive unknown-key rejection.
  */
 export function assertDeviceAiPrepareBody(body: DeviceAiPrepareBody): void {
   assertClosedFields(body, DEVICE_AI_PREPARE_REQUEST_FIELDS, "DeviceAIPrepareRequest");
   if (!isPlainString(body.package_id, 64)) hostFail("device_ai_host_invalid_argument");
   if (!isHash64(body.expected_sha256) || !isHash64(body.expected_owner_scope_id)
     || !isHash64(body.expected_projection_sha256) || !isHash64(body.question_sha256)) hostFail("device_ai_host_invalid_argument");
-  if (!isSafePositiveInt(body.expected_byte_count)) hostFail("device_ai_host_invalid_argument");
+  // D4 (decoder-spec 4.3-2): 1..DEVICE_AI_MAX_PACKAGE_BYTES inclusive — the
+  // same bound as the server object store, instead of 1..2^53-1.
+  if (!isSafePositiveInt(body.expected_byte_count) || body.expected_byte_count > DEVICE_AI_MAX_PACKAGE_BYTES) {
+    hostFail("device_ai_host_invalid_argument");
+  }
   if (body.expected_schema !== "offline-pack@1" && body.expected_schema !== "offline-pack@2") hostFail("device_ai_host_invalid_argument");
   if (!DEVICE_AI_PREPARE_PROJECTION_MODES.has(body.projection_mode)) hostFail("device_ai_host_invalid_argument");
   if (!Array.isArray(body.selectors) || !body.selectors.length || body.selectors.length > 6) hostFail("device_ai_host_invalid_argument");
-  for (const selector of body.selectors) assertDeviceAiPrepareSelector(selector);
+  for (const selector of body.selectors) {
+    assertDeviceAiPrepareSelector(selector);
+    // D9 (decoder-spec 4.3-9): nested key-set closure, prepare wire only.
+    assertDeviceAiPrepareWireSelectorKeyClosure(selector);
+  }
   const keys = new Set(body.selectors.map(item => item.member_key));
   if (keys.size !== body.selectors.length) hostFail("device_ai_host_invalid_argument");
   if (body.projection_mode === "frozen_decision_closure") {
     if (!Array.isArray(body.approved_closure) || !body.approved_closure.length) hostFail("device_ai_host_invalid_argument");
     if (body.approved_closure.length > 6) hostFail("device_ai_host_invalid_argument");
-    for (const selector of body.approved_closure) assertDeviceAiPrepareSelector(selector);
+    for (const selector of body.approved_closure) {
+      assertDeviceAiPrepareSelector(selector);
+      // D9: closure entries carry the same nested key-set closure (py closure
+      // items are the same extra=forbid selector models).
+      assertDeviceAiPrepareWireSelectorKeyClosure(selector);
+    }
     // D5 (decoder-spec 2.6): closure member_key uniqueness — the same fence as
     // the requested selector list, now asserted at the decoder layer (Rust
     // parity) instead of relying on the buildDeviceAiPrepareBody equality gate.

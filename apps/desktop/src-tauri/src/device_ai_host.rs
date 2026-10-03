@@ -1772,6 +1772,12 @@ pub const DEVICE_AI_PREPARE_PROJECTION_MODES: [&str; 5] = [
     "candidate_page_context",
 ];
 
+/// Server package size ceiling (`object_store.py` `MAX_OBJECT_BYTES`, 8 MiB),
+/// verbatim — decoder-spec 4.3-2 D4: the prepare assert bounds
+/// `expected_byte_count` to 1..=8,388,608 Host-side instead of leaning on the
+/// server 422 as the only backstop.
+pub const DEVICE_AI_MAX_PACKAGE_BYTES: i64 = 8_388_608;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeviceAiApiError {
     pub status: u16,
@@ -1870,7 +1876,7 @@ pub fn assert_device_ai_prepare_body(body: &DeviceAiPrepareBody) -> Result<(), D
         || !is_hash64(&body.expected_owner_scope_id)
         || !is_hash64(&body.expected_projection_sha256)
         || !is_hash64(&body.question_sha256)
-        || !is_safe_positive_int(body.expected_byte_count)
+        || !(1..=DEVICE_AI_MAX_PACKAGE_BYTES as u64).contains(&body.expected_byte_count)
         || !is_package_schema(&body.expected_schema)
         || !DEVICE_AI_PREPARE_PROJECTION_MODES.contains(&body.projection_mode.as_str())
     {

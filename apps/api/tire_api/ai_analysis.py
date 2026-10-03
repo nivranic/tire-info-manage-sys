@@ -11,7 +11,7 @@ from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session, load_only
 
 from .ai_evidence import PreparePack, pack_view, prepare_pack
-from .ai_gateway import (GatewayError, OpenAIResponsesAdapter, analysis_contract, configured_model, model_status,
+from .ai_gateway import (GatewayError, analysis_contract, configured_adapter, configured_model, model_status,
                          request_body)
 from .ai_recall_contract import (recall_boundary, validate_recall_claim, validate_recall_payload)
 from .ai_models import AICompletion, AIEvidencePack, AIRequest
@@ -356,7 +356,7 @@ def prepare_analysis(db, payload, session_id, *, stream=False):
 
 
 def register_ai_routes(app: FastAPI):
-    app.state.ai_adapter = OpenAIResponsesAdapter()
+    app.state.ai_adapter = configured_adapter()
 
     def get_db():
         with app.state.database.sessions() as db:

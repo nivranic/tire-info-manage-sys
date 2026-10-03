@@ -98,6 +98,13 @@ final class DeviceAiHost {
     /** test_event event_revision bound (1..2^31-1, projection core _reference). */
     static final long EVENT_REVISION_MAX = 2_147_483_647L;
     /**
+     * D4 (decoder-spec 4.3-2): prepare-assert upper bound for expected_byte_count,
+     * mirroring the server object store cap (apps/api/tire_api/object_store.py
+     * MAX_OBJECT_BYTES = 8 * 1024 * 1024) so the Host assert layer accepts exactly
+     * 1..8,388,608 inclusive and is never looser than the closed server check.
+     */
+    static final long MAX_PACKAGE_BYTES = 8_388_608L;
+    /**
      * Resolved-closure member bound (pack member cap 200): REQUESTED selectors are
      * capped at SELECTOR_CAPACITY by the DTO, but a frozen_decision_closure may
      * expand past that (fingerprint-spec section 2, TS/Rust parity).
@@ -120,6 +127,15 @@ final class DeviceAiHost {
         "recall", List.of("kind", "snapshot_id", "recall_revision_id", "verification_id"),
         "recall_search", List.of("kind", "snapshot_id", "verification_id"),
         "test_event", List.of("kind", "event_id", "event_revision"))));
+    /**
+     * D9 (decoder-spec 4.3-9): closed prepare-wire SELECTOR key set — the five
+     * wire keys every requested/closure selector carries. The per-kind
+     * reference key set is already closed by REFERENCE_FIELDS inside
+     * assertDeviceAiAnySelector; this closes the selector object itself on the
+     * prepare wire (py recursive extra=forbid / rs deny_unknown_fields parity).
+     */
+    static final List<String> PREPARE_SELECTOR_FIELDS = List.of(
+        "kind", "member_key", "document_id", "record_index", "reference");
 
     /** Closed server DTO field lists (apps/api/tire_api/device_ai.py + ai_analysis.py, verbatim; order = body key order). */
     static final List<String> PREPARE_REQUEST_FIELDS = List.of(
@@ -1131,7 +1147,10 @@ final class DeviceAiHost {
         requireHash64(body.opt("expected_owner_scope_id"));
         requireHash64(body.opt("expected_projection_sha256"));
         requireHash64(body.opt("question_sha256"));
-        positiveMetaLong(body, "expected_byte_count");
+        // D4 (decoder-spec 4.3-2): 1..MAX_PACKAGE_BYTES inclusive — the same bound
+        // as the server object store, instead of 1..2^53-1.
+        long expectedByteCount = positiveMetaLong(body, "expected_byte_count");
+        if (expectedByteCount > MAX_PACKAGE_BYTES) throw fail("device_ai_host_invalid_argument");
         String schema = body.optString("expected_schema");
         if (!schema.equals("offline-pack@1") && !schema.equals("offline-pack@2")) throw fail("device_ai_host_invalid_argument");
         if (!PREPARE_PROJECTION_MODES.contains(body.optString("projection_mode"))) throw fail("device_ai_host_invalid_argument");
@@ -1140,6 +1159,8 @@ final class DeviceAiHost {
         Set<String> keys = new HashSet<>();
         for (JSONObject selector : selectors) {
             assertDeviceAiPrepareSelector(selector);
+            // D9 (decoder-spec 4.3-9): nested key-set closure, prepare wire only.
+            assertPrepareSelectorKeyClosure(selector);
             if (!keys.add(selector.optString("member_key"))) throw fail("device_ai_host_invalid_argument");
         }
         Object closure = body.opt("approved_closure");
@@ -1157,11 +1178,29 @@ final class DeviceAiHost {
             Set<String> closureKeys = new HashSet<>();
             for (JSONObject selector : closureSelectors) {
                 assertDeviceAiPrepareSelector(selector);
+                // D9: closure entries carry the same nested key-set closure (py
+                // closure items are the same extra=forbid selector models).
+                assertPrepareSelectorKeyClosure(selector);
                 if (!closureKeys.add(selector.optString("member_key"))) throw fail("device_ai_host_invalid_argument");
             }
         } else if (hasClosure) throw fail("device_ai_host_invalid_argument");
         canonicalUuid(body.optString("host_receipt_id"));
         canonicalUuid(body.optString("intent_id"));
+    }
+
+    /**
+     * D9 (decoder-spec 4.3-9): prepare-wire selector key-set closure — the wire
+     * selector carries exactly the five-key set PREPARE_SELECTOR_FIELDS.
+     * Extra-key rejection only: a missing key keeps this layer's existing rules
+     * (absent document_id / record_index read as null; kind/member_key/reference
+     * absences already fail the per-selector assertion). Deliberately local to
+     * the prepare wire path, NOT assertDeviceAiAnySelector: digest/preview
+     * inputs are package-derived objects that may legitimately carry internal
+     * fields. The reference key set is already closed there via REFERENCE_FIELDS.
+     */
+    private static void assertPrepareSelectorKeyClosure(JSONObject selector) {
+        Set<String> expected = new LinkedHashSet<>(PREPARE_SELECTOR_FIELDS);
+        for (String key : keyNames(selector)) if (!expected.contains(key)) throw fail("device_ai_host_invalid_argument");
     }
 
     /** Ordered copy carrying exactly the closed fields (used for closed-set validation). */

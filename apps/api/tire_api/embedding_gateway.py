@@ -47,10 +47,16 @@ class EmbeddingConfig:
     daily_token_limit: int = 100000
     daily_request_limit: int = 20
     allow_private: bool = False
+    endpoint: str = ENDPOINT
+    allowed_host: str = 'api.openai.com'
 
     @property
     def model_space(self):
-        return digest({'provider': 'openai_embeddings', 'model': self.model, 'dimensions': self.dimensions})
+        scope = {'provider': 'openai_embeddings', 'model': self.model, 'dimensions': self.dimensions}
+        if self.endpoint != ENDPOINT:
+            # Vectors from different endpoints never share one pgvector space (ADR-2026-054 D-G).
+            scope['endpoint_host'] = self.allowed_host
+        return digest(scope)
 
 
 def configured_embeddings():
@@ -62,9 +68,21 @@ def configured_embeddings():
         raise EmbeddingError('embeddings_configuration_required')
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,119}', model) or any(c.isspace() for c in key):
         raise EmbeddingError('embeddings_configuration_invalid')
+    endpoint, allowed_host = ENDPOINT, 'api.openai.com'
+    base = os.getenv('TI_EMBEDDINGS_BASE_URL', '')
+    if base:
+        from .ai_gateway import GatewayError, validated_public_base_url
+        from urllib.parse import urlsplit
+        try:
+            base = validated_public_base_url(base)
+        except GatewayError as error:
+            raise EmbeddingError('embeddings_configuration_invalid') from error
+        allowed_host = urlsplit(base).hostname
+        endpoint = base + '/embeddings'
     return EmbeddingConfig(model, setting('TI_OPENAI_EMBEDDING_DIMENSIONS', 0, 1, 2000), key,
         setting('TI_AI_DAILY_TOKEN_LIMIT', 100000, 1000, 10000000),
-        setting('TI_AI_DAILY_REQUEST_LIMIT', 20, 1, 1000), os.getenv('TI_AI_ALLOW_PRIVATE', '0') == '1')
+        setting('TI_AI_DAILY_REQUEST_LIMIT', 20, 1, 1000), os.getenv('TI_AI_ALLOW_PRIVATE', '0') == '1',
+        endpoint=endpoint, allowed_host=allowed_host)
 
 
 def model_status():
@@ -136,12 +154,12 @@ class OpenAIEmbeddingAdapter:
                 or sum(len(value.encode('utf-8')) for value in inputs) > 100000):
             raise EmbeddingError('embeddings_configuration_invalid')
         body = {'model': config.model, 'input': inputs, 'encoding_format': 'float', 'dimensions': config.dimensions}
-        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({'api.openai.com'})),
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host})),
                                          use_dns_cache=False, family=socket.AF_UNSPEC, limit=1)
         try:
             async with aiohttp.ClientSession(connector=connector, trust_env=False,
                     cookie_jar=aiohttp.DummyCookieJar(), timeout=aiohttp.ClientTimeout(total=60, connect=8)) as client:
-                async with client.post(ENDPOINT, json=body, allow_redirects=False,
+                async with client.post(config.endpoint, json=body, allow_redirects=False,
                         headers={'Authorization': 'Bearer ' + config.api_key, 'Content-Type': 'application/json'}) as response:
                     if response.status != 200:
                         raise EmbeddingError('embeddings_http_error')
