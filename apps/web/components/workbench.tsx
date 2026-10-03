@@ -36,6 +36,9 @@ import RecallDialog from "./recalls";
 import QueryFilters, { describeFilter, parseFilterDrafts, QuerySelectionCounts, type FilterDraft } from "./query-filters";
 import type { TireFilter, TireFilterCatalog } from "@tire/domain-types";
 import { browserPlatform, WorkbenchPlatformContext, useWorkbenchPlatform, type WorkbenchPlatform } from "./workbench-platform";
+import { ToastProvider, useToast } from "./toast";
+import InlineConfirm from "./inline-confirm";
+import CommandPalette, { type CommandItem } from "./command-palette";
 
 type View = "query" | "vehicles" | "garage" | "compare" | "watch" | "sources";
 type SourceRun = { source: Source; loading: boolean; data?: QueryResult; error?: string; consentPending?: boolean; denied?: boolean };
@@ -53,6 +56,11 @@ const stateLabels: Record<string, string> = {
   live: "实时核验", live_verified_304: "在线验证 · 304", consent_required: "等待本次授权",
   source_unavailable: "来源不可用", local_snapshot: "LOCAL SNAPSHOT · 历史快照",
 };
+type ResultSort = "default" | "freshness" | "matched" | "completeness" | "state";
+const resultSortOptions: { id: ResultSort; label: string }[] = [
+  { id: "default", label: "来源顺序" }, { id: "state", label: "数据状态优先" }, { id: "freshness", label: "数据新鲜度" },
+  { id: "matched", label: "匹配数量" }, { id: "completeness", label: "字段完整度" },
+];
 const reasonLabels: Record<string, string> = {
   disabled: "当前来源已停用，暂时无法在线查询。",
   configuration_required: "当前来源尚未完成必要配置，暂时无法查询。",
@@ -186,13 +194,14 @@ function TireDrawing() {
 }
 
 export default function Workbench({ platform = browserPlatform, pwa = platform.kind === "web" }: { platform?: WorkbenchPlatform; pwa?: boolean } = {}) {
-  return <WorkbenchPlatformContext.Provider value={platform}><DeviceSyncLifecycle platform={platform} /><SourceAccessProvider><WorkbenchContent pwa={pwa} /></SourceAccessProvider></WorkbenchPlatformContext.Provider>;
+  return <WorkbenchPlatformContext.Provider value={platform}><DeviceSyncLifecycle platform={platform} /><SourceAccessProvider><ToastProvider><WorkbenchContent pwa={pwa} /></ToastProvider></SourceAccessProvider></WorkbenchPlatformContext.Provider>;
 }
 
 function WorkbenchContent({ pwa }: { pwa: boolean }) {
   const sourceAccess = useSourceAccess();
   const refreshSources = sourceAccess.refresh;
   const platform = useWorkbenchPlatform();
+  const toast = useToast();
   const [view, setView] = useState<View>("query");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sources, setSources] = useState<Source[]>([]);
@@ -248,6 +257,10 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
   const [changesError, setChangesError] = useState("");
   const [pendingWatch, setPendingWatch] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
+  const [resultSort, setResultSort] = useState<ResultSort>("default");
+  const [sizeHistory, setSizeHistory] = useState<string[]>([]);
+  const [watchWindow, setWatchWindow] = useState(50);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [evidenceError, setEvidenceError] = useState("");
@@ -317,7 +330,13 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
   useEffect(() => {
     const controller = new AbortController();
     void loadInitial(controller.signal);
-    try { setTheme(localStorage.getItem("tire-theme-v1") === "dark" ? "dark" : "light"); } catch { /* Storage is optional. */ }
+    try {
+      setTheme(localStorage.getItem("tire-theme-v1") === "dark" ? "dark" : "light");
+      const savedSort = localStorage.getItem("tire-result-sort-v1");
+      if (savedSort && resultSortOptions.some(option => option.id === savedSort)) setResultSort(savedSort as ResultSort);
+      const history = JSON.parse(localStorage.getItem("tire-query-history-v1") || "[]");
+      if (Array.isArray(history)) setSizeHistory(history.filter((item): item is string => typeof item === "string" && !!item).slice(0, 20));
+    } catch { /* Storage is optional. */ }
     return () => { controller.abort(); activeQuery.current?.controller.abort(); evidenceController.current?.abort(); };
   }, [loadInitial]);
 
@@ -349,7 +368,10 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault(); setView("query"); requestAnimationFrame(() => searchInput.current?.focus());
+        event.preventDefault();
+        // 原生 <dialog> 位于顶层，此时面板在其后不可见，不抢焦点。
+        if (document.querySelector("dialog[open]")) return;
+        setPaletteOpen(previous => !previous);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -412,6 +434,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
       setNotice(`${sizeRequiredSources.map(source => source.name).join("、")} 按尺寸查询规格，请填写轮胎尺寸。`);
       return;
     }
+    rememberSize(query.size || "");
     await runQuery(query, parsed.filters, requestedSources);
   }
 
@@ -499,9 +522,9 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     watchLock.current.add(variant.id); setPendingWatch(previous => [...previous, variant.id]);
     try {
       const existing = watches.find(item => item.variant_id === variant.id);
-      if (existing) { await tireApi.unwatch(existing.id); setWatches(previous => previous.filter(item => item.id !== existing.id)); setNotice("已取消关注。"); }
-      else { const added = await tireApi.watch(variant.id); setWatches(previous => [...previous.filter(item => item.variant_id !== variant.id), { ...added, variant: added.variant || variant }]); setNotice("已加入关注。可在我的关注中单独创建监控规则。"); }
-    } catch (error) { setNotice(errorText(error)); }
+      if (existing) { await tireApi.unwatch(existing.id); setWatches(previous => previous.filter(item => item.id !== existing.id)); toast("已取消关注。", "success"); }
+      else { const added = await tireApi.watch(variant.id); setWatches(previous => [...previous.filter(item => item.variant_id !== variant.id), { ...added, variant: added.variant || variant }]); toast("已加入关注。可在我的关注中单独创建监控规则。", "success"); }
+    } catch (error) { toast(errorText(error), "error"); }
     finally { watchLock.current.delete(variant.id); setPendingWatch(previous => previous.filter(id => id !== variant.id)); }
   }
 
@@ -538,6 +561,40 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
   const resultsCount = runs.reduce((total, run) => total + (hasQueryData(run.data) ? run.data!.variants.length : 0), 0);
   const availableModels = [...new Set(sources.filter(isQueryableSource).flatMap(source => source.supported_models || ["Pilot Sport EV", "Pilot Sport 4 S"]))];
   const regions = [...new Set(sources.map(source => source.region))];
+  const stateRank = (run: SourceRun) => (({ live: 0, live_verified_304: 1, local_snapshot: 2 }) as Record<string, number>)[run.data?.data_state || ""] ?? 3;
+  const completenessOf = (run: SourceRun) => {
+    const variants = run.data?.variants.slice(0, 50) || [];
+    let filled = 0, total = 0;
+    for (const variant of variants) for (const [, value] of visibleFacts(variant.facts || {}, variant.manufacturer_product_code)) { total++; if (!isMissingValue(value)) filled++; }
+    return total ? filled / total : 0;
+  };
+  const orderedRuns = (() => {
+    if (resultSort === "default" || !runs.length) return runs;
+    const withData = runs.filter(run => hasQueryData(run.data));
+    const rest = runs.filter(run => !hasQueryData(run.data));
+    const sorted = [...withData].sort((left, right) => {
+      if (resultSort === "freshness") return (left.data?.snapshot_age_seconds ?? Number.MAX_SAFE_INTEGER) - (right.data?.snapshot_age_seconds ?? Number.MAX_SAFE_INTEGER);
+      if (resultSort === "matched") return (right.data?.selection?.matched_count ?? 0) - (left.data?.selection?.matched_count ?? 0);
+      if (resultSort === "completeness") return completenessOf(right) - completenessOf(left);
+      return stateRank(left) - stateRank(right);
+    });
+    return [...sorted, ...rest];
+  })();
+
+  function chooseResultSort(value: ResultSort) {
+    setResultSort(value);
+    try { localStorage.setItem("tire-result-sort-v1", value); } catch { /* Storage is optional. */ }
+  }
+
+  function rememberSize(value: string) {
+    const normalized = value.trim().toUpperCase();
+    if (!normalized) return;
+    setSizeHistory(previous => {
+      const next = [normalized, ...previous.filter(item => item !== normalized)].slice(0, 20);
+      try { localStorage.setItem("tire-query-history-v1", JSON.stringify(next)); } catch { /* Storage is optional. */ }
+      return next;
+    });
+  }
 
   function chooseModel(value: string) {
     setModel(value);
@@ -550,6 +607,16 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     setView("query"); setNotice(`已填入 ${context} 的尺寸 ${axleSize}。请自行选择来源地区和轮胎型号；此操作不匹配产品代码或原配 SKU。`);
     requestAnimationFrame(() => { searchInput.current?.focus(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   }
+
+  const commands: CommandItem[] = [
+    ...navigation.map(item => ({ id: "view:" + item.id, label: "前往 · " + item.label, hint: item.english, run: () => setView(item.id) })),
+    { id: "focus-size", label: "聚焦轮胎尺寸输入", hint: "QUERY", run: () => { setView("query"); requestAnimationFrame(() => searchInput.current?.focus()); } },
+    { id: "toggle-theme", label: "切换深浅主题", hint: "THEME", run: toggleTheme },
+    { id: "open:knowledge", label: "打开历史证据检索", hint: "知识库", run: () => setKnowledgeOpen(true) },
+    { id: "open:ai", label: "打开 AI 知识应用", hint: "证据分析", run: () => { setAiTarget(null); setAiOpen(true); } },
+    { id: "open:reports", label: "打开证据报告库", hint: "历史报告", run: () => { setReportId(undefined); setReportsOpen(true); } },
+    { id: "open:recalls", label: "查询与监控召回公告", hint: "NHTSA", run: () => setRecallsOpen(true) },
+  ];
 
   return <div className="app-shell" data-theme={theme}>
     <a className="skip-link" href="#main-content">跳转到主要内容</a>
@@ -572,7 +639,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
           {view === "query" ? <>
             <form className="query-panel" onSubmit={submitQuery}>
               <div className="panel-title"><span><Icon name="search" size={18} />在线查询</span><kbd>Ctrl / ⌘ K</kbd></div>
-              <div className="query-fields"><label className="size-field"><span>轮胎尺寸</span><div className="input-wrap"><input ref={searchInput} value={size} onChange={event => setSize(event.target.value)} placeholder="例如 225/45 R18" maxLength={40} autoComplete="off" spellCheck={false} aria-describedby="size-hint" /><span className="input-unit">SIZE</span></div></label><label className="model-field"><span>轮胎型号 <small>当前支持</small></span><select value={model} onChange={event => chooseModel(event.target.value)}>{!model ? <option value="" disabled>请选择轮胎型号</option> : !availableModels.includes(model) ? <option value={model} disabled>{model} · {booting ? "等待来源目录" : "当前来源未接入，请重新选择"}</option> : null}{availableModels.filter(Boolean).map(value => <option key={value} value={value}>{value}</option>)}</select></label><button type="submit" className="primary-button query-submit" disabled={booting || !sourceAccess.items.length || !sources.some(source => isQueryableSource(source) && supportsModel(source, model) && selectedSources.includes(source.id) && (region === "all" || source.region === region))}><span>{loading ? "重新查询" : "查询轮胎"}</span><Icon name="arrow" size={18} /></button></div>
+              <div className="query-fields"><label className="size-field"><span>轮胎尺寸</span><div className="input-wrap"><input ref={searchInput} value={size} onChange={event => setSize(event.target.value)} placeholder="例如 225/45 R18" maxLength={40} autoComplete="off" spellCheck={false} list="tire-size-history" aria-describedby="size-hint" /><datalist id="tire-size-history">{sizeHistory.map(value => <option key={value} value={value} />)}</datalist><span className="input-unit">SIZE</span></div></label><label className="model-field"><span>轮胎型号 <small>当前支持</small></span><select value={model} onChange={event => chooseModel(event.target.value)}>{!model ? <option value="" disabled>请选择轮胎型号</option> : !availableModels.includes(model) ? <option value={model} disabled>{model} · {booting ? "等待来源目录" : "当前来源未接入，请重新选择"}</option> : null}{availableModels.filter(Boolean).map(value => <option key={value} value={value}>{value}</option>)}</select></label><button type="submit" className="primary-button query-submit" disabled={booting || !sourceAccess.items.length || !sources.some(source => isQueryableSource(source) && supportsModel(source, model) && selectedSources.includes(source.id) && (region === "all" || source.region === region))}><span>{loading ? "重新查询" : "查询轮胎"}</span><Icon name="arrow" size={18} /></button></div>
               <div id="size-hint" className="input-hint">按来源已接入的型号与地区在线查询。不同地区、OE 与技术配置独立保留，相同尺寸不代表同一 SKU。</div>
               <div className="region-selector"><label>来源地区<select value={region} onChange={event => setRegion(event.target.value)}>{!region ? <option value="" disabled>请选择来源地区</option> : null}<option value="all">全部地区 · 分别保留区域版本</option>{regions.map(value => <option value={value} key={value}>{regionLabels[value] || value}</option>)}</select></label></div><div className="source-selector"><span className="field-caption">查询来源</span>{booting ? <span className="muted">正在加载来源…</span> : sources.length ? sources.filter(source => source.target_kind !== "recall" && (region === "all" || source.region === region)).map(source => <label className={`source-option${isQueryableSource(source) && supportsModel(source, model) ? "" : " unavailable"}`} key={source.id}><input type="checkbox" disabled={!sourceAccess.fresh || !isQueryableSource(source) || !supportsModel(source, model)} checked={isQueryableSource(source) && supportsModel(source, model) && selectedSources.includes(source.id)} onChange={() => setSelectedSources(previous => previous.includes(source.id) ? previous.filter(id => id !== source.id) : [...previous, source.id])} /><span>{source.name}<small>{source.region}</small>{!isQueryableSource(source) || !supportsModel(source, model) ? <small className="source-availability">{!isQueryableSource(source) ? statusLabels[source.status] || source.status : "未接入此型号"}</small> : null}</span></label>) : <span className="muted">没有可用来源配置</span>}</div>
               {sourceError ? <div className="inline-error" role="alert">无法加载来源：{sourceError}<button type="button" className="text-button" onClick={() => void loadInitial(new AbortController().signal)}>重新连接</button></div> : null}
@@ -581,10 +648,10 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
             </form>
             <QueryFallbackPolicy kind="tire" sourceIds={selectedSources} sessionReady={!booting} />
 
-            <div className="results-heading"><h2>{runs.length ? "查询记录" : "开始你的第一次查询"}</h2><span className="mono">{runs.length ? `${runs.some(run => hasQueryData(run.data)) ? `${resultsCount} MATCHED SKU` : "等待可核验结果"} / ${runs.length} SOURCES` : "LIVE FIRST / EVIDENCE ALWAYS"}</span></div>
+            <div className="results-heading"><h2>{runs.length ? "查询记录" : "开始你的第一次查询"}</h2><div className="results-tools">{runs.length > 1 ? <label className="result-sort"><span>排序</span><select value={resultSort} onChange={event => chooseResultSort(event.target.value as ResultSort)}>{resultSortOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}<span className="mono">{runs.length ? `${runs.some(run => hasQueryData(run.data)) ? `${resultsCount} MATCHED SKU` : "等待可核验结果"} / ${runs.length} SOURCES` : "LIVE FIRST / EVIDENCE ALWAYS"}</span></div></div>
             {runs.length ? <section className="query-submitted-selection" aria-label="本次已提交筛选条件"><div><strong>本次已提交条件 · 全部满足</strong><button type="button" className="text-button" onClick={() => { const context = activeQuery.current; if (context) void runQuery(context.query, context.filters, context.sources); }}>按本次条件重新在线查询</button></div>{submittedFilterLabels.length ? <ul>{submittedFilterLabels.map((label, index) => <li key={`${index}-${label}`}>{label}</li>)}</ul> : <p>未添加规格筛选条件，展示本次型号、尺寸与来源范围内的全部返回规格。</p>}<p>上方为查询草稿；删除或修改条件后需点击「查询轮胎」提交。此处保留已提交的条件。</p></section> : null}
             {platform.offline && localOffers.length ? <div className="local-fallback-list" aria-label="本次独立设备历史授权">{localOffers.map(offer => <LocalFallbackPanel key={offer.intent.attempt_id} offer={offer} storage={platform.offline!} onClose={() => setLocalOffers(previous => previous.filter(value => value.intent.attempt_id !== offer.intent.attempt_id))} />)}</div> : null}
-            {runs.length ? <div className="results-list" aria-live="polite">{runs.map(run => <section key={run.source.id} className="source-result"><div className="source-result-heading"><div><span className="source-monogram">{run.source.name.slice(0, 1)}</span><div><h3>{run.source.name}</h3><small>{run.source.region} · {submittedLabel}</small></div></div><span className={`tag ${run.data?.data_state === "live" || run.data?.data_state === "live_verified_304" ? "success" : run.data?.data_state === "local_snapshot" ? "warning" : "quiet"}`}>{run.loading ? "在线查询中…" : run.denied ? "已拒绝本地回退" : run.data ? stateLabels[run.data.data_state] : "请求失败"}</span></div>
+            {runs.length ? <div className="results-list" aria-live="polite">{orderedRuns.map(run => <section key={run.source.id} className="source-result"><div className="source-result-heading"><div><span className="source-monogram">{run.source.name.slice(0, 1)}</span><div><h3>{run.source.name}</h3><small>{run.source.region} · {submittedLabel}</small></div></div><span className={`tag ${run.data?.data_state === "live" || run.data?.data_state === "live_verified_304" ? "success" : run.data?.data_state === "local_snapshot" ? "warning" : "quiet"}`}>{run.loading ? "在线查询中…" : run.denied ? "已拒绝本地回退" : run.data ? stateLabels[run.data.data_state] : "请求失败"}</span></div>
               {run.loading ? <div className="run-loading"><span className="spinner" />正在请求来源，获取可核验的规格与证据…</div> : null}
               {run.error ? <div className="inline-error" role="alert">{run.error}</div> : null}
               {run.data?.data_state === "consent_required" && !run.denied ? <div className="consent-card"><div className="consent-symbol"><Icon name="shield" size={22} /></div><div><h4>在线查询未完成，是否查看本地快照？</h4><SourceReason reason={run.data.reason} /><p>仅授权「{submittedLabel}」及本次已提交的 {submittedFilterLabels.length} 项筛选条件，在 {run.source.name} 的这一次查询。编辑草稿不会改变此次授权；历史数据可能已变化。</p><div className="consent-actions"><button className="primary-button compact" disabled={run.consentPending} onClick={() => void decideFallback(run, "allow")}>{run.consentPending ? "处理中…" : "仅本次允许"}</button><button className="secondary-button compact" disabled={run.consentPending} onClick={() => void decideFallback(run, "deny")}>拒绝，保持无结果</button></div></div></div> : null}
@@ -610,15 +677,15 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
 
           {view === "compare" && comparisonConflicts.length ? <section className="source-conflict" aria-label="本次比较的来源字段冲突"><strong>本次比较的来源字段冲突 · 默认值不代表裁定</strong><ConflictDetails conflicts={comparisonConflicts} /></section> : null}
           {view === "compare" ? <SavedComparisonsPanel sessionReady={!booting} refreshVersion={savedComparisonsRevision} renderComparison={(variants, onEvidence, conflicts) => <><ComparisonTable variants={variants} onEvidence={onEvidence} historical />{conflicts.length ? <section className="source-conflict" aria-label="保存时的来源字段冲突"><strong>保存时的来源字段冲突 · 未自动裁定</strong><ConflictDetails conflicts={conflicts} /></section> : null}</>} /> : null}
-          {view === "watch" ? <><section className="watch-section"><div className="panel-title"><span>关注规格 <b className="count-badge">{watches.length}</b></span><span className="tag quiet">关注标记与监控规则分别保存</span></div>{watchLoading ? <div className="run-loading"><span className="spinner" />正在加载关注记录…</div> : watchError ? <div className="inline-error" role="alert">{watchError}</div> : watches.length ? <><div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 已保存规格</strong><span>关注列表展示历史记录，不代表当前在线参数。</span></div>{watches.map(item => item.variant ? <div key={item.id}>{item.tracking_state === "identity_review_required" ? <p className="review-warning">此关注仍指向旧 SKU；身份需核对，未自动迁移到相关候选。</p> : null}<VariantCard variant={item.variant} {...variantActions(item.variant)} selected={evidenceKind === "tire" && selectedSnapshot === item.variant.snapshot_id} /></div> : <div className="result-explanation" key={item.id}>规格 {item.variant_id} 的详情不可用。</div>)}</> : <EmptyPanel icon="bookmark" title="为下一次研究留个标记" description="在查询结果中关注精确规格，便于稍后返回核对。" action={() => setView("query")} actionText="查找轮胎" />}</section><section className="changes-section"><div className="panel-title"><span>已记录的变更</span></div>{changesError ? <div className="inline-error" role="alert">{changesError}</div> : changes.length ? changes.map(change => <details key={change.id}><summary>{change.kind || change.field || "规格变更"} · {formatTime(change.observed_at)}</summary><pre>{JSON.stringify(change, null, 2)}</pre></details>) : <p className="muted padded">暂无变更记录。可在下方创建规则，查看符合条件的站内提醒。</p>}</section><MonitoringCenter sources={sources} watches={watches} onEvidence={id => void showEvidence(id)} onExplain={notice => { setAiTarget({ references: [{ kind: "change_event", change_id: notice.change_id }], label: `${notice.rule_name} · 这次历史变化`, defaultQuestion: "这次已记录的变化具体发生了什么？哪些内容值得关注，证据有哪些限制？请区分来源事实与推断，只解释这些冻结记录，不把首次观察称为新发布。" }); setAiOpen(true); }} /></> : null}
+          {view === "watch" ? <><section className="watch-section"><div className="panel-title"><span>关注规格 <b className="count-badge">{watches.length}</b></span><span className="tag quiet">关注标记与监控规则分别保存</span></div>{watchLoading ? <div className="run-loading"><span className="spinner" />正在加载关注记录…</div> : watchError ? <div className="inline-error" role="alert">{watchError}</div> : watches.length ? <><div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 已保存规格</strong><span>关注列表展示历史记录，不代表当前在线参数。</span></div>{watches.slice(0, watchWindow).map(item => item.variant ? <div key={item.id}>{item.tracking_state === "identity_review_required" ? <p className="review-warning">此关注仍指向旧 SKU；身份需核对，未自动迁移到相关候选。</p> : null}<VariantCard variant={item.variant} {...variantActions(item.variant)} selected={evidenceKind === "tire" && selectedSnapshot === item.variant.snapshot_id} /></div> : <div className="result-explanation" key={item.id}>规格 {item.variant_id} 的详情不可用。</div>)}{watches.length > watchWindow ? <button type="button" className="secondary-button" onClick={() => setWatchWindow(previous => previous + 50)}>再显示 {Math.min(50, watches.length - watchWindow)} 项 · 余 {watches.length - watchWindow} 项关注</button> : null}</> : <EmptyPanel icon="bookmark" title="为下一次研究留个标记" description="在查询结果中关注精确规格，便于稍后返回核对。" action={() => setView("query")} actionText="查找轮胎" />}</section><section className="changes-section"><div className="panel-title"><span>已记录的变更</span></div>{changesError ? <div className="inline-error" role="alert">{changesError}</div> : changes.length ? changes.map(change => <details key={change.id}><summary>{change.kind || change.field || "规格变更"} · {formatTime(change.observed_at)}</summary><pre>{JSON.stringify(change, null, 2)}</pre></details>) : <p className="muted padded">暂无变更记录。可在下方创建规则，查看符合条件的站内提醒。</p>}</section><MonitoringCenter sources={sources} watches={watches} onEvidence={id => void showEvidence(id)} onExplain={notice => { setAiTarget({ references: [{ kind: "change_event", change_id: notice.change_id }], label: `${notice.rule_name} · 这次历史变化`, defaultQuestion: "这次已记录的变化具体发生了什么？哪些内容值得关注，证据有哪些限制？请区分来源事实与推断，只解释这些冻结记录，不把首次观察称为新发布。" }); setAiOpen(true); }} /></> : null}
 
           {view === "compare" ? <div className="ai-entry compare-toolbar"><button className="secondary-button" onClick={() => setKnowledgeOpen(true)}>检索历史证据</button><button className="secondary-button" onClick={() => { setAiTarget(null); setAiOpen(true); }}>AI 调用记录与配置</button></div> : null}
           {view === "compare" ? <TestEvents sessionReady={!booting} /> : null}
           {view === "sources" ? <><section className="quarantine-panel"><div className="panel-title"><span>轮胎安全召回</span><button type="button" data-recall-entry className="secondary-button" disabled={booting} onClick={() => setRecallsOpen(true)}>查询与监控召回公告</button></div><p className="quality-intro">NHTSA 美国监管公告 · 在线检索候选，核对官方范围与补救措施。</p></section><SourceManagement /><MonitorTaskCenter /><SourceQuality sources={sources} sessionReady={!booting} /><div className="method-note"><Icon name="shield" size={24} /><div><h3>证据保留原貌，事实保留版本</h3><p>每份快照记录来源 URL、观察时间、解析器版本和 SHA-256。选择查询结果中的「查看证据」，即可在右侧核对原始内容。</p><p>远端页面只作为纯文本证据展示，不执行其中的脚本或指令。</p></div></div></> : null}
 
-          {savingSelection ? <SaveComparisonDialog selection={savingSelection} onClose={() => setSavingSelection(null)} onRefresh={() => { setSavingSelection(null); setComparisonRevision(value => value + 1); }} onSaved={() => { setSavingSelection(null); setSavedComparisonsRevision(value => value + 1); setNotice("已固定保存本次比较与引用证据。"); }} /> : null}
-          {garageTire ? <AssignTireDialog variant={garageTire} onClose={() => setGarageTire(null)} onSaved={() => { setGarageTire(null); setView("garage"); setNotice("已保存当前轮胎记录，请核对前后轴。"); }} /> : null}
-          {garageFitment ? <SaveFitmentDialog {...garageFitment} onClose={() => setGarageFitment(null)} onSaved={() => { setGarageFitment(null); setView("garage"); setNotice("已保存所选配置，尚未指定当前轮胎。"); }} /> : null}
+          {savingSelection ? <SaveComparisonDialog selection={savingSelection} onClose={() => setSavingSelection(null)} onRefresh={() => { setSavingSelection(null); setComparisonRevision(value => value + 1); }} onSaved={() => { setSavingSelection(null); setSavedComparisonsRevision(value => value + 1); toast("已固定保存本次比较与引用证据。", "success"); }} /> : null}
+          {garageTire ? <AssignTireDialog variant={garageTire} onClose={() => setGarageTire(null)} onSaved={() => { setGarageTire(null); setView("garage"); toast("已保存当前轮胎记录，请核对前后轴。", "success"); }} /> : null}
+          {garageFitment ? <SaveFitmentDialog {...garageFitment} onClose={() => setGarageFitment(null)} onSaved={() => { setGarageFitment(null); setView("garage"); toast("已保存所选配置，尚未指定当前轮胎。", "success"); }} /> : null}
           {lifecycleTarget ? <VariantLifecycleDialog key={lifecycleTarget} variantId={lifecycleTarget} onClose={() => setLifecycleTarget("")} onSaved={lifecycleSaved} onIdentity={() => { setIdentityTarget(lifecycleTarget); setLifecycleTarget(""); }} /> : null}
           {identityTarget ? <IdentityReviewDialog key={identityTarget} variantId={identityTarget} onClose={() => { setLifecycleTarget(identityTarget); setIdentityTarget(""); }} onSaved={identitySaved} /> : null}
           {reviewTarget ? <FactReviewDialog key={`${reviewTarget.variant.id}:${reviewTarget.sourceId || ""}`} {...reviewTarget} onClose={() => setReviewTarget(null)} onSaved={() => setComparisonRevision(value => value + 1)} /> : null}
@@ -635,6 +702,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     {compared.length && view === "query" ? <div className="comparison-tray"><Icon name="compare" size={18} /><span>已选 <strong>{compared.length}</strong> 项规格</span><button className="primary-button compact" onClick={() => setView("compare")}>查看比较<Icon name="arrow" size={15} /></button></div> : null}
     {recallsOpen ? <RecallDialog sessionReady={!booting} initialCampaign={recallCampaign} onAnalyze={target => { setAiTarget(target); setAiOpen(true); }} onClose={() => setRecallsOpen(false)} /> : null}
     <nav className="mobile-nav" aria-label="移动导航">{navigation.map(item => <button key={item.id} className={view === item.id ? "active" : ""} aria-current={view === item.id ? "page" : undefined} onClick={() => { setView(item.id); window.scrollTo({ top: 0, behavior: "smooth" }); }}><Icon name={item.icon} size={20} /><span>{item.label}</span></button>)}</nav>
+    <CommandPalette open={paletteOpen} commands={commands} onClose={() => setPaletteOpen(false)} />
   </div>;
 }
 
@@ -651,9 +719,10 @@ function VariantFieldFacts({ variant, onEvidence, onCandidateEvidence }: { varia
 }
 
 function VariantCard({ variant, compared, compareFull, watched, watchPending, selected, onCompare, onWatch, onEvidence, onCandidateEvidence, onReview, onLifecycle, onGarage, onAI }: { variant: Variant; compared: boolean; compareFull: boolean; watched: boolean; watchPending: boolean; selected: boolean; onCompare: () => void; onWatch: () => void; onEvidence: () => void; onCandidateEvidence: (snapshotId: string) => void; onReview: () => void; onLifecycle: () => void; onGarage: () => void; onAI: () => void }) {
+  const [confirmUnwatch, setConfirmUnwatch] = useState(false);
   const conflicts = variantConflicts(variant);
   const anomalies = variantAnomalies(variant);
-  return <article className={`variant-card${selected ? " selected" : ""}`}><div className="variant-card-heading"><div><span className="variant-brand">{displayValue(variant.brand)} <small>{variant.region}</small></span><h3>{displayValue(variant.model)}</h3></div><button className={`icon-button bookmark-button${watched ? " checked" : ""}`} onClick={onWatch} disabled={watchPending} aria-label={watched ? `取消关注 ${variant.model}` : `关注 ${variant.model}`} aria-pressed={watched}><Icon name={watchPending ? "refresh" : "bookmark"} size={20} /></button></div><div className="variant-size"><strong>{variant.size}</strong><span>{displayValue(variant.load_index)} {displayValue(variant.speed_rating)}</span>{hasFieldConflict(variant, "xl") ? <span className="tag warning">XL 待核验</span> : variant.xl ? <span className="tag quiet">XL</span> : null}{variant.hl ? <span className="tag quiet">HL</span> : null}{variant.run_flat ? <span className="tag quiet">防爆</span> : null}{variant.oe_mark ? <span className="tag quiet">OE · {variant.oe_mark}</span> : null}</div>{variant.lifecycle?.state === "revoked" ? <div className="snapshot-banner"><strong>已撤销 · 本地版本管理</strong><span>{variant.lifecycle.reason}。下列参数保留来源原貌，此版本不参与比较。</span></div> : null}{conflicts.length ? <section className="source-conflict" aria-label="来源字段冲突"><strong>来源字段冲突 · 尚未裁定</strong><p>同一来源快照存在不同取值，相关规格保持待核验。</p><ConflictDetails conflicts={conflicts} /></section> : null}{anomalies.length ? <section className="source-conflict" aria-label="来源参数异常"><strong>来源参数异常 · 保留原文，未采纳为标准值</strong>{anomalies.map((item, index) => <p key={`${item.field}-${index}`}>{conflictFieldLabel(item.field)}：来源声明 {displayValue(item.raw_value)}。{item.reason === "source_temperature_outside_standard_enum" ? "耐热等级应为 A、B 或 C，当前 UTQG 三项均待核验。" : "请核对原始证据。"}</p>)}</section> : null}<dl className="variant-meta"><div><dt>产品代码</dt><dd className="mono">{displayValue(variant.manufacturer_product_code)}</dd></div><div><dt>静音技术</dt><dd>{displayValue(variant.acoustic_technology)}</dd></div></dl><IdentityContractBadge contract={variant.identity_contract} /><details className="identity-contract-details"><summary>核对身份合同与原记录边界</summary><p className="identity-contract-note">原快照身份规则：{variant.identity_contract_version || "记录时未注明"}；卡片原字段保留快照值。</p><IdentityContractEvidence contract={variant.identity_contract} /></details><VariantFieldFacts variant={variant} onEvidence={onEvidence} onCandidateEvidence={onCandidateEvidence} />{variant.identity_resolution ? <div className="review-boundary"><strong>{identityLabel(variant.identity_resolution.state)}</strong><p>卡片保留原始SKU与来源参数；采用身份修订前请进入版本状态核对。</p></div> : null}<div className="variant-actions"><button className="evidence-link" onClick={onEvidence}><Icon name="file" size={15} />查看证据<Icon name="chevron" size={12} /></button><button className="evidence-link review-link" onClick={onReview}>核验与纠错</button><button type="button" className="evidence-link" disabled={variant.lifecycle?.state === "revoked"} onClick={onAI}>AI 分析</button><button type="button" className="evidence-link" onClick={onLifecycle}>版本状态</button><button type="button" className="evidence-link" disabled={variant.lifecycle?.state === "revoked"} onClick={onGarage}>记入车库</button><button className={`secondary-button compact${compared ? " is-selected" : ""}`} onClick={onCompare} disabled={!compared && (compareFull || variant.lifecycle?.state === "revoked")} aria-pressed={compared}><Icon name={compared ? "check" : "compare"} size={15} />{compared ? "已加入比较" : variant.lifecycle?.state === "revoked" ? "已撤销，不参与比较" : compareFull ? "比较已达 4 项" : "加入比较"}</button></div></article>;
+  return <article className={`variant-card${selected ? " selected" : ""}`}><div className="variant-card-heading"><div><span className="variant-brand">{displayValue(variant.brand)} <small>{variant.region}</small></span><h3>{displayValue(variant.model)}</h3></div><button className={`icon-button bookmark-button${watched ? " checked" : ""}`} onClick={() => { if (watched && !confirmUnwatch) { setConfirmUnwatch(true); return; } setConfirmUnwatch(false); onWatch(); }} disabled={watchPending} aria-label={watched ? `取消关注 ${variant.model}` : `关注 ${variant.model}`} aria-pressed={watched}><Icon name={watchPending ? "refresh" : "bookmark"} size={20} /></button></div>{watched && confirmUnwatch ? <InlineConfirm title="取消关注此规格？" description="只移除关注标记；已记录的变化与监控规则独立保留。" confirmLabel="确认取消关注" onConfirm={() => { setConfirmUnwatch(false); onWatch(); }} onCancel={() => setConfirmUnwatch(false)} /> : null}<div className="variant-size"><strong>{variant.size}</strong><span>{displayValue(variant.load_index)} {displayValue(variant.speed_rating)}</span>{hasFieldConflict(variant, "xl") ? <span className="tag warning">XL 待核验</span> : variant.xl ? <span className="tag quiet">XL</span> : null}{variant.hl ? <span className="tag quiet">HL</span> : null}{variant.run_flat ? <span className="tag quiet">防爆</span> : null}{variant.oe_mark ? <span className="tag quiet">OE · {variant.oe_mark}</span> : null}</div>{variant.lifecycle?.state === "revoked" ? <div className="snapshot-banner"><strong>已撤销 · 本地版本管理</strong><span>{variant.lifecycle.reason}。下列参数保留来源原貌，此版本不参与比较。</span></div> : null}{conflicts.length ? <section className="source-conflict" aria-label="来源字段冲突"><strong>来源字段冲突 · 尚未裁定</strong><p>同一来源快照存在不同取值，相关规格保持待核验。</p><ConflictDetails conflicts={conflicts} /></section> : null}{anomalies.length ? <section className="source-conflict" aria-label="来源参数异常"><strong>来源参数异常 · 保留原文，未采纳为标准值</strong>{anomalies.map((item, index) => <p key={`${item.field}-${index}`}>{conflictFieldLabel(item.field)}：来源声明 {displayValue(item.raw_value)}。{item.reason === "source_temperature_outside_standard_enum" ? "耐热等级应为 A、B 或 C，当前 UTQG 三项均待核验。" : "请核对原始证据。"}</p>)}</section> : null}<dl className="variant-meta"><div><dt>产品代码</dt><dd className="mono">{displayValue(variant.manufacturer_product_code)}</dd></div><div><dt>静音技术</dt><dd>{displayValue(variant.acoustic_technology)}</dd></div></dl><IdentityContractBadge contract={variant.identity_contract} /><details className="identity-contract-details"><summary>核对身份合同与原记录边界</summary><p className="identity-contract-note">原快照身份规则：{variant.identity_contract_version || "记录时未注明"}；卡片原字段保留快照值。</p><IdentityContractEvidence contract={variant.identity_contract} /></details><VariantFieldFacts variant={variant} onEvidence={onEvidence} onCandidateEvidence={onCandidateEvidence} />{variant.identity_resolution ? <div className="review-boundary"><strong>{identityLabel(variant.identity_resolution.state)}</strong><p>卡片保留原始SKU与来源参数；采用身份修订前请进入版本状态核对。</p></div> : null}<div className="variant-actions"><button className="evidence-link" onClick={onEvidence}><Icon name="file" size={15} />查看证据<Icon name="chevron" size={12} /></button><button className="evidence-link review-link" onClick={onReview}>核验与纠错</button><button type="button" className="evidence-link" disabled={variant.lifecycle?.state === "revoked"} onClick={onAI}>AI 分析</button><button type="button" className="evidence-link" onClick={onLifecycle}>版本状态</button><button type="button" className="evidence-link" disabled={variant.lifecycle?.state === "revoked"} onClick={onGarage}>记入车库</button><button className={`secondary-button compact${compared ? " is-selected" : ""}`} onClick={onCompare} disabled={!compared && (compareFull || variant.lifecycle?.state === "revoked")} aria-pressed={compared}><Icon name={compared ? "check" : "compare"} size={15} />{compared ? "已加入比较" : variant.lifecycle?.state === "revoked" ? "已撤销，不参与比较" : compareFull ? "比较已达 4 项" : "加入比较"}</button></div></article>;
 }
 
 function EmptyPanel({ icon, title, description, action, actionText }: { icon: IconName; title: string; description: string; action: () => void; actionText: string }) {

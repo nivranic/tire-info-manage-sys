@@ -7,6 +7,7 @@ import { ApiError, tireApi } from "@tire/api-client";
 import type { AIRuleDraftRun, AlertRuleCreate, AlertRuleDetail, AlertRuleRecord, AlertRuleSettings, LocalNotification, Source, WatchItem } from "@tire/domain-types";
 import { IdentityContractBadge, identityContractText } from "./identity-contract";
 import MonitorRuleDraftDialog from "./monitor-rule-draft";
+import { useToast } from "./toast";
 
 const errorText = (cause: unknown) => cause instanceof ApiError && cause.code === "identity_contract_review_required" ? "此精确 SKU 的身份编码类型尚未完成核对，不能自动跟随相关候选。请先核对身份。" : cause instanceof Error ? cause.message : "操作未完成，请重试。";
 const stamp = (value: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "尚未记录";
@@ -18,6 +19,7 @@ const ruleSettings = (value: AlertRuleCreate, enabled = value.enabled): AlertRul
 
 function RuleEditor({ id, draft, sources, watches, onClose, onChanged }: { id: string | null; draft?: AIRuleDraftRun; sources: Source[]; watches: WatchItem[]; onClose: () => void; onChanged: () => void }) {
   const sourceAccess = useSourceAccess();
+  const toast = useToast();
   const available = sources.filter(source => (!source.target_kind || source.target_kind === "tire") && sourceAccess.canQuery(source.id));
   const seed = draft?.draft?.rule;
   const [data, setData] = useState<AlertRuleDetail | null>(null);
@@ -71,7 +73,7 @@ function RuleEditor({ id, draft, sources, watches, onClose, onChanged }: { id: s
           await tireApi.applyRuleDraft(draft.id, saved.rule, saved.key, controller.signal);
         } else await tireApi.createAlertRule(request, controller.signal);
       }
-      if (!controller.signal.aborted) { onChanged(); onClose(); }
+      if (!controller.signal.aborted) { toast(action === "save" ? "监控规则已保存。" : action === "archive" ? "规则已归档。" : "规则已恢复为暂停规则。", "success"); onChanged(); onClose(); }
     } catch (cause) { if (!controller.signal.aborted) {
       setError(errorText(cause));
       if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500) { setApplyAttempt(null); applyAttemptRef.current = null; }
@@ -128,6 +130,7 @@ export default function MonitoringCenter({ sources, watches, onEvidence, onExpla
   const [noticeTotal, setNoticeTotal] = useState(0);
   const [archived, setArchived] = useState(false);
   const [unread, setUnread] = useState(false);
+  const [noticeWindow, setNoticeWindow] = useState(100);
   const [attempt, setAttempt] = useState(0);
   const [editor, setEditor] = useState<string | null | undefined>(undefined);
   const [draftId, setDraftId] = useState<string | null | undefined>(undefined);
@@ -172,7 +175,7 @@ export default function MonitoringCenter({ sources, watches, onEvidence, onExpla
       {rules.length ? rules.map(rule => <article className="quarantine-item" key={rule.id}><div className="quality-item-heading"><h3>{rule.name}</h3><span className="tag quiet">{rule.archived ? "已归档" : rule.enabled ? "规则已启用" : "已暂停"}</span></div><SourceStatus sourceId={rule.source_id} /><SourceOnlineNotice sourceId={rule.source_id} /><p className="monitor-text">{rule.source_id} · {rule.query.model} · {rule.query.size || (sources.some(source => source.id === rule.source_id && source.requires_size === true) ? "缺少必需尺寸" : "全部尺寸")} · 每 {rule.interval_seconds / 3600} 小时{rule.variant_id ? " · 精确 SKU" : ""} · 技术 {rule.conditions?.technology || "不限"}</p>{rule.variant_id ? <IdentityContractBadge contract={rule.identity_contract || undefined} /> : null}{rule.tracking_state === "identity_review_required" ? <p className="review-warning">此规则继续引用旧 SKU，身份需要核对；不会自动跟随相关新候选。</p> : null}<p className="monitor-text">最近执行：{rule.job.last_run ? `${stamp(rule.job.last_run.finished_at)} · ${stateText[rule.job.last_run.state] || rule.job.last_run.state}` : "尚无完成记录"}{rule.job.next_due_at ? `；计划时间 ${stamp(rule.job.next_due_at)}` : ""}</p><div className="variant-actions"><button type="button" className="text-button" onClick={() => setTaskJobId(rule.job.id)}>查看任务运行</button><button type="button" className="text-button" onClick={() => { setDraftReview(null); setEditor(rule.id); }}>编辑与历史</button>{rule.origin ? <button type="button" className="text-button" onClick={() => setDraftId(rule.origin!.draft_id)}>来源：已人工确认的 AI 草稿</button> : null}</div></article>) : <p className="quality-empty">暂无此范围的监控规则。关注标记不会自动创建或启用规则。</p>}
       {rules.length < ruleTotal ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void more("rules")}>加载更多规则</button> : null}
       <div className="panel-title"><span>站内提醒 · {noticeTotal}</span><label className="review-checkbox"><input type="checkbox" checked={unread} disabled={busy} onChange={event => setUnread(event.target.checked)} />只看未读</label></div>
-      {notices.length ? notices.map(notice => <article className="quarantine-item" key={notice.id}><div className="quality-item-heading"><h3>{notice.rule_name} · {kindText(notice.kind)}</h3><span className="tag quiet">{notice.read_at ? "已读" : "未读"}</span></div><p className="monitor-text">{valueText(notice.identity.model)} · {valueText(notice.identity.size)} · {valueText(notice.identity.manufacturer_product_code)}</p><IdentityContractBadge contract={notice.identity_contract} /><p className="monitor-text">LOCAL SNAPSHOT · {notice.source_id} · {stamp(notice.observed_at)} · 规则修订 #{notice.rule_revision}</p><dl className="monitor-diff">{Object.entries(notice.changes).map(([field, change]) => <div key={field}><dt>{field}</dt><dd>{change.before_present ? valueText(change.before) : "原未声明"} → {change.after_present ? valueText(change.after) : "现未声明"}</dd></div>)}</dl><div className="variant-actions"><button type="button" className="text-button" onClick={() => onExplain(notice)}>解释这次变化</button><button type="button" className="text-button" onClick={() => onEvidence(notice.snapshot_id)}>查看变化后证据</button>{notice.previous_snapshot_id ? <button type="button" className="text-button" onClick={() => onEvidence(notice.previous_snapshot_id!)}>查看变化前证据</button> : null}<button type="button" className="text-button" disabled={busy} onClick={() => void mark(notice)}>标记为{notice.read_at ? "未读" : "已读"}</button></div></article>) : <p className="quality-empty">暂无{unread ? "未读" : ""}站内提醒。只有启用规则后采纳且符合条件的变化才会出现；不会补发旧记录。</p>}
+      {notices.length ? <>{notices.slice(0, noticeWindow).map(notice => <article className="quarantine-item" key={notice.id}><div className="quality-item-heading"><h3>{notice.rule_name} · {kindText(notice.kind)}</h3><span className="tag quiet">{notice.read_at ? "已读" : "未读"}</span></div><p className="monitor-text">{valueText(notice.identity.model)} · {valueText(notice.identity.size)} · {valueText(notice.identity.manufacturer_product_code)}</p><IdentityContractBadge contract={notice.identity_contract} /><p className="monitor-text">LOCAL SNAPSHOT · {notice.source_id} · {stamp(notice.observed_at)} · 规则修订 #{notice.rule_revision}</p><dl className="monitor-diff">{Object.entries(notice.changes).map(([field, change]) => <div key={field}><dt>{field}</dt><dd>{change.before_present ? valueText(change.before) : "原未声明"} → {change.after_present ? valueText(change.after) : "现未声明"}</dd></div>)}</dl><div className="variant-actions"><button type="button" className="text-button" onClick={() => onExplain(notice)}>解释这次变化</button><button type="button" className="text-button" onClick={() => onEvidence(notice.snapshot_id)}>查看变化后证据</button>{notice.previous_snapshot_id ? <button type="button" className="text-button" onClick={() => onEvidence(notice.previous_snapshot_id!)}>查看变化前证据</button> : null}<button type="button" className="text-button" disabled={busy} onClick={() => void mark(notice)}>标记为{notice.read_at ? "未读" : "已读"}</button></div></article>)}{notices.length > noticeWindow ? <button type="button" className="secondary-button" disabled={busy} onClick={() => setNoticeWindow(previous => previous + 100)}>再显示 {Math.min(100, notices.length - noticeWindow)} 条 · 余 {notices.length - noticeWindow} 条提醒</button> : null}</> : <p className="quality-empty">暂无{unread ? "未读" : ""}站内提醒。只有启用规则后采纳且符合条件的变化才会出现；不会补发旧记录。</p>}
       {notices.length < noticeTotal ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void more("notices")}>加载更多提醒</button> : null}
     </>}
     {taskJobId ? <MonitorTaskDialog key={taskJobId} kind="tire" jobId={taskJobId} onClose={() => setTaskJobId(null)} /> : null}

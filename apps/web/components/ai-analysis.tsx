@@ -10,6 +10,7 @@ import { AIStreamProgress } from "./ai-stream-progress";
 import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope, recallAnalysisNotice } from "./recall-evidence-meta";
 import { recallCurrentRequest, uniqueAIReferences } from "./recall-evidence-values";
 import { AI_RECOVERY_KEY, aiStreamErrorMessage, aiStreamErrorMessages, canExportAIAnalysis, parseAIRecovery, type AIRecoveryPointer } from "./ai-stream-values";
+import AiBudgetMeter, { aiProviderLabel } from "./ai-budget";
 
 export type AITarget = ({ variant: Variant; sourceId?: string } | { references: AIAnalysisReference[]; label: string }
   | { recall: { campaign_number: string; reference: RecallAnalysisReference }; label: string }) & { defaultQuestion?: string };
@@ -21,13 +22,13 @@ const errors: Record<string, string> = {
   ai_evidence_field_contract_stale: "这份证据包的字段权威规则缺失或已经变化。请重新准备所选证据，核对默认值及全部来源，再重新授权分析；旧包仍可查看。",
   ai_evidence_identity_contract_stale: "这份证据包缺少有效的身份合同，或绑定已经变化。旧包仍可查看；请重新准备所选证据，再核对并授权分析。",
   identity_contract_review_required: "所选 SKU 的编码类型尚未完成身份核对。请先核对旧身份，不能自动改用相关候选。",
-  ai_disabled: "AI 尚未启用。请在本机 API 环境中配置 OpenAI 后启用。",
-  ai_configuration_required: "尚未配置专用 OpenAI 密钥或模型。",
+  ai_disabled: "AI 尚未启用。请在本机 API 环境中配置 AI Provider 后启用。。",
+  ai_configuration_required: "尚未配置专用的 AI Provider 密钥或模型。",
   ai_configuration_invalid: "本机 AI 配置无效，请检查模型与预算设置。",
   ai_grounding_validation_failed: "输出未通过引用校验，已丢弃；没有生成可展示的分析。",
-  ai_provider_timeout: "OpenAI 响应超时，可能已经计费。",
-  ai_provider_network_error: "未能确认 OpenAI 响应，可能已经计费。",
-  ai_provider_http_error: "OpenAI 返回错误，请核对本机配置与账户状态。",
+  ai_provider_timeout: "AI Provider 响应超时，可能已经计费。",
+  ai_provider_network_error: "未能确认 AI Provider 响应，可能已经计费。",
+  ai_provider_http_error: "AI Provider 返回错误，请核对本机配置与账户状态。",
   ai_response_incomplete: "模型输出不完整，未采纳为分析。",
   ai_refused: "模型拒绝了本次请求。",
 };
@@ -201,8 +202,8 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   return <><dialog ref={dialog} className="fact-review-dialog ai-dialog" aria-labelledby="ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">EVIDENCE → ANALYSIS</span><h2 id="ai-title">基于证据的 AI 分析</h2></div><button type="button" className="icon-button" aria-label="关闭 AI 分析" onClick={onClose}>×</button></header>
     <div className="ai-content">
-      <p className="review-boundary">{recallTarget || recallPack ? recallAnalysisNotice : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 OpenAI 的处理或免于计费。</p>
-      <section className="ai-status" aria-label="模型状态"><strong>OpenAI Responses API</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p>{status ? <small>UTC {status.budget.day_utc}：{status.budget.requests} 次请求 / 已记账 {status.budget.accounted_tokens.toLocaleString()} tokens。含未知用量的预留，不是账单金额。</small> : null}</section>
+      <p className="review-boundary">{recallTarget || recallPack ? recallAnalysisNotice : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 AI Provider 的处理或免于计费。</p>
+      <section className="ai-status" aria-label="模型状态"><strong>{aiProviderLabel(status?.model.provider)}</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p><AiBudgetMeter status={status} /></section>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       {recovery && !stream && !attempt ? <section className="ai-recovery" aria-label="上次分析提交核对"><h3>核对本标签页上次提交</h3><p>刷新或重新打开不会重新调用模型。先读取原请求记录；如果无法确认，原调用仍可能处理或计费。</p><div className="compare-toolbar"><button type="button" className="secondary-button" disabled={busy} onClick={() => void perform(async signal => { const value = await tireApi.lookupAIStream(recovery.key, signal); if (!signal.aborted) showStream(value, recovery.key); })}>只读核对上次提交</button><button type="button" className="text-button" disabled={busy} onClick={reset}>返回证据准备</button></div></section> : null}
       {savedReport ? <section className="snapshot-banner" role="status"><strong>已保存报告：{savedReport.title}</strong><span>本浏览器会话 · 历史冻结正文 · 未新增模型调用</span>{onOpenReport ? <button type="button" className="text-button" onClick={() => onOpenReport(savedReport.id)}>在报告库打开</button> : null}</section> : null}
@@ -228,9 +229,9 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         <div className="variant-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => setReportSave({ pack })}>保存证据报告</button>{canExportAIAnalysis(run) && run.pack_id === pack.id ? <button type="button" className="secondary-button" disabled={busy} onClick={() => setReportSave({ pack, analysis: run })}>保存含分析的报告</button> : null}</div>
         {!run ? <form className="ai-form" onSubmit={event => { event.preventDefault(); void submit(); }}>
           <label htmlFor="ai-question">本次问题</label><textarea id="ai-question" minLength={2} maxLength={2000} required rows={3} value={question} disabled={busy || !!attempt} onChange={event => setQuestion(event.target.value)} />
-          <label className="review-checkbox"><input type="checkbox" checked={externalConsent} disabled={busy || !!attempt || evidenceStale} onChange={event => setExternalConsent(event.target.checked)} />我允许将本次问题及上述全部证据发送到 OpenAI 处理。</label>
+          <label className="review-checkbox"><input type="checkbox" checked={externalConsent} disabled={busy || !!attempt || evidenceStale} onChange={event => setExternalConsent(event.target.checked)} />我允许将本次问题及上述全部证据发送到当前配置的 AI Provider 处理。</label>
           {!canSend ? <p className="review-boundary">{evidenceStale ? "证据合同或字段依据已失效。请重新准备所选证据并核对授权，旧包仍可查看。" : "模型配置或数据隐私策略尚不允许提交这份证据。"}</p> : null}
-          <button type="submit" className="primary-button" disabled={busy || (!attempt && (!canSend || !externalConsent || question.trim().length < 2))}>{busy ? "正在核对受理结果…" : attempt ? retrySameRequest ? "用原标识重新提交" : "核对同一次提交" : "发送到 OpenAI 并分析"}</button>
+          <button type="submit" className="primary-button" disabled={busy || (!attempt && (!canSend || !externalConsent || question.trim().length < 2))}>{busy ? "正在核对受理结果…" : attempt ? retrySameRequest ? "用原标识重新提交" : "核对同一次提交" : "发送到 AI Provider 并分析"}</button>
           {attempt ? <><p role="status">{retrySameRequest ? "只读核对暂未找到记录。若继续，使用原请求内容和同一个标识重新提交；已受理的调用不会重复执行。" : "提交结果尚未确认，已锁定请求内容与标识。核对只读取原记录，不新建模型调用。"}</p><button type="button" className="text-button" disabled={busy} onClick={reset}>返回证据准备</button><p className="review-boundary">返回不会取消原调用。新的分析需要重新授权，并可能另外计费。</p></> : null}
         </form> : null}
       </> : null}

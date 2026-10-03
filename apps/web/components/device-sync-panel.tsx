@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DeviceSyncConditions, DeviceSyncPreview, DeviceSyncStatus, OfflineSlot, OfflineStorage } from "@tire/domain-types";
 import { offlineError } from "./offline-crypto";
+import InlineConfirm from "./inline-confirm";
 
 const stamp = (value: string | null | undefined) => value ? new Date(value).toLocaleString("zh-CN") : "未安排";
 const stateText = { enabled: "持续许可已开启", paused: "已暂停，须重新预览授权", revoked: "已撤销持续许可" };
@@ -10,6 +11,7 @@ export default function DeviceSyncPanel({ storage, slot }: { storage: OfflineSto
   const [status, setStatus] = useState<DeviceSyncStatus | null>(null), [preview, setPreview] = useState<DeviceSyncPreview | null>(null);
   const [interval, setIntervalMinutes] = useState("60"), [conditions, setConditions] = useState<DeviceSyncConditions>({ network: "any", power: "any" });
   const [consent, setConsent] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const [revokeAsk, setRevokeAsk] = useState(false);
   const live = useRef(true), operation = useRef(false);
   const policy = status?.policies.find(value => value.slot_id === slot.slot_id), checks = status?.release_checks.find(value => value.slot_id === slot.slot_id && value.generation === slot.generation);
   const supported = !!storage.syncStatus && !!storage.previewSyncPolicy && !!storage.applySyncPolicy;
@@ -39,7 +41,8 @@ export default function DeviceSyncPanel({ storage, slot }: { storage: OfflineSto
         const run = await storage.runSyncPolicy!({ policy_id: policy.policy_id, expected_policy_revision: policy.policy_revision, trigger: "manual" });
         if (live.current) setNotice(`${runText[run.state]}。${run.state === "succeeded" ? "此包已有新版本，请点击重新读取本机资料；正在查看的历史内容保持原版本。" : ""}`);
       })}>现在按策略检查</button><button type="button" className="text-button" disabled={busy || policy.state !== "enabled"} onClick={() => void perform(async () => { await storage.pauseSyncPolicy!({ policy_id: policy.policy_id, expected_policy_revision: policy.policy_revision }); if (live.current) { changed(); setNotice("已暂停持续许可；重新启用须预览并重新授权。"); } })}>暂停持续更新</button>
-      <button type="button" className="text-button" disabled={busy || policy.state === "revoked"} onClick={() => void perform(async () => { await storage.revokeSyncPolicy!({ policy_id: policy.policy_id, expected_policy_revision: policy.policy_revision }); if (live.current) { changed(); setNotice("已撤销持续许可；本机历史包仍保留。"); } })}>撤销持续许可</button></div>
+      <button type="button" className="text-button" disabled={busy || policy.state === "revoked"} onClick={() => setRevokeAsk(true)}>撤销持续许可</button></div>
+      {revokeAsk ? <InlineConfirm title="撤销此包的持续更新许可？" description="撤销后本机历史包仍保留，但不再自动检查更新；重新启用需重新预览并授权。" confirmLabel="确认撤销许可" busy={busy} onConfirm={() => { setRevokeAsk(false); void perform(async () => { await storage.revokeSyncPolicy!({ policy_id: policy.policy_id, expected_policy_revision: policy.policy_revision }); if (live.current) { changed(); setNotice("已撤销持续许可；本机历史包仍保留。"); } }); }} onCancel={() => setRevokeAsk(false)} /> : null}
       {status?.runs.filter(run => run.policy_id === policy.policy_id).slice(-3).reverse().map(run => <p key={run.run_id} role="status">{runText[run.state]} · {stamp(run.finished_at || run.started_at)}{run.reason ? ` · ${offlineError(run.reason).message}` : ""}</p>)}</> : <p>此包尚未获得持续更新许可。</p>}
     <details><summary>预览并配置持续更新</summary>
       <div className="offline-search"><label>检查间隔（分钟）<input type="number" min="15" max="10080" step="1" value={interval} disabled={busy || old} onChange={event => { setIntervalMinutes(event.target.value); changed(); }} /></label>

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ApiError } from "@tire/api-client";
-import type { AIStreamAcceptance, AIStreamDetail, OfflineReadResult, OfflineSearchResult, OfflineSlot } from "@tire/domain-types";
+import { ApiError, tireApi } from "@tire/api-client";
+import type { AIStatus, AIStreamAcceptance, AIStreamDetail, OfflineReadResult, OfflineSearchResult, OfflineSlot } from "@tire/domain-types";
 import { useWorkbenchPlatform, type WorkbenchPlatform } from "./workbench-platform";
+import AiBudgetMeter from "./ai-budget";
 import { AIStreamProgress } from "./ai-stream-progress";
 import { offlineError } from "./offline-crypto";
 import { browserOfflineOwnerSummary, readBrowserOfflinePackBytes } from "./browser-offline-store";
@@ -85,6 +86,7 @@ export default function DeviceAiDialog({ platform: supplied, onClose }: { platfo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [aiBudget, setAiBudget] = useState<AIStatus | null>(null);
   // The mount effect opens the journal and calls refreshHistory in the same
   // tick; the `journal` state closure would still be null there, so the live
   // instance is kept in a ref as well.
@@ -96,7 +98,9 @@ export default function DeviceAiDialog({ platform: supplied, onClose }: { platfo
     const node = dialog.current, focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     node?.showModal();
     void bootstrap();
-    return () => { operation.current?.abort(); node?.close(); if (focus?.isConnected && !focus.closest("dialog:not([open])")) focus.focus({ preventScroll: true }); };
+    const budgetController = new AbortController();
+    void tireApi.aiStatus(budgetController.signal).then(value => setAiBudget(value)).catch(() => setAiBudget(null));
+    return () => { operation.current?.abort(); budgetController.abort(); node?.close(); if (focus?.isConnected && !focus.closest("dialog:not([open])")) focus.focus({ preventScroll: true }); };
   }, []);
 
   async function perform(work: (signal: AbortSignal) => Promise<void>) {
@@ -401,6 +405,7 @@ export default function DeviceAiDialog({ platform: supplied, onClose }: { platfo
     <header className="fact-review-heading"><div><span className="eyebrow">DEVICE HISTORY → AI</span><h2 id="device-ai-title">设备 AI 分析</h2><p>本机预览 · 一次决定 · 服务端复核 · 流式结果</p></div><button type="button" className="text-button" onClick={onClose}>关闭</button></header>
     <div className="offline-content">
       <p className="review-boundary">分析对象是本设备保存的离线历史观察（轮胎 / 车辆 / 召回公告 / 公告检索四域）。先在本机重算并展示即将外发的材料指纹；只有你明确确认后才会创建服务端准备记录，第二次确认后才交给 AI Provider。普通在线查询历史与此完全分开。</p>
+      <div className="device-ai-budget"><span className="field-caption">今日共享 AI 预算（与在线分析同一账户限额）</span><AiBudgetMeter status={aiBudget} compact /></div>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       {notice ? <p className="review-boundary" role="status">{notice}</p> : null}
       {journalError ? <p className="inline-error" role="alert">台账不可用：{journalError}</p> : null}

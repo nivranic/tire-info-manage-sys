@@ -7,6 +7,7 @@ import { IdentityContractEvidence } from "./identity-contract";
 import { FrozenFieldResolutions } from "./field-authority";
 import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope } from "./recall-evidence-meta";
 import { useWorkbenchPlatform } from "./workbench-platform";
+import { useToast } from "./toast";
 
 const stamp = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "未记录";
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : "请求未完成。";
@@ -115,6 +116,7 @@ function FrozenReportBody({ report }: { report: EvidenceReportDetail }) {
 }
 
 export default function ReportsDialog({ initialId, onClose }: { initialId?: string; onClose: () => void }) {
+  const toast = useToast();
   const platform = useWorkbenchPlatform();
   const dialog = useRef<HTMLDialogElement>(null);
   const listPane = useRef<HTMLElement>(null);
@@ -207,7 +209,7 @@ export default function ReportsDialog({ initialId, onClose }: { initialId?: stri
       try {
         const value = action === "metadata" ? await tireApi.editReport(detail.id, detail.revision, title.trim(), notes, signal)
           : await tireApi.reportState(detail.id, detail.revision, action, signal);
-        if (!signal.aborted) { accept(value); setListRevision(previous => previous + 1); }
+        if (!signal.aborted) { accept(value); setListRevision(previous => previous + 1); toast(action === "metadata" ? `已保存标题与备注修订 #${value.revision}。` : action === "archive" ? "报告已归档，可在归档范围查看。" : "报告已恢复为未归档。", "success"); }
       } catch (cause) {
         if (!signal.aborted && (!(cause instanceof ApiError) || cause.status === 409 || cause.status >= 500)) setStale(true);
         throw cause;

@@ -5,6 +5,8 @@ import { ApiError, tireApi } from "@tire/api-client";
 import type { GarageDetail, GarageProfile, GarageRecord, LifecycleReview, Variant } from "@tire/domain-types";
 import { IdentityContractBadge } from "./identity-contract";
 import { Icon } from "./icons";
+import InlineConfirm from "./inline-confirm";
+import { useToast } from "./toast";
 import { DrivingPreferences } from "./research";
 
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : "操作未完成，请重试。";
@@ -102,6 +104,8 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
   const [busy, setBusy] = useState("");
   const [editor, setEditor] = useState<GarageRecord | "new" | null>(null);
   const [historyId, setHistoryId] = useState("");
+  const [clearAsk, setClearAsk] = useState("");
+  const toast = useToast();
   const mutation = useRef<AbortController | null>(null);
   const pageRequest = useRef<AbortController | null>(null);
   useEffect(() => {
@@ -135,7 +139,7 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
     try {
       if (axle) await tireApi.garageTire(record.id, record.revision, axle, null, controller.signal);
       else await tireApi.garageState(record.id, record.revision, record.archived ? "restore" : "archive", controller.signal);
-      if (!controller.signal.aborted) setRevision(value => value + 1);
+      if (!controller.signal.aborted) { setRevision(value => value + 1); toast(axle ? "已取消此轴的当前轮胎记录。" : record.archived ? "车辆已恢复使用。" : "车辆已移入归档。", "success"); }
     } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
     finally { if (!controller.signal.aborted) setBusy(""); }
   }
@@ -153,7 +157,7 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
           <div className="garage-axles">{(["front", "rear"] as const).map(axle => {
             const tire = record.current_tires[axle]; const size = record.profile[axle].size;
             return <section className="axle-card" key={axle}><span className="axle-label">{axle === "front" ? "前轴" : "后轴"}</span><strong className="axle-size">{size || "尺寸未记录"}</strong>
-              {tire ? <><p>当前轮胎（用户记录）</p><p>{tire.brand} {tire.model}<br /><span className="mono">{tire.manufacturer_product_code || "产品代码未知"}</span> · {tire.region}</p><IdentityContractBadge contract={tire.identity_contract} />{tire.lifecycle?.state === "revoked" ? <p className="review-warning">关联的轮胎版本已撤销，请重新核对。</p> : null}<button className="text-button" onClick={() => onVariant(tire.id)}>核对版本状态与证据</button>{!record.archived ? <button className="text-button" disabled={!!busy} onClick={() => void change(record, axle)}>取消当前轮胎记录</button> : null}</> : <p>尚未关联精确轮胎版本。</p>}
+              {tire ? <><p>当前轮胎（用户记录）</p><p>{tire.brand} {tire.model}<br /><span className="mono">{tire.manufacturer_product_code || "产品代码未知"}</span> · {tire.region}</p><IdentityContractBadge contract={tire.identity_contract} />{tire.lifecycle?.state === "revoked" ? <p className="review-warning">关联的轮胎版本已撤销，请重新核对。</p> : null}<button className="text-button" onClick={() => onVariant(tire.id)}>核对版本状态与证据</button>{!record.archived ? <><button className="text-button" disabled={!!busy} onClick={() => setClearAsk(clearAsk === record.id + ":" + axle ? "" : record.id + ":" + axle)}>取消当前轮胎记录</button>{clearAsk === record.id + ":" + axle ? <InlineConfirm title="取消此轴的当前轮胎记录？" description="只清除轴位关联，不改车辆信息；关联的轮胎版本与证据仍在。" confirmLabel="确认取消轮胎记录" busy={busy === record.id} onConfirm={() => { setClearAsk(""); void change(record, axle); }} onCancel={() => setClearAsk("")} /> : null}</> : null}</> : <p>尚未关联精确轮胎版本。</p>}
               {size ? <button className="secondary-button" onClick={() => onQuerySize(size, `${record.profile.nickname}${axle === "front" ? "前轴" : "后轴"}`)}>按此尺寸查轮胎</button> : null}
             </section>;
           })}</div>
