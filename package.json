@@ -1,0 +1,29 @@
+{
+  "name": "tire-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/desktop",
+    "apps/mobile",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @tire/web",
+    "build": "npm run build --workspace @tire/web",
+    "start": "npm run start --workspace @tire/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:pwa": "node --test scripts/test-pwa.mjs",
+    "desktop:dev": "npm run tauri --workspace @tire/desktop -- dev",
+    "desktop:build": "npm run tauri --workspace @tire/desktop -- build",
+    "desktop:frontend": "npm run build --workspace @tire/desktop",
+    "test:desktop": "npm run test --workspace @tire/desktop",
+    "mobile:frontend": "npm run build --workspace @tire/mobile",
+    "mobile:sync": "npm run cap --workspace @tire/mobile -- sync android",
+    "mobile:android": "pwsh -NoProfile -File scripts/build-mobile.ps1",
+    "test:mobile": "npm run test --workspace @tire/mobile"
+  },
+  "devDependencies": {
+    "sharp": "0.35.4"
+  }
+}

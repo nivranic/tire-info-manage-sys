@@ -1,0 +1,49 @@
+[package]
+name = "tire-desktop"
+version = "0.1.0"
+description = "胎迹本地轮胎证据工作台"
+edition = "2021"
+rust-version = "1.90"
+
+[lib]
+name = "tire_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.0", features = [] }
+sha2 = "=0.10.9"
+
+[dependencies]
+aes-gcm = "=0.10.3"
+base64 = "=0.22.1"
+chrono = "=0.4.45"
+cookie = "=0.18.1"
+percent-encoding = "=2.3.2"
+reqwest = { version = "=0.12.28", default-features = false }
+rand_core = { version = "=0.6.4", features = ["getrandom"] }
+rusqlite = { version = "=0.40.2", features = ["bundled", "limits", "hooks"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["raw_value"] }
+sha2 = "=0.10.9"
+tauri = { version = "=2.12.0", features = [] }
+tauri-plugin-dialog = "=2.8.0"
+tauri-plugin-opener = "=2.6.0"
+tokio = { version = "1", features = ["sync", "time", "rt", "macros", "fs", "io-util", "net"] }
+tokio-util = { version = "=0.7.19", features = ["rt"] }
+url = "2.5"
+uuid = { version = "1", features = ["v4"] }
+unicode-normalization = "=0.1.24"
+zeroize = "=1.9.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "=3.6.3", default-features = false, features = ["windows-native"] }
+windows = { version = "=0.62.2", features = ["Networking_Connectivity", "Win32_System_Power", "Win32_System_WinRT"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "=3.6.3", default-features = false, features = ["apple-native"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+panic = "abort"

@@ -1,0 +1,4310 @@
+{
+  "cases": [
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:0",
+          "row:9",
+          "row:10",
+          "row:14"
+        ],
+        "matched_row_indexes": [
+          0,
+          9,
+          10,
+          14
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 9,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R20"
+            }
+          ],
+          "matched_count": 4,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:0\",\"row:9\",\"row:10\",\"row:14\"],\"matched_row_indexes\":[0,9,10,14],\"per_row\":[{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":9,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20\"}],\"matched_count\":4,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:0",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "٢٤٥/٤٠R20"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"٢٤٥/٤٠R20\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R٢٠"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:1"
+        ],
+        "matched_row_indexes": [
+          1
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 12,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R٢٠"
+            }
+          ],
+          "matched_count": 1,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:1\"],\"matched_row_indexes\":[1],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":12,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠\"}],\"matched_count\":1,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:1",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R٢٠"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40ZR۲۰"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40ZR۲۰\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:2"
+        ],
+        "matched_row_indexes": [
+          2
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 12,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40ZR۲۰"
+            }
+          ],
+          "matched_count": 1,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:2\"],\"matched_row_indexes\":[2],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":12,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40ZR۲۰\"}],\"matched_count\":1,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:2",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "۲۴۵/۴۰ZR۲۰"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"۲۴۵/۴۰ZR۲۰\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R२०"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R२०\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:3"
+        ],
+        "matched_row_indexes": [
+          3
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 12,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R२०"
+            }
+          ],
+          "matched_count": 1,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:3\"],\"matched_row_indexes\":[3],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":12,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R२०\"}],\"matched_count\":1,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:3",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "२४५/४०R२०"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"२४५/४०R२०\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20.5"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.5\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:4",
+          "row:8",
+          "row:13",
+          "row:16"
+        ],
+        "matched_row_indexes": [
+          4,
+          8,
+          13,
+          16
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 9,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R20.5"
+            }
+          ],
+          "matched_count": 4,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:4\",\"row:8\",\"row:13\",\"row:16\"],\"matched_row_indexes\":[4,8,13,16],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":9,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.5\"}],\"matched_count\":4,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:4",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "２４５／４０Ｒ２０．５"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"２４５／４０Ｒ２０．５\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R٢٠.5"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠.5\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:5"
+        ],
+        "matched_row_indexes": [
+          5
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 12,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R٢٠.5"
+            }
+          ],
+          "matched_count": 1,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:5\"],\"matched_row_indexes\":[5],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":12,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠.5\"}],\"matched_count\":1,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:5",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R٢٠.5"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠.5\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": null,
+      "canonical_filters_json": null,
+      "expected": null,
+      "id": "size-nd:6",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20.٥"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.٥\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": [
+        {
+          "loc": [
+            "filters",
+            0
+          ],
+          "type": "value_error"
+        }
+      ]
+    },
+    {
+      "canonical_filters": null,
+      "canonical_filters_json": null,
+      "expected": null,
+      "id": "size-nd:7",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R٢٠.٥"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R٢٠.٥\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": [
+        {
+          "loc": [
+            "filters",
+            0
+          ],
+          "type": "value_error"
+        }
+      ]
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20.5"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.5\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:4",
+          "row:8",
+          "row:13",
+          "row:16"
+        ],
+        "matched_row_indexes": [
+          4,
+          8,
+          13,
+          16
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 9,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R20.5"
+            }
+          ],
+          "matched_count": 4,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:4\",\"row:8\",\"row:13\",\"row:16\"],\"matched_row_indexes\":[4,8,13,16],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":9,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.5\"}],\"matched_count\":4,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:8",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R２０.5"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R２０.5\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:0",
+          "row:9",
+          "row:10",
+          "row:14"
+        ],
+        "matched_row_indexes": [
+          0,
+          9,
+          10,
+          14
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 9,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R20"
+            }
+          ],
+          "matched_count": 4,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:0\",\"row:9\",\"row:10\",\"row:14\"],\"matched_row_indexes\":[0,9,10,14],\"per_row\":[{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":9,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20\"}],\"matched_count\":4,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:9",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:0",
+          "row:9",
+          "row:10",
+          "row:14"
+        ],
+        "matched_row_indexes": [
+          0,
+          9,
+          10,
+          14
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 9,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R20"
+            }
+          ],
+          "matched_count": 4,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:0\",\"row:9\",\"row:10\",\"row:14\"],\"matched_row_indexes\":[0,9,10,14],\"per_row\":[{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":9,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20\"}],\"matched_count\":4,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:10",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245 /40 R20"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245 /40 R20\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    },
+    {
+      "canonical_filters": null,
+      "canonical_filters_json": null,
+      "expected": null,
+      "id": "size-nd:11",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20​"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20​\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": [
+        {
+          "loc": [
+            "filters",
+            0
+          ],
+          "type": "value_error"
+        }
+      ]
+    },
+    {
+      "canonical_filters": null,
+      "canonical_filters_json": null,
+      "expected": null,
+      "id": "size-nd:12",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20.۵"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.۵\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": [
+        {
+          "loc": [
+            "filters",
+            0
+          ],
+          "type": "value_error"
+        }
+      ]
+    },
+    {
+      "canonical_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "245/40R20.5"
+        }
+      ],
+      "canonical_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.5\"}]",
+      "expected": {
+        "matched_ids": [
+          "row:4",
+          "row:8",
+          "row:13",
+          "row:16"
+        ],
+        "matched_row_indexes": [
+          4,
+          8,
+          13,
+          16
+        ],
+        "per_row": [
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:0",
+            "row_index": 0
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠",
+                "value_json": "\"245/40R٢٠\""
+              }
+            ],
+            "id": "row:1",
+            "row_index": 1
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR۲۰",
+                "value_json": "\"245/40ZR۲۰\""
+              }
+            ],
+            "id": "row:2",
+            "row_index": 2
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R२०",
+                "value_json": "\"245/40R२०\""
+              }
+            ],
+            "id": "row:3",
+            "row_index": 3
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:4",
+            "row_index": 4
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R٢٠.5",
+                "value_json": "\"245/40R٢٠.5\""
+              }
+            ],
+            "id": "row:5",
+            "row_index": 5
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:6",
+            "row_index": 6
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:7",
+            "row_index": 7
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:8",
+            "row_index": 8
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:9",
+            "row_index": 9
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:10",
+            "row_index": 10
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:11",
+            "row_index": 11
+          },
+          {
+            "conditions": [
+              {
+                "matched": null,
+                "status": "invalid",
+                "value": null,
+                "value_json": "null"
+              }
+            ],
+            "id": "row:12",
+            "row_index": 12
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:13",
+            "row_index": 13
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40R20",
+                "value_json": "\"245/40R20\""
+              }
+            ],
+            "id": "row:14",
+            "row_index": 14
+          },
+          {
+            "conditions": [
+              {
+                "matched": false,
+                "status": "known",
+                "value": "245/40ZR20",
+                "value_json": "\"245/40ZR20\""
+              }
+            ],
+            "id": "row:15",
+            "row_index": 15
+          },
+          {
+            "conditions": [
+              {
+                "matched": true,
+                "status": "known",
+                "value": "245/40R20.5",
+                "value_json": "\"245/40R20.5\""
+              }
+            ],
+            "id": "row:16",
+            "row_index": 16
+          }
+        ],
+        "selection": {
+          "excluded_count": 9,
+          "filters": [
+            {
+              "field": "size",
+              "op": "eq",
+              "value": "245/40R20.5"
+            }
+          ],
+          "matched_count": 4,
+          "source_count": 17,
+          "undetermined_count": 4
+        }
+      },
+      "expected_json": "{\"matched_ids\":[\"row:4\",\"row:8\",\"row:13\",\"row:16\"],\"matched_row_indexes\":[4,8,13,16],\"per_row\":[{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:0\",\"row_index\":0},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠\",\"value_json\":\"\\\"245/40R٢٠\\\"\"}],\"id\":\"row:1\",\"row_index\":1},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR۲۰\",\"value_json\":\"\\\"245/40ZR۲۰\\\"\"}],\"id\":\"row:2\",\"row_index\":2},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R२०\",\"value_json\":\"\\\"245/40R२०\\\"\"}],\"id\":\"row:3\",\"row_index\":3},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:4\",\"row_index\":4},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R٢٠.5\",\"value_json\":\"\\\"245/40R٢٠.5\\\"\"}],\"id\":\"row:5\",\"row_index\":5},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:6\",\"row_index\":6},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:7\",\"row_index\":7},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:8\",\"row_index\":8},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:9\",\"row_index\":9},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:10\",\"row_index\":10},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:11\",\"row_index\":11},{\"conditions\":[{\"matched\":null,\"status\":\"invalid\",\"value\":null,\"value_json\":\"null\"}],\"id\":\"row:12\",\"row_index\":12},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:13\",\"row_index\":13},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40R20\",\"value_json\":\"\\\"245/40R20\\\"\"}],\"id\":\"row:14\",\"row_index\":14},{\"conditions\":[{\"matched\":false,\"status\":\"known\",\"value\":\"245/40ZR20\",\"value_json\":\"\\\"245/40ZR20\\\"\"}],\"id\":\"row:15\",\"row_index\":15},{\"conditions\":[{\"matched\":true,\"status\":\"known\",\"value\":\"245/40R20.5\",\"value_json\":\"\\\"245/40R20.5\\\"\"}],\"id\":\"row:16\",\"row_index\":16}],\"selection\":{\"excluded_count\":9,\"filters\":[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"245/40R20.5\"}],\"matched_count\":4,\"source_count\":17,\"undetermined_count\":4}}",
+      "id": "size-nd:13",
+      "input_filters": [
+        {
+          "field": "size",
+          "op": "eq",
+          "value": "٢٤٥/٤٠R20.5"
+        }
+      ],
+      "input_filters_json": "[{\"field\":\"size\",\"op\":\"eq\",\"value\":\"٢٤٥/٤٠R20.5\"}]",
+      "rows": [
+        {
+          "facts": {},
+          "id": "row:0",
+          "size": "٢٤٥/٤٠R20"
+        },
+        {
+          "facts": {},
+          "id": "row:1",
+          "size": "245/40R٢٠"
+        },
+        {
+          "facts": {},
+          "id": "row:2",
+          "size": "۲۴۵/۴۰ZR۲۰"
+        },
+        {
+          "facts": {},
+          "id": "row:3",
+          "size": "२४५/४०R२०"
+        },
+        {
+          "facts": {},
+          "id": "row:4",
+          "size": "２４５／４０Ｒ２０．５"
+        },
+        {
+          "facts": {},
+          "id": "row:5",
+          "size": "245/40R٢٠.5"
+        },
+        {
+          "facts": {},
+          "id": "row:6",
+          "size": "245/40R20.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:7",
+          "size": "245/40R٢٠.٥"
+        },
+        {
+          "facts": {},
+          "id": "row:8",
+          "size": "245/40R２０.5"
+        },
+        {
+          "facts": {},
+          "id": "row:9",
+          "size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘"
+        },
+        {
+          "facts": {},
+          "id": "row:10",
+          "size": "245 /40 R20"
+        },
+        {
+          "facts": {},
+          "id": "row:11",
+          "size": "245/40R20​"
+        },
+        {
+          "facts": {},
+          "id": "row:12",
+          "size": "245/40R20.۵"
+        },
+        {
+          "facts": {},
+          "id": "row:13",
+          "size": "٢٤٥/٤٠R20.5"
+        },
+        {
+          "facts": {},
+          "id": "row:14",
+          "size": "245/40R20"
+        },
+        {
+          "facts": {},
+          "id": "row:15",
+          "size": "245/40ZR20"
+        },
+        {
+          "facts": {},
+          "id": "row:16",
+          "size": "245/40R20.5"
+        }
+      ],
+      "rows_json": "[{\"facts\":{},\"id\":\"row:0\",\"size\":\"٢٤٥/٤٠R20\"},{\"facts\":{},\"id\":\"row:1\",\"size\":\"245/40R٢٠\"},{\"facts\":{},\"id\":\"row:2\",\"size\":\"۲۴۵/۴۰ZR۲۰\"},{\"facts\":{},\"id\":\"row:3\",\"size\":\"२४५/४०R२०\"},{\"facts\":{},\"id\":\"row:4\",\"size\":\"２４５／４０Ｒ２０．５\"},{\"facts\":{},\"id\":\"row:5\",\"size\":\"245/40R٢٠.5\"},{\"facts\":{},\"id\":\"row:6\",\"size\":\"245/40R20.٥\"},{\"facts\":{},\"id\":\"row:7\",\"size\":\"245/40R٢٠.٥\"},{\"facts\":{},\"id\":\"row:8\",\"size\":\"245/40R２０.5\"},{\"facts\":{},\"id\":\"row:9\",\"size\":\"𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘\"},{\"facts\":{},\"id\":\"row:10\",\"size\":\"245 /40 R20\"},{\"facts\":{},\"id\":\"row:11\",\"size\":\"245/40R20​\"},{\"facts\":{},\"id\":\"row:12\",\"size\":\"245/40R20.۵\"},{\"facts\":{},\"id\":\"row:13\",\"size\":\"٢٤٥/٤٠R20.5\"},{\"facts\":{},\"id\":\"row:14\",\"size\":\"245/40R20\"},{\"facts\":{},\"id\":\"row:15\",\"size\":\"245/40ZR20\"},{\"facts\":{},\"id\":\"row:16\",\"size\":\"245/40R20.5\"}]",
+      "validation_error": null
+    }
+  ],
+  "catalog": {
+    "fields": [
+      {
+        "key": "brand",
+        "label": "品牌",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "仅匹配 facts.family 明确发布的系列，不从型号推断。",
+        "key": "family",
+        "label": "产品系列",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "key": "model",
+        "label": "型号",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "本系统已采纳版本的精确 ID。",
+        "key": "variant_id",
+        "label": "版本 ID",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "key": "region",
+        "label": "区域",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "文本精确匹配，保留前导零。",
+        "key": "manufacturer_product_code",
+        "label": "厂商产品代码",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "文本精确匹配，保留前导零。",
+        "key": "gtin",
+        "label": "GTIN",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "文本精确匹配，保留前导零；不推断注册状态。",
+        "key": "eprel_id",
+        "label": "EPREL 编号",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "公制尺寸精确匹配，保留 R / ZR 差别。",
+        "key": "size",
+        "label": "尺寸",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "key": "construction",
+        "label": "结构",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "按完整文本匹配双载重指数；不提供数值排序。",
+        "key": "load_index",
+        "label": "载重指数",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "按完整级别精确匹配；不按字母排序。",
+        "key": "speed_rating",
+        "label": "速度级别",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "按来源完整标记文本匹配，不从 OE 推断车型适配。",
+        "key": "oe_mark",
+        "label": "OE 标记",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "技术名称精确匹配；Acoustic、PNCS、ContiSilent、Foam 互不等同。",
+        "key": "acoustic_technology",
+        "label": "静音技术",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "eq 匹配来源文本列表中的完整成员；不解析营销描述。空列表为未知。",
+        "key": "technology_features",
+        "label": "技术配置",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "仅接受来源明确声明的布尔值，未声明不等于否。",
+        "key": "xl",
+        "label": "XL",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "options": [
+          {
+            "label": "是",
+            "value": true
+          },
+          {
+            "label": "否",
+            "value": false
+          }
+        ],
+        "type": "boolean"
+      },
+      {
+        "description": "仅接受来源明确声明的布尔值，未声明不等于否。",
+        "key": "hl",
+        "label": "HL",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "options": [
+          {
+            "label": "是",
+            "value": true
+          },
+          {
+            "label": "否",
+            "value": false
+          }
+        ],
+        "type": "boolean"
+      },
+      {
+        "description": "仅接受来源明确声明的布尔值，未声明不等于否。",
+        "key": "run_flat",
+        "label": "防爆 / 缺气保用",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "options": [
+          {
+            "label": "是",
+            "value": true
+          },
+          {
+            "label": "否",
+            "value": false
+          }
+        ],
+        "type": "boolean"
+      },
+      {
+        "description": "仅接受来源明确声明的布尔值，未声明不等于否。",
+        "key": "acoustic_foam",
+        "label": "静音棉",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "options": [
+          {
+            "label": "是",
+            "value": true
+          },
+          {
+            "label": "否",
+            "value": false
+          }
+        ],
+        "type": "boolean"
+      },
+      {
+        "description": "仅接受来源明确声明的布尔值，未声明不等于否。",
+        "key": "ev_marketing_mark",
+        "label": "EV 营销标识",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "options": [
+          {
+            "label": "是",
+            "value": true
+          },
+          {
+            "label": "否",
+            "value": false
+          }
+        ],
+        "type": "boolean"
+      },
+      {
+        "key": "season",
+        "label": "季节",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "仅接受来源实际数字，不转换文本、对象或单位。",
+        "key": "utqg_treadwear",
+        "label": "UTQG 磨耗",
+        "operators": [
+          "eq",
+          "gte",
+          "lte",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "number"
+      },
+      {
+        "key": "utqg_traction",
+        "label": "UTQG 抓地",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "key": "utqg_temperature",
+        "label": "UTQG 温度",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "key": "eu_fuel_class",
+        "label": "欧盟能效等级",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "key": "eu_wet_grip",
+        "label": "欧盟湿地抓地等级",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      },
+      {
+        "description": "仅接受来源实际 dB 数值，不转换文本、对象或其他单位。",
+        "key": "eu_external_noise_db",
+        "label": "欧盟外部滚动噪声",
+        "operators": [
+          "eq",
+          "gte",
+          "lte",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "number",
+        "unit": "dB"
+      },
+      {
+        "key": "eu_noise_class",
+        "label": "欧盟噪声等级",
+        "operators": [
+          "eq",
+          "is_known",
+          "is_unknown"
+        ],
+        "type": "text"
+      }
+    ],
+    "max_conditions": 16,
+    "notice": "所有条件同时满足才返回。文本按 Unicode 规范化、合并空白和忽略大小写精确匹配。未声明不等于否；技术文本中的 unknown / unspecified 视为未声明（不适用于产品代码等标识）。冲突或不合法类型无法判定。筛选仅作用于本次来源结果，不影响完整证据、入库或质量检查。",
+    "version": "tire-query-filters@1"
+  },
+  "metadata": {
+    "canonical_sort": "json.dumps(sort_keys=True, ensure_ascii=False, allow_nan=False)",
+    "fingerprint_policy": "Never verify a Python fingerprint by host JSON re-encoding",
+    "number_policy": "Python exact integers and finite binary64 floats; preserve JSON token string columns",
+    "python_version": "3.12.10",
+    "source": "apps/api/tire_api/query_filters.py",
+    "source_sha256": "732a7b7ec653b949670327fce04886a4e0c53ef0414b5aa070f8b751b1420b32",
+    "unicode_version": "15.0.0"
+  },
+  "query_size_cases": [
+    {
+      "canonical_query": {
+        "size": "245/40R20"
+      },
+      "input_size": "٢٤٥/٤٠R20",
+      "invalid": false
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R٢٠"
+      },
+      "input_size": "245/40R٢٠",
+      "invalid": false
+    },
+    {
+      "canonical_query": {
+        "size": "245/40ZR۲۰"
+      },
+      "input_size": "۲۴۵/۴۰ZR۲۰",
+      "invalid": false
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R२०"
+      },
+      "input_size": "२४५/४०R२०",
+      "invalid": false
+    },
+    {
+      "canonical_query": null,
+      "input_size": "２４５／４０Ｒ２０．５",
+      "invalid": true
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R٢٠.5"
+      },
+      "input_size": "245/40R٢٠.5",
+      "invalid": false
+    },
+    {
+      "canonical_query": null,
+      "input_size": "245/40R20.٥",
+      "invalid": true
+    },
+    {
+      "canonical_query": null,
+      "input_size": "245/40R٢٠.٥",
+      "invalid": true
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R２０.5"
+      },
+      "input_size": "245/40R２０.5",
+      "invalid": false
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R𝟚𝟘"
+      },
+      "input_size": "𝟚𝟜𝟝/𝟜𝟘R𝟚𝟘",
+      "invalid": false
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R20"
+      },
+      "input_size": "245 /40 R20",
+      "invalid": false
+    },
+    {
+      "canonical_query": null,
+      "input_size": "245/40R20​",
+      "invalid": true
+    },
+    {
+      "canonical_query": null,
+      "input_size": "245/40R20.۵",
+      "invalid": true
+    },
+    {
+      "canonical_query": {
+        "size": "245/40R20.5"
+      },
+      "input_size": "٢٤٥/٤٠R20.5",
+      "invalid": false
+    }
+  ],
+  "schema": "tire-query-filter-reference@1",
+  "supplements": {
+    "primary_path": "apps/api/tests/data/query-filters49.json",
+    "primary_sha256": "fa00a9b8e563c7df0d61e861e1a31ad7ed032d3c2d8f5f400d3c615859bb4d5f",
+    "query_size_boundary": "TireQuery.parse_size is separate from filter NFKC/category-C normalization",
+    "reason": "Unicode Nd width/aspect normalize to ASCII; original two-digit rim tokens remain; fractional .5 is literal ASCII after filter NFKC"
+  }
+}

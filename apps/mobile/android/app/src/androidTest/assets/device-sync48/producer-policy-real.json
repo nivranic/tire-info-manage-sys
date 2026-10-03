@@ -1,0 +1,74 @@
+{
+  "schema": "device-sync-policy@1",
+  "policy_id": "bc85ca8e-8e39-4306-bd4d-262814508d74",
+  "policy_revision": 3,
+  "state": "enabled",
+  "profile_id": "d802400122fb8a4d5ff607881eea0d5f9cc91a7e8d86200abb63a17e7e369edd",
+  "owner_epoch": 1,
+  "owner_scope_id": "1597c43d61f3f8847acf877d0e6056c75ea62aba4bd455adfca1d08ea8b1e462",
+  "slot_id": "7bdc6781-7998-4dfb-94e1-5a2e6a754f5a",
+  "scope": {
+    "garage": {
+      "include": true,
+      "vehicle_ids": null
+    },
+    "recent": {
+      "include": false,
+      "limit": 20
+    },
+    "references": [
+      {
+        "event_id": "3959270e-ddfe-44d4-8d4e-8c36b8badabf",
+        "event_revision": 1,
+        "kind": "test_event"
+      },
+      {
+        "kind": "recall",
+        "recall_revision_id": "54016118-8776-4993-8c45-9b1f3a1fb259",
+        "snapshot_id": "6aed99ae-5a79-471a-a4ac-1c348fb6f733",
+        "verification_id": "8b38216e-11f8-42a1-9333-d6ef7bdbc1a9"
+      },
+      {
+        "kind": "recall",
+        "recall_revision_id": null,
+        "snapshot_id": "663db357-fecc-42da-b21d-bc2ce1e4e7cc",
+        "verification_id": "641a4af7-466e-49a4-8a69-cb8cd754a195"
+      },
+      {
+        "kind": "vehicle",
+        "snapshot_id": "a0138785-712b-4ff5-a7de-a2cfa5512970",
+        "verification_id": "569e6a0a-1e17-4e29-89d3-f6d099cb9498"
+      }
+    ],
+    "watchlist": {
+      "include": true,
+      "item_ids": null
+    }
+  },
+  "capacity": {
+    "version": "offline-policy@1",
+    "max_package_bytes": 8388608,
+    "max_distinct_evidence": 200,
+    "max_garage_profiles": 50,
+    "max_watch_items": 100,
+    "max_recent_query_candidates": 20,
+    "max_searchable_documents": 4000,
+    "plan_ttl_seconds": 600,
+    "raw_policy": "exclude"
+  },
+  "interval_seconds": 900,
+  "conditions": {
+    "network": "any",
+    "power": "any"
+  },
+  "approved_at": "2026-10-01T05:50:59.322Z",
+  "updated_at": "2026-10-01T05:51:00.107Z",
+  "binding": {
+    "binding_revision": 2,
+    "generation": 1,
+    "package_id": "79209e65-c310-4c59-8fa5-774cc34e86cf",
+    "sha256": "4f7e681c0b7643c90e1ea3e04b75afaa3db2093a06dabc1a6d2b88b5317ad91f"
+  },
+  "next_due_at": "2026-10-01T06:06:00.107Z",
+  "reason": "OFFLINE_SYNC_FAILED"
+}

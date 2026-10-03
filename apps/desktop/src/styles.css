@@ -1,0 +1,34 @@
+:root { color-scheme: light; background: #f6f5f1; color: #252925; }
+.desktop-root { min-width: 360px; }
+.desktop-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; position: sticky; top: 0; z-index: 40; min-height: 48px; padding: 10px 24px; border-bottom: 1px solid #dfdfd6; background: #efeee8; color: #252925; font-size: 12px; }
+.desktop-bar > strong { letter-spacing: 2px; }
+.desktop-bar > strong > span { font-size: 10px; font-weight: 400; letter-spacing: 0; margin-left: 8px; }
+.desktop-connection { margin-left: auto; color: #767a72; }
+.desktop-connection.ready { color: #49745c; }
+.desktop-connection.failed { color: #ad3d26; }
+.desktop-settings > summary { cursor: pointer; min-height: 28px; display: flex; align-items: center; }
+.desktop-settings > div { position: absolute; right: 20px; top: 48px; width: min(430px, calc(100vw - 40px)); padding: 20px; border: 1px solid #dfdfd6; background: #fdfcf9; box-shadow: 0 12px 36px #2529251a; line-height: 1.8; }
+.desktop-settings p { margin: 0 0 12px; }
+.desktop-settings button, .desktop-link-error button { padding: 6px 10px; border: 1px solid #bcbfb5; background: #f6f5f1; color: #252925; min-height: 36px; }
+.desktop-reset-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.desktop-reset-actions > span { flex-basis: 100%; }
+.desktop-link-error { padding: 10px 24px; background: #f5e7dc; color: #ad3d26; display: flex; align-items: center; gap: 20px; }
+.desktop-root .app-shell { min-height: calc(100dvh - 48px); }
+.desktop-root .sidebar { top: 48px; height: calc(100dvh - 48px); }
+/* 桌面端设备 AI 走 Tauri IPC 面板（desktop-bar 入口）。共用 Workbench 侧栏里的
+   Web 版入口依赖浏览器 IndexedDB 的包字节与台账，在桌面 WebView 内不可用；
+   它是侧栏中唯一紧跟 phase-note 的入口按钮，按结构选择器隐藏以免误用。 */
+.desktop-root .sidebar-bottom button.future-note:has(+ .phase-note) { display: none; }
+.desktop-connect-screen { min-height: calc(100dvh - 48px); padding: 64px 24px; display: grid; place-content: center; }
+.desktop-connect-card { width: min(660px, calc(100vw - 48px)); padding: 40px; background: #fdfcf9; border: 1px solid #dfdfd6; border-top: 3px solid #c65227; }
+.desktop-eyebrow { font-family: Consolas, monospace; font-size: 10px; letter-spacing: 2px; color: #767a72; }
+.desktop-connect-card h1 { margin: 20px 0; font-size: 28px; font-weight: 600; letter-spacing: 1px; }
+.desktop-connect-card p { line-height: 1.9; }
+.desktop-progress { color: #49745c; }
+.desktop-error { color: #ad3d26; padding: 14px; background: #f5e7dc; }
+.desktop-retry { margin: 8px 0 16px; min-height: 42px; padding: 10px 20px; border: 1px solid #c65227; background: #c65227; color: white; }
+.desktop-connect-card dl { margin: 24px 0 0; }
+.desktop-connect-card dl > div { display: grid; grid-template-columns: 110px 1fr; gap: 10px; padding: 16px 0; border-top: 1px solid #eaeae3; line-height: 1.8; }
+.desktop-connect-card dt { font-weight: 600; }
+.desktop-connect-card dd { margin: 0; color: #767a72; }
+@media (max-width: 700px) { .desktop-bar { padding-inline: 14px; gap: 8px 12px; } .desktop-bar > strong > span { display: none; } .desktop-connect-card { padding: 24px; } .desktop-root .sidebar { height: auto; top: auto; } }

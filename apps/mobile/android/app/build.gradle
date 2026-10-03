@@ -1,0 +1,111 @@
+apply plugin: 'com.android.application'
+
+def requestedPort = providers.gradleProperty('tireApiPort').getOrElse('8000')
+def requestedNamespace = providers.gradleProperty('tireSessionNamespace').getOrElse('default')
+def requestedTestBuildType = providers.gradleProperty('tireTestBuildType').getOrElse('debug')
+if (!(requestedTestBuildType in ['debug', 'offlineQa'])) {
+    throw new GradleException('tireTestBuildType must be debug or offlineQa')
+}
+if (!(requestedPort ==~ /[0-9]{4,5}/) || requestedPort.toInteger() < 1024 || requestedPort.toInteger() > 65535) {
+    throw new GradleException('tireApiPort must be an integer from 1024 to 65535')
+}
+if (!(requestedNamespace ==~ /[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?/)) {
+    throw new GradleException('tireSessionNamespace must be 1-48 lowercase letters, digits or internal hyphens')
+}
+
+android {
+    testBuildType = requestedTestBuildType
+    namespace = "org.taiji.tireintelligence.mobile"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "org.taiji.tireintelligence.mobile"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "0.1.0"
+        def hostDigest = java.security.MessageDigest.getInstance('SHA-256')
+        hostDigest.update('android-offline-host@1\u0000'.getBytes('UTF-8'))
+        def hostFiles = fileTree('src/main/java').matching { include '**/*.java' }.files.toList()
+        hostFiles += [file('build.gradle'), file('src/main/AndroidManifest.xml'), rootProject.file('build.gradle'), rootProject.file('variables.gradle')]
+        hostFiles.sort { a, b -> a.absolutePath <=> b.absolutePath }.each { productFile ->
+            hostDigest.update(('\u0000' + rootProject.projectDir.toPath().relativize(productFile.toPath()).toString().replace('\\','/') + '\u0000').getBytes('UTF-8'))
+            hostDigest.update(productFile.bytes)
+        }
+        buildConfigField 'String', 'OFFLINE_HOST_BUILD', '"' + hostDigest.digest().encodeHex().toString() + '"'
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildFeatures { buildConfig true }
+    // initWith copies build settings, not src/debug resources. This isolated QA
+    // application uses the same loopback-only network policy as Debug.
+    sourceSets { offlineQa.res.srcDirs += 'src/debug/res' }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+        coreLibraryDesugaringEnabled true
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+            buildConfigField 'int', 'API_PORT', requestedPort.toInteger().toString()
+            buildConfigField 'String', 'SESSION_NAMESPACE', '"debug-' + requestedNamespace + '"'
+        }
+        offlineQa {
+            initWith debug
+            applicationIdSuffix '.offlineqa'
+            versionNameSuffix '-offlineqa'
+            matchingFallbacks = ['debug']
+            buildConfigField 'String', 'SESSION_NAMESPACE', '"offlineqa-' + requestedNamespace + '"'
+        }
+        release {
+            buildConfigField 'int', 'API_PORT', '0'
+            buildConfigField 'String', 'SESSION_NAMESPACE', '"release-unconfigured"'
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation 'androidx.work:work-runtime:2.10.1'
+    implementation 'androidx.sqlite:sqlite-bundled:2.7.1'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.webkit:webkit:$androidxWebkitVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation 'org.json:json:20250517'
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation 'androidx.test:core:1.7.0'
+    androidTestImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    androidTestImplementation 'androidx.work:work-testing:2.10.1'
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

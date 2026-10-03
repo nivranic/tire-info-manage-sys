@@ -1,0 +1,212 @@
+{
+  "schema": "tire-basic-query-reference@1",
+  "unicode_version": "15.0.0",
+  "definition": "basic size condition expected=TireQuery canonical raw size; row=_matches/_read; advanced expected=TireFilter normalized value",
+  "source_hashes": {
+    "apps/api/tire_api/domain.py": "1e1e1a7b1f52fd6e75fa82fcc4965bd400ae9cc1bbd140d011770f715a1ca736",
+    "apps/api/tire_api/query_filters.py": "732a7b7ec653b949670327fce04886a4e0c53ef0414b5aa070f8b751b1420b32"
+  },
+  "cases": [
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R20",
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "205/55R𝟚𝟘"
+      },
+      "canonical_query": {
+        "size": "205/55R𝟚𝟘"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": false,
+      "advanced_match": true,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R𝟚𝟘",
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "205/55R20"
+      },
+      "canonical_query": {
+        "size": "205/55R20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": true,
+      "advanced_match": true,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R20",
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "٢٠٥/٥٥R٢٠"
+      },
+      "canonical_query": {
+        "size": "205/55R٢٠"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R٢٠"
+      },
+      "basic_match": false,
+      "advanced_match": false,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R20",
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "٢٠٥/٥٥R20"
+      },
+      "canonical_query": {
+        "size": "205/55R20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": true,
+      "advanced_match": true,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55ZR20",
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "205/55R20"
+      },
+      "canonical_query": {
+        "size": "205/55R20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": false,
+      "advanced_match": false,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R20",
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "205/55ZR20"
+      },
+      "canonical_query": {
+        "size": "205/55ZR20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55ZR20"
+      },
+      "basic_match": false,
+      "advanced_match": false,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R20",
+        "facts": {
+          "source_field_conflicts": [
+            {
+              "field": "identity.size"
+            }
+          ]
+        }
+      },
+      "draft_query": {
+        "size": "205/55R20"
+      },
+      "canonical_query": {
+        "size": "205/55R20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": null,
+      "advanced_match": null,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": null,
+        "facts": {}
+      },
+      "draft_query": {
+        "size": "205/55R20"
+      },
+      "canonical_query": {
+        "size": "205/55R20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": null,
+      "advanced_match": null,
+      "basic_with_false_model": false
+    },
+    {
+      "row": {
+        "model": "Fixture Tire",
+        "size": "205/55R20",
+        "facts": {
+          "utqg_treadwear": 200
+        }
+      },
+      "draft_query": {
+        "size": "205/55R20"
+      },
+      "canonical_query": {
+        "size": "205/55R20"
+      },
+      "advanced_filter": {
+        "field": "size",
+        "op": "eq",
+        "value": "205/55R20"
+      },
+      "basic_match": true,
+      "advanced_match": true,
+      "basic_with_false_model": false
+    }
+  ],
+  "source_calls": 0,
+  "parser_calls": 0,
+  "model_calls": 0,
+  "database_calls": 0
+}

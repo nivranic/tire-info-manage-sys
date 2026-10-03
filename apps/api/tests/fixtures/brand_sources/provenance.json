@@ -1,0 +1,89 @@
+{
+  "description": "Minimal excerpts of independently fetched public official responses. Not full pages, not a complete Golden SKU set. Original field values preserved. No fixture data enters the business database.",
+  "fixtures": [
+    {
+      "file": "toyo-proxes-sport-excerpt.json",
+      "source_url": "https://www.toyotires.com/tire/pattern/specs/PXSP",
+      "observed_at": "2026-09-26T05:40:54.102333+00:00",
+      "original_body_sha256": "5fb613da8e1dd7b3579f37551a3fb1bb19d33e29c9e9903e4957f57a89a16ea8",
+      "original_body_bytes": 7407,
+      "fixture_sha256": "317f861c8554dcad61a9d72115359dce9e7dd0152e96935a026adf90e580e147",
+      "parser_version": "toyo-us-specifications@1.0.0",
+      "product_codes": [
+        "136130",
+        "132860"
+      ],
+      "transformation": "Parsed official JSON and retained original layout/container plus two complete tire objects without modifying any source values; pretty-printed excerpt."
+    },
+    {
+      "file": "hankook-runflat-pair-excerpt.html",
+      "source_url": "https://www.hankooktire.com/us/en/tire/ventus/s1evo3-k127.html",
+      "observed_at": "2026-09-26T05:40:52.863426+00:00",
+      "original_body_sha256": "05426554f40238ee33f96bd7c2e5746f315077c3265a585502cd5ade162a7d79",
+      "original_body_bytes": 922435,
+      "fixture_sha256": "35e56f69a46f02bb307ebe56f3efb8e069d2d8800809fba1a18121856a44832f",
+      "parser_version": "hankook-us-spec-cards@1.0.0",
+      "product_codes": [
+        "1022631",
+        "1022632"
+      ],
+      "transformation": "Two complete original li cards copied byte-for-byte with original section, model-tab, tab-body and list opening tags; unrelated content removed and minimal closing containers supplied. SKU values unchanged.",
+      "source_row_sha256": [
+        "b7ada89e04d9d0be856bac8b33e7a37d0f06880d9db9804c683dcf4422281a6d",
+        "1fa2d3b6c4c5d435892f53a73e9d08a217eef071a8d3178ccb4b045f7c28e7fe"
+      ]
+    },
+    {
+      "file": "pirelli-pz4-265-40-r20-excerpt.html",
+      "source_url": "https://www.pirelli.com/tires/en-us/car/catalog/product/new-p-zero/265_40-r20",
+      "observed_at": "2026-09-30T08:20:29.413616+00:00",
+      "http_status": 200,
+      "original_body_sha256": "0f52064a90a6cf465cdc646715739a6b687c007591d43d36068b8b1968b09e56",
+      "original_body_bytes": 583301,
+      "fixture_sha256": "f4697028e58ec38cac68d29304b1eca3bb9bac58f9e70c48c7b191b9250e5b04",
+      "parser_version": "pirelli-us-pz4-flight@1.0.0",
+      "product_codes": [
+        "2524000",
+        "4080500",
+        "4159300"
+      ],
+      "transformation": "Decoded the original official Flight main props; retained all 3/8 complete size-page SKU rows, exact page scope/model fields and Product JSON-LD. Removed unrelated navigation/marketing, reserialized strict literal JSON inside a minimal HTML shell. Original retained source values unchanged; no fabricated SKU values.",
+      "source_row_sha256": [
+        "04f60fda7174b3e97d76299ae88b8cd3ea7a7fa607da19ee0488ddd80067287a",
+        "0090d5eabe141a08a5a1dc75b3e8b09ffb03c716a07b698f8fca58f06dd2deca",
+        "4fc721428bf7cb2910d5b160b700def497c552a4ae0987b11b87b9023f6543e3"
+      ]
+    },
+    {
+      "file": "pirelli-pz4-265-40-r21-excerpt.html",
+      "source_url": "https://www.pirelli.com/tires/en-us/car/catalog/product/new-p-zero/265_40-r21",
+      "observed_at": "2026-09-30T08:22:38.781478+00:00",
+      "http_status": 200,
+      "original_body_sha256": "a46fce3496c7060f97981e9ee79db20726bc2496e79d07fc0a45f0123e98f82f",
+      "original_body_bytes": 591998,
+      "fixture_sha256": "3019dc2eff206cb46a45a779a37660f73678311b6e6a9caaea790d2b32842d97",
+      "parser_version": "pirelli-us-pz4-flight@1.0.0",
+      "product_codes": [
+        "2679200",
+        "3768200",
+        "3791000",
+        "3973300",
+        "4059000",
+        "4188600",
+        "4193300",
+        "4220800"
+      ],
+      "transformation": "Decoded the original official Flight main props; retained all 3/8 complete size-page SKU rows, exact page scope/model fields and Product JSON-LD. Removed unrelated navigation/marketing, reserialized strict literal JSON inside a minimal HTML shell. Original retained source values unchanged; no fabricated SKU values.",
+      "source_row_sha256": [
+        "d89024bb3ffcc1252f5326a1cde22cb7ec00cc7f36df5185981f1975dd782fed",
+        "afe662d445c49acb7cafe9dbbb89eafaf1f7a459cfc65119b576e96d554034a9",
+        "3b7bfc5bea05dfb83f0e55f93935dfcc6f089bcccd74d20c76542a76d83e8ab4",
+        "0198eccdcc12ec7d89ee8c9fae5921c10e7357b67edf58f96b0816827bf3ea45",
+        "3b2e0c85a8f8faa2a42d8ebb948b57c8c37d69c0166b51996c9d001d38fb13e0",
+        "7e3691d0fbd92c126249bbb3b37264062762b8bdc46dc78d7a0be171b4ec2634",
+        "0f20383d339d3c54d4724e7598324e61e706ef7130d1cd04eaba9aa8be370f41",
+        "cfd344b3258171b35024f676827a31a40104c99ce18e690ae1e2dc5578ddf17f"
+      ]
+    }
+  ]
+}

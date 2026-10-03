@@ -1,0 +1,90 @@
+{
+  "descriptor_origin": "exact FastAPI producer confirmation response bytes",
+  "external_source_model_parser_calls": 0,
+  "normal_db_reads": 0,
+  "pack_origin": "exact owned download response bytes; no JSON reencoding",
+  "primary_filter_reference_sha256": "fa00a9b8e563c7df0d61e861e1a31ad7ed032d3c2d8f5f400d3c615859bb4d5f",
+  "samples": {
+    "empty": {
+      "bytes": 82348,
+      "counts": {
+        "distinct_evidence": 6,
+        "garage_profiles": 0,
+        "recent_queries": 0,
+        "searchable_documents": 8,
+        "watch_items": 0
+      },
+      "descriptor": "empty-descriptor.json",
+      "descriptor_schema": "offline-pack-descriptor@2",
+      "descriptor_sha256": "b73693be275ca1f51ed491f2970052d7123551d547779415b904f9ff01095783",
+      "member_kinds": [
+        "recall",
+        "recall_search",
+        "test_event",
+        "tire",
+        "vehicle"
+      ],
+      "pack": "empty-pack.json",
+      "pack_schema": "offline-pack@2",
+      "pack_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574"
+    },
+    "legacy": {
+      "bytes": 78418,
+      "counts": {
+        "distinct_evidence": 5,
+        "garage_profiles": 0,
+        "recent_queries": 0,
+        "searchable_documents": 7,
+        "watch_items": 0
+      },
+      "descriptor": "legacy-descriptor.json",
+      "descriptor_schema": "offline-pack-descriptor@1",
+      "descriptor_sha256": "58beed945e65dc23967742849a8b3fb78d5bc0809a67c13ec86562dc8c077edf",
+      "member_kinds": [
+        "recall",
+        "test_event",
+        "tire",
+        "vehicle"
+      ],
+      "pack": "legacy-pack.json",
+      "pack_schema": "offline-pack@1",
+      "pack_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00"
+    },
+    "nonempty": {
+      "bytes": 82981,
+      "counts": {
+        "distinct_evidence": 6,
+        "garage_profiles": 0,
+        "recent_queries": 0,
+        "searchable_documents": 8,
+        "watch_items": 0
+      },
+      "descriptor": "nonempty-descriptor.json",
+      "descriptor_schema": "offline-pack-descriptor@2",
+      "descriptor_sha256": "9a647693195d96daa5a73237f108973dea4b43dce2b35eb94096ea404972629d",
+      "member_kinds": [
+        "recall",
+        "recall_search",
+        "test_event",
+        "tire",
+        "vehicle"
+      ],
+      "pack": "nonempty-pack.json",
+      "pack_schema": "offline-pack@2",
+      "pack_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862"
+    }
+  },
+  "schema": "offline-producer49-samples@1",
+  "source_refresh_performed": false,
+  "source_sha256": {
+    "apps/api/tests/test_offline_packs.py": "0b19f003faecbb20dbf05a09a87c10bebec7f3431cdf0974d246c00e404ef6d7",
+    "apps/api/tests/test_offline_packs_v2.py": "f81c78633f92900e65f936c0edede62a23ba07eb1432600484d402ce23012135",
+    "apps/api/tests/test_recall_discovery.py": "29de1c1fd43fdd09242d80b95a6ca2ec2f166c18a8cee30e508925b4625c17f8",
+    "apps/api/tire_api/offline_evidence.py": "bc23514980426ebe4f60a866741f3b5f22861020246db5fba1f442493bd8cc06",
+    "apps/api/tire_api/offline_models.py": "cc4bb2d12ad21399605bcceef6f4ce3c48edf7e694cb4416bf3ad10ef82de9db",
+    "apps/api/tire_api/offline_packs.py": "9c62a72ecb65a96529fac4c0055bab20f63170e55471118ea27cc19f233ed045"
+  },
+  "source_unchanged_during_capture": true,
+  "state": "passed",
+  "synthetic_private_only": true
+}

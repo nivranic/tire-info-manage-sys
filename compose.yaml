@@ -1,0 +1,20 @@
+# PG17 + vector candidate. Native PG18 core is verified separately; this image is
+# not yet runtime-verified and is not a production deployment.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: tire
+      POSTGRES_DB: tire
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local environment}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - tire-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tire -d tire"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  tire-postgres:

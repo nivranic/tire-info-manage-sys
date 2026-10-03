@@ -1,0 +1,1 @@
+{"meta":{"status":200,"messages":[],"pagination":{"count":0,"max":10,"offset":0,"sort":"productName","order":"asc","total":0,"currentUrl":"https://api.nhtsa.gov/tires/bySearch?offset=0&max=10&sort=productName&order=asc&data=recalls&dataSet=safetyIssues&query=ZZZNOSUCHTIREMODEL20260928","nextUrl":null,"previousUrl":null},"filters":null,"decoder":[]},"results":[]}

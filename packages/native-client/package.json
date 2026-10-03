@@ -1,0 +1,13 @@
+{
+  "name": "@tire/native-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": { "@tire/api-client": "0.1.0" },
+  "devDependencies": { "typescript": "~5.9.3" }
+}
