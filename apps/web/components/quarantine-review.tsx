@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
 import type { QuarantineReviewState } from "@tire/domain-types";
+import { useWorkbenchAuth } from "./auth";
 
 const labels: Record<QuarantineReviewState["state"], string> = {
   pending: "尚未人工处理", restricted: "涉及身份或证据问题，不能直接批准",
@@ -14,6 +15,9 @@ const labels: Record<QuarantineReviewState["state"], string> = {
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : "审批操作未完成，请重试。";
 
 export default function QuarantineReview({ id }: { id: string }) {
+  const auth = useWorkbenchAuth();
+  // 会话未就绪（ready=false，如首帧或桌面宿主未注入）时不禁用，避免误伤只读浏览。
+  const adminBlocked = auth.ready && (!auth.state.authenticated || !auth.state.user?.is_admin);
   const [state, setState] = useState<QuarantineReviewState | null>(null);
   const [revision, setRevision] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -57,7 +61,7 @@ export default function QuarantineReview({ id }: { id: string }) {
         <label><span>核验署名（本地自报）</span><input value={operator} maxLength={80} disabled={busy} onChange={event => setOperator(event.target.value)} /></label>
         <label><span>决定依据（至少 5 字）</span><textarea value={reason} maxLength={2000} disabled={busy} placeholder="说明核对了什么、为什么允许缺失或继续保留隔离" onChange={event => setReason(event.target.value)} /></label>
         <label className="review-checkbox"><input type="checkbox" checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)} /><span>已核对原文、对照参数与本次缺失，确认以上处理依据</span></label>
-        <div className="quarantine-review-actions"><button type="button" className="primary-button" disabled={disabled || !state.can_approve} onClick={() => void save("approve")}>批准，待在线核验</button><button type="button" className="secondary-button" disabled={disabled} onClick={() => void save("keep_quarantined")}>保留隔离 / 撤回批准</button></div>
+        <div className="quarantine-review-actions"><button type="button" className="primary-button" disabled={disabled || adminBlocked || !state.can_approve} title={adminBlocked ? "需要管理员账户" : undefined} onClick={() => void save("approve")}>批准，待在线核验</button><button type="button" className="secondary-button" disabled={disabled || adminBlocked} title={adminBlocked ? "需要管理员账户" : undefined} onClick={() => void save("keep_quarantined")}>保留隔离 / 撤回批准</button></div>
       </form> : <p className="quality-intro">原隔离记录继续保留。生效后如需更正事实，请使用人工纠错或版本管理，不能撤写历史。</p>}
       <details className="quality-technical"><summary>审批历史（{state.history.length}{state.history_truncated ? "+" : ""} 条）</summary>{state.history.length ? state.history.map(item => <article key={item.id}><p>#{item.revision} · {item.action === "approve" ? "批准待在线核验" : "保留隔离"} · {item.operator} · {new Date(item.created_at).toLocaleString("zh-CN")}</p><p>{item.reason}</p>{item.action === "approve" ? <p>批准截止：{new Date(item.expires_at).toLocaleString("zh-CN")}</p> : null}</article>) : <p>尚无人工决定。</p>}</details>
     </> : !error ? <p role="status">正在读取审批与对照参数…</p> : null}

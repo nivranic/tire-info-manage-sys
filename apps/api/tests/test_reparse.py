@@ -23,6 +23,7 @@ from tire_api.main import create_app
 from tire_api.reparse_models import ReparseCompletion, ReparseReview, ReparseRun
 from tire_api.service import QueryService
 from tire_api.source_settings import assert_source_access
+from admin_support import register_admin
 from test_core import FixtureRegistry
 from test_vehicles import source_document
 
@@ -101,6 +102,7 @@ def setup(tmp_path, monkeypatch):
     monkeypatch.setattr(parser_runtime, 'parse_isolated', simulated_process)
     app = create_app('sqlite:///' + (tmp_path / 'reparse.db').as_posix(), FixtureRegistry())
     with TestClient(app) as client:
+        register_admin(client)
         yield client, app.state.database, calls
 
 
@@ -417,6 +419,7 @@ def verify_reparse_persistence(url):
     """Real child process, recorded public excerpt, no external HTTP or synthetic parser."""
     app = create_app(url, FixtureRegistry())
     with TestClient(app) as client:
+        register_admin(client)
         capture_id = seed_capture(client, app.state.database, baseline=True)
         before = totals(app.state.database)
         response = create(client, capture_id)

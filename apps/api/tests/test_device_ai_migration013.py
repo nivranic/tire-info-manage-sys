@@ -22,13 +22,14 @@ from tire_api.device_ai_models import DeviceAIConsentClaim, DeviceAIPreparation
 from tire_api.knowledge_models import initialize_search
 from tire_api.main import create_app
 from tire_api.offline_models import OfflinePack, OfflinePackPlan
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import OLD_VERSIONS
 from test_device_ai_migration012 import (ACTOR, ARCHIVE_HASH, CONTRACT_HASH, OTHER_ACTOR, PROJECTION_HASH,
                                          analysis_request, claim, preparation)
 
 VERSIONS = [*OLD_VERSIONS, '009_ai_streaming', '010_offline_packs', '011_query_fallback_policies',
             '012_device_ai_preparations']
-ALL_VERSIONS = set(VERSIONS) | {'013_device_ai_ledger_triggers', '014_local_sessions_user'}
+ALL_VERSIONS = set(EXPECTED_SCHEMA_VERSIONS)
 LEDGER_TABLES = ('device_ai_preparations', 'device_ai_consent_claims')
 EXPECTED_TRIGGERS = {f'{table}_no_{action}' for table in LEDGER_TABLES
                      for action in ('update', 'delete', 'replace')}
@@ -99,7 +100,7 @@ def test_013_adds_only_six_ledger_triggers_and_one_version_row(predecessor):
     assert after['schema'] == before['schema']  # non-trigger schema objects untouched.
     for table in before['tables'] - {'tire_schema_versions'}:
         assert before['rows'][table] == after['rows'][table], table
-    assert len(after['rows']['tire_schema_versions']) == 14
+    assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
     assert set(after['triggers']) == EXPECTED_TRIGGERS
     with predecessor.engine.connect() as connection:
         assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == ALL_VERSIONS
@@ -236,7 +237,7 @@ def test_two_engines_initialize_the_same_pre013_file_concurrently_without_duplic
 
     with predecessor.engine.connect() as connection:
         versions = connection.execute(text('SELECT version FROM tire_schema_versions')).scalars().all()
-        assert len(versions) == 14 and set(versions) == ALL_VERSIONS
+        assert len(versions) == len(EXPECTED_SCHEMA_VERSIONS) and set(versions) == ALL_VERSIONS
         assert set(trigger_tables(connection)) == EXPECTED_TRIGGERS
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         assert connection.execute(text('SELECT COUNT(*) FROM device_ai_preparations')).scalar() == 1

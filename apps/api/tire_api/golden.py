@@ -551,6 +551,8 @@ def register_golden_routes(app: FastAPI):
     @app.post('/v1/golden/cases/{case_id}/reviews', status_code=201)
     def review(case_id: str, payload: CaseReviewCreate, request: Request,
                idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return review_case(db, case_id, payload, request.state.session_id, idempotency_key)
 
     @app.get('/v1/golden/sets')

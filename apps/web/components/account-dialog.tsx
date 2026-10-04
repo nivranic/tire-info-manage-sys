@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useWorkbenchAuth } from "./auth";
+import { useToast } from "./toast";
 import { Icon } from "./icons";
 
 const usernamePattern = "[A-Za-z0-9_-]{3,32}";
@@ -9,6 +10,7 @@ const usernamePattern = "[A-Za-z0-9_-]{3,32}";
 /** 本机多用户工作台账户对话框：已登录态显示账户信息，未登录态提供登录 / 注册两个表单。 */
 export default function AccountDialog({ onClose }: { onClose: () => void }) {
   const auth = useWorkbenchAuth();
+  const toast = useToast();
   const dialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -37,7 +39,12 @@ export default function AccountDialog({ onClose }: { onClose: () => void }) {
       const result = mode === "login"
         ? await auth.login(username.trim(), password)
         : await auth.register(username.trim(), password, displayName);
-      if (result.ok) { setPassword(""); setError(""); return; } // 登录态由 context 更新，视图随之切换。
+      if (result.ok) {
+        setPassword(""); setError("");
+        const role = result.user?.is_admin ? "管理员" : "研究员";
+        toast(mode === "login" ? `已登录 · 角色：${role}` : `已注册并登录 · 角色：${role}`, "success");
+        return; // 登录态由 context 更新，视图随之切换。
+      }
       setError(result.error);
     } finally { setBusy(false); }
   }

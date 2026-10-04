@@ -10,6 +10,7 @@ from tire_api.db import Base, FallbackConsent, QueryRun, UserSession, uid, utcno
 from tire_api.knowledge_models import initialize_search
 from tire_api.main import create_app
 from tire_api.query_fallback_policies import QueryFallbackPolicyRevision, QueryFallbackPreview, QueryFallbackUse
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import OLD_VERSIONS, snapshot
 
 NEW_TABLES = {'query_fallback_previews', 'query_fallback_policy_revisions', 'query_fallback_uses'}
@@ -53,7 +54,7 @@ def test_three_additive_tables_and_011_preserve_every_predecessor_schema_and_row
     # 013 adds device-ledger triggers; their DDL is asserted in test_device_ai_migration013.py.
     assert [row for row in after['schema'] if row[2] in before['tables'] and row[0] != 'trigger'] == before['schema']
     assert all(before['rows'][table] == after['rows'][table] for table in before['tables'] - {'tire_schema_versions'})
-    assert len(after['rows']['tire_schema_versions']) == 14
+    assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
     assert all(not after['rows'][table] for table in NEW_TABLES)
     with predecessor.engine.connect() as connection:
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []

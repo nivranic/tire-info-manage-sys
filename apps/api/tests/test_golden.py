@@ -14,6 +14,7 @@ from tire_api.domain import VariantInput
 from tire_api.golden import CaseReviewCreate, GoldenError, review_case
 from tire_api.golden_models import GoldenCase, GoldenCaseRevision, GoldenCaseReview, GoldenSetRevision
 from tire_api.main import create_app
+from admin_support import register_admin
 from test_core import FixtureRegistry
 from test_reparse import BODY, QUERY, seed_capture, totals
 
@@ -95,6 +96,7 @@ def setup(tmp_path, monkeypatch):
     monkeypatch.setattr(parser_bundles, 'verify_bundle', prohibited)
     app = create_app('sqlite:///' + (tmp_path / 'golden.db').as_posix(), FixtureRegistry())
     with TestClient(app) as client:
+        register_admin(client)
         capture_id = seed_capture(client, app.state.database)
         yield client, app.state.database, capture_id
 

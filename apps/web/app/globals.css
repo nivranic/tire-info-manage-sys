@@ -93,6 +93,8 @@ button { touch-action: manipulation; }
 .icon-button { display: inline-flex; justify-content: center; align-items: center; width: 44px; height: 44px; flex: 0 0 44px; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--muted); }
 .icon-button:hover { background: var(--hover); color: var(--ink); }
 .theme-toggle { border-color: var(--border); width: 34px; height: 34px; flex-basis: 34px; }
+.topbar-toggle { border-color: var(--border); width: 34px; height: 34px; flex-basis: 34px; }
+.topbar-toggle .avatar { width: 24px; height: 24px; font-size: 10px; }
 .workbench-grid { display: grid; grid-template-columns: minmax(0, 1fr) 282px; min-height: calc(100dvh - 69px); }
 .main-content { min-width: 0; padding: 34px 31px 0; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 29px; }
@@ -437,6 +439,7 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
   .topbar .mobile-offline-entry { display: inline-flex; align-items: center; min-height: 44px; padding: 4px; font-size: 10px; white-space: nowrap; }
   .connection { font-size: 8px; gap: 5px; }
   .theme-toggle { width: 44px; height: 44px; flex-basis: 44px; border: none; }
+  .topbar-toggle { width: 44px; height: 44px; flex-basis: 44px; border: none; }
   .main-content { padding: 25px 18px 0; }
   .page-heading { margin-bottom: 24px; }
   .page-heading .eyebrow { font-size: 8px; letter-spacing: 1.4px; }

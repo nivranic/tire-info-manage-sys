@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import event, func, select
 
+from admin_support import register_admin
 from tire_api.db import FactVersion, Snapshot, TireVariant, Verification
 from tire_api.main import create_app
 from test_core import FixtureRegistry, QUERY, VARIANT, live, success
@@ -21,6 +22,7 @@ def setup():
     registry = FieldSources()
     app = create_app('sqlite://', registry)
     with TestClient(app) as client:
+        register_admin(client)
         yield client, registry, app.state.database
 
 

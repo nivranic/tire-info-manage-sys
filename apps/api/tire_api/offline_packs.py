@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 from sqlalchemy import desc, select
 
+from .auth import session_scope
 from .db import EvidenceObject, uid, utc, utcnow
 from .documents import record_object
 from .domain import StrictModel, digest
@@ -202,10 +203,10 @@ class ConfirmRequest(StrictModel):
         return value
 
 
-def owned(db, model, identifier, session_id):
-    row = db.scalar(select(model).where(model.id == identifier, model.actor_session_id == session_id))
+def owned(db, model, identifier, scope):
+    row = db.scalar(select(model).where(model.id == identifier, model.actor_session_id.in_(scope)))
     if row is None:
-        raise HTTPException(404, '未找到本会话的离线计划或包')
+        raise HTTPException(404, '未找到当前账户的离线计划或包')
     return row
 
 
@@ -322,7 +323,7 @@ def create_plan(db, registry, request, session_id):
     QueryService(db, None).lock_ingestion()
     previous = None
     if request.base_pack_id:
-        previous = json.loads(content(db, owned(db, OfflinePack, request.base_pack_id, session_id)))
+        previous = json.loads(content(db, owned(db, OfflinePack, request.base_pack_id, session_scope(db, session_id))))
     return persist_plan(db, prepare_plan(db, registry, request, session_id, previous), session_id)
 
 
@@ -373,7 +374,7 @@ def update_base_envelope(db, row, session_id):
 
 def prepare_update(db, registry, request, session_id):
     QueryService(db, None).lock_ingestion()
-    base = owned(db, OfflinePack, request.base_pack_id, session_id)
+    base = owned(db, OfflinePack, request.base_pack_id, session_scope(db, session_id))
     if request.expected_base_sha256 != base.content_hash:
         raise HTTPException(409, {'code': 'offline_base_sha256_mismatch'})
     previous = update_base_envelope(db, base, session_id)
@@ -405,7 +406,7 @@ def confirm_plan(db, request, session_id, key):
         if previous.request_hash != request_hash:
             raise HTTPException(409, {'code': 'offline_idempotency_payload_mismatch'})
         return deepcopy(previous.descriptor)
-    plan = owned(db, OfflinePackPlan, request.plan_id, session_id)
+    plan = owned(db, OfflinePackPlan, request.plan_id, session_scope(db, session_id))
     if plan.fingerprint != request.expected_fingerprint:
         raise HTTPException(409, {'code': 'offline_plan_fingerprint_mismatch'})
     if utc(plan.expires_at) <= utcnow():
@@ -450,7 +451,7 @@ def register_offline_routes(app):
     def get_plan(plan_id: str, request: Request, response: Response, mode: Literal['history'] = Query(...)):
         response.headers['Cache-Control'] = 'no-store'
         with app.state.database.sessions() as db:
-            return owned(db, OfflinePackPlan, plan_id, request.state.session_id).preview
+            return owned(db, OfflinePackPlan, plan_id, session_scope(db, request.state.session_id)).preview
 
     @app.post('/v1/offline-packs', status_code=201)
     def confirm(payload: ConfirmRequest, request: Request, response: Response,
@@ -462,7 +463,6 @@ def register_offline_routes(app):
     @app.get('/v1/offline-packs')
     def list_packs(request: Request, response: Response, mode: Literal['history'] = Query(...),
                    limit: int = Query(50, ge=1, le=100)):
-        from .auth import session_scope
         response.headers['Cache-Control'] = 'no-store'
         with app.state.database.sessions() as db:
             rows = db.scalars(select(OfflinePack).where(OfflinePack.actor_session_id.in_(session_scope(db, request.state.session_id)))
@@ -473,12 +473,12 @@ def register_offline_routes(app):
     def get_pack(package_id: str, request: Request, response: Response, mode: Literal['history'] = Query(...)):
         response.headers['Cache-Control'] = 'no-store'
         with app.state.database.sessions() as db:
-            return owned(db, OfflinePack, package_id, request.state.session_id).descriptor
+            return owned(db, OfflinePack, package_id, session_scope(db, request.state.session_id)).descriptor
 
     @app.get('/v1/offline-packs/{package_id}/download')
     def download(package_id: str, request: Request, mode: Literal['history'] = Query(...)):
         with app.state.database.sessions() as db:
-            row = owned(db, OfflinePack, package_id, request.state.session_id)
+            row = owned(db, OfflinePack, package_id, session_scope(db, request.state.session_id))
             raw = content(db, row)
             headers = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
                 'Content-Length': str(row.byte_count), 'ETag': '"' + row.content_hash + '"',

@@ -20,6 +20,7 @@ from tire_api.parser_releases import (DeploymentTransition, register_deployed_bu
                                     _reference_snapshot)
 from tire_api.recall_models import RecallSnapshot, RecallVerification
 from tire_api.recall_discovery import RecallSearchSnapshot, RecallSearchVerification
+from admin_support import register_admin
 from test_core import FixtureRegistry
 from test_parser_bundles import historical_install, trusted_copy
 from test_recall_reparse import (BODIES, QUERIES, SOURCE, formal_counts, seed_recall, create_reparse)
@@ -128,8 +129,7 @@ def setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'recall-release.db').as_posix(), FixtureRegistry())
     app.state.recall_adapter = adapter
     with TestClient(app) as client:
-        assert client.post('/v1/auth/register',
-                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+        register_admin(client)
         yield client, app.state.database, adapter, source
 
 
@@ -292,8 +292,7 @@ def verify_recall_parser_persistence(url, directory):
         app = create_app(url, FixtureRegistry())
         app.state.recall_adapter = adapter
         with TestClient(app) as client:
-            assert client.post('/v1/auth/register',
-                               json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+            register_admin(client)
             checkpoint = run_lifecycle(client, app.state.database, adapter, source, PERSIST_QUERIES)
             checkpoint['bundle_root'] = str(directory / 'sealed')
         assert_recall_parser_checkpoint(url, checkpoint)

@@ -62,3 +62,35 @@ require_admin 在 (e) 列出的四类端点内调用。账户家族行为验收�
 ## Rollback trigger / Revisit condition
 
 任何"部署到服务器"动议触发 R-012 复评：本方案不迁移、须重新设计鉴权。
+
+## 圆桌裁决补记（2026-10-04）
+
+五角色评审（波次4 多用户账户）对上述 (a)-(e) 的收敛裁决，作为本 ADR 的
+修正与补录；所引行号为 2026-10-04 修复后快照。
+
+1. **读路径裁决升级（修正 (d)）**：原 (d) 只聚合列表端点，详情/写/导出仍
+   校验单会话，同用户跨会话"看得到打不开"。裁决=所有权校验全部跟随用户
+   scope：owned_pack（ai_analysis.py:158-160）、owned_report（reports.py:66-68）、
+   离线包 owned（offline_packs.py:206-207）、reparse 运行详情（reparse.py:447）、
+   关注删除守卫（main.py:397-399）均改为 `not in scope` / `.in_(scope)`；
+   关注去重同步扩到用户 scope（main.py:386），离线包冻结基包内容同样按
+   session_scope 解引用（offline_packs.py:326、377）。(d) 中"写路径零改动"
+   的表述就此作废。
+2. **刻意全局清单补录（补全 (d) 工作区清单）**：除车库/已存比较/驾驶偏好/
+   证据文档外，另三类刻意不聚合：tire 告警规则——AlertRule 无会话列
+   （db.py:362-367，经 monitor_jobs 归属），monitoring.py 规则端点保持全局；
+   站内通知已读态——/v1/notifications 列表与已读写均无会话过滤
+   （monitoring.py:405-437），读态全局共享；query_fallback_policies——自述
+   scope=current_session 的单会话域（query_fallback_policies.py:529），与
+   cookie 同意语义绑定，刻意不聚合到用户。
+3. **驾驶偏好全局可写的已知后果**：修订链为全局单链（db.py:270-276，
+   revision 全表唯一），/v1/driving-preferences 读写不分用户
+   （research.py:247-257）——研究员 B 修改比较权重会改写研究员 A 的比较
+   结果，属正确性影响而非隐私观感。接受为现状（存量数据连续性优先），
+   重评触发=首个真实多用户共用场景。
+4. **session_scope 无界增长**：UserSession 无清理任务（db.py:36-42 有
+   expires_at 但无人执行过期清理），session_scope 的 in_ 列表随历史会话
+   线性膨胀。PoC 接受；长期需会话过期清理机制。
+5. **注册语义补记**：已登录会话再注册→409 already_authenticated
+   （auth.py:108-110，防静默改绑丢身份）；首用户判定以 ingestion 锁串行化
+   （auth.py:111-113），防并发注册产生双 admin。

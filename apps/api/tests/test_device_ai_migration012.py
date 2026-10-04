@@ -15,12 +15,12 @@ from tire_api.device_ai_models import DeviceAIConsentClaim, DeviceAIPreparation
 from tire_api.knowledge_models import initialize_search
 from tire_api.main import create_app
 from tire_api.offline_models import OfflinePack, OfflinePackPlan
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import OLD_VERSIONS, snapshot
 
 NEW_TABLES = {'device_ai_preparations', 'device_ai_consent_claims'}
 VERSIONS = [*OLD_VERSIONS, '009_ai_streaming', '010_offline_packs', '011_query_fallback_policies']
-ALL_VERSIONS = set(VERSIONS) | {'012_device_ai_preparations', '013_device_ai_ledger_triggers',
-                               '014_local_sessions_user'}
+ALL_VERSIONS = set(EXPECTED_SCHEMA_VERSIONS)
 ACTOR = 'synthetic-device-migration-actor'
 OTHER_ACTOR = 'synthetic-device-migration-other'
 ARCHIVE_HASH = 'a' * 64
@@ -115,7 +115,7 @@ def test_two_additive_tables_and_012_preserve_every_predecessor_schema_and_row(p
     assert after['tables'] - before['tables'] == NEW_TABLES and not before['tables'] - after['tables']
     assert [row for row in after['schema'] if row[2] in before['tables']] == before['schema']
     assert all(before['rows'][table] == after['rows'][table] for table in before['tables'] - {'tire_schema_versions'})
-    assert len(after['rows']['tire_schema_versions']) == 14
+    assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
     assert all(not after['rows'][table] for table in NEW_TABLES)
     with predecessor.engine.connect() as connection:
         assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == ALL_VERSIONS
@@ -222,7 +222,7 @@ def test_two_engines_initialize_the_same_pre012_file_concurrently_without_duplic
 
     with predecessor.engine.connect() as connection:
         versions = connection.execute(text('SELECT version FROM tire_schema_versions')).scalars().all()
-        assert len(versions) == 14 and set(versions) == ALL_VERSIONS
+        assert len(versions) == len(EXPECTED_SCHEMA_VERSIONS) and set(versions) == ALL_VERSIONS
         assert NEW_TABLES <= set(inspect(connection).get_table_names())
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         assert connection.execute(text('SELECT COUNT(*) FROM local_sessions')).scalar() == 1

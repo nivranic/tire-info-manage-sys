@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import event, func, select
 
+from admin_support import register_admin
 from tire_api.adapters import xiaomi
 from tire_api.adapters.transport import SourceAccessError
 from tire_api.db import FallbackConsent, utcnow
@@ -89,8 +90,7 @@ def setup():
     register_vehicle_routes(app, adapter)
     with TestClient(app) as client:
         # vehicle_setup 的导入方含隔离复核流程，管理写需要管理员。
-        assert client.post("/v1/auth/register",
-                           json={"username": "admin", "password": "fixture-admin-pw"}).status_code == 200
+        register_admin(client)
         yield client, adapter, app.state.database
 
 

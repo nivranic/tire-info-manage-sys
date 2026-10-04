@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { AuthState } from "@tire/domain-types";
 import { ApiError, tireApi } from "@tire/api-client";
 
-export type AuthResult = { ok: true } | { ok: false; error: string };
+export type AuthResult = { ok: true; user: AuthState["user"] } | { ok: false; error: string };
 
 type WorkbenchAuth = {
   state: AuthState;
@@ -56,15 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { void refresh(); return () => session.current?.abort(); }, [refresh]);
 
   const login = useCallback(async (username: string, password: string): Promise<AuthResult> => {
-    try { setState(await tireApi.authLogin({ username, password })); setReady(true); return { ok: true }; }
+    try { const result = await tireApi.authLogin({ username, password }); setState(result); setReady(true); return { ok: true, user: result.user }; }
     catch (cause) { return { ok: false, error: authErrorText(cause) }; }
   }, []);
 
   const register = useCallback(async (username: string, password: string, displayName?: string): Promise<AuthResult> => {
     const trimmed = displayName?.trim();
     try {
-      setState(await tireApi.authRegister({ username, password, ...(trimmed ? { display_name: trimmed } : {}) }));
-      setReady(true); return { ok: true };
+      const result = await tireApi.authRegister({ username, password, ...(trimmed ? { display_name: trimmed } : {}) });
+      setState(result); setReady(true); return { ok: true, user: result.user };
     } catch (cause) { return { ok: false, error: authErrorText(cause) }; }
   }, []);
 

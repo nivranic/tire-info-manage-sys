@@ -20,6 +20,16 @@
 - [ ] `.env` / compose / k8s secret 引用均来自密钥服务或运维托管，不进 git
 - [ ] AI 预算护栏（`TI_AI_DAILY_REQUEST_LIMIT` / `TI_AI_DAILY_TOKEN_LIMIT`）按服务器
       场景重新设定，不复用本地默认
+- [ ] 登录成功必须轮换会话 ID：当前 `bind_session`（apps/api/tire_api/auth.py:99-104）
+      仅把 user_id 写进既有 cookie 会话、不换 ID——会话固定风险在 loopback 单机
+      可接受，服务器形态必须改为登录成功后轮换
+- [ ] scrypt 成本参数复评：当前 N=2^14（auth.py:27）低于 OWASP 对交互式登录的
+      建议（N≥2^16），部署轮须按服务器实测登录延迟后上调
+- [ ] 注册策略与首用户引导窗口重审：当前开放注册、首用户先到先得成为 admin
+      （auth.py:107-115），服务器形态必须改为受控注册并重新设计管理员引导
+- [ ] 账户治理能力补齐：当前无提权/降级、改密、删户、用户列表端点（auth.py 仅有
+      register/login/logout/me），部署前必须补齐；唯一 admin 忘密码时只能手改
+      本机 SQLite（见 risk-register R-014）
 
 ## 现状（2026-10-03）
 

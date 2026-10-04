@@ -7,6 +7,7 @@ from pydantic import Field, StrictBool, StrictInt
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from .auth import session_scope
 from .db import utc, utcnow, uid
 from .domain import StrictModel, digest
 from .monitoring import LeaseLost, ReadState
@@ -164,11 +165,11 @@ def rule_view(db, rule, row):
             "state": last.state, "reason": last.reason, "finished_at": timestamp(last.finished_at)} if last else None}}
 
 
-def find_rule(db, rule_id, session_id, expected=None):
+def find_rule(db, rule_id, scope, expected=None):
     result = db.execute(current_rules().where(RecallMonitorRule.id == rule_id,
-                                             RecallMonitorRule.session_id == session_id)).first()
+                                             RecallMonitorRule.session_id.in_(scope))).first()
     if result is None:
-        raise HTTPException(404, "当前会话不存在此召回规则")
+        raise HTTPException(404, "当前账户不存在此召回规则")
     if expected is not None and result[1].revision != expected:
         raise HTTPException(409, "召回规则已更新，请重新载入")
     return result
@@ -215,7 +216,7 @@ def register_recall_monitoring_routes(app: FastAPI):
 
     @app.get("/v1/recall-monitor-rules/{rule_id}")
     def detail(rule_id: str, request: Request, mode: Literal["history"] = Query(...), db: Session = Depends(get_db)):
-        rule, row = find_rule(db, rule_id, request.state.session_id)
+        rule, row = find_rule(db, rule_id, session_scope(db, request.state.session_id))
         history = db.scalars(select(RecallRuleRevision).where(RecallRuleRevision.rule_id == rule.id)
                              .order_by(desc(RecallRuleRevision.revision)).limit(51)).all()
         return {**rule_view(db, rule, row), "history": [revision_view(item) for item in history[:50]],
@@ -225,7 +226,7 @@ def register_recall_monitoring_routes(app: FastAPI):
     def revise(rule_id: str, payload: RecallRuleEdit, request: Request, db: Session = Depends(get_db)):
         service = QueryService(db, None)
         service.lock_ingestion()
-        rule, before = find_rule(db, rule_id, request.state.session_id, payload.expected_revision)
+        rule, before = find_rule(db, rule_id, session_scope(db, request.state.session_id), payload.expected_revision)
         settings = payload.model_dump(exclude={"expected_revision"})
         if settings["archived"]:
             settings["enabled"] = False
@@ -269,8 +270,8 @@ def register_recall_monitoring_routes(app: FastAPI):
         service = QueryService(db, None)
         service.lock_ingestion()
         row = db.get(RecallNotification, notification_id)
-        if row is None or row.session_id != request.state.session_id:
-            raise HTTPException(404, "当前会话不存在此召回提醒")
+        if row is None or row.session_id not in session_scope(db, request.state.session_id):
+            raise HTTPException(404, "当前账户不存在此召回提醒")
         row.read_at = utcnow() if payload.read else None
         service.audit(request.state.session_id, "recall_notification_read_changed", notification_id=row.id, read=payload.read)
         db.commit()

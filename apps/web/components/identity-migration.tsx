@@ -6,6 +6,7 @@ import type { IdentityMigrationApplication, IdentityMigrationApply, IdentityMigr
   IdentityMigrationPreview, IdentityMigrationSummary, IdentityReview, ParserPage } from "@tire/domain-types";
 import { DataTree } from "./reparse-review";
 import { IdentityContractEvidence, identityReasonLabel } from "./identity-contract";
+import { useWorkbenchAuth } from "./auth";
 
 type Attempt = { key: string; payload: IdentityMigrationApply };
 // One fixed write per tab, retained across dialog closes; no private payload in browser storage.
@@ -38,6 +39,9 @@ function MigrationDialog({ onClose }: { onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const operation = useRef<AbortController | null>(null);
   const originalRequest = useRef<AbortController | null>(null);
+  const auth = useWorkbenchAuth();
+  // 会话未就绪（ready=false，如首帧或桌面宿主未注入）时不禁用，避免误伤只读浏览。
+  const adminBlocked = auth.ready && (!auth.state.authenticated || !auth.state.user?.is_admin);
   const [refresh, setRefresh] = useState(0);
   const [preview, setPreview] = useState<IdentityMigrationPreview | null>(null);
   const [filter, setFilter] = useState<"all" | IdentityMigrationAssessment["state"]>("all");
@@ -148,7 +152,7 @@ function MigrationDialog({ onClose }: { onClose: () => void }) {
         {stale ? <p className="inline-error">当前预览已失效或提交被拒绝。重新读取预览后再核对，不能沿用旧确认。</p> : null}
         <form className="review-form" onSubmit={event => { event.preventDefault(); apply(); }}><label><span>迁移署名（本地自报）</span><input maxLength={100} value={operator} disabled={locked} onChange={event => setOperator(event.target.value)} /></label><label><span>迁移理由</span><textarea rows={3} maxLength={2000} value={reason} disabled={locked} onChange={event => setReason(event.target.value)} /></label>
           <label className="review-checkbox"><input type="checkbox" checked={confirmed} disabled={locked || stale || !preview} onChange={event => setConfirmed(event.target.checked)} /><span>已核对整个预览的可绑定项、待核对项及旧关注／监控风险；确认按上述指纹追加绑定，不自动改变任何旧引用或关联候选。</span></label>
-          <button type="submit" className="primary-button" disabled={locked || stale || !preview?.can_apply || !confirmed || !operator.trim() || !reason.trim()}>应用已核对的迁移预览</button>
+          <button type="submit" className="primary-button" disabled={adminBlocked || locked || stale || !preview?.can_apply || !confirmed || !operator.trim() || !reason.trim()} title={adminBlocked ? "需要管理员账户" : undefined}>应用已核对的迁移预览</button>
         </form>
       </section>
       <section><h3>3 · 迁移应用历史</h3><div className="parser-bundle-options">{history?.items.map(item => <button type="button" className={`report-list-item${selectedId === item.id ? " selected" : ""}`} key={item.id} disabled={busy} aria-pressed={selectedId === item.id} onClick={() => { setSelectedId(item.id); setDetailRevision(value => value + 1); }}><strong>迁移 #{item.revision} · {item.operator}</strong><span>{stamp(item.created_at)}</span><small>{item.binding_ids.length} 条绑定 · {item.summary.needs_review} 条待核对</small></button>)}</div>{history?.total === 0 ? <p>还没有迁移应用记录。读取预览不会产生应用。</p> : null}

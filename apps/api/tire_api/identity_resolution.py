@@ -376,4 +376,6 @@ def register_identity_routes(app):
     @app.post('/v1/tire-variants/{variant_id}/identity-revisions', status_code=201)
     def decide(variant_id: str, payload: IdentityDecision, request: Request,
                idempotency_key: str = Header(alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
+        from .auth import require_admin
+        require_admin(request, db)
         return append_decision(db, variant_id, payload, request.state.session_id, idempotency_key)

@@ -130,7 +130,8 @@ def load_recall_search_member(db, reference, session_id):
     run = db.get(QueryRun, receipt.query_id) if receipt is not None else None
     if snapshot is None or receipt is None or run is None:
         raise HTTPException(422, 'offline_recall_search_formal_receipt_missing')
-    if run.session_id != session_id:
+    from .auth import session_scope
+    if run.session_id not in session_scope(db, session_id):
         raise HTTPException(422, 'offline_recall_search_receipt_owner_mismatch')
     query = snapshot.query
     if (not isinstance(query, dict) or set(query) != {'search', 'offset'}
@@ -256,6 +257,10 @@ def scope_limit(name, count, limit, *, at_least=False):
 
 
 def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='offline-pack@1'):
+    # 用户绑定后 watchlist/recent 冻结范围覆盖该用户全部会话（与聚合读路径一致）；匿名仍=本会话。
+    # 包内 context 的 scope 标签 'current_session' 是冻结 wire 合同字面量，保持不变。
+    from .auth import session_scope
+    owner_scope = session_scope(db, session_id)
     if pack_schema not in {'offline-pack@1', 'offline-pack@2'}:
         raise HTTPException(422, 'offline_pack_schema_not_supported')
     contexts, omissions, selected = [], [], []
@@ -307,7 +312,7 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
                                  reason('garage', row.vehicle_id, row.revision), context))
 
     if scope['watchlist']['include']:
-        statement = select(WatchItem).where(WatchItem.session_id == session_id)
+        statement = select(WatchItem).where(WatchItem.session_id.in_(owner_scope))
         requested = scope['watchlist']['item_ids']
         if requested is not None:
             statement = statement.where(WatchItem.id.in_(requested))
@@ -330,7 +335,7 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
     if scope['recent']['include']:
         # Candidates are bounded by query-created time. Failed candidates remain
         # visible omissions, and can never borrow proof from a matching query_key.
-        runs = db.scalars(select(QueryRun).where(QueryRun.session_id == session_id).order_by(
+        runs = db.scalars(select(QueryRun).where(QueryRun.session_id.in_(owner_scope)).order_by(
             desc(QueryRun.created_at), desc(QueryRun.id)).limit(scope['recent']['limit'])).all()
         counts['recent_queries'] = len(runs)
         for run in runs:

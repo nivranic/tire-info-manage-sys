@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 
 from tire_api.db import (ChangeEvent, Database, FactVersion, QueryRun, Snapshot,
     TireVariant, UserSession, Verification, WatchItem, uid, utcnow)
+from version_registry import EXPECTED_SCHEMA_VERSIONS
 from tire_api.domain import TireQuery, VariantInput, digest
 from tire_api.identity_contract import (IdentityContractError, MigrationApply, apply_migration,
     cli_engine, contract_metadata, migration_preview, resolve_variant, schema_version)
@@ -495,7 +496,7 @@ def test_backup_replay_keeps_every_original_column_and_row(tmp_path):
             if name != 'tire_schema_versions':
                 assert before[name] == after[name], name
         assert {row[0] for row in connection.execute('SELECT version FROM tire_schema_versions')} == (
-            before_versions | {'005_variant_identity_contract', '006_source_settings', '007_monitor_tasks', '008_recall_discovery_monitoring', '009_ai_streaming', '010_offline_packs', '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers', '014_local_sessions_user'})
+            before_versions | set(EXPECTED_SCHEMA_VERSIONS[4:]))
         assert connection.execute('SELECT COUNT(*) FROM snapshots WHERE identity_contract_version IS NOT NULL').fetchone()[0] == 0
     final_sha = hashlib.sha256(backup.read_bytes()).hexdigest()
     assert final_sha == original_sha

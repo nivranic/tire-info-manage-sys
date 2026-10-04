@@ -18,6 +18,7 @@ from tire_api.recall_discovery import RecallDiscoveryService, RecallSearchSnapsh
 from tire_api.recalls import RecallService
 from tire_api.reparse import compare_candidate, validate_candidate
 from tire_api.source_settings import assert_source_access
+from admin_support import register_admin
 from test_core import FixtureRegistry
 
 SOURCE = nhtsa.SOURCE_ID
@@ -79,6 +80,7 @@ def setup(tmp_path, monkeypatch):
     monkeypatch.setattr(parser_runtime, 'parse_isolated', simulated)
     app = create_app('sqlite:///' + (tmp_path / 'recall-reparse.db').as_posix(), FixtureRegistry())
     with TestClient(app) as client:
+        register_admin(client)
         yield client, app.state.database, calls
 
 

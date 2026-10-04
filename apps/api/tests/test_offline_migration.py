@@ -8,6 +8,7 @@ from tire_api.db import Base, UserSession, uid, utcnow
 from tire_api.main import create_app
 from tire_api.knowledge_models import initialize_search
 from tire_api.offline_models import OfflinePack, OfflinePackPlan
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import snapshot, OLD_VERSIONS
 
 NEW_TABLES = {'offline_pack_plans', 'offline_packs'}
@@ -45,7 +46,7 @@ def test_only_two_additive_tables_and_010_preserve_old_rows_and_schema(predecess
     assert [row for row in after['schema'] if row[2] in before['tables'] and row[0] != 'trigger'] == before['schema']
     for table in before['tables'] - {'tire_schema_versions'}:
         assert before['rows'][table] == after['rows'][table], table
-    assert len(after['rows']['tire_schema_versions']) == 14
+    assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
     assert all(not after['rows'][table] for table in NEW_TABLES)
     with database.engine.connect() as connection:
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []

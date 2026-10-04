@@ -8,6 +8,7 @@ from pydantic import Field, StrictBool, StrictInt, field_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from .auth import session_scope
 from .db import uid, utcnow
 from .domain import StrictModel, digest
 from .monitoring import ReadState
@@ -62,19 +63,19 @@ def _check_replay(row, fingerprint):
         raise HTTPException(409, {'code': 'idempotency_payload_mismatch', 'message': '同一请求标识已绑定不同内容'})
 
 
-def find_rule(db, rule_id, session_id):
+def find_rule(db, rule_id, scope):
     row = db.execute(current_rules().where(RecallDiscoveryRule.id == rule_id,
-        RecallDiscoveryRule.session_id == session_id)).first()
+        RecallDiscoveryRule.session_id.in_(scope))).first()
     if row is None:
-        raise HTTPException(404, '当前会话不存在此名称发现订阅')
+        raise HTTPException(404, '当前账户不存在此名称发现订阅')
     return row
 
 
-def find_job(db, job_id, session_id):
+def find_job(db, job_id, scope):
     job = db.scalar(select(RecallDiscoveryJob).where(RecallDiscoveryJob.id == job_id,
-                                                   RecallDiscoveryJob.session_id == session_id))
+                                                   RecallDiscoveryJob.session_id.in_(scope)))
     if job is None:
-        raise HTTPException(404, '当前会话不存在此名称发现任务')
+        raise HTTPException(404, '当前账户不存在此名称发现任务')
     return job
 
 
@@ -129,8 +130,8 @@ def _list(items, total, offset, limit):
     return {'scope': 'session', 'items': items, 'total': total, 'offset': offset, 'limit': limit}
 
 
-def scan_list(db, job_id, session_id, offset, limit):
-    find_job(db, job_id, session_id)
+def scan_list(db, job_id, scope, offset, limit):
+    find_job(db, job_id, scope)
     statement = select(RecallDiscoveryRun).where(RecallDiscoveryRun.job_id == job_id)
     total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
     rows = db.scalars(statement.order_by(desc(RecallDiscoveryRun.finished_at), desc(RecallDiscoveryRun.id))
@@ -138,13 +139,13 @@ def scan_list(db, job_id, session_id, offset, limit):
     return _list([run_view(row) for row in rows], total, offset, limit)
 
 
-def scan_detail(db, run_id, session_id, offset, limit):
+def scan_detail(db, run_id, scope, offset, limit):
     run = db.scalar(select(RecallDiscoveryRun).join(RecallDiscoveryJob,
         RecallDiscoveryJob.id == RecallDiscoveryRun.job_id).where(RecallDiscoveryRun.id == run_id,
-                                                                 RecallDiscoveryJob.session_id == session_id))
+                                                                 RecallDiscoveryJob.session_id.in_(scope)))
     if run is None:
         raise HTTPException(404, '当前会话不存在此名称发现扫描')
-    job = find_job(db, run.job_id, session_id)
+    job = find_job(db, run.job_id, scope)
     statement = select(RecallDiscoveryPage).where(RecallDiscoveryPage.attempt_id == run.attempt_id,
                                                  RecallDiscoveryPage.job_id == job.id)
     total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
@@ -171,19 +172,20 @@ def register_recall_discovery_monitor_routes(app: FastAPI):
                db: Session = Depends(get_db)):
         key, fingerprint = _key(idempotency_key), digest(payload.model_dump())
         session_id = request.state.session_id
+        scope = session_scope(db, session_id)
         service = QueryService(db, None)
         service.lock_ingestion()
-        existing = db.scalar(select(RecallDiscoveryRule).where(RecallDiscoveryRule.session_id == session_id,
+        existing = db.scalar(select(RecallDiscoveryRule).where(RecallDiscoveryRule.session_id.in_(scope),
             RecallDiscoveryRule.idempotency_key == key)) if key else None
         if existing:
             _check_replay(existing, fingerprint)
-            rule, current = find_rule(db, existing.id, session_id)
+            rule, current = find_rule(db, existing.id, scope)
             written = db.scalar(select(RecallDiscoveryRuleRevision).where(RecallDiscoveryRuleRevision.rule_id == rule.id,
                                                                          RecallDiscoveryRuleRevision.revision == 1))
             return rule_view(db, rule, current, write_revision=written, replayed=True)
         query = payload.query.model_dump()
         query_key = digest(query)
-        job = db.scalar(select(RecallDiscoveryJob).where(RecallDiscoveryJob.session_id == session_id,
+        job = db.scalar(select(RecallDiscoveryJob).where(RecallDiscoveryJob.session_id.in_(scope),
                                                          RecallDiscoveryJob.query_key == query_key))
         if job is None:
             job = RecallDiscoveryJob(id=uid(), session_id=session_id, source_id=SOURCE_ID, query=query, query_key=query_key)
@@ -215,7 +217,7 @@ def register_recall_discovery_monitor_routes(app: FastAPI):
 
     @app.get('/v1/recall-discovery-rules/{rule_id}')
     def detail(rule_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
-        rule, revision = find_rule(db, rule_id, request.state.session_id)
+        rule, revision = find_rule(db, rule_id, session_scope(db, request.state.session_id))
         rows = db.scalars(select(RecallDiscoveryRuleRevision).where(RecallDiscoveryRuleRevision.rule_id == rule.id)
                           .order_by(desc(RecallDiscoveryRuleRevision.revision)).limit(51)).all()
         return {**rule_view(db, rule, revision), 'history': [revision_view(row) for row in rows[:50]],
@@ -228,7 +230,7 @@ def register_recall_discovery_monitor_routes(app: FastAPI):
         key, fingerprint = _key(idempotency_key), digest(payload.model_dump())
         service = QueryService(db, None)
         service.lock_ingestion()
-        rule, current = find_rule(db, rule_id, request.state.session_id)
+        rule, current = find_rule(db, rule_id, session_scope(db, request.state.session_id))
         written = db.scalar(select(RecallDiscoveryRuleRevision).where(RecallDiscoveryRuleRevision.rule_id == rule.id,
             RecallDiscoveryRuleRevision.idempotency_key == key)) if key else None
         if written:
@@ -251,23 +253,23 @@ def register_recall_discovery_monitor_routes(app: FastAPI):
     @app.get('/v1/recall-discovery-runs')
     def runs(request: Request, job_id: str = Query(..., max_length=64), mode: Literal['history'] = Query(...),
              offset: int = Query(0, ge=0, le=100000), limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
-        return scan_list(db, job_id, request.state.session_id, offset, limit)
+        return scan_list(db, job_id, session_scope(db, request.state.session_id), offset, limit)
 
     @app.get('/v1/recall-discovery-jobs/{job_id}/scans')
     def scans(job_id: str, request: Request, mode: Literal['history'] = Query(...),
               offset: int = Query(0, ge=0, le=100000), limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
-        return scan_list(db, job_id, request.state.session_id, offset, limit)
+        return scan_list(db, job_id, session_scope(db, request.state.session_id), offset, limit)
 
     @app.get('/v1/recall-discovery-runs/{run_id}')
     def run_detail(run_id: str, request: Request, mode: Literal['history'] = Query(...),
                    page_offset: int = Query(0, ge=0, le=100000), page_limit: int = Query(20, ge=1, le=100),
                    db: Session = Depends(get_db)):
-        return scan_detail(db, run_id, request.state.session_id, page_offset, page_limit)
+        return scan_detail(db, run_id, session_scope(db, request.state.session_id), page_offset, page_limit)
 
     @app.get('/v1/recall-discovery-scans/{run_id}')
     def scan(run_id: str, request: Request, mode: Literal['history'] = Query(...),
              offset: int = Query(0, ge=0, le=100000), limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)):
-        return scan_detail(db, run_id, request.state.session_id, offset, limit)
+        return scan_detail(db, run_id, session_scope(db, request.state.session_id), offset, limit)
 
     @app.get('/v1/recall-discovery-notifications')
     def notifications(request: Request, unread_only: bool = False, offset: int = Query(0, ge=0, le=100000),

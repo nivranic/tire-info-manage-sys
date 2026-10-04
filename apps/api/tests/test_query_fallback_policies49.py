@@ -12,6 +12,7 @@ from tire_api.domain import LiveQueryRequest
 from tire_api.main import create_app
 from tire_api.query_fallback_policies import QueryFallbackPolicyRevision, QueryFallbackPreview, QueryFallbackUse
 from tire_api.service import QueryService
+from admin_support import register_admin
 from test_core import FixtureRegistry, QUERY, grant, live
 
 
@@ -73,8 +74,7 @@ def setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'policy.sqlite').as_posix(), registry)
     with TestClient(app) as client:
         client.get('/v1/source-settings')  # Explicit normal bootstrap before owned policy API.
-        assert client.post('/v1/auth/register',
-                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+        register_admin(client)
         yield client, registry, app.state.database
 
 

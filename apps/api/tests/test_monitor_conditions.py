@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import func, select, text
 
 from tire_api.db import AlertRule, AlertRuleRevision, AuditEvent, MonitorJob
+from version_registry import EXPECTED_SCHEMA_VERSIONS
 from tire_api.main import create_app
 from tire_api.monitoring import RuleCreate, create_rule, matches_conditions, normalize_technology
 from tire_api.service import QueryService
@@ -159,12 +160,7 @@ def test_additive_migration_preserves_legacy_rows_without_rewriting_them(tmp_pat
             after = connection.execute(text('SELECT * FROM alert_rule_revisions')).mappings().all()
             assert [{key: value for key, value in row.items() if key != 'conditions'} for row in after] == [dict(row) for row in before]
             assert all(row['conditions'] is None for row in after)
-            assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == {
-                '001_verification_validators', '002_monitor_rule_conditions', '003_parser_release_provenance',
-                '004_query_selection_filters', '005_variant_identity_contract', '006_source_settings',
-                '007_monitor_tasks', '008_recall_discovery_monitoring', '009_ai_streaming', '010_offline_packs',
-                '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers',
-                '014_local_sessions_user'}
+            assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(EXPECTED_SCHEMA_VERSIONS)
         restarted.state.database.initialize()
         assert edit(client, detail, name='new revision').json()['conditions'] == {}
 

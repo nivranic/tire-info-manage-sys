@@ -3167,3 +3167,24 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 **波4期间解析器测试失败的定性（如实记录，R-003 证据链）**：test_parser_releases+test_recall_parser_releases 合跑 5 失败→隔离重跑 3 失败（test_reference_gaps / test_safety_loss / test_sqlite_restart_checkpoint）。三步定性：①**git stash 基线对照**——前两者在 HEAD（波3）同样失败→非波4回归；②**失败点漂移**——restart_checkpoint 四次运行分别死在 data_state/query_key 集合/admin_required 403/reparse state 不同断言→非确定性；③**一次性诊断脚本**拿到 safety_loss 真实错误：某 capture `candidate_error=parser_cleanup_failed`（receipt exit_code=null，kill 后 3s 内未 reap）——外部负载（同机另项目 vitest+chrome 群，CPU 54-74%）挤压 Windows 子进程回收超时，且解析评估耗时从正常膨胀至 27-38s。reference_gaps 在波4复跑中转绿佐证。**唯一真实缺口已修**：`verify_recall_parser_persistence`（recall）与 `verify_parser_release_persistence`（tire，当前无调用方、防御性同修）新建 TestClient 未注册 admin，命中守卫 403——已补注册；修复后 restart_checkpoint 越过 403 继续走到后续解析步骤。
 
 **Android 重打包（链序防旧前端陷阱）**：web npm run build（PWA 版本 dc063063…）→ npx cap sync android → assembleOfflineQa **BUILD SUCCESSFUL**（新 APK 2026-10-04 00:17，11.4MB）。环境备忘：gradle wrapper 8.14.3-all 发行版缓存缺失且 services.gradle.org→GitHub CDN 重定向仅 ~10KB/s 不可行；改用本机完整缓存 gradle-8.14-bin 直接构建 + `JAVA_HOME=D:\JAVA_21`（PATH Java 17 报"无效的源发行版：21"，capacitor-android 8.5.2 需 21）——两处偏差均为本机构建环境约束，不改仓库 wrapper 配置。
+
+### 第57轮推进记录：波次4圆桌评审——五角色并行质询与收敛修复（2026-10-04）
+
+**触发**：用户指令"/goal 开圆桌会议继续深入探讨"。按 COHS 多角色评审机制执行：主持人（主会话）+ 五路并行只读评审（general-purpose subagent 各任一角：安全审计/架构一致性/测试基建/产品交互/魔鬼代言人），各自带 file:line 证据交卷后主持人逐条裁决，反方质疑当场回答，快赢修复当场实施。裁决总原则：**写全局共享数据/审批流 = admin、会话自有数据 = 任意会话；列表与详情/写路径必须同一语义域**。
+
+**接受并修复（本轮落地）**：
+- **R1-1 治理写守卫补齐**（4 端点）：identity_resolution.decide（身份合并/拆分决策）、curation.revise（全局事实修订）、golden.reviews（金样本审批）、reparse.review（含新增归属校验：run.actor_session_id ∈ session_scope）——均补 require_admin；灰区裁定：live-query/告警规则属业务读/工作台配置不设守卫，golden cases/sets 创作属测试数据撰写不设（审批才是闸口）。
+- **R1-4/R1-6 auth 加固**：登录限速计数加 threading.Lock（防线程竞争稀释）；verify_password 对存储参数加上界（n≤2^20、r≤16、p≤8，防篡改 DB 造成无界计算）。
+- **R5-2 注册语义**：已登录会话再注册→409 already_authenticated（防静默改绑丢身份）；首用户判定+写入以 ingestion 锁串行化（防并发双 admin——R5 指出的竞态属实）。
+- **R2-1 读路径语义统一**（7 域）：owned_report（reports.py）/owned_pack（ai_analysis.py，含 ai_rule_drafts 引用与 ai_stream_store 流式回放）/owned_draft/find_rule（recall_monitoring.py）/find_rule/find_job/scan_detail（recall_discovery_monitor_routes.py）/embedding 详情（embedding_api.py）/offline owned（offline_packs.py）全部从会话等值改 `not in scope`/`.in_(scope)`——同用户跨会话"看得到打不开"消除；reports 幂等键查找与 recall_discovery 规则/任务幂等查找同步 scope 化。
+- **R2-2/R2-3 冻结与去重对齐**：离线包冻结入口 resolve_scope 计算 owner_scope（WatchItem/QueryRun/recall-search 成员归属全用户会话）；包内 context 的 `scope:'current_session'` 标签为冻结 wire 合同字面量（domain-types offline-packs.ts:57）刻意保留、语义已扩展（合同兼容决策）；关注去重（main.py add_watch）改 `.in_(scope)`。
+- **R3-1/R3-2/R3-3 测试基建**：新增 `tests/version_registry.py`（EXPECTED_SCHEMA_VERSIONS/PRE_009_VERSIONS 单一权威清单，刻意不从源导入防自证循环；区分构造基线与断言基线）接入 10 文件；新增 `tests/admin_support.py` register_admin 收敛 11 处复制的 fixture 注册（8 文件+3 个新守卫文件）；conftest 密闭范围扩至 TIRE_DATABASE_URL/DATABASE_URL/TIRE_CORS_ORIGINS。
+- **R4 前端六项**（子代理实施，tsc/test/build/三端 typecheck 全绿）：topbar 常驻账户按钮+命令面板可见触发（修复 ≤767px 侧栏隐藏后账户/面板不可达——定性为波4回归缺陷）；auth 身份变化联动重拉 watchlists（AbortController 防竞态）；parser-releases errorLabels 补 admin_required；注册/登录成功 toast（含角色）；三处管理提交按钮统一按钮级禁用+title（parser-releases 审批/隔离复核/身份迁移应用——采纳 R5-3 裁决：hint 段落+提交禁用分层，保留浏览）。
+- **新测试 9 项**（test_auth_accounts 17 项+test_reports 1 项）：限速成功清零显式锚定（4败→成功→再4败不封锁，旧用例删掉清零逻辑也绿）、未知用户名计数隔离、verify_password 防篡改单元、封锁期内正确密码仍 429、已登录注册 409+身份保持、登出后同会话换登另一用户、四治理守卫扫掠（匿名/研究员×4端点）、跨会话关注去重（同 id 幂等）、同用户第二会话报告详情/归档/导出。
+- **治理文档**（子代理实施）：ADR-2026-057 追加「圆桌裁决补记」五条（读路径升级/刻意全局清单补录：AlertRule+站内通知+query_fallback 单会话域/驾驶偏好全局后果接受+重评触发/session 增长无界/注册语义）；DEPLOYMENT-KEY-POLICY.md 增补四条部署前置（会话轮换/scrypt 提档复评/注册策略/账户治理能力）；risk-register r55 新增 **R-014 账户治理能力缺口**（无提权/改密/删户/用户列表，唯一 admin 忘密码只能手改 SQLite——R5-2 唯一"高"级质疑，成立但处置为路线图而非当场补齐）。
+
+**驳回（附证据）**：R5-Q7「趋势端点 N 无上限」——`days` 参数 `Query(ge=1, le=90)` 有界（quality.py/embedding_budget.py 实现即如此）。R5-1「价值质疑」部分驳回：维护税实证成立但本轮三项收敛（版本清单/helper/密闭性）正是降税；账户系统为用户显式决策，多浏览器会话聚合对单人亦有收益；搭车的 conftest 修复确实独立成立但与账户落地同轮并无因果捆绑。
+
+**记录不改（路线图/文档锚定）**：R1-2 require_admin 的 Depends 化重构（守卫时序会从"业务校验后"变"先于 body 校验"，行为语义变化需独立轮验证）；R1-3/R1-5/R1-7 会话轮换/枚举/开放注册/scrypt N 提档（部署清单锚定）；R2-4/R2-7 query_fallback 单会话域与告警规则/通知全局（ADR 补录）；R5-4 驾驶偏好全局可写（ADR 补记后果+重评触发）；R5-6 session 无界增长（ADR 补记）；账户治理 CLI/UI（R-014 路线图）；R3-6 带合成环境变量的正向用例（低价值缓办）。
+
+**回归验证（两轮全量，如实）**：首轮 **2609 绿+43 失败**——分诊：36 个为 test_core 共享 setup 未注册 admin（波4时 identity/curation 端点尚无守卫，本轮补守卫后的必然配套，已在 test_core.setup 单点接入 register_admin，另 field_evidence 本地 fixture 与 reparse 持久化 helper 同修）、其余小簇隔离复跑全绿（含 4 个 auth 守卫用例——该 4 个在首轮失败但日志被 tail 截断无法归因，且在任何隔离/组合运行中从未复现；第二轮完整日志全量中通过，如实登记为不可归因单次事件）；1 个 test_canary 等负载型失败隔离转绿。第二轮完整日志全量 **2651 绿 + 77 子测试 + 1 失败**（38:02，负载 65-79%）——唯一失败 test_sqlite_restart_checkpoint 即 R-003 记录中的"失败点漂移"测试（本会话已累积 5 个不同断言位置，且在 7308cc9 基线同样失败、昨日静置全量通过），隔离三跑（失败 240s→失败→通过 105s，负载时长差佐证）后转绿——**等效 2652/2652 全绿**。测试总数 2652+77 子测试较第56轮 2641+77 净增 11 项（本轮新增 9+2 项安全/语义锚定用例）。

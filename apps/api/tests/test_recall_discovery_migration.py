@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from tire_api.db import Base, UserSession, AlertRule, AlertRuleRevision, MonitorJob, MonitorRun, uid, utcnow
 from tire_api.main import create_app
 from tire_api.monitor_task_models import MonitorTaskAttempt
@@ -101,7 +102,7 @@ def test_nine_additive_tables_preserve_all_old_schema_rows_and_cursors(predecess
     for table in before['tables'] - {'tire_schema_versions'}:
         assert after['rows'][table] == before['rows'][table], table
     assert set(before['rows']['tire_schema_versions']) < set(after['rows']['tire_schema_versions'])
-    assert len(after['rows']['tire_schema_versions']) == 14
+    assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
     for table in NEW_TABLES:
         assert after['rows'][table] == [], table
     with database.sessions() as db:

@@ -11,6 +11,7 @@ from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session, load_only
 
 from .ai_evidence import PreparePack, pack_view, prepare_pack
+from .auth import session_scope
 from .ai_gateway import (GatewayError, analysis_contract, configured_adapter, configured_model, model_status,
                          request_body)
 from .ai_recall_contract import (recall_boundary, validate_recall_claim, validate_recall_payload)
@@ -154,10 +155,10 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
     return result
 
 
-def owned_pack(db, pack_id, session_id):
+def owned_pack(db, pack_id, scope):
     pack = db.get(AIEvidencePack, pack_id)
-    if pack is None or pack.actor_session_id != session_id:
-        raise HTTPException(404, '未找到本会话的 AI 证据包')
+    if pack is None or pack.actor_session_id not in scope:
+        raise HTTPException(404, '未找到当前账户的 AI 证据包')
     if digest(pack.payload) != pack.fingerprint:
         raise HTTPException(409, '证据包完整性校验失败，请重新准备')
     return pack
@@ -305,7 +306,7 @@ def _prepare_device_analysis(db, payload, pack, preparation, *, stream=False):
 
 def prepare_analysis(db, payload, session_id, *, stream=False):
     """Shared authorization for synchronous and asynchronously accepted analysis."""
-    pack = owned_pack(db, payload.pack_id, session_id)
+    pack = owned_pack(db, payload.pack_id, session_scope(db, session_id))
     if pack.payload.get('purpose') == 'rule_draft':
         raise HTTPException(422, '规则草稿须使用独立的生成和人工审核接口')
     # D1 DB 结构判别 device origin（ai_pack_id unique FK 是 authoritative discriminator）；
@@ -381,7 +382,7 @@ def register_ai_routes(app: FastAPI):
 
     @app.get('/v1/ai/evidence-packs/{pack_id}')
     def evidence(pack_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
-        return pack_view(owned_pack(db, pack_id, request.state.session_id))
+        return pack_view(owned_pack(db, pack_id, session_scope(db, request.state.session_id)))
 
     @app.post('/v1/ai/analyses')
     def analyze(payload: AnalysisRequest, request: Request, response: Response,
@@ -414,11 +415,10 @@ def register_ai_routes(app: FastAPI):
         row = db.get(AIRequest, request_id)
         if row is None or row.actor_session_id != request.state.session_id or row.request_contract.get('purpose') == 'rule_draft':
             raise HTTPException(404, '未找到本会话的 AI 调用记录')
-        return {**run_state(db, row), 'pack': pack_view(owned_pack(db, row.pack_id, request.state.session_id))}
+        return {**run_state(db, row), 'pack': pack_view(owned_pack(db, row.pack_id, session_scope(db, request.state.session_id)))}
 
     @app.get('/v1/ai/analyses')
     def history(request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
-        from .auth import session_scope
         rows = db.execute(select(AIRequest, AICompletion)
             .outerjoin(AICompletion, AICompletion.request_id == AIRequest.id)
             .options(load_only(AICompletion.request_id, AICompletion.state, AICompletion.error_code,

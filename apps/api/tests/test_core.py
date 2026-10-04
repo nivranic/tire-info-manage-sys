@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import event, func, inspect, select, text
 
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
+from admin_support import register_admin
 from tire_api.db import AuditEvent, ChangeEvent, Database, FactVersion, FallbackConsent, Snapshot, TireVariant, UserSession, utcnow
 from tire_api.domain import LiveQueryRequest, VariantInput, parse_size
 from tire_api.main import create_app
@@ -53,6 +55,9 @@ def setup():
     registry = FixtureRegistry()
     app = create_app("sqlite://", registry)
     with TestClient(app) as client:
+        # 身份/事实治理与解析器发布等管理写已要求管理员；本夹具是套件 majority
+        # 的共享基座（第57轮圆桌后统一在此注册，替代各文件自行补注册）。
+        register_admin(client)
         yield client, registry, app.state.database
 
 
@@ -460,8 +465,7 @@ def test_legacy_schema_upgrade_preserves_evidence_facts_and_watchlist(tmp_path):
         with db.engine.connect() as connection:
             assert connection.execute(text("SELECT etag FROM verifications")).scalar() is None
             assert connection.execute(text("SELECT parser_identity FROM verifications")).scalar() is None
-            assert set(connection.execute(text("SELECT version FROM tire_schema_versions")).scalars()) == {
-                "001_verification_validators", "002_monitor_rule_conditions", "003_parser_release_provenance", "004_query_selection_filters", "005_variant_identity_contract", "006_source_settings", "007_monitor_tasks", "008_recall_discovery_monitoring", "009_ai_streaming", "010_offline_packs", "011_query_fallback_policies", "012_device_ai_preparations", "013_device_ai_ledger_triggers", "014_local_sessions_user"}
+            assert set(connection.execute(text("SELECT version FROM tire_schema_versions")).scalars()) == set(EXPECTED_SCHEMA_VERSIONS)
         # Idempotent startup; no repeated mutation or loss of old observations.
         db.initialize()
         assert count(db, Snapshot) == 1

@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import func, inspect, select
 
+from admin_support import register_admin
 from tire_api.db import (Database, FactVersion, GarageRevision, QueryRun, Snapshot, TireVariant,
                          VariantLifecycleEvent, Verification, WatchItem, uid, utcnow)
 from tire_api.domain import IDENTITY_CONTRACT_VERSION, VariantInput, digest
@@ -147,8 +148,7 @@ def relation_setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'relations.sqlite').as_posix(), NoNetworkRegistry())
     with TestClient(app) as client:
         client.get('/health')
-        assert client.post('/v1/auth/register',
-                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+        register_admin(client)
         session_id = client.cookies['tire_local_session']
         database = app.state.database
         vehicle = seed_vehicle(database, session_id)

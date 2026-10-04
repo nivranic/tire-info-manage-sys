@@ -12,6 +12,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, load_only
 
 from .ai_analysis import grounded_answer, owned_pack
+from .auth import session_scope
 from .ai_recall_contract import is_recall_evidence, validate_recall_payload
 from .ai_models import AICompletion, AIRequest
 from .db import uid
@@ -62,10 +63,10 @@ def latest_revision(db, report_id, expected=None):
     return row
 
 
-def owned_report(db, report_id, session_id):
+def owned_report(db, report_id, scope):
     row = db.get(ResearchReport, report_id)
-    if row is None or row.actor_session_id != session_id:
-        raise HTTPException(404, '未找到本会话的报告')
+    if row is None or row.actor_session_id not in scope:
+        raise HTTPException(404, '未找到当前账户的报告')
     if digest(row.body) != row.body_hash:
         raise HTTPException(409, '报告正文完整性校验失败')
     return row
@@ -225,16 +226,16 @@ def register_report_routes(app: FastAPI):
             raise HTTPException(422, 'Idempotency-Key 必须是 UUID') from None
         QueryService(db, None).lock_ingestion()
         request_hash = digest(payload.model_dump())
-        previous = db.scalar(select(ResearchReport).where(ResearchReport.actor_session_id == request.state.session_id,
+        previous = db.scalar(select(ResearchReport).where(ResearchReport.actor_session_id.in_(session_scope(db, request.state.session_id)),
                                                          ResearchReport.idempotency_key == key))
         if previous:
             if previous.request_hash != request_hash:
                 raise HTTPException(409, '同一幂等键不能用于不同报告内容')
-            owned_report(db, previous.id, request.state.session_id)
+            owned_report(db, previous.id, session_scope(db, request.state.session_id))
             result = detail(db, previous)
             db.commit()
             return result
-        pack = owned_pack(db, payload.pack_id, request.state.session_id)
+        pack = owned_pack(db, payload.pack_id, session_scope(db, request.state.session_id))
         body = freeze_body(db, pack, payload.analysis_id, request.state.session_id)
         row = ResearchReport(id=uid(), actor_session_id=request.state.session_id, idempotency_key=key, request_hash=request_hash,
             pack_id=pack.id, analysis_id=payload.analysis_id, privacy_class='private', body=body, body_hash=digest(body))
@@ -251,7 +252,6 @@ def register_report_routes(app: FastAPI):
     @app.get('/v1/reports')
     def listing(request: Request, mode: Literal['history'] = Query(...), archived: bool = False,
                 offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
-        from .auth import session_scope
         heads = select(ResearchReportRevision.report_id, func.max(ResearchReportRevision.revision).label('revision')).group_by(
             ResearchReportRevision.report_id).subquery()
         statement = select(ResearchReport, ResearchReportRevision).join(ResearchReportRevision,
@@ -267,12 +267,12 @@ def register_report_routes(app: FastAPI):
 
     @app.get('/v1/reports/{report_id}')
     def read(report_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
-        return detail(db, owned_report(db, report_id, request.state.session_id))
+        return detail(db, owned_report(db, report_id, session_scope(db, request.state.session_id)))
 
     @app.put('/v1/reports/{report_id}')
     def edit(report_id: str, payload: ReportEdit, request: Request, db: Session = Depends(get_db)):
         QueryService(db, None).lock_ingestion()
-        row = owned_report(db, report_id, request.state.session_id)
+        row = owned_report(db, report_id, session_scope(db, request.state.session_id))
         current = latest_revision(db, report_id, payload.expected_revision)
         if current.archived:
             raise HTTPException(409, '请先恢复已归档报告')
@@ -291,7 +291,7 @@ def register_report_routes(app: FastAPI):
     @app.post('/v1/reports/{report_id}/state')
     def state(report_id: str, payload: ReportState, request: Request, db: Session = Depends(get_db)):
         QueryService(db, None).lock_ingestion()
-        row = owned_report(db, report_id, request.state.session_id)
+        row = owned_report(db, report_id, session_scope(db, request.state.session_id))
         current = latest_revision(db, report_id, payload.expected_revision)
         archived = payload.action == 'archive'
         if current.archived == archived:
@@ -307,7 +307,7 @@ def register_report_routes(app: FastAPI):
     @app.post('/v1/reports/{report_id}/exports', status_code=201)
     def export(report_id: str, payload: ExportRequest, request: Request, db: Session = Depends(get_db)):
         from .report_rendering import RENDERER_VERSION, ReportRenderError, render_report
-        report = owned_report(db, report_id, request.state.session_id)
+        report = owned_report(db, report_id, session_scope(db, request.state.session_id))
         revision = report_revision(db, report_id, payload.revision)
         document = document_for(report, revision)
         document_hash = digest(document)
@@ -327,7 +327,7 @@ def register_report_routes(app: FastAPI):
         except ObjectStoreError:
             raise HTTPException(503, '导出文件存储未完成，未创建导出记录') from None
         QueryService(db, None).lock_ingestion()
-        owned_report(db, report_id, request.state.session_id)
+        owned_report(db, report_id, session_scope(db, request.state.session_id))
         # Concurrent identical exports reuse the first immutable object receipt.
         existing = db.scalar(select(ReportExport).where(ReportExport.report_id == report_id,
             ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == RENDERER_VERSION))
@@ -350,7 +350,7 @@ def register_report_routes(app: FastAPI):
     @app.get('/v1/reports/{report_id}/exports/{export_id}/content')
     def content(report_id: str, export_id: str, request: Request, mode: Literal['history'] = Query(...),
                 revision: int = Query(..., ge=1), db: Session = Depends(get_db)):
-        report = owned_report(db, report_id, request.state.session_id)
+        report = owned_report(db, report_id, session_scope(db, request.state.session_id))
         record = db.get(ReportExport, export_id)
         if record is None or record.report_id != report_id or record.revision != revision:
             raise HTTPException(404, '未找到所选报告修订的导出文件')

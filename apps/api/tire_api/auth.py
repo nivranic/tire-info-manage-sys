@@ -13,6 +13,7 @@ import hashlib
 import hmac
 import re
 import secrets
+import threading
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -40,9 +41,13 @@ def verify_password(password: str, stored: str) -> bool:
         scheme, n, r, p, salt_hex, digest_hex = stored.split("$")
         if scheme != "scrypt":
             return False
+        n, r, p = int(n), int(r), int(p)
+        # 防御被篡改的存储串把校验变成无界计算（正常值由本模块写入，远低于上界）。
+        if not (1 <= n <= 1 << 20 and 1 <= r <= 16 and 1 <= p <= 8):
+            return False
         expected = bytes.fromhex(digest_hex)
         digest = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt_hex),
-                                n=int(n), r=int(r), p=int(p), dklen=len(expected))
+                                n=n, r=r, p=p, dklen=len(expected))
         return hmac.compare_digest(digest.hex(), digest_hex)
     except (ValueError, TypeError):
         return False
@@ -85,6 +90,7 @@ def user_view(user: User) -> dict:
 def register_auth_routes(app: FastAPI) -> None:
     # 进程内登录限速：用户名 -> [连续失败数, 封锁截止时间戳]。进程重启清零可接受。
     attempts: dict[str, list] = {}
+    attempts_lock = threading.Lock()
 
     def get_db():
         with app.state.database.sessions() as db:
@@ -99,6 +105,12 @@ def register_auth_routes(app: FastAPI) -> None:
 
     @app.post("/v1/auth/register")
     def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+        if current_user(db, request.state.session_id) is not None:
+            raise HTTPException(409, {"code": "already_authenticated",
+                                      "message": "当前会话已登录，请先登出再注册新账户。"})
+        # ingestion 锁串行化"首用户判定+写入"，防止并发注册产生双管理员。
+        from .service import QueryService
+        QueryService(db, None).lock_ingestion()
         if db.scalar(select(User.id).where(User.username == payload.username)):
             raise HTTPException(409, {"code": "username_taken", "message": "此用户名已被注册。"})
         first = db.scalar(select(User.id).limit(1)) is None
@@ -111,17 +123,22 @@ def register_auth_routes(app: FastAPI) -> None:
 
     @app.post("/v1/auth/login")
     def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> dict:
-        record = attempts.setdefault(payload.username, [0, 0.0])
-        if record[1] > time.monotonic():
-            raise HTTPException(429, {"code": "auth_too_many_attempts",
-                                      "message": "连续失败次数过多，请稍后再试。"})
+        with attempts_lock:
+            record = attempts.setdefault(payload.username, [0, 0.0])
+            if record[1] > time.monotonic():
+                raise HTTPException(429, {"code": "auth_too_many_attempts",
+                                          "message": "连续失败次数过多，请稍后再试。"})
         user = db.scalar(select(User).where(User.username == payload.username))
         if not user or not verify_password(payload.password, user.password_hash):
-            record[0] += 1
-            if record[0] >= LOGIN_FAIL_LIMIT:
-                record[1] = time.monotonic() + LOGIN_BLOCK_SECONDS
+            with attempts_lock:
+                record = attempts.setdefault(payload.username, [0, 0.0])
+                record[0] += 1
+                if record[0] >= LOGIN_FAIL_LIMIT:
+                    record[1] = time.monotonic() + LOGIN_BLOCK_SECONDS
             raise HTTPException(401, {"code": "bad_credentials", "message": "用户名或密码不正确。"})
-        record[0], record[1] = 0, 0.0
+        with attempts_lock:
+            record = attempts.setdefault(payload.username, [0, 0.0])
+            record[0], record[1] = 0, 0.0
         bind_session(db, request, user)
         return {"user": user_view(user), "authenticated": True}
 

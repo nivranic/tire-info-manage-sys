@@ -203,4 +203,6 @@ def register_curation_routes(app: FastAPI) -> None:
 
     @app.post("/v1/tire-variants/{variant_id}/fact-revisions", status_code=201)
     def revise(variant_id: str, payload: RevisionRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+        from .auth import require_admin
+        require_admin(request, db)
         return append_revision(db, variant_id, payload, request.state.session_id)

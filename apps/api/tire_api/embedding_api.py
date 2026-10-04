@@ -8,6 +8,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, load_only
 
 from .dense import capability, coverage, current_materials, ensure_hnsw, hybrid_result, mirror_cache
+from .auth import session_scope
 from .domain import StrictModel, digest
 from .embedding_budget import budget_usage
 from .embedding_gateway import (EmbeddingError, OpenAIEmbeddingAdapter, configured_embeddings,
@@ -207,13 +208,12 @@ def register_embedding_routes(app: FastAPI):
     @app.get('/v1/knowledge/embedding-runs/{run_id}')
     def get_run(run_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
         row = db.get(EmbeddingRequest, run_id)
-        if row is None or row.actor_session_id != request.state.session_id:
-            raise HTTPException(404, '未找到本会话的向量调用记录')
+        if row is None or row.actor_session_id not in session_scope(db, request.state.session_id):
+            raise HTTPException(404, '未找到当前账户的向量调用记录')
         return run_view(db, row)
 
     @app.get('/v1/knowledge/embedding-runs')
     def history(request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
-        from .auth import session_scope
         rows = db.execute(select(EmbeddingRequest, EmbeddingCompletion).outerjoin(EmbeddingCompletion,
             EmbeddingCompletion.request_id == EmbeddingRequest.id).options(load_only(
                 EmbeddingCompletion.request_id, EmbeddingCompletion.state, EmbeddingCompletion.error_code,

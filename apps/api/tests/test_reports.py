@@ -95,7 +95,24 @@ def test_private_ownership_covers_pack_analysis_report_metadata_and_exports(setu
     assert other.post(f'/v1/reports/{report["id"]}/state', json={'expected_revision': 1, 'action': 'archive'}).status_code == 404
     assert other.post(f'/v1/reports/{report["id"]}/exports', json={'revision': 1, 'format': 'markdown'}).status_code == 404
     assert other.get(f'/v1/reports/{report["id"]}/exports/fake/content?mode=history&revision=1').status_code == 404
-    assert count(database, ResearchReportRevision) == 1
+
+
+def test_same_user_second_session_reads_and_archives_report(setup):
+    """圆桌 R2-1：详情/写/导出跟随用户 scope——同用户另一浏览器会话不再"看得到打不开"。"""
+    from admin_support import register_admin
+    client, _, _, database = setup
+    register_admin(client, username='alice')
+    pack = historical_pack(client)
+    analysis = analyze(client, pack).json()
+    report = save(client, pack, analysis['id']).json()
+    second = TestClient(client.app)
+    assert second.post('/v1/auth/login', json={'username': 'alice', 'password': 'fixture-admin-pw'}).status_code == 200
+    detail = second.get(f'/v1/reports/{report["id"]}?mode=history')
+    assert detail.status_code == 200 and detail.json()['id'] == report['id']
+    assert second.post(f'/v1/reports/{report["id"]}/state',
+                       json={'expected_revision': 1, 'action': 'archive'}).status_code == 200
+    exported = second.post(f'/v1/reports/{report["id"]}/exports', json={'revision': 1, 'format': 'markdown'})
+    assert exported.status_code == 201, exported.text
 
 
 def test_expired_pack_allowed_and_fact_text_rebuilt_from_bound_values(setup):

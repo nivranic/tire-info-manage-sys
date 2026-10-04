@@ -279,6 +279,8 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
   const activeQuery = useRef<ActiveQuery | null>(null);
   const evidenceController = useRef<AbortController | null>(null);
   const watchLock = useRef(new Set<string>());
+  // 关注列表归属随登录账户变化；记录上次归属，仅在实际变化时重拉（首次就绪时挂载加载已按同一会话读取）。
+  const lastWatchOwner = useRef<string | null | undefined>(undefined);
   const queryDraftKey = JSON.stringify([model, size, region, selectedSources, filterDrafts]);
   const lastDraftKey = useRef(queryDraftKey);
   const currentDraftKey = useRef(queryDraftKey); currentDraftKey.current = queryDraftKey;
@@ -431,6 +433,21 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     });
     return () => controller.abort();
   }, [view]);
+
+  // 登录 / 登出 / 切换账户后关注列表归属变化，重新拉取（登出回匿名数据）。仅 watchlists，变更记录随 watch 视图重读。
+  useEffect(() => {
+    if (!auth.ready) return;
+    const owner = auth.state.user?.id ?? null;
+    if (lastWatchOwner.current === undefined) { lastWatchOwner.current = owner; return; }
+    if (lastWatchOwner.current === owner) return;
+    lastWatchOwner.current = owner;
+    const controller = new AbortController();
+    setWatchError("");
+    void tireApi.watchlists(controller.signal).then(result => {
+      if (!controller.signal.aborted) { setWatches(result.items); setWatchError(""); }
+    }).catch(error => { if (!controller.signal.aborted) setWatchError(errorText(error)); });
+    return () => controller.abort();
+  }, [auth.ready, auth.state.user?.id]);
 
   function toggleTheme() {
     const next = theme === "light" ? "dark" : "light";
@@ -675,7 +692,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     </aside>
 
     <div className="workspace">
-      <header className="topbar"><div className="breadcrumb"><span>工作台</span><Icon name="chevron" size={12} /><strong>{currentNav.label}</strong></div><div className="topbar-actions">{platform.kind === "web" ? <OfflineLibraryEntry platform={platform} className="text-button mobile-offline-entry" /> : null}<span className={`connection ${health ? "connected" : ""}`}><span className="status-dot" />{booting ? "连接中" : health ? "API 已连接" : "API 未连接"}</span><button type="button" className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "切换深色主题" : "切换浅色主题"}><Icon name={theme === "light" ? "moon" : "sun"} /></button></div></header>
+      <header className="topbar"><div className="breadcrumb"><span>工作台</span><Icon name="chevron" size={12} /><strong>{currentNav.label}</strong></div><div className="topbar-actions">{platform.kind === "web" ? <OfflineLibraryEntry platform={platform} className="text-button mobile-offline-entry" /> : null}<span className={`connection ${health ? "connected" : ""}`}><span className="status-dot" />{booting ? "连接中" : health ? "API 已连接" : "API 未连接"}</span><button type="button" className="icon-button topbar-toggle" onClick={() => setPaletteOpen(true)} aria-label="打开命令面板" title="命令面板 · Ctrl / ⌘ K"><Icon name="search" size={17} /></button><button type="button" className="icon-button topbar-toggle" onClick={() => setAccountOpen(true)} aria-label={auth.state.user ? `账户 · ${auth.state.user.display_name || auth.state.user.username}，点击打开` : "打开本机账户，登录或注册"} title={auth.state.user ? "本机账户" : "登录本机账户"}><span className="avatar" aria-hidden="true">{auth.state.user ? (auth.state.user.display_name || auth.state.user.username).slice(0, 1) || "研" : "研"}</span></button><button type="button" className="icon-button theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "切换深色主题" : "切换浅色主题"}><Icon name={theme === "light" ? "moon" : "sun"} /></button></div></header>
       <div className="workbench-grid">
         <main id="main-content" className="main-content">
           {!booting && !sourceAccess.fresh ? <div className="source-access-notice" role="status">{sourceAccess.loading ? "正在核对来源目录，暂不发起新的在线操作。" : "来源目录刷新未完成，暂不发起新的在线操作。"} 历史证据与已保存记录仍可读取。<button type="button" className="text-button" disabled={sourceAccess.loading} onClick={() => void refreshSources()}>刷新来源目录</button></div> : null}

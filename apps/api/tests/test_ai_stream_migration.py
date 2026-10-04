@@ -6,6 +6,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
+from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from tire_api.ai_models import AICompletion, AIEvidencePack, AIRequest
 from tire_api.ai_stream_models import AIStreamExecution, AIStreamEvent
 from tire_api.db import Base, uid, utcnow
@@ -13,9 +14,7 @@ from tire_api.knowledge_models import initialize_search
 from tire_api.main import create_app
 
 NEW_TABLES = {'ai_stream_executions', 'ai_stream_events'}
-OLD_VERSIONS = ['001_verification_validators', '002_monitor_rule_conditions', '003_parser_release_provenance',
-    '004_query_selection_filters', '005_variant_identity_contract', '006_source_settings',
-    '007_monitor_tasks', '008_recall_discovery_monitoring']
+OLD_VERSIONS = PRE_009_VERSIONS  # 单一权威清单见 version_registry.py
 
 
 def snapshot(database):
@@ -75,7 +74,7 @@ def test_only_two_new_tables_and_one_version_preserve_every_old_schema_and_row(p
     assert len(after['rows']['tire_schema_versions']) == len(OLD_VERSIONS) + 6
     assert all(after['rows'][name] == [] for name in NEW_TABLES)
     with database.engine.connect() as connection:
-        assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(OLD_VERSIONS) | {'009_ai_streaming', '010_offline_packs', '011_query_fallback_policies', '012_device_ai_preparations', '013_device_ai_ledger_triggers', '014_local_sessions_user'}
+        assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(EXPECTED_SCHEMA_VERSIONS)
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         assert inspect(connection).get_check_constraints('ai_completions') == []
 

@@ -440,8 +440,12 @@ def register_reparse_routes(app: FastAPI):
 
     @app.post('/v1/reparse/runs/{run_id}/reviews', status_code=201)
     def review(run_id: str, payload: ReviewCreate, request: Request, db: Session = Depends(get_db)):
+        from .auth import require_admin, session_scope
+        require_admin(request, db)
         QueryService(db, None).lock_ingestion()
         run = checked_run(db, run_id)
+        if run.actor_session_id not in session_scope(db, request.state.session_id):
+            raise HTTPException(404, {'code': 'reparse_not_found'})
         completion = checked_completion(db, run)
         if completion is None:
             raise HTTPException(409, {'code': 'reparse_not_completed'})

@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+from admin_support import register_admin
 from tire_api.db import (AuditEvent, ChangeEvent, Database, FactVersion, QueryRun, Snapshot,
                          SourceQuarantine, TireVariant, UserSession, Verification, utcnow)
 from tire_api.domain import LiveQueryRequest
@@ -63,8 +64,7 @@ def setup():
     app = create_app("sqlite://", registry)
     with TestClient(app) as client:
         # 隔离复核等管理写操作需要管理员（auth.py 守卫）；首个注册用户即管理员。
-        assert client.post("/v1/auth/register",
-                           json={"username": "admin", "password": "fixture-admin-pw"}).status_code == 200
+        register_admin(client)
         yield client, registry, app.state.database
 
 

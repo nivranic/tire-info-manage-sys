@@ -378,11 +378,12 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
     @app.post("/v1/watchlists", status_code=201)
     def add_watch(payload: WatchRequest, request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
         service = QueryService(db, adapter_registry)
+        from .auth import session_scope
         from .identity_contract import require_current_identity
         service.lock_ingestion()
         require_current_identity(db, payload.variant_id)
         variant = service.historical_variant(payload.variant_id)
-        item = db.scalar(select(WatchItem).where(WatchItem.session_id == request.state.session_id,
+        item = db.scalar(select(WatchItem).where(WatchItem.session_id.in_(session_scope(db, request.state.session_id)),
                                                 WatchItem.variant_id == payload.variant_id))
         if not item:
             item = WatchItem(session_id=request.state.session_id, variant_id=payload.variant_id)

@@ -8,6 +8,7 @@ from pydantic import Field, StrictBool
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, load_only
 
+from .auth import session_scope
 from .ai_analysis import owned_pack, run_state
 from .ai_evidence import pack_view
 from .ai_execution import execute_response, reserve_response
@@ -43,10 +44,10 @@ def key_value(value):
         raise HTTPException(422, 'Idempotency-Key 必须是 UUID') from None
 
 
-def owned_draft(db, run_id, session_id):
+def owned_draft(db, run_id, scope):
     row = db.get(AIRequest, run_id)
-    if row is None or row.actor_session_id != session_id or row.request_contract.get('purpose') != 'rule_draft':
-        raise HTTPException(404, '未找到本会话的规则草稿')
+    if row is None or row.actor_session_id not in scope or row.request_contract.get('purpose') != 'rule_draft':
+        raise HTTPException(404, '未找到当前账户的规则草稿')
     return row
 
 
@@ -106,7 +107,7 @@ def register_rule_draft_routes(app: FastAPI):
             db.commit()
             response.status_code = 202 if value['state'] == 'pending' else 200
             return value
-        pack = owned_pack(db, payload.pack_id, request.state.session_id)
+        pack = owned_pack(db, payload.pack_id, session_scope(db, request.state.session_id))
         checked_catalog(db, app.state.registry, pack)
         if not payload.allow_external_processing:
             raise HTTPException(422, '需要明确允许将监控意图和所选目录发送到 OpenAI')
@@ -135,9 +136,9 @@ def register_rule_draft_routes(app: FastAPI):
 
     @app.get('/v1/ai/rule-drafts/{run_id}')
     def detail(run_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
-        row = owned_draft(db, run_id, request.state.session_id)
+        row = owned_draft(db, run_id, session_scope(db, request.state.session_id))
         application = db.scalar(select(AIDraftApplication).where(AIDraftApplication.draft_request_id == row.id))
-        return {**draft_view(db, row), 'pack': pack_view(owned_pack(db, row.pack_id, request.state.session_id)),
+        return {**draft_view(db, row), 'pack': pack_view(owned_pack(db, row.pack_id, session_scope(db, request.state.session_id))),
                 'application': application_view(application) if application else None}
 
     @app.post('/v1/ai/rule-drafts/{run_id}/apply', status_code=201)
@@ -147,7 +148,7 @@ def register_rule_draft_routes(app: FastAPI):
         if not payload.acknowledged:
             raise HTTPException(422, '请先审核完整规则并明确确认保存')
         QueryService(db, None).lock_ingestion()
-        row = owned_draft(db, run_id, request.state.session_id)
+        row = owned_draft(db, run_id, session_scope(db, request.state.session_id))
         reviewed = payload.rule.model_dump(mode='json')
         payload_hash = digest({'draft_id': run_id, 'rule': reviewed})
         same_key = db.scalar(select(AIDraftApplication).where(AIDraftApplication.actor_session_id == request.state.session_id,
@@ -163,7 +164,7 @@ def register_rule_draft_routes(app: FastAPI):
         completion = db.get(AICompletion, row.id)
         if not completion or completion.state != 'completed' or not completion.answer or not completion.answer.get('can_apply'):
             raise HTTPException(409, '草稿未完成或仍有未解决需求，不能保存为规则')
-        pack = owned_pack(db, row.pack_id, request.state.session_id)
+        pack = owned_pack(db, row.pack_id, session_scope(db, request.state.session_id))
         checked_catalog(db, app.state.registry, pack)
         if payload.rule.source_id != pack.payload['source']['id'] or payload.rule.query.model not in pack.payload['supported_models']:
             raise HTTPException(422, '审核规则的来源与型号必须属于准备时明确选择的目录')

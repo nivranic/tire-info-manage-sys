@@ -8,6 +8,7 @@ from sqlalchemy import select
 from tire_api.db import (AuditEvent, QuarantineApprovalUse, QuarantineReview, Snapshot,
                          SourceQuarantine, utcnow)
 from tire_api import quarantine_review as reviews
+from admin_support import register_admin
 from test_quality import (QUERY, accepted_counts, count, grant, live, quarantine, reduced,
                           result, setup)
 from test_vehicles import setup as vehicle_setup, live as vehicle_live
@@ -209,8 +210,7 @@ def verify_concurrent_review(url):
     registry = FixtureRegistry()
     app = create_app(url, registry)
     with TestClient(app) as seed:
-        assert seed.post('/v1/auth/register',
-                         json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+        register_admin(seed)
         baseline_counts = {model: count(app.state.database, model)
                            for model in (QuarantineApprovalUse, QuarantineReview, Snapshot)}
         qid = rejected(seed, registry)

@@ -5,6 +5,7 @@ import { ApiError, tireApi } from "@tire/api-client";
 import type { ParserBundle, ParserDeployment, ParserEvaluation, ParserEvaluationCreate, ParserPage,
   ParserSignedAction, ParserTransition, RawCaptureEvidence, RawCaptureRecord, Source, GoldenSet, GoldenGate } from "@tire/domain-types";
 import { DataTree, QualityMetrics, qualityLabels, qualityGroupLabels, queryScope, targetLabel } from "./reparse-review";
+import { useWorkbenchAuth } from "./auth";
 
 const stamp = (value?: string) => value ? new Date(value).toLocaleString("zh-CN") : "未记录";
 const short = (value: string) => `${value.slice(0, 12)}…`;
@@ -41,6 +42,7 @@ const errorLabels: Record<string, string> = {
   parser_receipt_mismatch: "执行回执与固定代码包或部署修订不匹配，结果已拒收。",
   parser_receipt_input_mismatch: "执行回执与冻结输入不匹配，结果已拒收。",
   idempotency_payload_mismatch: "请求标识已绑定其他操作，请保留标识并核对记录。",
+  admin_required: "此管理操作需要管理员账户登录。",
 };
 const message = (error: unknown) => error instanceof ApiError && error.code
   ? errorLabels[error.code] || `操作未完成（${error.code}）。请核对记录。`
@@ -101,6 +103,9 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
   const dialog = useRef<HTMLDialogElement>(null);
   const focusTarget = useRef<HTMLHeadingElement>(null);
   const operation = useRef<AbortController | null>(null);
+  const auth = useWorkbenchAuth();
+  // 会话未就绪（ready=false，如首帧或桌面宿主未注入）时不禁用，避免误伤只读浏览。
+  const adminBlocked = auth.ready && (!auth.state.authenticated || !auth.state.user?.is_admin);
   // An installed source can be disabled independently of its Parser deployment;
   // keep its release history reachable while excluding unimplemented sources.
   const choices = [...sources.filter(item => !!item.parser_version && item.id !== "xiaomi-cn-vehicles"), { id: "xiaomi-cn-vehicles", name: "小米汽车 · 官方配置" }];
@@ -348,7 +353,7 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
           {reviewStale ? <p className="inline-error" role="alert">审批状态发生冲突或结果未确认。重新读取后再核对；当前表单已锁定。</p> : null}
           {evaluation.completion ? <form className="review-form" onSubmit={event => { event.preventDefault(); void review(); }}><h4>追加发布审批（不自动切换）</h4><label><span>审批决定</span><select value={reviewAction} disabled={locked || reviewStale} onChange={event => { setReviewAction(event.target.value as "approve" | "reject"); setReviewConfirmed(false); }}><option value="approve">批准此冻结评估用于发布</option><option value="reject">不批准 / 撤回批准</option></select></label><label><span>审批署名（本地自报）</span><input value={reviewOperator} maxLength={100} required disabled={locked || reviewStale} onChange={event => setReviewOperator(event.target.value)} /></label><label><span>审批理由</span><textarea value={reviewReason} maxLength={2000} rows={3} required disabled={locked || reviewStale} onChange={event => setReviewReason(event.target.value)} /></label>
             {evaluation.completion.reference_gaps.length ? <label className="review-checkbox"><input type="checkbox" checked={gapConfirmed} disabled={locked || reviewStale} onChange={event => setGapConfirmed(event.target.checked)} /><span>确认相对回归缺少同原文正式参考；已核对对照结果或其失败。此确认不能豁免 Golden 精确差异或覆盖缺口。</span></label> : null}
-            <label className="review-checkbox"><input type="checkbox" checked={reviewConfirmed} disabled={locked || reviewStale} onChange={event => setReviewConfirmed(event.target.checked)} /><span>已核对{recallRegression(evaluation.golden_gate) ? "召回候选、参考、质量与回执" : "人工冻结集、精确差异、候选及回执"}；批准只绑定当前完成指纹，仍须单独激活。</span></label><button type="submit" className="primary-button" disabled={locked || reviewStale || !reviewConfirmed || !reviewOperator.trim() || !reviewReason.trim() || (reviewAction === "approve" && (!canApprove || (!!evaluation.completion.reference_gaps.length && !gapConfirmed)))}>追加审批修订</button></form> : null}
+            <label className="review-checkbox"><input type="checkbox" checked={reviewConfirmed} disabled={locked || reviewStale} onChange={event => setReviewConfirmed(event.target.checked)} /><span>已核对{recallRegression(evaluation.golden_gate) ? "召回候选、参考、质量与回执" : "人工冻结集、精确差异、候选及回执"}；批准只绑定当前完成指纹，仍须单独激活。</span></label><button type="submit" className="primary-button" disabled={locked || reviewStale || adminBlocked || !reviewConfirmed || !reviewOperator.trim() || !reviewReason.trim() || (reviewAction === "approve" && (!canApprove || (!!evaluation.completion.reference_gaps.length && !gapConfirmed)))} title={adminBlocked ? "需要管理员账户" : undefined}>追加审批修订</button></form> : null}
           {canActivate ? <button type="button" className="secondary-button" disabled={locked} onClick={() => { setAction("activate"); setChangeConfirmed(false); document.getElementById("parser-transition-title")?.scrollIntoView({ block: "start" }); }}>准备激活此已批准评估</button> : null}
         </> : null}</section></div>
       <section className="parser-transition"><h3 id="parser-transition-title">4 · 明确变更部署</h3><p>所有动作只改变本机后续请求的 Parser 选择，不回退数据库或重写旧事实。暂停后已在途的旧修订结果也不能采纳。</p>{deploymentStale ? <p className="inline-error">部署修订已发生冲突，先重新读取当前部署再确认。</p> : null}

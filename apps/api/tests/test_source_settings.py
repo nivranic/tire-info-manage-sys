@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, update
 
+from admin_support import register_admin
 from tire_api.db import Database, QueryRun, UserSession, utcnow
 from tire_api.main import create_app
 from tire_api.source_setting_models import SourceSettingRevision
@@ -20,8 +21,7 @@ def setup(monkeypatch):
     monkeypatch.delenv('TI_DISABLED_SOURCES', raising=False)
     app = create_app('sqlite://')
     with TestClient(app) as client:
-        assert client.post('/v1/auth/register',
-                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+        register_admin(client)
         yield client, app.state.database
 
 

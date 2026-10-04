@@ -1,9 +1,9 @@
-# COHS 风险登记 — r54（2026-10-03）
+# COHS 风险登记 — r55（2026-10-04）
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r54
-updated: 2026-10-03
+register_version: r55
+updated: 2026-10-04
 
 risks:
   - id: R-001
@@ -137,3 +137,14 @@ risks:
     compensating_control: 波次3浏览器验收（深链直达/前进后退/刷新存活/compare 占位回填/移动返回链）+ 三端构建门禁（共享文件禁入 next/* 构件）；route-hash.test.ts 纯函数编解码锚
     reassess_trigger: 任何导航结构改动或新增平台壳时
     status: open-accepted
+
+  - id: R-014
+    asset: 本机账户治理能力（apps/api/tire_api/auth.py；ADR-2026-057 圆桌裁决补记）
+    finding: 账户治理端点为零——无提权/降级、改密、删户、用户列表（auth.py 仅有 register/login/logout/me），唯一 admin 忘密码或需提权只能手改本机 SQLite；并发注册双 admin 竞态已由 ingestion 锁串行化修复（auth.py:111-113）
+    impact: medium
+    likelihood: low（当前单人使用）
+    priority: roadmap
+    owner: user
+    compensating_control: 本机 SQLite 可直接维护（工作台形态可接受的运维后门）；ADR-2026-057 圆桌裁决补记登记裁决口径；docs/DEPLOYMENT-KEY-POLICY.md 部署前置检查清单明列"账户治理能力部署前必须补齐"
+    reassess_trigger: 首个真实多用户共用场景或任何"部署到服务器"工作启动时
+    status: open-roadmap

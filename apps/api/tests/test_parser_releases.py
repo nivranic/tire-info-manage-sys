@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 
 from tire_api import parser_runtime as runtime, parser_bundles as bundles
 from tire_api.adapters import registry, xiaomi
+from admin_support import register_admin
 from tire_api.db import FactVersion, QueryRun, RawCapture, Snapshot, Verification, uid
 from tire_api.domain import LiveQueryRequest, VariantInput, digest
 from tire_api.main import create_app
@@ -97,8 +98,7 @@ def setup(tmp_path, monkeypatch):
     app = create_app('sqlite:///' + (tmp_path / 'releases.db').as_posix(), adapter)
     with TestClient(app) as client:
         client.get('/health')
-        assert client.post('/v1/auth/register',
-                           json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+        register_admin(client)
         yield client, app.state.database, adapter, source
 
 
@@ -384,8 +384,7 @@ def verify_parser_release_persistence(url, directory):
         adapter = RecordedRegistry()
         app = create_app(url, adapter)
         with TestClient(app) as client:
-            assert client.post('/v1/auth/register',
-                               json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+            register_admin(client)
             first = live(client)
             assert first['data_state'] == 'live'
             first_id = adapter.calls[-1]['bundle_id']

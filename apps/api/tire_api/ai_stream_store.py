@@ -261,6 +261,7 @@ def device_view(preparation, claim):
 
 def detail(db, request_id, session_id):
     from .ai_analysis import run_state, owned_pack
+    from .auth import session_scope
     from .ai_evidence import pack_view
     from .device_ai_models import DeviceAIConsentClaim, DeviceAIPreparation
     row = owned_request(db, request_id, session_id)
@@ -270,7 +271,7 @@ def detail(db, request_id, session_id):
     completion = db.get(AICompletion, request_id)
     execution = execution_view(db, request_id, last, completion=completion, prefetched=True)
     analysis = {**run_state(db, row, completion, prefetched=True),
-                'pack': pack_view(owned_pack(db, row.pack_id, session_id))}
+                'pack': pack_view(owned_pack(db, row.pack_id, session_scope(db, session_id)))}
     # D1/D9：device origin 由 preparation 表权威判别；读取路径同时断言 AIRequest 与 claim
     # 双 ledger 一致（replay/lookup 一致性，结构上不可能孤儿，防御性 fail closed）。
     preparation = db.scalar(select(DeviceAIPreparation).where(DeviceAIPreparation.ai_pack_id == row.pack_id,

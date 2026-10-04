@@ -12,5 +12,8 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _hermetic_ti_env(monkeypatch):
-    for name in [key for key in os.environ if key.startswith('TI_')]:
+    # TIRE_DATABASE_URL/DATABASE_URL/TIRE_CORS_ORIGINS 同样影响应用行为（R3 圆桌：
+    # 定义盲区），一并清空；全部测试显式传 URL 且不断言 CORS。
+    for name in [key for key in os.environ
+                 if key.startswith('TI_') or key in ('TIRE_DATABASE_URL', 'DATABASE_URL', 'TIRE_CORS_ORIGINS')]:
         monkeypatch.delenv(name, raising=False)
