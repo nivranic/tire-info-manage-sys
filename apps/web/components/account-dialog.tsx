@@ -1,11 +1,105 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useWorkbenchAuth } from "./auth";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AuthUserListItem } from "@tire/domain-types";
+import { tireApi } from "@tire/api-client";
+import { useWorkbenchAuth, authErrorText } from "./auth";
 import { useToast } from "./toast";
 import { Icon } from "./icons";
 
 const usernamePattern = "[A-Za-z0-9_-]{3,32}";
+
+/** 管理员用户管理区：列出本机用户并支持角色切换与密码重置（R-014）。降级保护以服务端裁决为准，前端仅按"唯一管理员是自己"预禁用。 */
+function AdminUsersPanel({ selfId, locked, onIdentityChanged }: { selfId: string; locked: boolean; onIdentityChanged: () => void }) {
+  const toast = useToast();
+  const [users, setUsers] = useState<AuthUserListItem[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const session = useRef<AbortController | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    session.current?.abort();
+    const controller = new AbortController(); session.current = controller;
+    setLoadError("");
+    try {
+      const result = await tireApi.authUsers(controller.signal);
+      if (!controller.signal.aborted) setUsers(result.items);
+    } catch (cause) {
+      if (!controller.signal.aborted) { setUsers(previous => previous ?? []); setLoadError(authErrorText(cause)); }
+    } finally { if (session.current === controller) session.current = null; }
+  }, []);
+
+  useEffect(() => { void loadUsers(); return () => session.current?.abort(); }, [loadUsers]);
+
+  function closeReset() { setResetFor(null); setNewPassword(""); setConfirmPassword(""); setError(""); }
+
+  async function toggleRole(item: AuthUserListItem) {
+    if (locked || busyId) return;
+    setBusyId(item.id); setError("");
+    try {
+      await tireApi.authSetRole(item.id, !item.is_admin);
+      await loadUsers();
+      await onIdentityChanged(); // 自己的角色可能已变化，刷新 me 保持账户摘要一致。
+    } catch (cause) { setError(authErrorText(cause)); }
+    finally { setBusyId(null); }
+  }
+
+  async function submitReset(event: React.FormEvent, item: AuthUserListItem) {
+    event.preventDefault();
+    if (locked || busyId) return;
+    if (newPassword !== confirmPassword) { setError("两次输入的密码不一致。"); return; }
+    setBusyId(item.id); setError("");
+    try {
+      await tireApi.authResetPassword(item.id, newPassword);
+      closeReset();
+      toast("已重置并将该用户全部会话登出", "success");
+    } catch (cause) { setError(authErrorText(cause)); }
+    finally { setBusyId(null); }
+  }
+
+  const adminCount = (users ?? []).filter(item => item.is_admin).length;
+  const rowBusy = busyId !== null;
+  return <section className="account-admin-panel" aria-labelledby="account-admin-title">
+    <div className="account-admin-heading">
+      <div><span className="eyebrow">ADMIN · USERS</span><h3 id="account-admin-title">用户管理</h3></div>
+      {loadError ? <button type="button" className="text-button" disabled={locked} onClick={() => void loadUsers()}>重试</button> : null}
+    </div>
+    <p className="review-boundary">本机账户列表；角色切换即时生效，重置密码会使该用户全部会话强制登出。</p>
+    {loadError ? <div className="inline-error" role="alert">{loadError}</div> : null}
+    {error ? <div className="inline-error" role="alert">{error}</div> : null}
+    {users === null ? <p className="account-admin-status">正在载入用户…</p> : users.length === 0 ? <p className="account-admin-status">暂无账户。</p> : <ul className="account-user-list">
+      {users.map(item => {
+        const isSelf = item.id === selfId;
+        const demoteSelfLocked = isSelf && item.is_admin && adminCount === 1;
+        return <li className="account-user-row" key={item.id}>
+          <div className="account-user-name">
+            <strong>{item.display_name || item.username}{isSelf ? "（本人）" : ""}</strong>
+            <small>@{item.username} · 会话 {item.session_count}</small>
+          </div>
+          <span className={`tag ${item.is_admin ? "warning" : "quiet"}`}>{item.is_admin ? "管理员" : "研究员"}</span>
+          <div className="account-user-actions">
+            {item.is_admin
+              ? <button type="button" className="text-button" disabled={locked || rowBusy || demoteSelfLocked} title={demoteSelfLocked ? "唯一管理员不能自降级" : undefined} onClick={() => void toggleRole(item)}>{busyId === item.id ? "处理中…" : "取消管理员"}</button>
+              : <button type="button" className="text-button" disabled={locked || rowBusy} onClick={() => void toggleRole(item)}>{busyId === item.id ? "处理中…" : "设为管理员"}</button>}
+            <button type="button" className="text-button" disabled={locked || rowBusy} aria-expanded={resetFor === item.id} onClick={() => { if (resetFor === item.id) closeReset(); else { setResetFor(item.id); setError(""); } }}>重置密码</button>
+          </div>
+          {resetFor === item.id ? <form className="review-form account-reset-form" onSubmit={event => void submitReset(event, item)}>
+            <label><span>新密码（8-200 位）</span><input type="password" value={newPassword} required minLength={8} maxLength={200} autoComplete="new-password" disabled={locked || rowBusy} onChange={event => setNewPassword(event.target.value)} /></label>
+            <label><span>确认新密码</span><input type="password" value={confirmPassword} required minLength={8} maxLength={200} autoComplete="new-password" disabled={locked || rowBusy} onChange={event => setConfirmPassword(event.target.value)} /></label>
+            <div className="compare-toolbar">
+              <button type="submit" className="secondary-button" disabled={locked || rowBusy}>{busyId === item.id ? "正在重置…" : "确认重置"}</button>
+              <button type="button" className="text-button" disabled={locked || rowBusy} onClick={closeReset}>取消</button>
+            </div>
+          </form> : null}
+        </li>;
+      })}
+    </ul>}
+  </section>;
+}
 
 /** 本机多用户工作台账户对话框：已登录态显示账户信息，未登录态提供登录 / 注册两个表单。 */
 export default function AccountDialog({ onClose }: { onClose: () => void }) {
@@ -67,6 +161,7 @@ export default function AccountDialog({ onClose }: { onClose: () => void }) {
           <div><strong>{user.display_name || user.username}</strong><small>@{user.username}</small></div>
           <span className={`tag ${user.is_admin ? "warning" : "quiet"}`}>{user.is_admin ? "管理员" : "研究员"}</span>
         </div>
+        {user.is_admin ? <AdminUsersPanel selfId={user.id} locked={busy} onIdentityChanged={() => void auth.refresh()} /> : null}
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => void signOut()}>{busy ? "正在退出…" : "退出登录"}</button>
       </> : <>

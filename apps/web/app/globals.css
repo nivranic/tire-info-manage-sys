@@ -1436,3 +1436,18 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
 .account-summary small { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
 .account-form-switch { display: flex; gap: 16px; align-items: center; margin-bottom: 6px; }
 .account-note { color: var(--muted); font-size: 10px; line-height: 1.7; margin: 18px 0 0; }
+/* 波次4 · 管理员用户管理区（R-014）。 */
+.account-admin-panel { display: grid; gap: 12px; margin: 20px 0 0; padding-top: 16px; border-top: 1px solid var(--border); }
+.account-admin-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.account-admin-heading h3 { margin: 6px 0 0; font-size: 15px; font-weight: 500; }
+.account-admin-panel .review-boundary { margin: 0; font-size: 12px; }
+.account-admin-status { color: var(--muted); font-size: 11px; line-height: 1.7; margin: 0; }
+.account-user-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.account-user-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+.account-user-row:last-child { border-bottom: none; }
+.account-user-name { display: grid; gap: 3px; flex: 1 1 180px; min-width: 0; }
+.account-user-name strong { font-size: 13px; }
+.account-user-name small { color: var(--muted); font-size: 10px; }
+.account-user-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.account-reset-form { flex-basis: 100%; gap: 12px; margin: 2px 0 6px; }
+.account-reset-form label { gap: 6px; font-size: 12px; }

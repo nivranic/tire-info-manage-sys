@@ -3188,3 +3188,19 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 **记录不改（路线图/文档锚定）**：R1-2 require_admin 的 Depends 化重构（守卫时序会从"业务校验后"变"先于 body 校验"，行为语义变化需独立轮验证）；R1-3/R1-5/R1-7 会话轮换/枚举/开放注册/scrypt N 提档（部署清单锚定）；R2-4/R2-7 query_fallback 单会话域与告警规则/通知全局（ADR 补录）；R5-4 驾驶偏好全局可写（ADR 补记后果+重评触发）；R5-6 session 无界增长（ADR 补记）；账户治理 CLI/UI（R-014 路线图）；R3-6 带合成环境变量的正向用例（低价值缓办）。
 
 **回归验证（两轮全量，如实）**：首轮 **2609 绿+43 失败**——分诊：36 个为 test_core 共享 setup 未注册 admin（波4时 identity/curation 端点尚无守卫，本轮补守卫后的必然配套，已在 test_core.setup 单点接入 register_admin，另 field_evidence 本地 fixture 与 reparse 持久化 helper 同修）、其余小簇隔离复跑全绿（含 4 个 auth 守卫用例——该 4 个在首轮失败但日志被 tail 截断无法归因，且在任何隔离/组合运行中从未复现；第二轮完整日志全量中通过，如实登记为不可归因单次事件）；1 个 test_canary 等负载型失败隔离转绿。第二轮完整日志全量 **2651 绿 + 77 子测试 + 1 失败**（38:02，负载 65-79%）——唯一失败 test_sqlite_restart_checkpoint 即 R-003 记录中的"失败点漂移"测试（本会话已累积 5 个不同断言位置，且在 7308cc9 基线同样失败、昨日静置全量通过），隔离三跑（失败 240s→失败→通过 105s，负载时长差佐证）后转绿——**等效 2652/2652 全绿**。测试总数 2652+77 子测试较第56轮 2641+77 净增 11 项（本轮新增 9+2 项安全/语义锚定用例）。
+
+### 第58轮推进记录：R-014 账户治理能力落地（2026-10-04）
+
+**触发**：用户"/goal 持续推进"——执行第57轮圆桌遗留路线图最高优先级项（R-014，魔鬼代言人唯一"高"级质疑的落点："分配即永囚"的半成品账户系统）。
+
+**实现**（后端主线 + 前端子代理并行，零文件交叠）：
+- 后端 `auth.py` 三管理端点：GET /v1/auth/users（管理员可见用户列表，含 session_count 聚合）；POST /v1/auth/users/{id}/role 提权/降级——**唯一管理员自降级 409 last_admin**（防锁死，角色变更即时生效无需重登）；POST /v1/auth/users/{id}/password 管理员重置任意用户口令——**该用户全部会话强制登出**（新口令生效即旧凭据作废）。
+- 本机自救通道 `tire_api/manage.py`（新）：`python -m tire_api.manage reset-password --username X [--new-password Y|TI_MANAGE_NEW_PASSWORD]`——唯一 admin 忘密码且无其他管理员可代重置时的恢复路径；口令只从参数/环境变量读取，源码零字面量（Mimosa 钩子两次拦截字面量写法后改为运行时生成，最终形态合规）。
+- 前端（子代理，三端 typecheck/test/build 全绿）：domain-types 三类型 + api-client 三方法 + account-dialog 管理员「用户管理」面板（列表+角色徽标+会话数、设/取消管理员（自降级前端预禁用+服务端 409 兜底）、重置密码内联表单+成功 toast「已重置并将该用户全部会话登出」、错误映射补 last_admin/user_not_found）。
+- 测试 `test_auth_governance.py`（新，3 项）：列表守卫+会话计数+末位管理员保护+提权即时过守卫/降级回 403+user_not_found；重置口令双会话登出+旧口令 401+新口令 200+非管理员 403；**CLI 子进程真实 e2e**（注册→子进程重置→重启后新口令登录）。口令全部 secrets.token_urlsafe 运行时生成。
+
+**治理**：risk-register R-014 open-roadmap→**partially-closed**（register_version r56）——核心治理闭环（列表/提权/降级/改密/自救），仍缺删户（数据归属未定义，登记重评触发）与改名；ADR-057 补记第 6 条。
+
+**验证**：test_auth_governance+test_auth_accounts+test_core 57 绿；前端子代理 apps/web tsc/test/build + desktop/mobile typecheck + api-client decoder-fixtures 34/34 全绿。**全量回归 2655 绿 + 77 子测试 + 0 失败**（31:16，完整日志 .artifacts/r014-full-run.log；较第57轮等效 2652 净增 3 项治理用例，R-003 漂移者本轮静置通过）。
+
+**未验证**：面板运行时交互未做浏览器手验（子代理声明；静态链路全绿）；删户/改名未实现（如上登记）。

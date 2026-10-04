@@ -1,4 +1,4 @@
-import type { ChangeItem, Evidence, Health, QuarantineEvidence, QuarantineRecord, QueryResult, Source, SourceHealthResult, SourceHealthTrends, AIUsageHistory, AuthState, TireQuery, Variant, VehicleCandidate, VehicleFitmentResult, WatchItem } from "@tire/domain-types";
+import type { ChangeItem, Evidence, Health, QuarantineEvidence, QuarantineRecord, QueryResult, Source, SourceHealthResult, SourceHealthTrends, AIUsageHistory, AuthState, AuthUser, AuthUserListItem, TireQuery, Variant, VehicleCandidate, VehicleFitmentResult, WatchItem } from "@tire/domain-types";
 import type { ExcludedVariant, FactReview, FactRevisionRequest, LifecycleRequest, LifecycleReview, RawCaptureEvidence, RawCaptureRecord } from "@tire/domain-types";
 import type { GarageDetail, GarageList, GarageProfile, GarageRecord } from "@tire/domain-types";
 import type { ComparisonView, DrivingPreferenceState, DrivingWeights, SaveComparisonRequest, SavedComparisonDetail, SavedComparisonRecord } from "@tire/domain-types";
@@ -451,6 +451,9 @@ export const tireApi = {
   authRegister: (payload: { username: string; password: string; display_name?: string }, signal?: AbortSignal) => post<AuthState>("/v1/auth/register", payload, signal),
   authLogin: (payload: { username: string; password: string }, signal?: AbortSignal) => post<AuthState>("/v1/auth/login", payload, signal),
   authLogout: (signal?: AbortSignal) => post<AuthState>("/v1/auth/logout", {}, signal),
+  authUsers: (signal?: AbortSignal) => request<{ items: AuthUserListItem[] }>("/v1/auth/users", { signal }),
+  authSetRole: (userId: string, isAdmin: boolean, signal?: AbortSignal) => post<AuthUser>(`/v1/auth/users/${encodeURIComponent(userId)}/role`, { is_admin: isAdmin }, signal),
+  authResetPassword: (userId: string, newPassword: string, signal?: AbortSignal) => post<{ id: string }>(`/v1/auth/users/${encodeURIComponent(userId)}/password`, { new_password: newPassword }, signal),
   prepareAI: (payload: import("@tire/domain-types").AIPrepareRequest, signal?: AbortSignal) => post<{ pack: import("@tire/domain-types").AIPack | null; query_result: QueryResult | import("@tire/domain-types").RecallResult | null; reason: string | null }>("/v1/ai/evidence-packs", payload, signal),
   analyzeAI: (payload: { pack_id: string; question: string; allow_external_processing: boolean }, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").AIAnalysis>("/v1/ai/analyses", { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
   aiHistory: (signal?: AbortSignal) => request<{ items: import("@tire/domain-types").AIAnalysis[] }>("/v1/ai/analyses?mode=history", { signal }),

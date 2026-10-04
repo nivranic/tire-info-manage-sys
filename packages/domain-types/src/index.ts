@@ -872,3 +872,6 @@ export interface DrivingPreferenceState {
 }
 export interface AuthUser { id: string; username: string; display_name: string; is_admin: boolean; }
 export interface AuthState { authenticated: boolean; user: AuthUser | null; }
+export interface AuthUserListItem { id: string; username: string; display_name: string; is_admin: boolean; session_count: number; }
+export interface RoleUpdateRequest { is_admin: boolean }
+export interface PasswordResetRequest { new_password: string }

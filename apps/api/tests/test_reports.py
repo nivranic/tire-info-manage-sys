@@ -99,14 +99,14 @@ def test_private_ownership_covers_pack_analysis_report_metadata_and_exports(setu
 
 def test_same_user_second_session_reads_and_archives_report(setup):
     """圆桌 R2-1：详情/写/导出跟随用户 scope——同用户另一浏览器会话不再"看得到打不开"。"""
-    from admin_support import register_admin
+    from admin_support import ADMIN_PASSWORD, register_admin
     client, _, _, database = setup
     register_admin(client, username='alice')
     pack = historical_pack(client)
     analysis = analyze(client, pack).json()
     report = save(client, pack, analysis['id']).json()
     second = TestClient(client.app)
-    assert second.post('/v1/auth/login', json={'username': 'alice', 'password': 'fixture-admin-pw'}).status_code == 200
+    assert second.post('/v1/auth/login', json={'username': 'alice', 'password': ADMIN_PASSWORD}).status_code == 200
     detail = second.get(f'/v1/reports/{report["id"]}?mode=history')
     assert detail.status_code == 200 and detail.json()['id'] == report['id']
     assert second.post(f'/v1/reports/{report["id"]}/state',

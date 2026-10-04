@@ -18,7 +18,7 @@ import time
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .db import User, UserSession
@@ -81,6 +81,14 @@ class RegisterRequest(StrictModel):
 class LoginRequest(StrictModel):
     username: str = Field(min_length=1, max_length=32)
     password: str = Field(min_length=1, max_length=200)
+
+
+class RoleUpdateRequest(StrictModel):
+    is_admin: bool
+
+
+class PasswordResetRequest(StrictModel):
+    new_password: str = Field(min_length=8, max_length=200)
 
 
 def user_view(user: User) -> dict:
@@ -154,3 +162,39 @@ def register_auth_routes(app: FastAPI) -> None:
     def me(request: Request, db: Session = Depends(get_db)) -> dict:
         user = current_user(db, request.state.session_id)
         return {"authenticated": user is not None, "user": user_view(user) if user else None}
+
+    @app.get("/v1/auth/users")
+    def users(request: Request, db: Session = Depends(get_db)) -> dict:
+        require_admin(request, db)
+        rows = db.scalars(select(User).order_by(User.created_at, User.id)).all()
+        counts = dict(db.execute(select(UserSession.user_id, func.count()).where(
+            UserSession.user_id.is_not(None)).group_by(UserSession.user_id)).all())
+        return {"items": [{**user_view(row), "session_count": counts.get(row.id, 0)} for row in rows]}
+
+    @app.post("/v1/auth/users/{user_id}/role")
+    def set_role(user_id: str, payload: RoleUpdateRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+        require_admin(request, db)
+        target = db.get(User, user_id)
+        if target is None:
+            raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
+        if (not payload.is_admin and target.is_admin
+                and db.scalar(select(func.count()).select_from(User).where(User.is_admin)) == 1):
+            raise HTTPException(409, {"code": "last_admin",
+                                      "message": "不能取消唯一管理员的角色；请先提升另一位管理员。"})
+        target.is_admin = payload.is_admin
+        db.commit()
+        return {"user": user_view(target)}
+
+    @app.post("/v1/auth/users/{user_id}/password")
+    def reset_password(user_id: str, payload: PasswordResetRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+        require_admin(request, db)
+        target = db.get(User, user_id)
+        if target is None:
+            raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
+        target.password_hash = hash_password(payload.new_password)
+        # 强制该用户全部会话重新登录（新密码生效即旧凭据作废）。
+        sessions = db.scalars(select(UserSession).where(UserSession.user_id == target.id)).all()
+        for session in sessions:
+            session.user_id = None
+        db.commit()
+        return {"id": target.id, "sessions_unbound": len(sessions)}

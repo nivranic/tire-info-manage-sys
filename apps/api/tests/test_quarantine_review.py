@@ -8,7 +8,7 @@ from sqlalchemy import select
 from tire_api.db import (AuditEvent, QuarantineApprovalUse, QuarantineReview, Snapshot,
                          SourceQuarantine, utcnow)
 from tire_api import quarantine_review as reviews
-from admin_support import register_admin
+from admin_support import ADMIN_PASSWORD, register_admin
 from test_quality import (QUERY, accepted_counts, count, grant, live, quarantine, reduced,
                           result, setup)
 from test_vehicles import setup as vehicle_setup, live as vehicle_live
@@ -218,7 +218,7 @@ def verify_concurrent_review(url):
         def review(_):
             with TestClient(create_app(url, registry)) as client:
                 assert client.post('/v1/auth/login',
-                                   json={'username': 'admin', 'password': 'fixture-admin-pw'}).status_code == 200
+                                   json={'username': 'admin', 'password': ADMIN_PASSWORD}).status_code == 200
                 barrier.wait(timeout=10)
                 return decide(client, qid).status_code
         with ThreadPoolExecutor(max_workers=2) as pool:

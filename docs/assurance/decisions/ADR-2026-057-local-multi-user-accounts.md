@@ -94,3 +94,11 @@ require_admin 在 (e) 列出的四类端点内调用。账户家族行为验收�
 5. **注册语义补记**：已登录会话再注册→409 already_authenticated
    （auth.py:108-110，防静默改绑丢身份）；首用户判定以 ingestion 锁串行化
    （auth.py:111-113），防并发注册产生双 admin。
+
+6. **治理能力落地（2026-10-04 第58轮，R-014 收窄为 partially-closed）**：
+   GET /v1/auth/users（管理员列表，含会话数）、POST /v1/auth/users/{id}/role
+   （提权/降级；唯一管理员自降级 409 last_admin 防锁死）、POST
+   /v1/auth/users/{id}/password（管理员重置任意用户口令并强制其全部会话
+   登出）、python -m tire_api.manage reset-password 本机自救通道（唯一
+   admin 忘密码场景；口令仅从参数或 TI_MANAGE_NEW_PASSWORD 环境变量读取，
+   源码零字面量）。仍不提供：删户（数据归属未定义）与用户名变更。
