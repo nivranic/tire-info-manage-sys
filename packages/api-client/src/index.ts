@@ -454,6 +454,8 @@ export const tireApi = {
   authUsers: (signal?: AbortSignal) => request<{ items: AuthUserListItem[] }>("/v1/auth/users", { signal }),
   authSetRole: (userId: string, isAdmin: boolean, signal?: AbortSignal) => post<AuthUser>(`/v1/auth/users/${encodeURIComponent(userId)}/role`, { is_admin: isAdmin }, signal),
   authResetPassword: (userId: string, newPassword: string, signal?: AbortSignal) => post<{ id: string }>(`/v1/auth/users/${encodeURIComponent(userId)}/password`, { new_password: newPassword }, signal),
+  authDeleteUser: (userId: string, signal?: AbortSignal) => request<{ ok: boolean; username: string; sessions_unbound: number }>(`/v1/auth/users/${encodeURIComponent(userId)}`, { method: "DELETE", signal }),
+  authUpdateProfile: (payload: import("@tire/domain-types").ProfileUpdateRequest, signal?: AbortSignal) => post<{ user: AuthUser }>("/v1/auth/profile", payload, signal),
   prepareAI: (payload: import("@tire/domain-types").AIPrepareRequest, signal?: AbortSignal) => post<{ pack: import("@tire/domain-types").AIPack | null; query_result: QueryResult | import("@tire/domain-types").RecallResult | null; reason: string | null }>("/v1/ai/evidence-packs", payload, signal),
   analyzeAI: (payload: { pack_id: string; question: string; allow_external_processing: boolean }, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").AIAnalysis>("/v1/ai/analyses", { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
   aiHistory: (signal?: AbortSignal) => request<{ items: import("@tire/domain-types").AIAnalysis[] }>("/v1/ai/analyses?mode=history", { signal }),

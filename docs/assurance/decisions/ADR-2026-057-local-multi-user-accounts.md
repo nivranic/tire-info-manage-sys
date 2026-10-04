@@ -102,3 +102,30 @@ require_admin 在 (e) 列出的四类端点内调用。账户家族行为验收�
    登出）、python -m tire_api.manage reset-password 本机自救通道（唯一
    admin 忘密码场景；口令仅从参数或 TI_MANAGE_NEW_PASSWORD 环境变量读取，
    源码零字面量）。仍不提供：删户（数据归属未定义）与用户名变更。
+
+7. **路线图收尾（2026-10-04 第59轮，R-014 关闭；解决补记 3/4）**：
+   - **守卫 Depends 化**：14 处函数内 require_admin 全部改为
+     make_admin_guard(get_db) 依赖工厂（auth.py；各路由模块在自身
+     register 闭包内以本地 get_db 装配）。语义变化=守卫先于 body/查询参数
+     校验：未登录或非管理员的畸形请求得 403 admin_required（旧实现 422）；
+     管理员畸形请求仍 422。时序矩阵测试锚定
+     （tests/test_auth_lifecycle.py）。
+   - **删户与改名**（补齐第 58 轮遗留）：DELETE /v1/auth/users/{id}
+     （管理员；唯一管理员 409 last_admin；数据行不级联删除——归属锚点是
+     会话而非账户，解绑后其会话退化为匿名，对任何账户 scope 均不可见，
+     行留存本机 SQLite）与 POST /v1/auth/profile（自改用户名/显示名；
+     重名 409 username_taken；匿名 403 not_authenticated）。
+   - **驾驶偏好私有化（解决补记 3，重评触发被用户"完成剩余路线图"指令
+     提前）**：preference_state/append_preference 按 session_scope 过滤
+     actor_session_id（research.py），零 schema 变更；revision 列保留全局
+     单调计数（全表唯一约束），各主体只见自己链条（修订号可跳档，审计序
+     连续）。wire 契约 scope 字段 "local_workspace"→"actor"
+     （domain-types 扩为 union，向后兼容）。saved-comparisons 仍为工作区
+     共享（补记 2 清单不变）。
+   - **会话过期清理（解决补记 4）**：login/register 顺带
+     sweep_expired_sessions（UPDATE 解绑过期会话；不删行——数据表
+     actor_session_id 外键且连接开启 PRAGMA foreign_keys=ON）+
+     python -m tire_api.manage expire-sessions 手动通道。session_scope
+     聚合范围不再随历史会话无界增长。
+   - **维持部署门控**：会话轮换/scrypt 提档/注册策略/治理在线化四项仍
+     锚定 docs/DEPLOYMENT-KEY-POLICY.md，无部署目标不实施。

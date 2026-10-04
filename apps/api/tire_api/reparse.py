@@ -12,6 +12,7 @@ from pydantic import Field, StrictInt, field_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from .auth import make_admin_guard
 from .captures import checked_capture_bytes
 from .db import AuditEvent, CaptureObject, QueryRun, RawCapture, Snapshot, Verification, uid, utc, utcnow
 from .domain import StrictModel, TireQuery, VariantInput, digest, stable_json
@@ -320,6 +321,8 @@ def register_reparse_routes(app: FastAPI):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/reparse/status')
     @app.get('/v1/reparse/catalog')
     def catalog(mode: Literal['history'] = Query(...),
@@ -438,10 +441,9 @@ def register_reparse_routes(app: FastAPI):
             raise HTTPException(http_failure, {'code': error_code, 'run_id': run.id})
         return run_view(db, run)
 
-    @app.post('/v1/reparse/runs/{run_id}/reviews', status_code=201)
+    @app.post('/v1/reparse/runs/{run_id}/reviews', status_code=201, dependencies=[Depends(admin_guard)])
     def review(run_id: str, payload: ReviewCreate, request: Request, db: Session = Depends(get_db)):
-        from .auth import require_admin, session_scope
-        require_admin(request, db)
+        from .auth import session_scope
         QueryService(db, None).lock_ingestion()
         run = checked_run(db, run_id)
         if run.actor_session_id not in session_scope(db, request.state.session_id):

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 from sqlalchemy import desc, func, select
 
+from .auth import make_admin_guard
 from .captures import checked_capture_bytes
 from .db import RawCapture, uid, utc
 from .domain import StrictModel, digest, stable_json
@@ -519,6 +520,8 @@ def register_golden_routes(app: FastAPI):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/golden/cases')
     def cases(mode: Literal['history'] = Query(...), source_id: str | None = Query(None, max_length=80),
               offset: int = Query(0, ge=0), limit: int = Query(10, ge=1, le=25), db=Depends(get_db)):
@@ -548,11 +551,9 @@ def register_golden_routes(app: FastAPI):
                idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
         return write_case(db, payload, request.state.session_id, idempotency_key, case_id)
 
-    @app.post('/v1/golden/cases/{case_id}/reviews', status_code=201)
+    @app.post('/v1/golden/cases/{case_id}/reviews', status_code=201, dependencies=[Depends(admin_guard)])
     def review(case_id: str, payload: CaseReviewCreate, request: Request,
                idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return review_case(db, case_id, payload, request.state.session_id, idempotency_key)
 
     @app.get('/v1/golden/sets')

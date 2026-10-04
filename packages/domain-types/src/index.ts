@@ -866,7 +866,7 @@ export interface SavedComparisonDetail extends SavedComparisonRecord {
 export type DrivingWeightKey = "dry" | "wet" | "quiet" | "comfort" | "wear" | "energy" | "appearance";
 export type DrivingWeights = Record<DrivingWeightKey, number>;
 export interface DrivingPreferenceState {
-  scope: "local_workspace"; revision: number; weights: DrivingWeights | null; updated_at: string | null;
+  scope: "local_workspace" | "actor"; revision: number; weights: DrivingWeights | null; updated_at: string | null;
   history_truncated: boolean; notice: string;
   history: { revision: number; weights: DrivingWeights | null; created_at: string }[];
 }
@@ -875,3 +875,4 @@ export interface AuthState { authenticated: boolean; user: AuthUser | null; }
 export interface AuthUserListItem { id: string; username: string; display_name: string; is_admin: boolean; session_count: number; }
 export interface RoleUpdateRequest { is_admin: boolean }
 export interface PasswordResetRequest { new_password: string }
+export interface ProfileUpdateRequest { username?: string; display_name?: string }

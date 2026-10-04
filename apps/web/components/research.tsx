@@ -189,7 +189,7 @@ export function DrivingPreferences({ sessionReady }: { sessionReady: boolean }) 
   }
   return <section className="quarantine-panel driving-preferences" aria-labelledby="driving-preferences-title">
     <div className="panel-title"><span id="driving-preferences-title">驾驶偏好</span><button className="text-button" disabled={!sessionReady || busy} onClick={() => setAttempt(value => value + 1)}>重新载入偏好</button></div>
-    <p className="quality-intro">记录你的取舍，七项合计 100。权重独立于官方参数和测试排序；当前保存偏好，尚未启用推荐评分。本地工作区共享此设置。</p>
+    <p className="quality-intro">记录你的取舍，七项合计 100。权重独立于官方参数和测试排序；当前保存偏好，尚未启用推荐评分。偏好仅本人可见：登录账户内多端共享，匿名按会话隔离。</p>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}{notice ? <p className="review-saved" role="status">{notice}</p> : null}
     {!data ? !error ? <p className="quality-empty" role="status">正在读取偏好…</p> : null : <form className="review-form preferences-form" onSubmit={event => { event.preventDefault(); void save(); }}>
       <p className="muted">{data.weights ? `已保存 · 修订 #${data.revision}` : "尚未设置当前偏好"}</p>

@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import Field, StrictBool, StrictInt, field_validator
 from sqlalchemy import Text, cast, desc, func, or_, select
 
+from .auth import make_admin_guard
 from .db import AlertRule, FactVersion, QueryRun, Snapshot, TireVariant, Verification, WatchItem, uid, utc
 from .domain import StrictModel, VariantInput, digest, stable_json
 from .identity_contract_models import VariantIdentityBinding, VariantIdentityMigrationApplication
@@ -416,15 +417,15 @@ def register_identity_contract_routes(app: FastAPI):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/identity-contract/migration-preview')
     def preview(mode: Literal['history'] = Query(...), db=Depends(get_db)):
         return migration_preview(db)
 
-    @app.post('/v1/identity-contract/migration-applications', status_code=201)
+    @app.post('/v1/identity-contract/migration-applications', status_code=201, dependencies=[Depends(admin_guard)])
     def apply(payload: MigrationApply, request: Request,
               idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return apply_migration(db, payload, request.state.session_id, idempotency_key)
 
     @app.get('/v1/identity-contract/migration-applications')

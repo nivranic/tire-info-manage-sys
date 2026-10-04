@@ -8,6 +8,7 @@ from pydantic import Field, StrictBool, StrictInt, field_validator
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from .auth import make_admin_guard
 from .db import (AuditEvent, QueryRun, QuarantineApprovalUse, QuarantineReview,
                  RejectedObservation, Snapshot, SourceQuarantine, Verification, utc, utcnow)
 from .domain import StrictModel, VariantInput, digest
@@ -153,14 +154,14 @@ def register_review_routes(app: FastAPI):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/quarantines/{quarantine_id}/review')
     def read(quarantine_id: str, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
         return review_state(db, find_quarantine(db, quarantine_id))
 
-    @app.post('/v1/quarantines/{quarantine_id}/reviews', status_code=201)
+    @app.post('/v1/quarantines/{quarantine_id}/reviews', status_code=201, dependencies=[Depends(admin_guard)])
     def decide(quarantine_id: str, payload: ReviewRequest, request: Request, db: Session = Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         from .service import QueryService
         service = QueryService(db, None)
         service.lock_ingestion()

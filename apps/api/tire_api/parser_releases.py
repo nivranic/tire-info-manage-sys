@@ -10,6 +10,8 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, Query, Request
+
+from .auth import make_admin_guard
 from fastapi.responses import JSONResponse
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 from sqlalchemy import desc, func, select
@@ -747,6 +749,8 @@ def register_parser_release_routes(app: FastAPI):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/parser-bundles')
     def bundles(mode: Literal['history'] = Query(...), offset: int = Query(0, ge=0),
                 limit: int = Query(10, ge=1, le=25), db: Session = Depends(get_db)):
@@ -769,24 +773,18 @@ def register_parser_release_routes(app: FastAPI):
         return {**deployment_view(current, db), 'history': [deployment_view(row, db) for row in history],
                 'history_truncated': current.revision > len(history)}
 
-    @app.post('/v1/parser-deployments/{source_id}/bootstrap', status_code=201)
+    @app.post('/v1/parser-deployments/{source_id}/bootstrap', status_code=201, dependencies=[Depends(admin_guard)])
     def bootstrap(source_id: str, payload: SignedAction, request: Request, db: Session = Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return deployment_view(bootstrap_source(db, source_id, payload.operator, payload.reason), db)
 
-    @app.post('/v1/parser-deployments/{source_id}/transitions', status_code=201)
+    @app.post('/v1/parser-deployments/{source_id}/transitions', status_code=201, dependencies=[Depends(admin_guard)])
     def transition(source_id: str, payload: DeploymentTransition, request: Request,
                    idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db: Session = Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return transition_deployment(db, source_id, payload, request.state.session_id, idempotency_key)
 
-    @app.post('/v1/parser-evaluations', status_code=201)
+    @app.post('/v1/parser-evaluations', status_code=201, dependencies=[Depends(admin_guard)])
     def evaluate(payload: EvaluationCreate, request: Request,
                  idempotency_key: str = Header(..., alias='Idempotency-Key', max_length=64), db: Session = Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return create_evaluation(db, payload, request.state.session_id, idempotency_key)
 
     @app.get('/v1/parser-evaluations')
@@ -823,10 +821,8 @@ def register_parser_release_routes(app: FastAPI):
                 'completed_at': utc(completed.created_at).isoformat()}
         return result
 
-    @app.post('/v1/parser-evaluations/{evaluation_id}/reviews', status_code=201)
+    @app.post('/v1/parser-evaluations/{evaluation_id}/reviews', status_code=201, dependencies=[Depends(admin_guard)])
     def review(evaluation_id: str, payload: EvaluationReviewCreate, request: Request, db: Session = Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return review_evaluation(db, evaluation_id, payload, request.state.session_id)
 
 

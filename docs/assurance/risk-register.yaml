@@ -2,7 +2,7 @@
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r56
+register_version: r57
 updated: 2026-10-04
 
 risks:
@@ -140,11 +140,11 @@ risks:
 
   - id: R-014
     asset: 本机账户治理能力（apps/api/tire_api/auth.py / manage.py；ADR-2026-057 圆桌裁决补记）
-    finding: 核心治理能力已落地（2026-10-04 第58轮）——GET /v1/auth/users 列表（含会话数）、提权/降级（唯一管理员自降级 409 last_admin 防锁死）、管理员重置任意用户口令（该用户全部会话强制登出）、python -m tire_api.manage reset-password 本机自救通道（唯一 admin 忘密码场景）；并发注册双 admin 竞态已由 ingestion 锁串行化修复。仍缺：删户（数据归属未定义）与用户名变更
+    finding: 治理能力已全量落地——第58轮：GET /v1/auth/users 列表（含会话数）、提权/降级（唯一管理员自降级 409 last_admin 防锁死）、管理员重置任意用户口令（该用户全部会话强制登出）、python -m tire_api.manage reset-password 本机自救通道；第59轮：DELETE /v1/auth/users/{id} 删户（唯一管理员不可删；数据行以会话为归属锚点不级联，解绑后退化为匿名不可见）、POST /v1/auth/profile 用户名/显示名自改（重名 409）、14 处管理守卫 Depends 化（守卫先于 body 校验：未登录畸形请求 403 而非 422，时序矩阵测试锚定）、login/register 顺带过期会话解绑（sweep_expired_sessions，收敛 session_scope 聚合范围）+ CLI expire-sessions、驾驶偏好按 session_scope 私有化（解决"研究员 B 改写研究员 A 权重"）。并发注册双 admin 竞态已由 ingestion 锁串行化修复
     impact: medium
     likelihood: low（当前单人使用）
     priority: roadmap
     owner: user
-    compensating_control: 测试锚定（tests/test_auth_governance.py：末位管理员保护/提权即时生效/重置登出/CLI 子进程 e2e）；删户暂以"不提供"为边界（登出不删数据）；docs/DEPLOYMENT-KEY-POLICY.md 部署清单仍要求服务器形态重审治理流程（CLI 后门必须收敛为带审计的在线流程）
-    reassess_trigger: 首个真实多用户共用需要删户/改名的场景，或任何"部署到服务器"工作启动时
-    status: partially-closed
+    compensating_control: 测试锚定（tests/test_auth_governance.py：末位管理员保护/提权即时生效/重置登出/CLI 子进程 e2e；tests/test_auth_lifecycle.py：守卫时序矩阵/改名/删户/过期清理/偏好隔离）；docs/DEPLOYMENT-KEY-POLICY.md 部署清单仍要求服务器形态重审治理流程（CLI 后门必须收敛为带审计的在线流程）
+    reassess_trigger: 任何"部署到服务器"工作启动时（本地形态无剩余触发项）
+    status: closed

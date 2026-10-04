@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 from sqlalchemy import Text, cast, desc, func, select
 
+from .auth import make_admin_guard
 from .curation import EvidenceReference
 from .db import FactVersion, Snapshot, TireVariant, VariantLifecycleEvent, uid
 from .domain import StrictModel, digest, product_code_namespace
@@ -346,6 +347,8 @@ def register_identity_routes(app):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/identity-candidates')
     def candidates(mode: Literal['history'] = Query(...), q: str = Query('', max_length=120),
                    offset: int = Query(0, ge=0, le=100000), db=Depends(get_db)):
@@ -373,9 +376,7 @@ def register_identity_routes(app):
         db.commit()
         return result
 
-    @app.post('/v1/tire-variants/{variant_id}/identity-revisions', status_code=201)
+    @app.post('/v1/tire-variants/{variant_id}/identity-revisions', status_code=201, dependencies=[Depends(admin_guard)])
     def decide(variant_id: str, payload: IdentityDecision, request: Request,
                idempotency_key: str = Header(alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return append_decision(db, variant_id, payload, request.state.session_id, idempotency_key)

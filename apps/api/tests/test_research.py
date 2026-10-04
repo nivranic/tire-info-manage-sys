@@ -225,7 +225,9 @@ def test_workspace_research_persists_across_sessions_and_restart(tmp_path):
         assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
     with TestClient(create_app(url, FixtureRegistry())) as restarted:
         assert restarted.get('/v1/saved-comparisons').json()['items'][0]['id'] == saved['id']
-        assert restarted.get('/v1/driving-preferences').json()['weights'] == WEIGHTS
+        # 偏好按行为主体隔离：重启后的新匿名会话（未携带原 cookie）看不到原会话的偏好
+        fresh_preferences = restarted.get('/v1/driving-preferences').json()
+        assert fresh_preferences['weights'] is None and fresh_preferences['revision'] == 0
 
 
 def test_concurrent_preference_updates_have_one_winner(tmp_path):

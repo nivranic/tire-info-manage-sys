@@ -18,10 +18,10 @@ import time
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from .db import User, UserSession
+from .db import User, UserSession, utcnow
 from .domain import StrictModel
 
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 1 << 14, 8, 1
@@ -72,6 +72,30 @@ def require_admin(request: Request, db: Session) -> None:
         raise HTTPException(403, {"code": "admin_required", "message": "此管理操作需要管理员账户登录。"})
 
 
+def make_admin_guard(get_db):
+    """FastAPI 依赖形式的 require_admin 工厂。
+
+    各路由模块的 get_db 都是在 register_*_routes 闭包里定义的，共享依赖必须
+    由各模块用自己的 get_db 组装。依赖形式使守卫先于 body/查询参数校验执行
+    （未登录的畸形请求得到 403 而非 422），这是圆桌裁决明确的语义变化。
+    """
+    def admin_guard(request: Request, db: Session = Depends(get_db)) -> None:
+        require_admin(request, db)
+    return admin_guard
+
+
+def sweep_expired_sessions(db: Session) -> int:
+    """解绑已过期的登录会话，收敛 session_scope 的聚合范围。
+
+    只做 UPDATE 不删行：数据表（关注/报告/AI 历史等）以 actor_session_id
+    外键引用会话行，且连接已开启 PRAGMA foreign_keys=ON，删除会被约束阻断。
+    过期会话行本身极小，允许留存在本机 SQLite 中。
+    """
+    result = db.execute(update(UserSession).where(
+        UserSession.user_id.is_not(None), UserSession.expires_at <= utcnow()).values(user_id=None))
+    return int(result.rowcount or 0)
+
+
 class RegisterRequest(StrictModel):
     username: str = Field(min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
     password: str = Field(min_length=8, max_length=200)
@@ -91,6 +115,11 @@ class PasswordResetRequest(StrictModel):
     new_password: str = Field(min_length=8, max_length=200)
 
 
+class ProfileUpdateRequest(StrictModel):
+    username: str | None = Field(default=None, min_length=3, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
+    display_name: str | None = Field(default=None, max_length=80)
+
+
 def user_view(user: User) -> dict:
     return {"id": user.id, "username": user.username, "display_name": user.display_name, "is_admin": user.is_admin}
 
@@ -103,6 +132,8 @@ def register_auth_routes(app: FastAPI) -> None:
     def get_db():
         with app.state.database.sessions() as db:
             yield db
+
+    admin_guard = make_admin_guard(get_db)
 
     def bind_session(db: Session, request: Request, user: User) -> None:
         session = db.get(UserSession, request.state.session_id)
@@ -119,6 +150,7 @@ def register_auth_routes(app: FastAPI) -> None:
         # ingestion 锁串行化"首用户判定+写入"，防止并发注册产生双管理员。
         from .service import QueryService
         QueryService(db, None).lock_ingestion()
+        sweep_expired_sessions(db)
         if db.scalar(select(User.id).where(User.username == payload.username)):
             raise HTTPException(409, {"code": "username_taken", "message": "此用户名已被注册。"})
         first = db.scalar(select(User.id).limit(1)) is None
@@ -147,6 +179,7 @@ def register_auth_routes(app: FastAPI) -> None:
         with attempts_lock:
             record = attempts.setdefault(payload.username, [0, 0.0])
             record[0], record[1] = 0, 0.0
+        sweep_expired_sessions(db)
         bind_session(db, request, user)
         return {"user": user_view(user), "authenticated": True}
 
@@ -163,17 +196,29 @@ def register_auth_routes(app: FastAPI) -> None:
         user = current_user(db, request.state.session_id)
         return {"authenticated": user is not None, "user": user_view(user) if user else None}
 
-    @app.get("/v1/auth/users")
-    def users(request: Request, db: Session = Depends(get_db)) -> dict:
-        require_admin(request, db)
+    @app.post("/v1/auth/profile")
+    def update_profile(payload: ProfileUpdateRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+        user = current_user(db, request.state.session_id)
+        if user is None:
+            raise HTTPException(403, {"code": "not_authenticated", "message": "修改资料需要先登录。"})
+        if payload.username is not None and payload.username != user.username:
+            if db.scalar(select(User.id).where(User.username == payload.username)):
+                raise HTTPException(409, {"code": "username_taken", "message": "此用户名已被注册。"})
+            user.username = payload.username
+        if payload.display_name is not None:
+            user.display_name = payload.display_name.strip() or user.username
+        db.commit()
+        return {"user": user_view(user)}
+
+    @app.get("/v1/auth/users", dependencies=[Depends(admin_guard)])
+    def users(db: Session = Depends(get_db)) -> dict:
         rows = db.scalars(select(User).order_by(User.created_at, User.id)).all()
         counts = dict(db.execute(select(UserSession.user_id, func.count()).where(
             UserSession.user_id.is_not(None)).group_by(UserSession.user_id)).all())
         return {"items": [{**user_view(row), "session_count": counts.get(row.id, 0)} for row in rows]}
 
-    @app.post("/v1/auth/users/{user_id}/role")
-    def set_role(user_id: str, payload: RoleUpdateRequest, request: Request, db: Session = Depends(get_db)) -> dict:
-        require_admin(request, db)
+    @app.post("/v1/auth/users/{user_id}/role", dependencies=[Depends(admin_guard)])
+    def set_role(user_id: str, payload: RoleUpdateRequest, db: Session = Depends(get_db)) -> dict:
         target = db.get(User, user_id)
         if target is None:
             raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
@@ -185,9 +230,8 @@ def register_auth_routes(app: FastAPI) -> None:
         db.commit()
         return {"user": user_view(target)}
 
-    @app.post("/v1/auth/users/{user_id}/password")
-    def reset_password(user_id: str, payload: PasswordResetRequest, request: Request, db: Session = Depends(get_db)) -> dict:
-        require_admin(request, db)
+    @app.post("/v1/auth/users/{user_id}/password", dependencies=[Depends(admin_guard)])
+    def reset_password(user_id: str, payload: PasswordResetRequest, db: Session = Depends(get_db)) -> dict:
         target = db.get(User, user_id)
         if target is None:
             raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
@@ -198,3 +242,22 @@ def register_auth_routes(app: FastAPI) -> None:
             session.user_id = None
         db.commit()
         return {"id": target.id, "sessions_unbound": len(sessions)}
+
+    @app.delete("/v1/auth/users/{user_id}", dependencies=[Depends(admin_guard)])
+    def delete_user(user_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+        target = db.get(User, user_id)
+        if target is None:
+            raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
+        if target.is_admin and db.scalar(select(func.count()).select_from(User).where(User.is_admin)) == 1:
+            raise HTTPException(409, {"code": "last_admin",
+                                      "message": "不能删除唯一管理员；请先提升另一位管理员。"})
+        # 数据行（关注/报告/AI 历史等）以会话为归属锚点，不随删户级联删除：
+        # 解绑后其会话退化为匿名会话，对任何账户的作用域都不可见，数据留存在
+        # 本机 SQLite 中。持有旧会话 cookie 的浏览器仍能以匿名身份看到它们。
+        sessions = db.scalars(select(UserSession).where(UserSession.user_id == target.id)).all()
+        for session in sessions:
+            session.user_id = None
+        username = target.username
+        db.delete(target)
+        db.commit()
+        return {"ok": True, "username": username, "sessions_unbound": len(sessions)}

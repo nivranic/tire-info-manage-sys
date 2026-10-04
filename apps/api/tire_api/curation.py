@@ -10,6 +10,7 @@ from pydantic import Field, StrictInt, model_validator
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from .auth import make_admin_guard
 from .db import FactVersion, ManualFactRevision, Snapshot, TireVariant, uid, utc, utcnow
 from .domain import StrictModel
 from .service import QueryService, provenance, timestamp
@@ -192,6 +193,8 @@ def register_curation_routes(app: FastAPI) -> None:
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get("/v1/tire-variants/{variant_id}/fact-review")
     def review(variant_id: str, request: Request, source_id: str = Query(min_length=1, max_length=80),
                mode: Literal["history"] = Query(...), db: Session = Depends(get_db)) -> dict:
@@ -201,8 +204,6 @@ def register_curation_routes(app: FastAPI) -> None:
         db.commit()
         return result
 
-    @app.post("/v1/tire-variants/{variant_id}/fact-revisions", status_code=201)
+    @app.post("/v1/tire-variants/{variant_id}/fact-revisions", status_code=201, dependencies=[Depends(admin_guard)])
     def revise(variant_id: str, payload: RevisionRequest, request: Request, db: Session = Depends(get_db)) -> dict:
-        from .auth import require_admin
-        require_admin(request, db)
         return append_revision(db, variant_id, payload, request.state.session_id)

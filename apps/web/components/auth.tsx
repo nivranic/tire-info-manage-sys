@@ -25,13 +25,20 @@ const WorkbenchAuthContext = createContext<WorkbenchAuth>({
 });
 export const useWorkbenchAuth = () => useContext(WorkbenchAuthContext);
 
-export const authErrorText = (cause: unknown) => {
+/** context 用于同一 code 在不同操作下的文案区分（如 last_admin 同时服务于降级与删除）。 */
+export const authErrorText = (cause: unknown, context?: "profile" | "delete_user") => {
   if (cause instanceof ApiError) {
     if (cause.code === "username_taken") return "此用户名已被注册。";
     if (cause.code === "bad_credentials") return "用户名或密码不正确。";
     if (cause.code === "auth_too_many_attempts") return "连续失败次数过多，请稍后再试。";
-    if (cause.code === "last_admin") return "不能取消唯一管理员的角色，请先将其他账户设为管理员。";
+    if (cause.code === "last_admin") return context === "delete_user"
+      ? "不能删除唯一管理员；请先提升另一位管理员。"
+      : "不能取消唯一管理员的角色，请先将其他账户设为管理员。";
     if (cause.code === "user_not_found") return "目标用户不存在，请刷新列表后重试。";
+    if (context === "profile") {
+      if (cause.status === 403) return "修改资料需要先登录。";
+      if (cause.status === 422) return "用户名需 3-32 位字母数字下划线连字符，显示名不超过 80 字。";
+    }
   }
   return cause instanceof Error && cause.message ? cause.message : "账户操作未完成，请重试。";
 };

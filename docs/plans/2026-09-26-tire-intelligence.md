@@ -3204,3 +3204,24 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 **验证**：test_auth_governance+test_auth_accounts+test_core 57 绿；前端子代理 apps/web tsc/test/build + desktop/mobile typecheck + api-client decoder-fixtures 34/34 全绿。**全量回归 2655 绿 + 77 子测试 + 0 失败**（31:16，完整日志 .artifacts/r014-full-run.log；较第57轮等效 2652 净增 3 项治理用例，R-003 漂移者本轮静置通过）。
 
 **未验证**：面板运行时交互未做浏览器手验（子代理声明；静态链路全绿）；删户/改名未实现（如上登记）。
+
+## 第 59 轮：路线图收尾——守卫 Depends 化、删户/改名、过期会话清理、驾驶偏好私有化（2026-10-04）
+
+**背景**：用户指令"推进完成剩余路线图"。第57轮圆桌与第58轮治理轮遗留的本地可完成项全部落地；部署门控四项（会话轮换/scrypt 提档/注册策略/治理在线化）无部署目标，维持 docs/DEPLOYMENT-KEY-POLICY.md 清单不实施。
+
+**改动**：
+1. **守卫 Depends 化（圆桌裁决的独立验证轮）**：auth.py 新增 make_admin_guard(get_db) 工厂（闭包 get_db 各模块自带），14 处函数内 require_admin（auth 3 + parser_releases 4 + curation/golden/identity_contract/identity_resolution/quarantine_review/reparse/source_settings 各 1）全部改为装饰器 dependencies=[Depends(admin_guard)]。语义变化按裁决如实落地：守卫先于 body/查询参数校验——未登录或非管理员的畸形请求得 403 admin_required（旧 422）；管理员畸形请求仍 422。新增时序矩阵测试锚定（test_auth_lifecycle.py::test_admin_guard_dependency_runs_before_body_validation）。
+2. **删户与改名（R-014 收尾）**：DELETE /v1/auth/users/{id}（管理员；唯一管理员 409 last_admin；数据行不级联——归属锚点是会话，解绑后退化为匿名会话、对任何账户 scope 不可见，行留存本机 SQLite）+ POST /v1/auth/profile（自改用户名/显示名；重名 409；匿名 403）。
+3. **会话过期清理（ADR-057 补记4 解决）**：sweep_expired_sessions 于 login/register 顺带执行（UPDATE 解绑过期会话；不删行——数据表 actor_session_id 外键 + PRAGMA foreign_keys=ON 会阻断删行）+ python -m tire_api.manage expire-sessions 手动通道。session_scope 聚合范围不再无界增长。
+4. **驾驶偏好私有化（ADR-057 补记3 解决，触发条件被用户指令提前）**：preference_state/append_preference 按 session_scope 过滤 actor_session_id（research.py），零 schema 变更；revision 保留全局单调计数（全表唯一约束），各主体只见自己链条（编号可跳档、审计序连续）。wire scope 字段 "local_workspace"→"actor"（domain-types 扩 union 兼容）；research.tsx 文案更新，saved-comparisons 仍工作区共享不动。
+5. **前端（子代理）**：account-dialog.tsx 新增 ProfilePanel（我的资料）与删除用户行内确认流（checkbox 知情同意，沿用 resetFor 模式）；auth.tsx authErrorText 扩展 profile/delete_user 语境；api-client 增 authDeleteUser/authUpdateProfile。
+
+**治理**：risk-register R-014 → **closed**（register_version r57，本地形态无剩余触发项；部署触发保留）；ADR-2026-057 补记第 7 条（含删户不级联的设计理由与偏好零 schema 方案）。
+
+**验证**：
+- 目标测试：test_auth_lifecycle.py 6 绿（时序矩阵/改名含 403-422 边界/删户含 last_admin 与数据不级联/过期清理含 DB 直查断言/CLI 子进程/偏好隔离含登录聚合）；test_auth_governance+test_auth_accounts+test_research 47 绿；守卫模块十文件 273+1（唯一失败 test_inflight_a_b_a…为 R-003 漂移——live-query 16.2s 真超时，隔离重跑 45s 通过，非回归）。
+- 前端：三端 build 全绿（web next build 0 error / desktop+mobile tsc+vite）+ 三端单测 5+22+23 全绿（子代理实测）。
+- **全量回归 2661 绿 + 77 子测试 + 0 失败**（31:12，.artifacts/r59-full-run.log；较第58轮 2655 净增 6 项生命周期用例，守卫时序翻转与偏好语义回归均未出现）。
+- **浏览器 E2E（一次性 DB .artifacts/r59-e2e.db，不触碰正常库；验后已删并恢复正常库服务）**：注册管理员→UI 面板完整呈现；匿名畸形请求线上实测 403 admin_required（Depends 时序）；删除 victim-e2e（checkbox 确认流）后列表回 1、旧口令登录 401；唯一管理员自删被拦且 aria-live 文案「不能删除唯一管理员；请先提升另一位管理员。」正确呈现；改名 chief-e2e→chief-renamed 后 me 即时更新；偏好：UI 保存（scope=actor/rev1）→匿名读 rev0/null→匿名自存 200（rev2）→admin 再读 rev1/dry20 完好——"B 改写 A 权重"消除；车库视图新文案上线。
+
+**未验证**：desktop/mobile 真机运行时未跑（共享组件层构建+单测绿；浏览器已覆盖组件行为）；部署门控四项未实施（无部署目标，属清单条件非本轮范围）；正常库 data/dev.db 全程未触碰（E2E 用一次性 DB）。

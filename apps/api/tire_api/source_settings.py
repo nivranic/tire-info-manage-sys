@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import Field, StrictInt, field_validator, model_validator
 from sqlalchemy import desc, func, select
 
+from .auth import make_admin_guard
 from .domain import StrictModel, digest
 from .source_setting_models import SourceSettingRevision
 
@@ -299,6 +300,8 @@ def register_source_setting_routes(app: FastAPI):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/source-settings')
     def listing(db=Depends(get_db)):
         values = [source_setting(db, source_id, registry=app.state.registry) for source_id in sorted(_catalog(app.state.registry))]
@@ -322,10 +325,8 @@ def register_source_setting_routes(app: FastAPI):
     def preview(source_id: str, payload: SourceSettingPreview, db=Depends(get_db)):
         return preview_source_setting(db, source_id, payload, registry=app.state.registry)
 
-    @app.post('/v1/source-settings/{source_id}/revisions', status_code=201)
+    @app.post('/v1/source-settings/{source_id}/revisions', status_code=201, dependencies=[Depends(admin_guard)])
     def revise(source_id: str, payload: SourceSettingDecision, request: Request,
                idempotency_key: str = Header(alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
-        from .auth import require_admin
-        require_admin(request, db)
         return append_source_setting(db, source_id, payload, request.state.session_id,
                                      idempotency_key, registry=app.state.registry)

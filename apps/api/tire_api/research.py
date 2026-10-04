@@ -6,6 +6,7 @@ from pydantic import AfterValidator, Field, StrictInt, model_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, load_only
 
+from .auth import session_scope
 from .curation import review_state
 from .db import DrivingPreferenceRevision, SavedComparison, SavedComparisonRevision, Snapshot, uid
 from .domain import CompareRequest, StrictModel, digest, stable_json
@@ -136,27 +137,30 @@ def latest_saved(db: Session, comparison_id: str, expected_revision: int | None 
     return saved, row
 
 
-def preference_state(db: Session) -> dict:
-    rows = db.scalars(select(DrivingPreferenceRevision).order_by(desc(DrivingPreferenceRevision.revision)).limit(21)).all()
+def preference_state(db: Session, scope: list[str]) -> dict:
+    rows = db.scalars(select(DrivingPreferenceRevision).where(DrivingPreferenceRevision.actor_session_id.in_(scope))
+                      .order_by(desc(DrivingPreferenceRevision.revision)).limit(21)).all()
     row = rows[0] if rows else None
-    return {"scope": "local_workspace", "revision": row.revision if row else 0, "weights": row.weights if row else None,
+    return {"scope": "actor", "revision": row.revision if row else 0, "weights": row.weights if row else None,
             "updated_at": timestamp(row.created_at) if row else None, "history_truncated": len(rows) > 20,
             "history": [{"revision": item.revision, "weights": item.weights, "created_at": timestamp(item.created_at)} for item in rows[:20]],
-            "notice": "个人偏好不改写官方参数或客观测试排序；当前未启用推荐评分。"}
+            "notice": "个人偏好不改写官方参数或客观测试排序；偏好仅本人可见（登录按账户聚合，匿名按会话隔离）；当前未启用推荐评分。"}
 
 
 def append_preference(db: Session, expected: int, weights: dict | None, session_id: str) -> dict:
     QueryService(db, None).lock_ingestion()
-    before = preference_state(db)
+    before = preference_state(db, session_scope(db, session_id))
     if expected != before["revision"]:
         raise HTTPException(409, "驾驶偏好已更新，请重新载入并核对后保存")
     if weights == before["weights"]:
         return before
-    row = DrivingPreferenceRevision(revision=before["revision"] + 1, weights=weights, actor_session_id=session_id)
+    # revision 列带全局唯一约束：沿用全局单调计数，各账户只看自己归属过滤后的链条（编号可能有跳档）。
+    next_revision = (db.scalar(select(func.max(DrivingPreferenceRevision.revision))) or 0) + 1
+    row = DrivingPreferenceRevision(revision=next_revision, weights=weights, actor_session_id=session_id)
     db.add(row)
     QueryService(db, None).audit(session_id, "driving_preferences_changed", revision=row.revision, cleared=weights is None)
     db.commit()
-    return preference_state(db)
+    return preference_state(db, session_scope(db, session_id))
 
 
 def register_research_routes(app: FastAPI) -> None:
@@ -245,8 +249,8 @@ def register_research_routes(app: FastAPI) -> None:
         return revise(comparison_id, payload.expected_revision, request.state.session_id, db, archived=payload.action == "archive")
 
     @app.get("/v1/driving-preferences")
-    def preferences(db: Session = Depends(get_db)) -> dict:
-        return preference_state(db)
+    def preferences(request: Request, db: Session = Depends(get_db)) -> dict:
+        return preference_state(db, session_scope(db, request.state.session_id))
 
     @app.put("/v1/driving-preferences")
     def save_preferences(payload: PreferenceRequest, request: Request, db: Session = Depends(get_db)) -> dict:
