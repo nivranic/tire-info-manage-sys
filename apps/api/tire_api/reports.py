@@ -137,8 +137,8 @@ def freeze_body(db, pack, analysis_id, session_id):
     analysis = None
     if analysis_id:
         row = db.get(AIRequest, analysis_id)
-        if row is None or row.actor_session_id != session_id:
-            raise HTTPException(404, '未找到本会话的分析')
+        if row is None or row.actor_session_id not in session_scope(db, session_id):
+            raise HTTPException(404, '未找到本账户的分析')
         completion = db.get(AICompletion, row.id)
         if (row.pack_id != pack.id or row.request_contract.get('purpose') == 'rule_draft'
                 or not completion or completion.state != 'completed' or not completion.answer):

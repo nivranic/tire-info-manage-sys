@@ -14,7 +14,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from tire_api.db import DrivingPreferenceRevision, UserSession, utc, utcnow
+from tire_api.ai_models import AIEvidencePack, AIRequest
+from tire_api.db import DrivingPreferenceRevision, UserSession, uid, utc, utcnow
+from tire_api.domain import digest
 from tire_api.main import create_app
 from test_auth_accounts import PASSWORD, login, register
 from test_core import FixtureRegistry
@@ -177,8 +179,9 @@ def test_login_sweep_unbinds_expired_sessions(setup_app):
 
 
 def test_active_sessions_slide_instead_of_expiring(setup_app):
-    """R2-1（第60轮圆桌）：滑动续期——剩余 TTL 过半则续满、未过半不动；
-    活跃用户的会话锚定数据不再因固定 TTL 静默失踪。"""
+    """R2-1（第60轮圆桌，第62轮补 cookie 半边）：滑动续期——剩余 TTL 过半则续满、
+    未过半不动；服务端行与浏览器 cookie Max-Age 同步滑动，活跃用户的会话锚定数据
+    不再因固定 TTL 静默失踪。"""
     client, app = setup_app
     register(client, username="root")
     sid = client.cookies["tire_local_session"]
@@ -189,14 +192,48 @@ def test_active_sessions_slide_instead_of_expiring(setup_app):
             db.commit()
 
     set_expiry(timedelta(days=3))  # 剩 3 天 < TTL/2 → 触发续期
-    assert client.get("/v1/auth/me").status_code == 200
+    renewed = client.get("/v1/auth/me")
+    assert renewed.status_code == 200
+    # cookie Max-Age 必须同步重发，否则浏览器仍在创建后第 14 天丢弃 cookie
+    assert f"max-age={int(timedelta(days=14).total_seconds())}" in renewed.headers.get("set-cookie", "").lower()
     with app.state.database.sessions() as db:
         assert utc(db.get(UserSession, sid).expires_at) - utcnow() > timedelta(days=13)
 
-    set_expiry(timedelta(days=10))  # 剩 10 天 > TTL/2 → 不动（无写放大）
-    assert client.get("/v1/auth/me").status_code == 200
+    set_expiry(timedelta(days=10))  # 剩 10 天 > TTL/2 → 不动（无写放大、无 cookie 重发）
+    steady = client.get("/v1/auth/me")
+    assert steady.status_code == 200
+    assert "set-cookie" not in steady.headers
     with app.state.database.sessions() as db:
         assert utc(db.get(UserSession, sid).expires_at) - utcnow() < timedelta(days=10)
+
+
+def test_ai_analysis_records_follow_account_scope(setup_app):
+    """第62轮 M2：AI 调用记录列表按账户聚合后，详情同步跟随账户作用域——
+    同账户第二会话看得到也打得开；匿名会话仍不可见。"""
+    client, app = setup_app
+    register(client, username="root")
+    sid = client.cookies["tire_local_session"]
+    with app.state.database.sessions() as db:
+        payload = {'synthetic': 'frozen'}
+        pack = AIEvidencePack(actor_session_id=sid, mode='history', data_state='local_snapshot',
+            privacy_class='public', payload=payload, fingerprint=digest(payload),
+            expires_at=utcnow() + timedelta(minutes=30))
+        db.add(pack)
+        db.flush()
+        row = AIRequest(actor_session_id=sid, idempotency_key=uid(), request_hash='f' * 64,
+            pack_id=pack.id, question='synthetic r62', provider='anthropic', model='synthetic-model',
+            request_contract={'purpose': 'analysis', 'prompt_version': 'r62'}, reserved_tokens=100)
+        db.add(row)
+        db.commit()
+        request_id = row.id
+    second = TestClient(app)
+    assert login(second, "root", PASSWORD).status_code == 200
+    detail = second.get(f"/v1/ai/analyses/{request_id}", params={"mode": "history"})
+    assert detail.status_code == 200
+    assert detail.json()["state"] == "pending"
+    items = second.get("/v1/ai/analyses", params={"mode": "history"}).json()["items"]
+    assert any(item["id"] == request_id for item in items)
+    assert TestClient(app).get(f"/v1/ai/analyses/{request_id}", params={"mode": "history"}).status_code == 404
 
 
 def test_cli_expire_sessions_reports_zero_when_clean(tmp_path):

@@ -14,6 +14,7 @@ from .ai_execution import reserve_response
 from .ai_gateway import analysis_contract
 from .ai_models import AIRequest
 from . import ai_stream_store as store
+from .auth import session_scope
 from .db import uid, utcnow
 from .domain import digest
 from .monitor_tasks import _frame
@@ -74,7 +75,7 @@ def register_ai_stream_routes(app):
         def reserve_in_thread():
             with database.sessions() as db:
                 QueryService(db, None).lock_ingestion()
-                existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id == session_id,
+                existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, session_id)),
                                                             AIRequest.idempotency_key == key))
                 if existing:
                     if existing.request_hash != fingerprint:
@@ -121,10 +122,10 @@ def register_ai_stream_routes(app):
                idempotency_key: str = Query(..., max_length=64)):
         key = canonical_key(idempotency_key)
         with app.state.database.sessions() as db:
-            row = db.scalar(select(AIRequest).where(AIRequest.actor_session_id == request.state.session_id,
+            row = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)),
                                                     AIRequest.idempotency_key == key))
             if row is None:
-                raise HTTPException(404, '未找到本会话的 AI 流式分析')
+                raise HTTPException(404, '未找到本账户的 AI 流式分析')
             return store.detail(db, row.id, request.state.session_id)
 
     @app.get('/v1/ai/analysis-streams/{request_id}')

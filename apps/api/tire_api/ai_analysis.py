@@ -394,7 +394,7 @@ def register_ai_routes(app: FastAPI):
         request_hash = digest(payload.model_dump())
         shared = QueryService(db, None)
         shared.lock_ingestion()
-        existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id == request.state.session_id,
+        existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)),
                                                     AIRequest.idempotency_key == key))
         if existing:
             if existing.request_hash != request_hash or existing.request_contract.get('purpose') == 'rule_draft':
@@ -413,8 +413,8 @@ def register_ai_routes(app: FastAPI):
     @app.get('/v1/ai/analyses/{request_id}')
     def get_analysis(request_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
         row = db.get(AIRequest, request_id)
-        if row is None or row.actor_session_id != request.state.session_id or row.request_contract.get('purpose') == 'rule_draft':
-            raise HTTPException(404, '未找到本会话的 AI 调用记录')
+        if row is None or row.actor_session_id not in session_scope(db, request.state.session_id) or row.request_contract.get('purpose') == 'rule_draft':
+            raise HTTPException(404, '未找到本账户的 AI 调用记录')
         return {**run_state(db, row), 'pack': pack_view(owned_pack(db, row.pack_id, session_scope(db, request.state.session_id)))}
 
     @app.get('/v1/ai/analyses')
@@ -427,5 +427,5 @@ def register_ai_routes(app: FastAPI):
             .where(or_(AIRequest.request_contract['purpose'].as_string().is_(None),
                        AIRequest.request_contract['purpose'].as_string() != 'rule_draft'))
             .order_by(desc(AIRequest.created_at), desc(AIRequest.id)).limit(20)).all()
-        return {'scope': 'browser_session', 'items': [run_state(db, row, completion, prefetched=True,
+        return {'scope': 'actor', 'items': [run_state(db, row, completion, prefetched=True,
                 include_answer=False) for row, completion in rows]}

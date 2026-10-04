@@ -231,6 +231,7 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
             response.headers["X-Content-Type-Options"] = "nosniff"
             return response
         new_session = False
+        renewed = False
         owner_scope = None
         with database.sessions() as db:
             cookie = request.cookies.get(SESSION_COOKIE)
@@ -244,10 +245,14 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
                 db.commit()
                 new_session = True
             elif utc(session.expires_at) - utcnow() < SESSION_TTL / 2:
-                # 滑动续期（第60轮圆桌 R2 裁决）：活跃会话不过期，sweep 过期清理只收敛真正
-                # 不活跃的会话；剩余 TTL 过半才写，每会话最多每 TTL/2 一次，无每请求写放大。
+                # 滑动续期（第60轮圆桌 R2 裁决、第62轮补 cookie 半边）：活跃会话不过期，
+                # sweep 过期清理只收敛真正不活跃的会话；剩余 TTL 过半才写，每会话最多每
+                # TTL/2 一次，无每请求写放大。续期时必须同步重发同参数 cookie——浏览器按
+                # Set-Cookie 的 Max-Age 绝对计时，只续服务端行会让 cookie 在创建后第
+                # SESSION_TTL 天整被丢弃，登录绑定随之丢失。
                 session.expires_at = utcnow() + SESSION_TTL
                 db.commit()
+                renewed = True
             if offline_sync:
                 owner_scope = digest({'namespace': 'offline-owner-scope@1', 'session': session.id})
                 if expected_owners[0] != owner_scope:
@@ -260,7 +265,7 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
             response.headers[OFFLINE_SYNC_OWNER_HEADER] = owner_scope
         elif source_metadata and 200 <= response.status_code < 300:
             response.headers[OFFLINE_SYNC_OWNER_HEADER] = owner_scope
-        if new_session:
+        if new_session or renewed:
             response.set_cookie(SESSION_COOKIE, request.state.session_id, httponly=True,
                                 samesite="strict", secure=request.url.scheme == "https",
                                 max_age=int(SESSION_TTL.total_seconds()))

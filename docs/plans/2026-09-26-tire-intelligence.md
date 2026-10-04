@@ -3271,3 +3271,21 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 **不修+理由**：G3 PWA 版本链/workbench useEffect 依赖/hash 路由/中间件栈/迁移幂等/双后端隔离/8MiB 五层限额/worker 租约恢复/Android 权限面/预算护栏（DB 持久化非进程内——G5 纠正了任务前提）/grounding 与提示注入面/密钥边界——各角色"已检查未发现问题"清单合计 30+ 项全部通过。
 
 **验证**：分段目标测试（AI/设备族 165 绿、迁移族+core 125 绿、watch/changes 消费方 114 绿、chat/anthropic/source_access 79 绿、auth 族 74+12 绿）；三端 build 绿（web PWA 47e4644f… 含白名单校验）；五端单测 web 5/desktop 22/mobile 23/native 6/api-client 188+34 全绿。全量回归 **2670 passed + 77 子测试 + 0 失败**（28:31，.artifacts/r61-full-run.log；较第60轮 2666 净增 4：provider 归因/索引同构哨兵/resolver 三态/auth 族含 015 后迁移族回归）。
+
+## 第 62 轮：全局圆桌复查——四路并行复查第60/61轮修复自身与角落补查（2026-10-04）
+
+**机制**：用户指令"again，全局无限制，不要过度；没有需要改动的如实说没有"。定位为"复查复查者"：A 路后端修复复查（aaf16ae+81e18e7 两提交 diff 新鲜眼）、B 路前端/构建修复复查、C 路角落补查（scripts/根配置/packages/worker/安全卫生——前两轮覆盖弱区）、D 路文档/测试一致性。每路限 top 发现+防沉默清单。共 6 项发现（去重后 4 实质：A1=D1、A3=B1 双路交叉）。
+
+**M1 滑动续期 cookie 半边（A1+D1 双路独立同发现，高）**：第60轮 R2-1 修复只续服务端 expires_at，Set-Cookie 全仓唯一且仅 new_session 分支下发——浏览器按 Max-Age 绝对计时，Web/PWA 活跃用户仍在第 14 天丢 cookie 退化为匿名（登录绑定丢失、匿名数据不可见），第60轮"本轮最重要修复"在浏览器端未达成且原测试结构性测不到（TestClient cookie jar 不老化）。**已修**：续期分支置 renewed 标志，`new_session or renewed` 合并下发同参数 cookie；测试补双向断言（续期响应含 Max-Age=1209600、未续期无 Set-Cookie）。残余边界如实登记（ADR-057 补记9）：续期已 commit 而该次响应中断时 cookie 未重发、下一请求不再触发续期，旧 cookie 到期仍掉匿名（可重登找回）；桌面/移动 token 在系统凭据库不受影响。
+
+**M2 AI 分析记录所有权跟随账户 scope（A2，高）**：第57轮 scope 化清单漏掉 AIRequest 行——/v1/ai/analyses 列表按 session_scope 聚合，详情 get_analysis、流式 owned_request/lookup（覆盖 detail/events/SSE 全路径）、报告保存 analysis 引用仍锚单会话；同账户第二会话"看得到打不开"（404），reports 域同型缺陷第57轮已修、此处漏网。**已修**：ai_analysis 详情+幂等查找、ai_stream_store.owned_request（一处覆盖流式全路径）、ai_stream_routes 创建幂等+lookup、ai_rule_drafts 幂等+应用重放键、reports 引用共 9 处改 `actor_session_id.in_(session_scope(...))`（对齐 reports 幂等先例）；响应 scope 标签失实的 'browser_session'→'actor'（ai_analysis/embedding 两处，客户端未消费无兼容影响）。新增跨会话可见性测试（同账户第二会话详情 200+列表含该行；匿名 404）。DeviceAIPreparation 锚定不随动（设备同意语义绑设备+会话，见 ADR-057 补记9）。
+
+**M3 provider 文案补漏（A3+B1 双路同发现，高/低风险）**：G5-1 的"同意文案改中性"不完整——后端 ai_rule_drafts 422 仍写"发送到 OpenAI"（当前真实通道 anthropic）；前端 monitor-rule-draft 状态标题硬编码 `<strong>OpenAI Responses API</strong>`、错误文案"尚未配置专用 OpenAI 密钥"。**已修**：后端文案改"外部模型服务"；前端标题改 `aiProviderLabel(status?.model.provider)`（对齐 ai-analysis.tsx 既有模式）、错误文案中性化。不修+理由：dense.py/embedding_api 的 embedding 文案（通道恒为 OpenAI 协议，默认端点下属实）、vector-tools"交给 OpenAI 建向量"（同上，B 路核实事实准确）。
+
+**M4 迁移 015 哨兵测试空洞（D2，高——测试假绿类）**：第61轮 G2-1 声称的"升级/新建索引同构哨兵"实际防不了漂移——predecessor fixture 用当前 ORM create_all 建库，ix_local_sessions_user_id 在 fixture 阶段已存在，015 的 CREATE INDEX IF NOT EXISTS 空转；删掉 015 迁移该测试仍绿（交叉证据：同文件 schema 不变断言与"015 真建索引"逻辑上互斥而套件全绿）。**已修**：哨兵先显式 drop 该索引（ORM Index.drop，零 SQL 文本）再 initialize——fixture 只登记 pre-009 版本行，014/015 补建路径由此真实执行；docstring 如实改写。
+
+**M5 文档顺带**：README 备份段补 backup_dev.py 可执行入口指引（C 路边界观察）；第61轮遗留未提交的验证块（test_telemetry_monitor/workspace 单测/verify-all.ps1 指引，D 路逐条核实引用属实）随本轮入库。
+
+**C 路角落补查零实质发现**：scripts 全部脚本路径/逻辑、根配置（compose/.env.example/.gitignore/package.json）、packages 两包客户端封装与后端路由抽查匹配、worker 两套测试一致性、全仓凭据模式扫描（仅合成占位与运行时随机）——防沉默清单 20+ 项全过。**备案不修**（A 路边界观察）：aiohttp 对 IP 字面量主机短路自定义 resolver，操作者可用私网 IP base URL 绕过"仅公网"围栏——预存在行为、操作者自配端点在 ADR-054 D-C 信任边界内，部署轮处理。
+
+**验证**：目标测试 137 绿（auth_lifecycle 14+迁移哨兵+AI 域家族含 stream/rule_drafts/reports/monitoring）；typecheck 五包过；web 单测 5/5；web 生产构建+PWA 白名单校验绿（17 项资产，版本 a5912845…）；全量回归（apps/api/tests + worker 两套）**2694 passed + 77 子测试 + 0 失败**（29:28；口径拆分：tests 2671=第61轮 2670+新增 1，worker 23）。服务已重启载入第62轮代码（/health ok；新会话 cookie Max-Age=1209600 实测下发）。未验证如实：14 天真实浏览器 cookie 老化未实机验证（基于标准 cookie 语义+TestClient 断言）；desktop/mobile 端本轮未跑构建（改动仅 web 组件 monitor-rule-draft.tsx 与后端，三端共享 device-ai 面板未触碰）。

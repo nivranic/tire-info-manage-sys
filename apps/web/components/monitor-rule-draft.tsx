@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SourceOnlineNotice, useSourceAccess } from "./source-status";
+import { aiProviderLabel } from "./ai-budget";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { AIRuleDraftPack, AIRuleDraftRun, AIStatus, Source } from "@tire/domain-types";
 
@@ -10,7 +11,7 @@ const states = { pending: "生成处理中", outcome_unknown: "调用结果待�
 const unsupportedLabels: Record<string, string> = { numeric_thresholds: "数值或价格阈值", inventory: "库存变化", external_delivery: "邮件、短信等外部通知", negative_conditions: "排除某类规格的负向条件", compound_logic: "多个条件的组合逻辑" };
 const errors: Record<string, string> = {
   ai_disabled: "AI 尚未启用；仍可在本机准备需求。",
-  ai_configuration_required: "尚未配置专用 OpenAI 密钥或模型。",
+  ai_configuration_required: "尚未配置专用模型密钥或模型。",
   ai_configuration_invalid: "本机 AI 配置无效，请检查模型与预算设置。",
   ai_grounding_validation_failed: "输出未通过草稿约束校验，未生成可应用的规则。",
   ai_provider_timeout: "模型响应超时，调用可能已经计费。",
@@ -134,7 +135,7 @@ export default function MonitorRuleDraftDialog({ sources, initialRunId, onClose,
     <header className="fact-review-heading"><div><span className="eyebrow">INTENT → REVIEW → RULE</span><h2 id="rule-draft-title">用自然语言起草监控规则</h2></div><button type="button" className="icon-button" aria-label="关闭规则草稿" onClick={onClose}>×</button></header>
     <div className="ai-content">
       <p className="review-boundary">先在本机固定原文与来源能力，再由你授权发送到外部模型服务。生成草稿不会创建或启用规则；保存前须另行编辑、核对和确认。关闭窗口不会取消已经外发的调用。</p>
-      <section className="ai-status" aria-label="草稿模型状态"><strong>OpenAI Responses API</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p>{status ? <small>UTC {status.budget.day_utc}：{status.budget.requests} 次请求，已记账 {status.budget.accounted_tokens.toLocaleString()} tokens。包含未知用量的预留。</small> : null}</section>
+      <section className="ai-status" aria-label="草稿模型状态"><strong>{aiProviderLabel(status?.model.provider)}</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p>{status ? <small>UTC {status.budget.day_utc}：{status.budget.requests} 次请求，已记账 {status.budget.accounted_tokens.toLocaleString()} tokens。包含未知用量的预留。</small> : null}</section>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       <SourceOnlineNotice sourceId={sourceId} /><form className="review-form draft-form" onSubmit={event => { event.preventDefault(); void prepare(); }}>
         <label><span>选择已经接入的来源</span><select required value={sourceId} disabled={busy || frozen} onChange={event => setSourceId(event.target.value)}>

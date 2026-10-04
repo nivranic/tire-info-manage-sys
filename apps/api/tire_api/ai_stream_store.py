@@ -186,12 +186,13 @@ def finish_execution(database, request_id, owner_token, *, state, error_code=Non
 
 
 def owned_request(db, request_id, session_id):
+    from .auth import session_scope
     row = db.get(AIRequest, request_id)
-    if (row is None or row.actor_session_id != session_id
+    if (row is None or row.actor_session_id not in session_scope(db, session_id)
             or row.request_contract.get('delivery_mode') != 'stream'
             or row.request_contract.get('purpose') == 'rule_draft'
             or db.get(AIStreamExecution, request_id) is None):
-        raise HTTPException(404, '未找到本会话的 AI 流式分析')
+        raise HTTPException(404, '未找到本账户的 AI 流式分析')
     return row
 
 

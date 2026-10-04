@@ -99,7 +99,7 @@ def register_rule_draft_routes(app: FastAPI):
         key = key_value(idempotency_key)
         request_hash = digest({'purpose': 'rule_draft', **payload.model_dump()})
         QueryService(db, None).lock_ingestion()
-        existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id == request.state.session_id, AIRequest.idempotency_key == key))
+        existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)), AIRequest.idempotency_key == key))
         if existing:
             if existing.request_hash != request_hash or existing.request_contract.get('purpose') != 'rule_draft':
                 raise HTTPException(409, '同一幂等键不能用于不同任务或草稿')
@@ -110,7 +110,7 @@ def register_rule_draft_routes(app: FastAPI):
         pack = owned_pack(db, payload.pack_id, session_scope(db, request.state.session_id))
         checked_catalog(db, app.state.registry, pack)
         if not payload.allow_external_processing:
-            raise HTTPException(422, '需要明确允许将监控意图和所选目录发送到 OpenAI')
+            raise HTTPException(422, '需要明确允许将监控意图和所选目录发送到外部模型服务')
         try:
             config = configured_model()
             if not config.allow_private:
@@ -151,7 +151,7 @@ def register_rule_draft_routes(app: FastAPI):
         row = owned_draft(db, run_id, session_scope(db, request.state.session_id))
         reviewed = payload.rule.model_dump(mode='json')
         payload_hash = digest({'draft_id': run_id, 'rule': reviewed})
-        same_key = db.scalar(select(AIDraftApplication).where(AIDraftApplication.actor_session_id == request.state.session_id,
+        same_key = db.scalar(select(AIDraftApplication).where(AIDraftApplication.actor_session_id.in_(session_scope(db, request.state.session_id)),
                                                              AIDraftApplication.idempotency_key == key))
         previous = db.scalar(select(AIDraftApplication).where(AIDraftApplication.draft_request_id == run_id))
         for existing in (same_key, previous):

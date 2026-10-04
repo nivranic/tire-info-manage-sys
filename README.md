@@ -396,19 +396,27 @@ Parser 额外目标 `round36-parser-current-target.log` 为 **11 passed、27 des
 合成浏览器服务自检 **5 组通过**，实际桌面 1440×1000 浅色及手机 390×844 深色验证组合筛选、草稿冻结、允许/拒绝历史授权、304 零匹配、目录故障恢复、16 条上限、校验、焦点及无横向溢出，两端 console error/warn 均 0。该浏览器验收使用合成传输与合成 Parser 输出、真实业务 API/独立临时数据库，没有真实子进程回执；与上述官网验收分别记录，AI/Embeddings 调用为 0。PostgreSQL **45 项**、最终类型检查/生产构建/PWA **8/8** 已通过，静态白名单 17 项。正常库原 **83 张表**全部原列/原行哈希保留、无新表；仅新增 1 条会话与迁移版本004，23条旧查询的 `selection_filters` 均为 SQL NULL，业务事实及AI没有新增。正常3000/8000入口已恢复，真实开发入口核对目录28字段/16条件及添加/清空控件通过，没有从正常库发起官网或模型查询。QA/临时PG已停止，3001/8001/55432/55433/55434无监听、Parser子进程0。本轮早期 `/fixture/mode` 422 来自验收夹具的局部请求类前向注解，移至模块级并让自检实际调用 POST 后通过，不是生产后端错误。上一轮偶发 8 秒 Parser 超时仍未确定根因，生产限制未放宽；其他未交付范围与完整历史证据见[实施计划](docs/plans/2026-09-26-tire-intelligence.md#2026-09-28-第二十八轮计划普通查询的组合-sku-筛选)。
 
 ```text
-# 离线回归：领域、HTTP安全、Parser、授权、历史、迁移、并发及Worker
-uv run --project apps/api --extra dev pytest apps/api/tests apps/worker/test_monitor.py -q
+# 离线回归：领域、HTTP安全、Parser、授权、历史、迁移、并发及Worker（含遥测监听）
+uv run --project apps/api --extra dev pytest apps/api/tests apps/worker/test_monitor.py apps/worker/test_telemetry_monitor.py -q
 
 # TypeScript与生产构建；请先停止next dev，避免共用.next写入
 npm run typecheck
 npm run build
 npm run test:pwa
 
+# JS/TS 单测：web（route-hash 纯函数）、api-client（含 decoder-fixtures 34 用例）、native-client 传输
+npm run test --workspace @tire/web
+npm run test --workspace @tire/api-client
+npm run test --workspace @tire/native-client
+
 # 移动/桌面 Node 传输回归；不是 Android 仪器或真实来源验收
 npm run test:mobile
 npm run test:desktop
 npm run mobile:frontend
 npm run desktop:frontend
+
+# 一键串联全量验证：typecheck → 五端单测 → web 生产构建（含PWA白名单构建期校验）→ API全量pytest + Worker两套测试
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/verify-all.ps1
 
 # 显式联网，不在普通测试中自动执行；不修改开发业务库
 uv run --project apps/api python scripts/canary.py
@@ -576,6 +584,8 @@ API 提供 `/v1/garage` 列表/创建、`/from-fitment` 配置复制、`/{id}?mo
 新接收原文按 `sha256/<前两位>/<完整哈希>` 存储。文件系统使用临时文件、fsync 和原子无覆盖链接；S3 使用条件写入和读取校验。对象缺失或损坏会拒绝读取，不静默回退数据库副本，也不覆盖同键损坏对象。旧接收记录继续使用 `database_legacy`；现有快照与文本副本仍留在数据库，尚未执行全量外置或回填。
 
 **备份须同时包含数据库与对象目录/桶**。本地 SQLite 默认为 `data/dev.db` 和 `data/dev.db.objects`；备份时停止 API/Worker 写入后保存数据库（使用 SQLite backup 或完整停库后的文件）与对应对象目录。恢复到匹配的数据库和存储配置后，按引用哈希与字节数校验对象；不能只恢复数据库或在不迁移对象的情况下切换后端。PG 验收脚本已演示数据库恢复及配套对象副本校验，生产一致性备份、桶版本/保留期/WORM 和灾备演练仍待完成。
+
+日常快照可使用可执行备份入口（第61轮 G2-3 交付）：`uv run --project apps/api python scripts/backup_dev.py` 以只读连接对运行中的正常库做 SQLite backup，并复制对象目录与 Parser 封存包，输出带 schema 版本、字节数与行数清单的 `manifest.json`；目标目录已存在时拒绝覆盖。它不代替上段的生产一致性备份要求。
 
 `uv run --project apps/api --extra dev python scripts/object_store_acceptance.py` 在独立临时库中显式查询真实韩泰，核对解析前对象、正式快照哈希、合成 PDF 字节往返和重启持久性；本轮 6 项通过。S3/R2 只通过 SDK Stubber 协议测试，没有真实云端验收。对象先于数据库提交，失败可能留下未引用对象，尚无垃圾回收；应用无覆盖不等于存储管理员无法修改或断电持久性保证。
 

@@ -160,3 +160,23 @@ require_admin 在 (e) 列出的四类端点内调用。账户家族行为验收�
      同标准）；测试口令全仓运行时随机化（R5 复核唯一实质残留
      test_auth_accounts.py 修复）；Mimosa 报告的 17 处存量命中经独立复核
      全部定性为模式性误报（验收脚本/测试占位素材/受控枚举拼接）。
+
+9. **补记9（第62轮圆桌，2026-10-04）——第60/61轮修复的复查补全**：
+   - **滑动续期补 cookie 半边**：补记8 的滑动续期只续服务端 expires_at，
+     Set-Cookie 仅在新会话分支下发且全仓唯一——浏览器按 Max-Age 绝对计时，
+     Web/PWA 端活跃用户仍在第 14 天丢 cookie 退化为匿名会话。修复：续期
+     分支重发同参数 cookie（`new_session or renewed`），测试断言续期响应带
+     Max-Age=SESSION_TTL、未续期响应无 Set-Cookie。已知残余边界：续期已
+     commit 而响应失败时该次不发 cookie，下一请求因剩余 TTL 已满不再触发
+     续期，旧 cookie 到期后仍会掉为匿名（可重登找回；发生窗口=恰好在该次
+     响应中断，接受不另行补偿）。桌面/移动端 token 在系统凭据库，不受影响。
+   - **AI 分析记录所有权跟随账户 scope（补记1 的补全）**：第57轮 scope 化
+     清单漏掉 AIRequest 行——/v1/ai/analyses 列表已按 session_scope 聚合，
+     而详情（get_analysis）、流式 owned_request/lookup（覆盖 detail/events/
+     SSE 全路径）、报告保存时的 analysis 引用仍锚单会话，同账户第二会话
+     "看得到打不开"（404）。五处所有权与四处幂等键查找全部改为
+     `actor_session_id.in_(session_scope(...))`（对齐 reports 域先例，
+     reports.py idempotency 早已 scope 化）；响应 scope 标签由失实的
+     'browser_session' 改为 'actor'（客户端未消费该字段，无兼容影响）。
+     DeviceAIPreparation 的会话锚定不随动——设备同意语义绑设备+会话，非
+     账户聚合域。

@@ -9,7 +9,7 @@ from sqlalchemy.schema import CreateTable
 from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from tire_api.ai_models import AICompletion, AIEvidencePack, AIRequest
 from tire_api.ai_stream_models import AIStreamExecution, AIStreamEvent
-from tire_api.db import Base, Database, uid, utcnow
+from tire_api.db import Base, Database, UserSession, uid, utcnow
 from tire_api.knowledge_models import initialize_search
 from tire_api.main import create_app
 
@@ -80,12 +80,17 @@ def test_only_two_new_tables_and_one_version_preserve_every_old_schema_and_row(p
 
 
 def test_upgraded_pre009_database_matches_fresh_init_index_shape(predecessor, tmp_path):
-    """G2-1 哨兵（第61轮圆桌）：升级库与新建库的 local_sessions 索引同构。
+    """G2-1 哨兵（第61轮建立、第62轮真实化）：升级库与新建库的 local_sessions 索引同构。
 
-    014 曾只加列不建索引（ORM index=True 仅对新库 create_all 生效），
-    该不同构自此有测试锚点：任何"只在 init 建"的索引漂移都会在此暴露。
+    predecessor 的 create_all 按当前 ORM 预建 user_id 列与索引，使 015 的补建语句
+    空转（第62轮 D 路发现原哨兵删掉 015 仍绿）；此处先显式 drop 该索引再走
+    initialize——fixture 只登记 pre-009 版本行，014/015 的迁移补建路径由此真实
+    执行，删除 015（或任何"只在 init 建"的索引漂移）会在此暴露。
     """
     database = predecessor
+    target = next(index for index in UserSession.__table__.indexes if index.name == 'ix_local_sessions_user_id')
+    target.drop(database.engine)
+    assert 'ix_local_sessions_user_id' not in {index['name'] for index in inspect(database.engine).get_indexes('local_sessions')}
     database.initialize()
     upgraded = {index['name'] for index in inspect(database.engine).get_indexes('local_sessions')}
     fresh = Database(f"sqlite:///{(tmp_path / 'fresh-index.db').as_posix()}")
