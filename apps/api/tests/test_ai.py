@@ -53,6 +53,8 @@ def setup(monkeypatch):
     model = ModelFixture()
     app.state.ai_adapter = model
     with TestClient(app) as client:
+        from admin_support import register_admin
+        register_admin(client)  # lifecycle-events 等全局写端点已加管理守卫
         yield client, registry, model, app.state.database
 
 

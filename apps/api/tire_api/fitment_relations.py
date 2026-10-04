@@ -8,6 +8,7 @@ from fastapi import Depends, Header, HTTPException, Query, Request
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 from sqlalchemy import Text, cast, desc, func, select
 
+from .auth import make_admin_guard
 from .db import FactVersion, Snapshot, TireVariant, VariantLifecycleEvent, Verification, uid
 from .domain import IDENTITY_CONTRACT_VERSION, StrictModel, VariantInput, digest
 from .fitment_relation_models import FitmentRelation, FitmentRelationRevision
@@ -464,6 +465,8 @@ def register_fitment_relation_routes(app):
         with app.state.database.sessions() as db:
             yield db
 
+    admin_guard = make_admin_guard(get_db)
+
     @app.get('/v1/fitment-relations/vehicle-snapshots')
     def vehicle_snapshots(mode: Literal['history'] = Query(...), vehicle_id: str | None = Query(None, max_length=80),
                           offset: int = Query(0, ge=0, le=100000), limit: int = Query(20, ge=1, le=100), db=Depends(get_db)):
@@ -514,7 +517,7 @@ def register_fitment_relation_routes(app):
         db.commit()
         return result
 
-    @app.post('/v1/fitment-relations/revisions', status_code=201)
+    @app.post('/v1/fitment-relations/revisions', status_code=201, dependencies=[Depends(admin_guard)])
     def append(payload: RelationDecision, request: Request,
                idempotency_key: str = Header(alias='Idempotency-Key', max_length=64), db=Depends(get_db)):
         return append_revision(db, payload, request.state.session_id, idempotency_key)

@@ -3225,3 +3225,25 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 - **浏览器 E2E（一次性 DB .artifacts/r59-e2e.db，不触碰正常库；验后已删并恢复正常库服务）**：注册管理员→UI 面板完整呈现；匿名畸形请求线上实测 403 admin_required（Depends 时序）；删除 victim-e2e（checkbox 确认流）后列表回 1、旧口令登录 401；唯一管理员自删被拦且 aria-live 文案「不能删除唯一管理员；请先提升另一位管理员。」正确呈现；改名 chief-e2e→chief-renamed 后 me 即时更新；偏好：UI 保存（scope=actor/rev1）→匿名读 rev0/null→匿名自存 200（rev2）→admin 再读 rev1/dry20 完好——"B 改写 A 权重"消除；车库视图新文案上线。
 
 **未验证**：desktop/mobile 真机运行时未跑（共享组件层构建+单测绿；浏览器已覆盖组件行为）；部署门控四项未实施（无部署目标，属清单条件非本轮范围）；正常库 data/dev.db 全程未触碰（E2E 用一次性 DB）。
+
+## 第 60 轮：圆桌评审第58/59轮改动——五角色并行深审与裁决修复（2026-10-04）
+
+**机制**：五角色（R1 权限守卫 / R2 数据一致性并发 / R3 测试质量 / R4 契约前端 / R5 存量安全专项）并行只读评审，file:line 证据 + 置信度分级 + "已检查未发现问题"清单防沉默遗漏；R5 明确独立复核不受主持人此前定性影响。共 14 项发现 + R5 逐命中定性表。
+
+**裁决与修复（8 立即修 / 2 拆半 / 2 延迟带触发）**：
+1. **R2-1【本轮最重要】会话滑动续期**：第59轮 sweep 收敛暴露固定 14 天 TTL 无续期的固有缺陷——活跃用户每 14 天静默丢失会话锚定个人数据（偏好/关注/AI 历史/证据包/规则草稿）的可见性且无法找回。修复=main.py 中间件剩余 TTL<半时滑动续期（每会话最多每 TTL/2 一次写，无放大）；测试双向锚定（触发续期/不触发）。
+2. **R1-1 守卫矩阵矛盾**：ADR (e) 原文"curation 不设门禁"与代码现状矛盾（第57轮已推翻未改原文）→ ADR 补注修正；lifecycle-events（revoke=全局硬阻断）与 fitment revisions（review 全局生效）补 admin_guard（+2=16 处），preview 保持开放（模拟无副作用）；test_ai/test_ai_monitoring/test_reports 三处 fixture 补 register_admin。
+3. **R2-2 会话数据过户语义**：delete_user 注释的绝对断言不成立——解绑会话再登录他人则旧数据并入新账户作用域（含 reset_password/登出换号同根源）。修正如实注释 + ADR 补记8 登记设计决策（接受，本机威胁模型）+ 行为锚定测试。
+4. **R1-2 profile 并发改名竞态**：ingestion 锁 + IntegrityError→409 兜底（与 register 同标准）。
+5. **R1-3 治理审计缺口**：set_role/reset_password/delete_user 补 audit 事件（username 快照入 detail）；AuditEvent actor_user_id 列**延迟**（触发=部署轮或审计追责）。
+6. **R1-4 部署清单断链**：DEPLOYMENT-KEY-POLICY.md 治理条目更新为现状（端点已齐+CLI 后门+审计锚点缺口明示），行号引用改函数名。
+7. **R2-3 session_count 虚高**：计数加 expires_at>now 过滤。
+8. **R3×6 测试缺口全补**：删户数据不级联（DB 行留存+会话行留存+匿名可见+他账户不可见四层断言）、CLI expire 非空路径、display_name 置空回退、sweep 未过期边界、delete 404 code/reset 404、clear 后 scope/revision。test_auth_lifecycle 6→12 用例。
+9. **R4-1 前端**：AdminUsersPanel key 绑定 username（改名后列表同步）。
+10. **R5 存量安全**：17/17 命中独立定性为模式性误报；唯一实质残留 test_auth_accounts.py 固定口令 → 运行时随机。
+
+**延迟登记（2）**：AuditEvent actor_user_id 快照列（部署/追责触发）；golden freeze 不校验 case 审批（观察项，消费侧有守卫）。
+
+**验证**：守卫影响面 test_lifecycle/fitment/auth×3 74 绿 + test_ai/ai_monitoring/garage 59 绿；test_auth_lifecycle 12/12；test_reports 修复后 21/21；三端构建绿（web PWA 5837917d…）。**全量回归 2666 passed + 77 子测试 + 1 失败**——唯一失败 test_reports withdrawal 用例系 lifecycle 守卫的真实回归（独立 setup 未 admin 化），文件级修复后 21/21 绿；其后生产代码零改动（等效全绿，如实记录未重跑全量）。
+
+**未验证**：R1-2/R2-2 的并发路径为代码推演未做运行时并发注入（评审双代理声明）；desktop/mobile 真机未跑。

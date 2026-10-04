@@ -243,6 +243,11 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
                 db.add(session)
                 db.commit()
                 new_session = True
+            elif utc(session.expires_at) - utcnow() < SESSION_TTL / 2:
+                # 滑动续期（第60轮圆桌 R2 裁决）：活跃会话不过期，sweep 过期清理只收敛真正
+                # 不活跃的会话；剩余 TTL 过半才写，每会话最多每 TTL/2 一次，无每请求写放大。
+                session.expires_at = utcnow() + SESSION_TTL
+                db.commit()
             if offline_sync:
                 owner_scope = digest({'namespace': 'offline-owner-scope@1', 'session': session.id})
                 if expected_owners[0] != owner_scope:

@@ -24,6 +24,8 @@ def setup(monkeypatch):
     app = create_app('sqlite://', registry)
     app.state.ai_adapter = ModelFixture()
     with TestClient(app) as client:
+        from admin_support import register_admin
+        register_admin(client)  # lifecycle-events 等全局写端点已加管理守卫
         yield client, registry, app.state.database
 
 

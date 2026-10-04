@@ -1,13 +1,16 @@
 """Multi-user accounts: scrypt logins, first-user admin, user-scoped reads, admin guards,
 and session-user binding surviving a schema-upgraded restart. Synthetic fixtures only."""
 
+import secrets
+
 import pytest
 from fastapi.testclient import TestClient
 
 from tire_api.main import create_app
 from test_core import FixtureRegistry, live
 
-PASSWORD = "correct horse battery"
+# 口令为模块级运行时随机（仓库规则：测试口令不得写字面量）。
+PASSWORD = secrets.token_urlsafe(12)
 
 
 @pytest.fixture

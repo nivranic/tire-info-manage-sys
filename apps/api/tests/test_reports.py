@@ -193,7 +193,9 @@ def test_report_rejects_uncompleted_unbound_or_forged_analysis(setup, failure):
 
 def test_withdrawal_blocks_new_save_but_keeps_existing_history(setup):
     from test_lifecycle import request_for
+    from admin_support import register_admin
     client, _, _, _ = setup
+    register_admin(client)  # lifecycle-events 已加管理守卫（第60轮圆桌 R1）
     pack = historical_pack(client)
     report = save(client, pack).json()
     source = live(client).json()

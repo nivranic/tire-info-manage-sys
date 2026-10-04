@@ -42,7 +42,8 @@
    （parser_releases.py）、隔离复核 reviews（quarantine_review.py）、身份
    迁移 apply（identity_contract.py migration-applications）返回
    `403 {"code": "admin_required"}`；事实/身份修订等研究员 curation 不设
-   门禁（审计已记 operator_session_id）。
+   门禁（审计已记 operator_session_id）。**[已被第57/60轮裁决部分推翻，见
+   补记1与补记8——curation/identity-revisions 等全局目录写已加门禁。]**
 
 ## Verification
 
@@ -129,3 +130,33 @@ require_admin 在 (e) 列出的四类端点内调用。账户家族行为验收�
      聚合范围不再随历史会话无界增长。
    - **维持部署门控**：会话轮换/scrypt 提档/注册策略/治理在线化四项仍
      锚定 docs/DEPLOYMENT-KEY-POLICY.md，无部署目标不实施。
+
+8. **第60轮圆桌裁决（2026-10-04，五角色评审第58/59轮改动）**：
+   - **守卫矩阵澄清与补齐（修正 (e) 原文）**：(e) 的"curation 不设门禁"
+     在第57轮"治理守卫补齐"裁决中已被推翻但未同步原文，本轮补记修正。
+     现行守卫矩阵=16 处全局目录/审批写端点（原 14 处 + lifecycle-events、
+     fitment-relations/revisions——revoke 是全局硬阻断、fitment review 全局
+     生效，均适用"写全局共享数据=admin"治理边界）；fitment preview 保持
+     开放（模拟预览，无全局写副作用）。golden create/revise 无守卫维持
+     观察项（生效经 admin review 把关，消费侧评估创建有守卫）。
+   - **会话滑动续期（修复 R2 重大发现）**：main.py 中间件对未过期会话在
+     剩余 TTL < SESSION_TTL/2 时滑动续期。原"固定 14 天 TTL 无续期 + sweep
+     解绑"组合会让活跃用户每 14 天静默丢失会话锚定的个人数据可见性
+     （偏好/关注/AI 历史/证据包/规则草稿）；滑动续期后 sweep 只收敛真正
+     不活跃的会话，"登录账户内多端共享"的 UI 承诺成立。
+   - **会话数据过户语义（如实登记）**：会话锚定数据在"解绑后再登录他人"
+     时并入新账户作用域——这是会话聚合设计的自然延伸，适用于删户、口令
+     重置、普通登出换号三个入口；共享浏览器场景下前用户的私有数据会暴露
+     给下一登录者及其全部会话。本机威胁模型下接受（需持有该浏览器会话
+     cookie）；不做 bind 时阻断（保持聚合语义一致性，避免引入数据迁移
+     复杂度）。部署形态如需强隔离，须重新设计归属锚点（联动补记8审计项）。
+   - **治理动作审计**：set_role/reset_password/delete_user 补 audit 事件
+     （user_role_changed/user_password_reset/user_deleted，detail 含目标
+     username 快照）。已知残余：AuditEvent 归属仍锚 session_id→当前绑定，
+     换人登录后错归因、删户后失归属——**AuditEvent 增加 actor_user_id
+     快照列登记为延迟项**，触发=部署轮启动或首次审计追责需求。
+   - **杂项修复**：users 列表 session_count 过滤过期绑定（读数即时准确）；
+     update_profile 改名走 ingestion 锁 + IntegrityError 兜底（与 register
+     同标准）；测试口令全仓运行时随机化（R5 复核唯一实质残留
+     test_auth_accounts.py 修复）；Mimosa 报告的 17 处存量命中经独立复核
+     全部定性为模式性误报（验收脚本/测试占位素材/受控枚举拼接）。

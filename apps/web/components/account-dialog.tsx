@@ -223,7 +223,8 @@ export default function AccountDialog({ onClose }: { onClose: () => void }) {
           <span className={`tag ${user.is_admin ? "warning" : "quiet"}`}>{user.is_admin ? "管理员" : "研究员"}</span>
         </div>
         <ProfilePanel user={user} locked={busy} onProfileChanged={() => void auth.refresh()} />
-        {user.is_admin ? <AdminUsersPanel selfId={user.id} locked={busy} onIdentityChanged={() => void auth.refresh()} /> : null}
+        {/* key 绑定用户名：管理员自改资料后 me 刷新触发重挂载，列表行同步新 @用户名（第60轮圆桌 R4）。 */}
+        {user.is_admin ? <AdminUsersPanel key={user.username} selfId={user.id} locked={busy} onIdentityChanged={() => void auth.refresh()} /> : null}
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => void signOut()}>{busy ? "正在退出…" : "退出登录"}</button>
       </> : <>
