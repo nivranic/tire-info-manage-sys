@@ -387,9 +387,10 @@ function DesktopDeviceAiDialog({ platform, onClose }: { platform: WorkbenchPlatf
       if (replay && previous) submission = previous;
       else {
         const view = preparation!;
+        const provider = typeof providerPreview!.provider === "string" ? providerPreview!.provider : null;
         const model = typeof providerPreview!.model === "string" ? providerPreview!.model : null;
         const allowPrivate = Array.isArray(providerPreview!.allowed_privacy_classes) && (providerPreview!.allowed_privacy_classes as string[]).includes("private");
-        if (!model) throw new Error("模型未配置，不能提交设备历史材料。");
+        if (!provider || !model) throw new Error("模型未配置，不能提交设备历史材料。");
         const packFingerprint = (view.pack as { fingerprint?: unknown }).fingerprint;
         if (typeof packFingerprint !== "string" || !/^[0-9a-f]{64}$/.test(packFingerprint)) throw new Error("准备记录缺少证据包指纹。");
         submission = {
@@ -398,8 +399,8 @@ function DesktopDeviceAiDialog({ platform, onClose }: { platform: WorkbenchPlatf
           deviceContextFingerprint: view.device_context_fingerprint, question,
           consent: {
             expected_pack_fingerprint: packFingerprint, expected_device_context_fingerprint: view.device_context_fingerprint,
-            question_sha256: view.question_sha256, provider: "openai_responses", model,
-            expected_provider_policy_fingerprint: await deviceProviderPolicyFingerprint({ model, allowPrivate }),
+            question_sha256: view.question_sha256, provider, model,
+            expected_provider_policy_fingerprint: await deviceProviderPolicyFingerprint({ provider, model, allowPrivate }),
           },
         };
         frozenSubmission.current = submission;

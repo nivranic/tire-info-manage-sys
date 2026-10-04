@@ -112,7 +112,7 @@ class AIStreamSupervisor:
                 operation.finish('outcome_unknown')
                 return
             if committed:
-                record_ai_usage('openai_responses', usage)
+                record_ai_usage(config.provider, usage)
             operation.finish(state if committed else 'outcome_unknown')
 
     async def shutdown(self):

@@ -143,7 +143,7 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
         raise HTTPException(429, '已有 AI 请求尚未确认完成，请先查看调用记录')
     extra_contract = {'origin': 'device_history', 'preparation_id': preparation.id} if preparation is not None else {}
     row = AIRequest(actor_session_id=session_id, idempotency_key=key, request_hash=request_hash,
-        pack_id=pack.id, question=question, provider='openai_responses', model=config.model, reserved_tokens=reserve,
+        pack_id=pack.id, question=question, provider=config.provider, model=config.model, reserved_tokens=reserve,
         request_contract={**contract, **extra_contract, 'body_hash': digest(body), 'max_output_tokens': config.max_output_tokens, 'store': False})
     db.add(row)
     db.flush()
@@ -158,7 +158,7 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
         from .device_ai_models import DeviceAIConsentClaim
         db.add(DeviceAIConsentClaim(id=uid(), actor_session_id=session_id, preparation_id=preparation.id,
             ai_request_id=row.id, analysis_key=key, request_hash=request_hash,
-            provider_consent_hash=plan['provider_consent_hash'], provider='openai_responses',
+            provider_consent_hash=plan['provider_consent_hash'], provider=config.provider,
             model=config.model, provider_policy_fingerprint=plan['provider_policy_fingerprint']))
         try:
             db.flush()
@@ -201,7 +201,7 @@ def _execute_response(db, app, row, config, body, validator):
     completion = AICompletion(request_id=row.id, state='failed' if error else 'completed',
         error_code=error, answer=answer, usage=safe_usage(receipt.get('usage')), provider_response_id=response_id)
     from .telemetry import record_ai_usage
-    record_ai_usage('openai_responses', completion.usage)
+    record_ai_usage(row.provider, completion.usage)  # 账本行已按 config.provider 落库，遥测归因同源
     db.add(completion)
     QueryService(db, None).audit(row.actor_session_id, 'ai_request_finished', request_id=row.id,
                                state=completion.state, error_code=error)

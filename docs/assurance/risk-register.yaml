@@ -1,8 +1,8 @@
-# COHS 风险登记 — r55（2026-10-04）
+# COHS 风险登记 — r58（2026-10-04）
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r57
+register_version: r58
 updated: 2026-10-04
 
 risks:
@@ -105,6 +105,7 @@ risks:
     reassess_trigger: 任何"部署到服务器"工作启动时（P2 生产部署项）
     status: open-guarded
 
+# R-010：编号已废弃（历史上并入 R-009 平台验收边界，无独立条目）
   - id: R-009
     asset: 整体发布 Gate（原规格 10 项）
     finding: P0 来源 provenance 100%、Golden 0 错合并、六平台 E2E、WCAG2.2 AA 等 10 项 V1 Gate 仍多项未满足（明细见 HANDOFF §7）
@@ -148,3 +149,25 @@ risks:
     compensating_control: 测试锚定（tests/test_auth_governance.py：末位管理员保护/提权即时生效/重置登出/CLI 子进程 e2e；tests/test_auth_lifecycle.py：守卫时序矩阵/改名/删户/过期清理/偏好隔离）；docs/DEPLOYMENT-KEY-POLICY.md 部署清单仍要求服务器形态重审治理流程（CLI 后门必须收敛为带审计的在线流程）
     reassess_trigger: 任何"部署到服务器"工作启动时（本地形态无剩余触发项）
     status: closed
+
+  - id: R-015
+    asset: 前端 Web 测试保障（apps/web）
+    finding: Web 业务 UI 回归保障极不对称——单测仅 route-hash 纯函数 5 用例，查询/授权门/监控/AI 流/报告等 UI 语义依赖约 20 个一次性人工浏览器 QA 脚本（scripts/*_frontend_qa.mjs），不自动重跑
+    impact: medium
+    likelihood: medium（下次 web 大改时回归发现成本高）
+    priority: low
+    owner: engineering
+    compensating_control: 分轮浏览器 E2E 验收 + route-hash 纯函数锚点 + 三端 tsc/build 门禁
+    reassess_trigger: 下次 web 组件大改或新增交互域
+    status: open-accepted
+
+  - id: R-016
+    asset: 本机数据增长（data/dev.db + objects）
+    finding: RawCapture.raw_body 与 Snapshot.body 双份入库且对无验证器来源每次轮询新增全量 blob（无清理/回填，README 已列原文外置为未完成项）；元数据类增长可忽略
+    impact: medium（长期备份窗口与体积）
+    likelihood: low（当前 25MB 量级、来源多支持 etag/304）
+    priority: roadmap
+    owner: engineering
+    compensating_control: 快照内容级去重 + 对象存储内容寻址 + 备份工具 scripts/backup_dev.py（第61轮补）
+    reassess_trigger: dev.db 超过 100MB 或任何部署动议
+    status: open-roadmap

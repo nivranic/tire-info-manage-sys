@@ -33,10 +33,10 @@ async function sha256Text(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function deviceProviderPolicyFingerprint(input: { model: string; allowPrivate: boolean }): Promise<string> {
+export async function deviceProviderPolicyFingerprint(input: { provider: string; model: string; allowPrivate: boolean }): Promise<string> {
   const groundingSchema = await sha256Text(canonicalDeviceAiJson(DEVICE_AI_GROUNDING_SCHEMA));
   const value: DeviceAiJsonAst = {
-    provider: "openai_responses",
+    provider: input.provider,
     model: input.model,
     allow_private: input.allowPrivate,
     allowed_privacy_classes: input.allowPrivate ? ["public", "private"] : ["public"],

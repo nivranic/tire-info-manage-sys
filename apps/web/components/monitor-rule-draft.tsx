@@ -133,7 +133,7 @@ export default function MonitorRuleDraftDialog({ sources, initialRunId, onClose,
     onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">INTENT → REVIEW → RULE</span><h2 id="rule-draft-title">用自然语言起草监控规则</h2></div><button type="button" className="icon-button" aria-label="关闭规则草稿" onClick={onClose}>×</button></header>
     <div className="ai-content">
-      <p className="review-boundary">先在本机固定原文与来源能力，再由你授权发送到 OpenAI。生成草稿不会创建或启用规则；保存前须另行编辑、核对和确认。关闭窗口不会取消已经外发的调用。</p>
+      <p className="review-boundary">先在本机固定原文与来源能力，再由你授权发送到外部模型服务。生成草稿不会创建或启用规则；保存前须另行编辑、核对和确认。关闭窗口不会取消已经外发的调用。</p>
       <section className="ai-status" aria-label="草稿模型状态"><strong>OpenAI Responses API</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p>{status ? <small>UTC {status.budget.day_utc}：{status.budget.requests} 次请求，已记账 {status.budget.accounted_tokens.toLocaleString()} tokens。包含未知用量的预留。</small> : null}</section>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       <SourceOnlineNotice sourceId={sourceId} /><form className="review-form draft-form" onSubmit={event => { event.preventDefault(); void prepare(); }}>
@@ -159,9 +159,9 @@ export default function MonitorRuleDraftDialog({ sources, initialRunId, onClose,
           <div><dt>通知渠道</dt><dd>{pack.capabilities.notification_channels.map(channel => channel === "in_app" ? "站内提醒" : channel).join("、")}</dd></div>
         </dl><details><summary>可关注字段</summary><p>{pack.capabilities.fields.map(field => `${field.label}（${field.key}）`).join("、") || "未列出字段"}</p></details>
         {pack.capabilities.unsupported_features.length ? <><p>未实现的能力：</p><ul>{pack.capabilities.unsupported_features.map((value, index) => <li key={index}>{unsupportedLabels[value] || value}</li>)}</ul></> : null}</details>
-        {!run ? <div className="draft-send"><label className="review-checkbox"><input type="checkbox" checked={externalConsent} disabled={busy || !!attempt} onChange={event => setExternalConsent(event.target.checked)} />我允许将上述需求原文、来源和能力清单发送到 OpenAI，生成待审核草稿。</label>
+        {!run ? <div className="draft-send"><label className="review-checkbox"><input type="checkbox" checked={externalConsent} disabled={busy || !!attempt} onChange={event => setExternalConsent(event.target.checked)} />我允许将上述需求原文、来源和能力清单发送到外部模型服务，生成待审核草稿。</label>
           {!canSend && !attempt ? <p className="review-boundary">模型配置或工作区隐私策略尚不允许提交。准备需求本身不会外发。</p> : null}
-          <div className="variant-actions"><button type="button" className="primary-button" disabled={busy || (!attempt && (!canSend || !externalConsent))} onClick={() => void generate()}>{busy ? "正在处理…" : attempt ? "用同一请求标识核对结果" : "发送到 OpenAI 生成草稿"}</button>
+          <div className="variant-actions"><button type="button" className="primary-button" disabled={busy || (!attempt && (!canSend || !externalConsent))} onClick={() => void generate()}>{busy ? "正在处理…" : attempt ? "用同一请求标识核对结果" : "发送到外部模型服务生成草稿"}</button>
           {!attempt ? <button type="button" className="text-button" disabled={busy} onClick={reset}>修改原文并重新准备</button> : null}</div>
           {attempt ? <p role="status">请求标识已保留。网络中断后的结果核对沿用同一标识；已受理调用不会再次外发。</p> : null}
         </div> : null}

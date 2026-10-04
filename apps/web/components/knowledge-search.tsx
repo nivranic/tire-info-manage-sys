@@ -146,7 +146,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   return <dialog ref={dialog} className="fact-review-dialog knowledge-dialog" aria-labelledby="knowledge-title" aria-describedby="knowledge-boundary" onCancel={event => { event.preventDefault(); event.stopPropagation(); close(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">EVIDENCE LIBRARY</span><h2 id="knowledge-title">历史证据知识检索</h2><p>从参数和来源，找到可以核对的记录。</p></div><button type="button" className="icon-button" aria-label="关闭历史证据检索" onClick={close}>×</button></header>
     <div className="knowledge-content">
-      <div className="snapshot-banner" id="knowledge-boundary"><strong>LOCAL SNAPSHOT · 仅限历史记录</strong><span>{result?.external_processing?.query_text_sent ? "本条混合检索记录的查询文本经过单次授权发送到 OpenAI 生成向量；结果仍为历史证据，不代表当前在线参数。" : "普通检索只读取已采纳的本地证据，不联网、不调用模型；结果不代表当前在线参数。"}隔离记录与未解析文档不参与检索。</span></div>
+      <div className="snapshot-banner" id="knowledge-boundary"><strong>LOCAL SNAPSHOT · 仅限历史记录</strong><span>{result?.external_processing?.query_text_sent ? "本条混合检索记录的查询文本经过单次授权发送到外部模型服务生成向量；结果仍为历史证据，不代表当前在线参数。" : "普通检索只读取已采纳的本地证据，不联网、不调用模型；结果不代表当前在线参数。"}隔离记录与未解析文档不参与检索。</span></div>
       <form className="review-form knowledge-form" onSubmit={event => { event.preventDefault(); void search(); }}>
         <label htmlFor="knowledge-text">关键词<input ref={textInput} id="knowledge-text" maxLength={500} value={text} onChange={event => { invalidate(); setText(event.target.value); }} aria-describedby="knowledge-text-hint" /></label>
         <small id="knowledge-text-hint">支持已保存证据中的关键词；留空可按下方条件浏览历史记录。</small>

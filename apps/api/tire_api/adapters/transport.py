@@ -68,12 +68,23 @@ def validate_public_ip(address: str) -> None:
 
 
 class PublicResolver(AbstractResolver):
-    def __init__(self, hosts: frozenset[str]) -> None:
+    """主机白名单 + 公网 IP 解析器（SSRF 防线，来源抓取与 AI 适配器共用）。
+
+    allow_loopback=True 仅供操作者自行配置 base URL 的 AI/embedding 适配器使用
+    （ADR-2026-054 D-C：本地 OpenAI 兼容端点在信任边界内）；来源抓取恒为默认 False。
+    """
+
+    def __init__(self, hosts: frozenset[str], *, allow_loopback: bool = False) -> None:
         self.hosts = hosts
+        self.allow_loopback = allow_loopback
 
     async def resolve(self, host: str, port: int = 0, family: int = socket.AF_INET):
         if host not in self.hosts:
             raise SourceAccessError("host_not_allowed")
+        if self.allow_loopback and host in ("localhost", "127.0.0.1", "::1"):
+            # 仅当 host 本身就是环回名（非环回名解析出环回 IP 仍走公网校验拒绝）。
+            return [{"hostname": host, "host": host, "port": port,
+                     "family": family, "proto": socket.IPPROTO_TCP, "flags": socket.AI_NUMERICHOST}]
         records = await asyncio.get_running_loop().getaddrinfo(
             host, port, family=family, type=socket.SOCK_STREAM
         )

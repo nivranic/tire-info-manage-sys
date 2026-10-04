@@ -3247,3 +3247,27 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 **验证**：守卫影响面 test_lifecycle/fitment/auth×3 74 绿 + test_ai/ai_monitoring/garage 59 绿；test_auth_lifecycle 12/12；test_reports 修复后 21/21；三端构建绿（web PWA 5837917d…）。**全量回归 2666 passed + 77 子测试 + 1 失败**——唯一失败 test_reports withdrawal 用例系 lifecycle 守卫的真实回归（独立 setup 未 admin 化），文件级修复后 21/21 绿；其后生产代码零改动（等效全绿，如实记录未重跑全量）。
 
 **未验证**：R1-2/R2-2 的并发路径为代码推演未做运行时并发注入（评审双代理声明）；desktop/mobile 真机未跑。
+
+## 第 61 轮：全局圆桌——六领域无限制深审全项目（2026-10-04）
+
+**机制**：用户指令"全局项目所有涉及方面——无任何限制，不要过度"。六领域角色并行只读评审（G1 后端架构 95 模块/G2 数据层与迁移/G3 前端工作台 54 组件/G4 设备端与离线链路/G5 AI 与外部集成/G6 工程化交付与全局盲区），每角色限报 top 发现+「已检查未发现问题」清单防沉默遗漏；moderator 裁决按"立即修/延迟带触发/不修+理由"三分。共 20 项发现。
+
+**最重发现（G5-1，活跃失真）**：AI provider 标签全链路硬编码 `openai_responses`——当前真实通道 anthropic(GLM) 下，审计账本（不可追加改写）、遥测归因、设备 AI 同意六元组全部记错数据处理者，设备同意文案写"发送到 OpenAI"实际发往 Anthropic 协议端点。**已修**：AIRequest/DeviceAIConsentClaim/record_ai_usage/device 指纹与同意门全部改 config.provider；telemetry PROVIDERS 补全 openai_chat/anthropic；三端 consent 构造从 provider_preview（=model_status，已含 provider）动态取值；同意文案改中性"外部模型服务"；新增归因测试（chat 配置下账本 provider=='openai_chat'）。已知后果如实登记：provider 策略指纹变化会使现存设备同意失配需重新授权（数据处理者真实变了，理应重新同意）。
+
+**其余立即修（8 项）**：
+- G2-1 迁移 015：014 只加列未建索引，升级库与新建库 schema 不同构（session_scope 全表扫描）——幂等 CREATE INDEX IF NOT EXISTS + version_registry 登记 + 升级/新建索引同构哨兵测试（复用 pre-009 fixture；test_ai_stream_migration 硬编码 +6 改权威清单长度）。
+- G1-3 watchlists/changes N+1：契约上下文单次批量预取（contract_metadata 已支持 context 注入）+ watchlists 加 limit 参数。
+- G5-2 loopback 矛盾：配置层允许 http://localhost（ADR-054 D-C）但传输层 PublicResolver 必拒——AI/embedding 适配器加显式 allow_loopback 例外（操作者自配端点在信任边界内；来源抓取恒拒绝），行为测试锚定三态。
+- G3-2 CommandPalette a11y：焦点归还（复用 offline-library 模式）+ Tab 焦点圈禁。
+- G3-4 changes 渲染窗口：50/批与 watches 对齐 + JSON 序列化惰性化（展开才算）。
+- G3-3 PWA 白名单构建期校验：prerendered HTML 与 manifest 引用的同源资源必须全在表内否则构建失败（负例演练 NEGATIVE_CHECK_OK，真 sw.js 零污染）。
+- G4-1 gradle 构建期硬校验：pre{Debug,OfflineQa,Release}Build 比对 dist↔assets/public（包含式 size 对比，忽略 Capacitor 生成物），堵 round-52 型"绕过管线静默嵌入旧前端"（实测：dist 缺失→报错指引；篡改→stale 拦截；恢复→通过）。
+- G2-3 scripts/backup_dev.py：SQLite backup API（源只读、WAL 安全）+ objects/parser-bundles 一并备份 + manifest 版本清单；对正常库实测（27.99MB/497 bundles/14 版本——如实：正常库尚未应用 015，服务重启后升级）。
+
+**G6 文档批**：HANDOFF 勘误补第 8 条（Git 状态脱节——已分轮入库、origin 停第59轮）；README 验证块补 test_telemetry_monitor 与 web/api-client/native-client 单测口径；新建 scripts/verify-all.ps1 聚合验证入口（9 步串联，语法自检过，全量运行未验证）；risk-register r58（头注同步+R-010 缺号注释+新增 R-015 web 测试不对称 open-accepted、R-016 数据增长 open-roadmap；YAML 实解析通过）。
+
+**延迟登记（带触发）**：G1-1 lock_ingestion 寄生 QueryService（61 处借实例拿锁；触发=新增写域或 service.py 再增长）；G1-2 db.initialize 反向驱动域初始化（触发=初始化编排改动时上移组合根）；G1-4 HTTPException 双轨 336:251（立规约：新端点必带机器 code，旧字符串"触碰即迁移"）；G1-5 私有成员跨模块引用（触发=触碰即公开化）；G2-2 原文 blob 双存无界增长（并入 R-016，触发=dev.db>100MB 或部署动议）；G3-1 workbench 65 useState 击键全树重渲染（触发=下次 web 大改时拆查询表单子组件）；G6-5 lockfile 全 npmmirror resolved（登记环境前提，触发=海外 CI 需求）。
+
+**不修+理由**：G3 PWA 版本链/workbench useEffect 依赖/hash 路由/中间件栈/迁移幂等/双后端隔离/8MiB 五层限额/worker 租约恢复/Android 权限面/预算护栏（DB 持久化非进程内——G5 纠正了任务前提）/grounding 与提示注入面/密钥边界——各角色"已检查未发现问题"清单合计 30+ 项全部通过。
+
+**验证**：分段目标测试（AI/设备族 165 绿、迁移族+core 125 绿、watch/changes 消费方 114 绿、chat/anthropic/source_access 79 绿、auth 族 74+12 绿）；三端 build 绿（web PWA 47e4644f… 含白名单校验）；五端单测 web 5/desktop 22/mobile 23/native 6/api-client 188+34 全绿。全量回归 **2670 passed + 77 子测试 + 0 失败**（28:31，.artifacts/r61-full-run.log；较第60轮 2666 净增 4：provider 归因/索引同构哨兵/resolver 三态/auth 族含 015 后迁移族回归）。

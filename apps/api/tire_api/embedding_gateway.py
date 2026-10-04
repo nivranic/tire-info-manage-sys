@@ -154,7 +154,7 @@ class OpenAIEmbeddingAdapter:
                 or sum(len(value.encode('utf-8')) for value in inputs) > 100000):
             raise EmbeddingError('embeddings_configuration_invalid')
         body = {'model': config.model, 'input': inputs, 'encoding_format': 'float', 'dimensions': config.dimensions}
-        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host})),
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host}), allow_loopback=True),
                                          use_dns_cache=False, family=socket.AF_UNSPEC, limit=1)
         try:
             async with aiohttp.ClientSession(connector=connector, trust_env=False,

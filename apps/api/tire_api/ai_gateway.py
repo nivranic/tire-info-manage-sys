@@ -546,7 +546,7 @@ class ChatCompletionsAdapter:
         from .ai_stream_parser import MAX_STREAM_BYTES
         if body.get('stream') is not True or not isinstance(body.get('messages'), list) or 'input' in body:
             raise GatewayError('ai_configuration_invalid')
-        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host})),
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host}), allow_loopback=True),
                                          use_dns_cache=False, family=socket.AF_UNSPEC, limit=1)
         try:
             async with aiohttp.ClientSession(connector=connector, trust_env=False,
@@ -573,7 +573,7 @@ class ChatCompletionsAdapter:
     async def generate(self, config: OpenAIConfig, body: dict) -> dict:
         if body.get('stream') is not False or not isinstance(body.get('messages'), list) or 'input' in body:
             raise GatewayError('ai_configuration_invalid')
-        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host})),
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host}), allow_loopback=True),
                                          use_dns_cache=False, family=socket.AF_UNSPEC, limit=1)
         try:
             async with aiohttp.ClientSession(connector=connector, trust_env=False,
@@ -789,7 +789,7 @@ class AnthropicAdapter:
         if body.get('stream') is not True or not isinstance(body.get('messages'), list) \
                 or 'input' in body or 'system' not in body:
             raise GatewayError('ai_configuration_invalid')
-        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host})),
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host}), allow_loopback=True),
                                          use_dns_cache=False, family=socket.AF_UNSPEC, limit=1)
         try:
             async with aiohttp.ClientSession(connector=connector, trust_env=False,
@@ -816,7 +816,7 @@ class AnthropicAdapter:
         if body.get('stream') is not False or not isinstance(body.get('messages'), list) \
                 or 'input' in body or 'system' not in body:
             raise GatewayError('ai_configuration_invalid')
-        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host})),
+        connector = aiohttp.TCPConnector(resolver=PublicResolver(frozenset({config.allowed_host}), allow_loopback=True),
                                          use_dns_cache=False, family=socket.AF_UNSPEC, limit=1)
         try:
             async with aiohttp.ClientSession(connector=connector, trust_env=False,

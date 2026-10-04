@@ -3,7 +3,7 @@
 > 更新日期：2026-10-02，Asia/Hong_Kong。本文供新 agent 接手，不是完整需求完成证明。
 > 当前结论：已有大量 PoC 实现与限定范围验收；第49轮设备历史查询未收尾，第50轮设备 AI 只有基础核心，完整 V1 尚未完成。
 
-## 勘误与后续进展（2026-10-02 晚追加；2026-10-03 增补）
+## 勘误与后续进展（2026-10-02 晚追加；2026-10-03 增补；2026-10-04 增补）
 
 本文为 2026-10-02 上午生成的**交接时点快照**，下方正文按原文保留、一律不改写。当日接手会话推进后，以下表述已部分过时，阅读正文时以本节勘误为准；完整推进记录见[实施计划第 51 轮](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-09-26-tire-intelligence.md)。逐条勘误：
 
@@ -18,6 +18,7 @@
 5. **不变项声明**：Android 凭据保留审批仍无用户答复，`continuous_policies=false` 不变；正常库 011/012 应用仍未执行，本文不额外授权的原则不变。
 6. **§5.1"尚未获得的授权"Android 段——已于 2026-10-03 获用户批准并完成目标验收**：用户答复"允许保留并继续"，三个 androidTest cleanup 补丁应用（保留合成 QA 资料/Keystore 别名，两个销毁凭据测试 @Ignore 标注"user approval 2026-10-03"）；模拟器（Pixel 5/API 34/emulator-5554）仪器测试 OK（41 tests，0 失败，2 项按批准跳过）、Keystore 保留验证（offline-v1 profile 15→57、61 个 sealed blob 与 catalog 留存）与主入口 smoke 均通过，回执见 [android-native-acceptance-a/verification.json](E:/Mix/project/tire-info-manage-sys/.artifacts/device-ai50/android-native-acceptance-a/verification.json)。第 49 轮 Android 收尾完成；上文第 5 条中"Android 凭据保留审批仍无用户答复"表述已过时。
 7. **2026-10-03 核查轮（第 52 轮）后续进展**：第 5.2 节"尚未实现的整链"与第 6 节 P1 各项已在第 51 轮基本完成（见计划文档第 51 轮记录）；第 52 轮完成从头核查（四端新鲜全绿、完整 API 套件重跑、E6 route 闭包测试补齐、Root 第二批裁决 D8/D1-D4/D7 与冻结前置口径、两个销毁测试以自建材料方式恢复并通过仪器验证 43/0、tauri NSIS 与含新前端的 Android APK 打包验收、Mimosa 静态扫描分级），COHS 实例载体建于 [docs/assurance/](E:/Mix/project/tire-info-manage-sys/docs/assurance/README.md)。剩余待办以 [risk-register.yaml](E:/Mix/project/tire-info-manage-sys/docs/assurance/risk-register.yaml) 与计划文档第 52 轮"未验证与待办"为准。
+8. **§1 表格"Git 状态"行（"README 修改，`apps/`、`packages/`…未跟踪；没有提交、推送或发布"）已过时**：自 2026-10-03 起全部工作已分轮提交——提交序列为「第50/51轮」（设备证据→AI 桥接全链实现与验收）、「第52-55轮」（遗漏核查与 COHS 实例化、双 Provider 适配器及 GLM 真实接入）、波次1-4、第57轮至第60轮；第61轮进行中。origin/main 已推进至第59轮（2026-10-04 推送），其后提交按用户 push 指令推送，不自动推送。`.artifacts/`（R-007 测试依赖的密封向量库）与 `data/`（本机数据库与对象）仍不入库——clone 后不可直接跑全量验证，需按 README「验证与监控命令」恢复依赖与测试基建。
 
 ## 1. 接手时先知道这几件事
 

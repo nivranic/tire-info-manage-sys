@@ -195,7 +195,7 @@ def device_provider_policy_fingerprint(config) -> str:
     expected_provider_policy_fingerprint 只有与当前服务端策略逐字节一致才通过。
     """
     from .ai_gateway import OUTPUT_SCHEMA, PROMPT_VERSION
-    return digest({'provider': 'openai_responses', 'model': config.model,
+    return digest({'provider': config.provider, 'model': config.model,
                    'allow_private': bool(config.allow_private),
                    'allowed_privacy_classes': ['public', 'private'] if config.allow_private else ['public'],
                    'prompt_version': PROMPT_VERSION, 'grounding_schema': digest(OUTPUT_SCHEMA)})
@@ -227,7 +227,7 @@ def _prepare_device_analysis(db, payload, pack, preparation, *, stream=False):
         raise HTTPException(409, '问题要求当前信息，请选择先在线核验；历史证据不能回答当前状态')
     # allow_external_processing 在 device 分支只接受字面 true（closed branch）。
     if payload.allow_external_processing is not True:
-        raise HTTPException(422, '分析需要明确允许将问题和所选证据发送到 OpenAI')
+        raise HTTPException(422, '分析需要明确允许将问题和所选证据发送到外部模型服务')
     try:
         config = configured_model()
         # 隐私 gate 与 legacy 同式（device pack 投影核恒 private，restricted 仍双重拒绝）。
@@ -247,7 +247,7 @@ def _prepare_device_analysis(db, payload, pack, preparation, *, stream=False):
     policy_fingerprint = device_provider_policy_fingerprint(config)
     if (consent.expected_pack_fingerprint != pack.fingerprint
             or consent.expected_device_context_fingerprint != preparation.device_context_fingerprint
-            or consent.provider != 'openai_responses' or consent.model != config.model
+            or consent.provider != config.provider or consent.model != config.model
             or consent.expected_provider_policy_fingerprint != policy_fingerprint):
         raise HTTPException(409, {'code': 'device_ai_consent_mismatch',
             'message': 'Provider 同意六元组与服务端权威复算不一致；同意对象不成立，请重新预览授权'})
@@ -335,7 +335,7 @@ def prepare_analysis(db, payload, session_id, *, stream=False):
     if pack.mode == 'history' and CURRENT_WORDS.search(payload.question):
         raise HTTPException(409, '问题要求当前信息，请选择先在线核验；历史证据不能回答当前状态')
     if not payload.allow_external_processing:
-        raise HTTPException(422, '分析需要明确允许将问题和所选证据发送到 OpenAI')
+        raise HTTPException(422, '分析需要明确允许将问题和所选证据发送到外部模型服务')
     try:
         config = configured_model()
         if pack.privacy_class == 'restricted' or pack.privacy_class != 'public' and not config.allow_private:

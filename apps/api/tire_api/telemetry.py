@@ -45,7 +45,7 @@ OUTCOMES = frozenset({'success', 'error', 'cancelled', 'unknown', 'completed', '
     'blocked', 'skipped', 'finalized', 'stale'})
 ERROR_OUTCOMES = frozenset({'error', 'failed', 'source_unavailable', 'unavailable',
     'worker_error', 'lease_lost'})
-PROVIDERS = frozenset({'openai_responses', 'openai_embeddings'})
+PROVIDERS = frozenset({'openai_responses', 'openai_chat', 'anthropic', 'openai_embeddings'})
 MAX_RECENT_SPANS = 256
 MAX_ROUTES = 512
 MAX_METRIC_SERIES = 1024

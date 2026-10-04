@@ -368,15 +368,18 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
         return result
 
     @app.get("/v1/watchlists")
-    def watches(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    def watches(request: Request, limit: int = Query(default=100, ge=1, le=200),
+                db: Session = Depends(get_db)) -> dict[str, Any]:
         from .auth import session_scope
         scope = session_scope(db, request.state.session_id)
         items = db.scalars(select(WatchItem).where(WatchItem.session_id.in_(scope))
-                          .order_by(desc(WatchItem.created_at))).all()
+                          .order_by(desc(WatchItem.created_at)).limit(limit)).all()
         service = QueryService(db, adapter_registry)
-        from .identity_contract import contract_metadata
+        # G1-3（第61轮圆桌）：契约上下文单次批量预取（此前逐项 contract_metadata 造成 1+N）。
+        from .identity_contract import contract_context, contract_metadata
+        context = contract_context(db, [item.variant_id for item in items])
         return {"data_state": "local_snapshot", "items": [
-            {"identity_contract": contract_metadata(db, item.variant_id), "id": item.id, "variant_id": item.variant_id, "created_at": timestamp(item.created_at),
+            {"identity_contract": contract_metadata(db, item.variant_id, context=context), "id": item.id, "variant_id": item.variant_id, "created_at": timestamp(item.created_at),
              "variant": service.historical_variant(item.variant_id)} for item in items],
             "monitoring_enabled": False}
 
@@ -417,9 +420,10 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
         rows = db.scalars(select(ChangeEvent).join(WatchItem, WatchItem.variant_id == ChangeEvent.variant_id)
                           .where(WatchItem.session_id.in_(scope))
                           .order_by(desc(ChangeEvent.observed_at)).limit(limit)).all()
-        from .identity_contract import contract_metadata
+        from .identity_contract import contract_context, contract_metadata
+        context = contract_context(db, {row.variant_id for row in rows})  # G1-3：批量预取去重后单查
         return {"data_state": "local_snapshot", "items": [
-            {"identity_contract": contract_metadata(db, row.variant_id), "id": row.id, "variant_id": row.variant_id, "source_id": row.source_id,
+            {"identity_contract": contract_metadata(db, row.variant_id, context=context), "id": row.id, "variant_id": row.variant_id, "source_id": row.source_id,
              "snapshot_id": row.snapshot_id, "previous_snapshot_id": row.previous_snapshot_id,
              "kind": row.kind, "changes": row.changes, "observed_at": timestamp(row.observed_at)}
             for row in rows], "monitoring_enabled": False}

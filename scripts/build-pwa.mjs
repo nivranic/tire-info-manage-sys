@@ -38,6 +38,18 @@ if (process.argv.includes("--icons")) {
     return results;
   }
   const assets = ["/", "/manifest.webmanifest", "/favicon.ico", ...icons.map(size => `/icons/icon-${size}.png`), ...await walk(staticRoot)].sort();
+  // G3-3（第61轮圆桌）：构建期完整性校验——prerendered HTML 与 manifest 引用的每个
+  // 同源静态资源都必须在白名单内，否则离线时该资源 404 且无任何告警（静默漏登记）。
+  const referenced = new Set();
+  const html = await readFile(join(root, distDir, "server", "app", "index.html"), "utf8").catch(() => null);
+  if (html) for (const match of html.matchAll(/(?:src|href)="(\/[^"?\s]+)"/g)) referenced.add(match[1]);
+  // manifest 由 app/manifest.ts 的 route 运行时生成——从源码提取 icon 引用做同源校验。
+  const manifestSource = await readFile(join(root, "app", "manifest.ts"), "utf8");
+  for (const match of manifestSource.matchAll(/src:\s*"(\/[^"?"]+)"/g)) referenced.add(match[1]);
+  const missing = [...referenced].filter(path => !assets.includes(path) && !path.startsWith("/_next/image"));
+  if (missing.length) {
+    throw new Error(`PWA allowlist is missing referenced assets (offline 404): ${missing.join(", ")}`);
+  }
   const template = await readFile(join(root, "pwa", "worker.js"), "utf8");
   const version = createHash("sha256").update(JSON.stringify({ buildId, assets, template })).digest("hex").slice(0, 24);
   await writeFile(join(root, "public", "sw.js"), template.replace("__TIRE_PWA_CONFIG__", JSON.stringify({ version, assets })), "utf8");

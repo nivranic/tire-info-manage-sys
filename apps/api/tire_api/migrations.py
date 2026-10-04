@@ -191,3 +191,12 @@ def upgrade(connection: Connection) -> None:
         connection.execute(text(
             "INSERT INTO tire_schema_versions (version) VALUES (:version)"
         ), {"version": "014_local_sessions_user"})
+    if "015_local_sessions_user_index" not in applied:
+        # G2-1（第61轮圆桌）：014 只加列未建索引，而 ORM 的 index=True 仅在新库
+        # create_all 时生效——升级库与新建库 schema 不同构，session_scope 按
+        # user_id 过滤退化为全表扫描。幂等补建两路径共同的索引。
+        connection.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_local_sessions_user_id ON local_sessions (user_id)")
+        connection.execute(text(
+            "INSERT INTO tire_schema_versions (version) VALUES (:version)"
+        ), {"version": "015_local_sessions_user_index"})

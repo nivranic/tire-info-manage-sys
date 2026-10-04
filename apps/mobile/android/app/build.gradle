@@ -101,6 +101,38 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
+// G4-1（第61轮圆桌）：assets/public 必须与最新前端构建一致——绕过 scripts/build-mobile.ps1
+// 直接 assemble 曾静默嵌入陈旧前端（round-52 事故），此处升级为构建期硬校验。
+// 按 dist→assets 的包含式 size 对比：Capacitor sync 生成的 capacitor.config.json
+// 等额外文件不计入，只要求 dist 的每个产物都不陈旧、不缺失。
+def webAssetEntries(File dir) {
+    def entries = [:]
+    if (dir.isDirectory()) {
+        dir.eachFileRecurse { file ->
+            if (file.isFile()) {
+                entries[dir.toPath().relativize(file.toPath()).toString().replace('\\', '/')] = file.length()
+            }
+        }
+    }
+    return entries
+}
+tasks.matching { it.name ==~ /pre(Debug|OfflineQa|Release)Build/ }.configureEach {
+    doFirst {
+        def distEntries = webAssetEntries(new File(rootProject.projectDir, '../dist'))
+        def embeddedEntries = webAssetEntries(file('src/main/assets/public'))
+        if (!distEntries) {
+            throw new GradleException('apps/mobile/dist missing/empty: build via scripts/build-mobile.ps1 (frontend -> cap sync -> assemble)')
+        }
+        if (!embeddedEntries) {
+            throw new GradleException('src/main/assets/public missing/empty: run npx cap sync android before assembling')
+        }
+        def stale = distEntries.findAll { relativePath, size -> embeddedEntries[relativePath] != size }.collect { it.key }
+        if (stale) {
+            throw new GradleException('Embedded web assets are stale (' + stale.size() + ' file(s), e.g. ' + stale.first() + '): run npm run build + npx cap sync android (or scripts/build-mobile.ps1) before assembling.')
+        }
+    }
+}
+
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {

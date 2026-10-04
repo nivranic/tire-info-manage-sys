@@ -433,3 +433,20 @@ def test_additional_identity_fields_keep_separate_variants_not_false_conflicts(s
         {'kind': 'tire', 'snapshot_id': first['provenance'][0]['snapshot_id'], 'variant_id': first['variants'][0]['id']}]}).json()['pack']
     assert pack['conflicts'] == []
     assert '999321' not in json.dumps(pack)
+
+
+def test_provider_label_reflects_configured_channel(monkeypatch, setup):
+    """G5-1（第61轮圆桌）：账本/回执的 provider 归因随配置通道真实记录，不再硬编码 openai_responses。"""
+    for name in ('TI_CHAT_MODEL', 'TI_CHAT_API_KEY', 'TI_CHAT_BASE_URL'):
+        monkeypatch.setenv(name, {'TI_CHAT_MODEL': 'glm-test', 'TI_CHAT_API_KEY': 'chat-key-synthetic',
+                                  'TI_CHAT_BASE_URL': 'https://open.bigmodel.cn/api/paas/v4'}[name])
+    monkeypatch.setenv('TI_AI_PROVIDER', 'openai_chat')
+    client, _, model, database = setup
+    pack = historical_pack(client)
+    response = analyze(client, pack)
+    assert response.status_code == 200, response.text
+    run = response.json()
+    assert run['provider'] == 'openai_chat'
+    with database.sessions() as db:
+        row = db.scalar(select(AIRequest).where(AIRequest.id == run['id']))
+        assert row is not None and row.provider == 'openai_chat'

@@ -107,6 +107,33 @@ def test_validated_public_base_url_direct_rules():
     expect_error(lambda: validated_public_base_url('http://api.example.com'), 'ai_configuration_invalid')
 
 
+def test_resolver_loopback_exception_matches_config_layer_promise(monkeypatch):
+    """G5-2（第61轮圆桌）：配置层允许的 loopback base URL 在传输层同样放行（AI 适配器例外）；
+    来源抓取默认形态仍拒绝环回解析。"""
+    from tire_api.adapters.transport import PublicResolver, SourceAccessError
+
+    async def scenario():
+        allowed = PublicResolver(frozenset({'localhost'}), allow_loopback=True)
+        records = await allowed.resolve('localhost', 11434)
+        assert records[0]['host'] == 'localhost'
+        blocked = PublicResolver(frozenset({'localhost'}))
+        try:
+            await blocked.resolve('localhost', 11434)
+        except SourceAccessError as error:
+            assert str(error) == 'non_public_address'
+        else:
+            raise AssertionError('默认 resolver 不应放行环回地址')
+        outside = PublicResolver(frozenset({'api.openai.com'}), allow_loopback=True)
+        try:
+            await outside.resolve('localhost', 11434)
+        except SourceAccessError as error:
+            assert str(error) == 'host_not_allowed'
+        else:
+            raise AssertionError('白名单外主机必须拒绝')
+
+    asyncio.run(scenario())
+
+
 def test_chat_request_body_shapes_and_knobs(monkeypatch):
     chat_env(monkeypatch)
     config = configured_model()
