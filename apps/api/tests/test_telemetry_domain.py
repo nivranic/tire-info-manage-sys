@@ -249,11 +249,11 @@ def test_response_observation_covers_validation_and_commit(private_domain, failu
         with runtime.scope(), observe('worker.job', component='worker'):
             if failure == 'commit':
                 with pytest.raises(RuntimeError, match=CANARY):
-                    execute_response(db, SimpleNamespace(state=SimpleNamespace(ai_adapter=Provider())), request,
+                    execute_response(db, SimpleNamespace(state=SimpleNamespace(ai_adapter=Provider(), database=database)), request,
                                      SimpleNamespace(), {'private': CANARY}, validate)
                 db.rollback()
             else:
-                result = execute_response(db, SimpleNamespace(state=SimpleNamespace(ai_adapter=Provider())), request,
+                result = execute_response(db, SimpleNamespace(state=SimpleNamespace(ai_adapter=Provider(), database=database)), request,
                                           SimpleNamespace(), {'private': CANARY}, validate)
                 assert result.state == ('failed' if failure else 'completed')
                 assert db.get(AICompletion, request.id) is not None

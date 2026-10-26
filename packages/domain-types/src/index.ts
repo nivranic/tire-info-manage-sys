@@ -331,7 +331,7 @@ export interface AlertRuleSettings {
   name: string;
   interval_seconds: number;
   enabled: boolean;
-  kinds: ("facts_changed" | "variant_observed" | "page_changed")[];
+  kinds: ("facts_changed" | "variant_observed" | "page_changed" | "url_moved")[];
   fields: string[];
   conditions: { technology?: string };
 }
@@ -392,6 +392,11 @@ export type {
   SourcePageEvidenceSide, SourcePageChange, SourcePageNotification,
   SourcePageNotifications, SourcePageNotificationDetail, SourcePageNotificationRead,
 } from "./source-page-monitoring";
+
+export type {
+  SourcePageUrlMoveSide, SourcePageUrlMove, SourcePageUrlMoveNotification,
+  SourcePageUrlMoveNotifications, SourcePageUrlMoveNotificationDetail, SourcePageUrlMoveNotificationRead,
+} from "./source-page-url-moves";
 
 export interface Variant {
   field_resolution?: import("./field-authority").FieldResolution;

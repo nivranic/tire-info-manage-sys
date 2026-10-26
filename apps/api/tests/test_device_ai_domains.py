@@ -200,10 +200,46 @@ def submit_stream(env, body, key=None):
                            headers={'Idempotency-Key': key or str(uuid4())})
 
 
+def materialize_vehicle_snapshots(env, value):
+    """R93 车辆胶囊完整性门：按冻结投影为 vehicle 引用物化 utf-8 文本快照。
+
+    提交侧胶囊门要求每个 vehicle 引用在仓库存在已采纳快照，且其来源字段与投影核
+    冻结值逐字一致（文本编码走直读路径，无需二进制捕获链）。"""
+    from datetime import datetime
+
+    from tire_api.vehicles import VehicleManufacturer, VehicleModel, VehicleSnapshot
+    with env.app.state.database.sessions() as db:
+        preparation = db.get(DeviceAIPreparation, value['id'])
+        raw = env.app.state.database.object_store.get(
+            preparation.projection_hash, preparation.projection_byte_count)
+        db.add(VehicleManufacturer(id='synthetic-vehicle-manufacturer', name='Synthetic Manufacturer'))
+        db.flush()
+        db.add(VehicleModel(id='synthetic-vehicle-model', manufacturer_id='synthetic-vehicle-manufacturer',
+                            name='Synthetic Vehicle', generation='synthetic-g1', region='synthetic',
+                            source_vehicle_id='synthetic-vehicle'))
+        db.flush()
+        for entry in json.loads(raw)['observations']:
+            selector = entry.get('selector') if isinstance(entry, dict) else None
+            reference = selector.get('reference') if isinstance(selector, dict) else None
+            if not isinstance(reference, dict) or reference.get('kind') != 'vehicle':
+                continue
+            source, material = entry['source'], entry['material']
+            db.add(VehicleSnapshot(id=reference['snapshot_id'], vehicle_id='synthetic-vehicle-model',
+                source_id=source['source_id'], source_url=source['source_url'], raw_hash=source['raw_hash'],
+                body='synthetic vehicle accepted text', body_encoding='utf-8', content_type='application/json',
+                parser_version=source['parser_version'], parser_identity=source['parser_identity'],
+                observed_at=datetime.fromisoformat(source['observed_at']),
+                payload={key: material[key] for key in ('vehicle', 'trims', 'fitments', 'footnotes')},
+                fact_hash=material['fact_hash'], fact_version=1))
+        db.commit()
+
+
 def full_chain(env, kind, *, with_record=False, seed_mutate=None):
     seeded = env.seed(mutate=seed_mutate)
     selector = domain_selector(seeded[2], kind, with_record=with_record)
     value = env.prepare(seeded, selector, DOMAIN_MODES[kind])
+    if kind == 'vehicle':
+        materialize_vehicle_snapshots(env, value)
     response = submit_stream(env, submission(env, value))
     assert response.status_code == 202, response.text
     return seeded, value, selector, response.json()['analysis']['id']

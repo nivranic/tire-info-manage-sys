@@ -1,0 +1,5 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": { "types": ["node"], "incremental": false, "allowImportingTsExtensions": true },
+  "include": ["source-page-url-moves.mts", "source-page-url-moves.types.ts"]
+}

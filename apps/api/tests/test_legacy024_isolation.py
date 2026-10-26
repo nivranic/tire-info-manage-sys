@@ -6,6 +6,7 @@ are made only after load_private_023 has completed its original full validation.
 """
 from copy import deepcopy
 from pathlib import Path
+import re
 import shutil
 import unittest
 from uuid import uuid4
@@ -29,9 +30,23 @@ TEST_ROOT = Path(__file__).resolve().parents[3] / '.artifacts/legacy024-isolatio
 VERSION_006 = '006_source_settings'
 VERSION_025 = '025_external_fact_governance'
 VERSION_026 = '026_query_ownership'
+VERSION_027 = '027_test_event_golden'
+VERSION_028 = '028_ai_price_versions'
+VERSION_029 = '029_source_page_monitoring'
+VERSION_030 = '030_interest_source_quality'
+VERSION_031 = '031_source_material_stops'
+VERSION_032 = '032_source_page_url_moves'
 TABLES_025 = {'external_fact_license_evidence', 'external_fact_grant_revisions'}
 TABLES_026 = {'query_run_owner_receipts'}
-CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026
+TABLES_027 = {'test_event_golden_cases', 'test_event_golden_case_revisions',
+              'test_event_golden_case_reviews', 'test_event_golden_set_revisions'}
+TABLES_028 = {'ai_price_versions'}
+TABLES_029 = {'source_page_changes', 'source_page_notifications'}
+TABLES_031 = {'source_material_stops'}
+TABLES_032 = {'source_page_url_moves', 'source_page_url_move_notifications'}
+# 030 adds no table; it appends one boolean column to interest_revisions.
+CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032
+TAIL_VERSIONS = (VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032)
 CUSTOM = 'synthetic_r109_external_table'
 FUTURE = 'synthetic_r109_future026'
 
@@ -151,16 +166,33 @@ class Legacy024IsolationTests(unittest.TestCase):
             assert_025_native_schema(connection)
             assert_026_native_schema(connection)
             self.assertEqual(set(after025['tables']) - set(before025['tables']), CURRENT_TAIL_TABLES)
-            self.assertEqual([item for item in after025['schema_objects'] if item['table'] not in CURRENT_TAIL_TABLES],
-                             before025['schema_objects'])
-            self.assertEqual(after025['versions'], before025['versions'] + [VERSION_025, VERSION_026])
+            self.assertEqual([item for item in after025['schema_objects']
+                              if item['table'] not in CURRENT_TAIL_TABLES and item['name'] != 'interest_revisions'],
+                             [item for item in before025['schema_objects'] if item['name'] != 'interest_revisions'])
+            # 030 rebuilds interest_revisions' DDL by appending exactly one column.
+            new_interest = next(item for item in after025['schema_objects'] if item['name'] == 'interest_revisions')
+            old_interest = next(item for item in before025['schema_objects'] if item['name'] == 'interest_revisions')
+            self.assertEqual({key: value for key, value in new_interest.items() if key != 'sql'},
+                             {key: value for key, value in old_interest.items() if key != 'sql'})
+            fragment = r'source_quality_notifications\s+BOOLEAN\s+NOT\s+NULL\s+DEFAULT\s+false'
+            restored, count = re.subn(r',\s*' + fragment + r'(?=\s*\))|' + fragment + r'\s*,\s*', '',
+                new_interest['sql'], flags=re.I)
+            self.assertEqual(count, 1)
+            self.assertEqual(re.sub(r'\s+', '', restored), re.sub(r'\s+', '', old_interest['sql']))
+            self.assertEqual(after025['versions'], before025['versions'] + list(TAIL_VERSIONS))
             for table, expected_table in before025['tables'].items():
                 actual_table = after025['tables'][table]
                 if table == 'tire_schema_versions':
-                    self.assertEqual(ledger_without(connection, (VERSION_025, VERSION_026)),
+                    self.assertEqual(ledger_without(connection, TAIL_VERSIONS),
                                      {key: expected_table[key] for key in ('row_count', 'rows_sha256')})
                     self.assertEqual({key: actual_table[key] for key in ('columns', 'foreign_keys')},
                                      {key: expected_table[key] for key in ('columns', 'foreign_keys')})
+                elif table == 'interest_revisions':
+                    # 030 appends exactly one interest boolean column with default false.
+                    self.assertEqual(actual_table['columns'][:-1], expected_table['columns'])
+                    self.assertEqual(actual_table['columns'][-1], [len(expected_table['columns']), 'source_quality_notifications', 'BOOLEAN', 1, 'false', 0, 0])
+                    self.assertEqual(actual_table['foreign_keys'], expected_table['foreign_keys'])
+                    self.assertEqual(actual_table['row_count'], expected_table['row_count'])
                 else:
                     self.assertEqual(actual_table, expected_table, table)
             self.assertTrue(all(after025['tables'][table]['row_count'] == 0 for table in CURRENT_TAIL_TABLES))

@@ -250,3 +250,13 @@ risks:
     compensating_control: 已根因修复：契约补 9 表（含通知式五元组新风格）并全量回归 22 文件 463 过；证据 url-move-032-2026-10-26.md §4；新测试文件须登记 TEST_MODULES（manifest 防漂已按设计拦截本切片一次）
     reassess_trigger: 下一次新增 after_create 守卫迁移时核对契约同步；或再次出现显式目标列表替代默认清单的全量声明时重评覆盖面
     status: root-caused-mitigated
+  - id: R-024
+    asset: 默认 183 模块清单中未被近期显式批覆盖的测试文件（历史夹具冻结面）
+    finding: 2026-10-26 全量批（u032ful2，死于中断前）暴露 39 个失败，隔离重跑+HEAD worktree 复现证实其中 30 个为潜伏红：external_tire_fact_reader 表清单漏第50轮起的隔离/监控表（25 败，潜伏自第50/51轮）、legacy024 尾巴冻结停在 026（3 败，潜伏自 027）、telemetry 测试命名空间缺 app.state.database（3 败）、device_ai_domains 车辆域缺胶囊门快照物化（1 败，潜伏自 R93）、CLI 1 败为共跑级联；全部测试侧修复，产品代码零改动
+    impact: medium
+    likelihood: n/a
+    priority: medium
+    owner: engineering
+    compensating_control: 五文件修复后组合 71 过；全量批以分离进程重开（u032ful3，pwsh Start-Process 脱离会话生存期，此前两批 u032full/u032ful2 均被会话中断连带杀死）；显式目标批不得再作为"全量绿"声明的依据（R-023/R-024 同源教训）
+    reassess_trigger: u032ful3 批完成后核验；或任何新轮次宣称全量绿前必须默认清单批回执
+    status: root-caused-mitigated

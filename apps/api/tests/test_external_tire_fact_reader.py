@@ -24,7 +24,8 @@ from sqlalchemy.pool import NullPool
 from tire_api.auth import hash_password
 from tire_api.db import (AlertRule, AlertRuleRevision, AuditEvent, Base, ChangeEvent,
     FactVersion, FallbackConsent, ManualFactRevision, MonitorJob, QueryRun, Snapshot,
-    TireVariant, User, UserSession, VariantLifecycleEvent, Verification, utc, utcnow)
+    SourceQuarantine, TireVariant, User, UserSession,
+    VariantLifecycleEvent, Verification, utc, utcnow)
 from tire_api.domain import LiveQueryRequest
 from tire_api.external_api import KeyCreate, register_external_api_routes, revoke_account_keys
 from tire_api.external_api_models import ApiKey, ApiKeyMinute, ApiKeyOperation, ApiKeyRevocation
@@ -41,6 +42,8 @@ from tire_api.interest_models import Interest, InterestEvent, InterestRevision
 from tire_api.query_owner_models import QueryRunOwnerReceipt, install_schema as install_owners
 from tire_api.query_ownership import capture_query_actor
 from tire_api.service import QueryService
+from tire_api.source_page_models import SourcePageChange, SourcePageNotification
+from tire_api.source_page_url_models import SourcePageUrlMove, SourcePageUrlMoveNotification
 from tire_api.source_setting_models import SourceSettingRevision
 from tire_api.vehicles import VehicleManufacturer, VehicleModel
 from tire_api.webhook_delivery import seal
@@ -125,6 +128,8 @@ class OwnedFactReaderTests(unittest.TestCase):
         self.addCleanup(self.engine.dispose)
         # Explicit service/reader tables plus FK closure. No broad metadata.create_all.
         models = (User, UserSession, QueryRun, Snapshot, Verification, AuditEvent,
+            SourceQuarantine, SourcePageChange, SourcePageNotification,
+            SourcePageUrlMove, SourcePageUrlMoveNotification,
             TireVariant, FactVersion, ChangeEvent, SourceSettingRevision,
             VariantIdentityBinding, VariantIdentityMigrationApplication, IdentityRevision,
             VariantLifecycleEvent, ManualFactRevision, MonitorJob, AlertRule, AlertRuleRevision,

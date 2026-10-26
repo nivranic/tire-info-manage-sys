@@ -134,6 +134,46 @@ def test_url_moves_never_leak_into_page_listings_and_reverse(setup):
     assert url_notices(client)['total'] == 1
 
 
+@pytest.mark.parametrize('failure', ['unavailable', 'quarantined', 'bad_schema'])
+def test_rejected_observation_between_moves_does_not_break_adjacency(setup, failure):
+    client, registry, database = setup
+    create_url_rule(client)
+    first = live(client).json()
+    if failure == 'unavailable':
+        registry.result = {'status': 'unavailable', 'reason': 'synthetic_offline'}
+    elif failure == 'quarantined':
+        registry.result = success('quarantined-moved', [], url=NEW_URL)
+    else:
+        registry.result = success('bad-schema-moved', [{'not': 'a variant'}], url=NEW_URL)
+    rejected = live(client).json()
+    assert rejected['data_state'] != 'live'
+    assert count(database, SourcePageUrlMove) == 0
+    after = move(client, registry, 'accepted-after-failure', NEW_URL)
+    data = url_notices(client)
+    assert data['total'] == 1
+    evidence = data['items'][0]['event']
+    assert evidence['previous_source_url'] == OLD_URL and evidence['source_url'] == NEW_URL
+    assert evidence['before']['snapshot_id'] == first['provenance'][0]['snapshot_id']
+    assert evidence['after']['snapshot_id'] == after['provenance'][0]['snapshot_id']
+
+
+def test_not_modified_observation_bridges_a_move_as_its_before_side(setup):
+    client, registry, database = setup
+    create_url_rule(client)
+    first = live(client).json()
+    registry.result = {'status': 'not_modified', 'url': OLD_URL, 'etag': '"fixture-etag"'}
+    confirmed = live(client).json()
+    assert confirmed['data_state'] == 'live_verified_304'
+    after = move(client, registry, 'moved-after-304', NEW_URL)
+    data = url_notices(client)
+    assert data['total'] == 1
+    evidence = data['items'][0]['event']
+    assert evidence['previous_source_url'] == OLD_URL and evidence['source_url'] == NEW_URL
+    assert evidence['before']['snapshot_id'] == first['provenance'][0]['snapshot_id']
+    assert evidence['before']['verified_at'] == confirmed['verified_at']
+    assert evidence['after']['snapshot_id'] == after['provenance'][0]['snapshot_id']
+
+
 @pytest.mark.parametrize('values', [
     {'kinds': ['url_moved', 'facts_changed']}, {'fields': ['utqg_treadwear']},
     {'conditions': {'technology': 'Acoustic'}}, {'variant_id': 'not-a-page-identity'},
