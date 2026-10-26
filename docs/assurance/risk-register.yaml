@@ -236,6 +236,6 @@ risks:
     likelihood: n/a
     priority: low
     owner: engineering
-    compensating_control: 已在 full-review-2026-10-26 披露并抽查定性；不改写冻结测试迎合扫描；后续提交继续如实转述扫描输出
+    compensating_control: 已在 full-review-2026-10-26 披露并抽查定性；2026-10-26 复核补充：quoted()（vehicle_binary_fixture.py:47-48）为标准 SQLite 标识符转义（双引号翻倍），全部输入来自测试自建夹具库的 sqlite_schema 自省，无外部输入面，判定为转义正确的模式误报；不改写冻结测试迎合扫描；后续提交继续如实转述扫描输出
     reassess_trigger: 用户授权正式深度安全扫描时裁决；或 quoted() 实现变更/该测试改接真实外部输入时重评
     status: open-accepted
