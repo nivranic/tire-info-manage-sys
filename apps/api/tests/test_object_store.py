@@ -6,9 +6,6 @@ import json
 import os
 from pathlib import Path
 
-import boto3
-from botocore.response import StreamingBody
-from botocore.stub import Stubber
 import pytest
 from sqlalchemy import select
 
@@ -75,13 +72,18 @@ def test_config_does_not_discover_ambient_credentials_or_accept_http(monkeypatch
 
 
 def s3():
+    # Deferred: importing boto3 pulls urllib3, whose module import probes IPv6
+    # support with a socket bind; test collection must stay free of network probes.
+    import boto3
+    from botocore.response import StreamingBody
+    from botocore.stub import Stubber
     client = boto3.client('s3', region_name='us-east-1', aws_access_key_id='test-only', aws_secret_access_key='test-only')
-    return client, S3ObjectStore(client, 'tire-test-bucket')
+    return client, S3ObjectStore(client, 'tire-test-bucket'), Stubber, StreamingBody
 
 
 @pytest.mark.parametrize('existing', [False, True])
 def test_s3_conditional_put_and_verified_get_contract(existing):
-    client, store = s3()
+    client, store, Stubber, StreamingBody = s3()
     digest = hashlib.sha256(PDF).hexdigest()
     read = {'Bucket': 'tire-test-bucket', 'Key': store.key(digest)}
     write = {**read, 'Body': PDF, 'IfNoneMatch': '*', 'ContentType': 'application/octet-stream',
@@ -97,7 +99,7 @@ def test_s3_conditional_put_and_verified_get_contract(existing):
 
 
 def test_s3_errors_are_sanitized_and_corruption_is_rejected():
-    client, store = s3()
+    client, store, Stubber, StreamingBody = s3()
     digest = hashlib.sha256(PDF).hexdigest()
     with Stubber(client) as stub:
         stub.add_client_error('get_object', service_error_code='AccessDenied', service_message='private provider details', http_status_code=403)

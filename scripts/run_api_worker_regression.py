@@ -12,6 +12,7 @@ import _sqlite3
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 import hashlib
+import importlib
 import io
 import json
 import logging
@@ -371,7 +372,19 @@ def bootstrap(out: Path, actual_dir: Path | None) -> dict:
     tempfile.tempdir = str(private / 'tmp')
     sys.path[:0] = [str(ROOT / p) for p in ('apps/api', 'apps/api/tests', 'apps/worker', 'scripts')]
     os.chdir(private)
+    # Warm optional heavy dependencies before the guard arms: importing boto3
+    # pulls urllib3, whose module import probes IPv6 support with a loopback
+    # socket bind. Importing here keeps that side effect out of the guarded
+    # run without weakening any guard denial rule.
+    warmed = []
+    for name in ('botocore', 'boto3'):
+        try:
+            importlib.import_module(name)
+            warmed.append(name)
+        except ImportError:
+            pass
     return {'removed_environment_variable_count': removed, 'credential_values_recorded': False,
+            'warmed_optional_imports': warmed,
             'private_configuration': values, 'python_platform': sysconfig.get_platform(),
             'process_only_architecture': architecture, 'cwd': str(private),
             'r76_actuals': 'explicit directory supplied' if actual_dir else 'unset; affected tests may skip'}

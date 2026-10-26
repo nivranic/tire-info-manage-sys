@@ -40,7 +40,7 @@
 | Python AST | venv 3.12.10 遍历 apps/api+apps/worker+scripts（排除 venv/pycache） | 2,005 文件全部解析通过，零语法错误 |
 | 核心批复跑 | 受管 runner `--phase run`，新私槽 `fullreview-20261026-core-a`，同 R136 三模块目标 | **251/251，runner exit 0**，764 源稳定，正常库未启动，零意外拒绝 |
 | Parser/Golden 批复跑 | 同 runner，先长槽名后短槽名 | 长槽名 21/27 早段失败（见§6根因，非回归）；**短槽 `fvr-p1`：27/27、runner exit 0、47 受管子进程全 exit 0**，与 r136p2 完全一致 |
-| 扩展 11 模块批 | 未重跑 | 维持已记录形态：468 pytest 绿 + runner exit3（已知 IPv6 探针），交接卡§4 结论不变 |
+| 扩展 11 模块批 | 复核当日未重跑；**同日 P2 闭环后已修复重跑** | 复核时维持已记录形态（468 pytest 绿 + runner exit3 已知 IPv6 探针）；随后按 [P2 闭环](p2-closeout-2026-10-26.md) 根除探针，`fvr-ex2` 批 **468/468 + runner exit 0 严格绿**（零拒绝） |
 
 结构一致性锚点：迁移版本以 `apps/api/tests/version_registry.py` 为权威全集 001–031（`024_vehicle_binary_raw` 定义于 `vehicle_binary_migration.py:19`，无空号）；Parser 来源清单 `parser_bundles._SOURCES` 恰为 10（michelin-us/uk/fr/de/cn、toyo-us、hankook-us、pirelli-us 共 8 个轮胎参数源 + nhtsa-us-recalls + xiaomi-cn-vehicles），与交接卡口径精确吻合；12 个规格模块在 `apps/api/tire_api/` 均有对应实现模块在位。
 
@@ -70,7 +70,7 @@
 ## 9. 未复验项（诚实边界，按五层口径）
 
 - 源码层：已复验（tsc×3、AST、web 测试、字节钉；见§5）。
-- 合成/隔离层：核心批与 Parser/Golden 批已当日复验通过；扩展 11 模块批、全量套件、浏览器 E2E、生产构建、Native/Android 编译与设备批**未重跑**，维持历史回执。
+- 合成/隔离层：核心批与 Parser/Golden 批已当日复验通过；浏览器 E2E、生产构建、Native/Android 编译与设备批**未重跑**，维持历史回执（扩展 11 模块批在同日 [P2 闭环](p2-closeout-2026-10-26.md) 中修复探针后重跑为严格绿）。
 - 真实 HTTP 层：未发起新捕获；既有 GNT 捕获回执复核一致；来源网络白名单维持研究卡结论（前沿封锁中）。
 - 模型层：本轮零 Provider 调用；真实 Responses 语义验收仍缺本机凭据，维持开放（不索要密钥）。
 - 设备层：未重跑任何设备/模拟器验收。

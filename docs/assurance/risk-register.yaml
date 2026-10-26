@@ -2,8 +2,10 @@
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r82
-updated: 2026-10-19
+register_version: r82+fullreview-2026-10-26
+updated: 2026-10-26
+# 2026-10-26 增量同步：R-001..R-019 保持 r82 原文未动（按 AGENT-HANDOFF-2026-10-26 §6，
+# 旧条目关闭须逐项对后续轮报告核验，不做整表关闭）；本轮仅追加 R-020..R-022 三条有直接证据的新条目。
 
 risks:
   - id: R-001
@@ -204,3 +206,36 @@ risks:
     compensating_control: R80后端自有17/独立72/R79回归102，SDK新47/旧43，HTTP14检查8响应和SDK回放12分别通过；React1440x900/390x844/320x740为45/50/55项（含不同历史页数），类型及三端前端最终build通过；Native TS9/Java5/Rust10仅策略测试。单SQL joined投影、17条异常探测、owner头不作凭据、900秒不续期、anchor撤销/到期可续页；历史错误保留active，owner epoch/abort隔离迟到。API禁止外网/子进程/正常库尝试0，Provider/receiver0；正常库未启动023，无新迁移，测试Key已撤销，私有服务已停，未提交推送。R79证据保留历史绑定
     reassess_trigger: 接入更多公共域/事实或原件导出、正常库023、生产公网部署/代理信任/外部流量、分布式限额与密钥托管时分别设计并验收；本轮不关闭R-017真实材料/模型及R-018公网投递边界
     status: open-roadmap
+
+  - id: R-020
+    asset: 受管回归 runner 输出槽命名与 Windows 路径上限
+    finding: 2026-10-26 全项目复核实锤：`--output-root` 槽名过长（29 字符 `fullreview-20261026-parser-a`）× `--basetemp private\pytest-tmp\test_<长测试名>0` × test_parser_releases 的 `trusted_copy(tmp_path)` seal staging 深路径（`bundles\sha256\<64hex>\package\tire_api\...`）把最深绝对路径推过 MAX_PATH 260（本机 LongPathsEnabled=0），Parser 批 21/27 早段失败（seal OSError→503）、零受管子进程，文件级隔离复现 10/12；同批 764 源字节稳定、绕开 pytest 直接 seal 长短槽均成功、短槽官方批 fvr-p1 27/27+47 子进程全过，判定为环境命名陷阱而非产品回归；既有历史回执均为短槽不受影响
+    impact: medium
+    likelihood: high
+    priority: medium
+    owner: engineering
+    compensating_control: 新批槽名 ≤10 字符量级约定已入跨会话备忘与 full-review-2026-10-26 §6（含差分实验与判别协议）；失败复跑回执 fullreview-20261026-parser-a/-parser-iso1 与只读诊断私槽原样保留
+    reassess_trigger: 修改 trusted_copy/seal staging 路径布局、启用系统 LongPaths、或再现"Parser 批早败+零子进程"形态时，先按 §6 判别协议查槽名长度再谈回归
+    status: mitigated-convention
+
+  - id: R-021
+    asset: Python 全量/批处理测试的机器独占协议（R-003 的 R136 实例闭环）
+    finding: R136 旧 Parser 批（r136-parser-a，短槽）两红根因 2026-10-26 闭环：该批完成时间 13:09:44 仅比 468 测试扩展批 r136-final-a（13:09:05 完成）晚 39 秒，两批并行十余分钟违反"全量须独占机器"协议；两失败形态均为深水区超时（59.7s 后评估未完成 test:167 / 首个 live 查询约 19s 状态断言失败 test:209），与 parser 子进程 8s 墙钟预算被并发负载吃爆一致；子进程数 35（正常 47）因两测试提前中止自洽；r136p2（10-25 隔离）与 fvr-p1（10-26 隔离）同目标集 27/27 全绿。预算护栏按 §8 禁放宽保留，旧回执不重写
+    impact: low
+    likelihood: medium
+    priority: low
+    owner: engineering
+    compensating_control: 独占协议已在跨会话备忘（全量须独占机器+关模拟器）；根因证据链与时间线差分见 p2-closeout-2026-10-26；r136-parser-a 原回执保留
+    reassess_trigger: 并行/连续密集批处理执行前重读本条；再现深水区超时形态时先核当期机器负载与并行任务
+    status: root-caused-procedural
+
+  - id: R-022
+    asset: 仓库静态安全扫描信号（Mimosa 等）与冻结测试源码
+    finding: 2026-10-26 提交时 Mimosa 钩子对既有 apps/api/tests/test_vehicle_binary_migration.py 报 12 处 high 级 SQL 注入模式匹配（如 :241 `'SELECT * FROM ' + quoted(name)`）；该文件为合成夹具迁移测试，name 取自测试自建夹具库的 sqlite_schema 自省而非外部输入，属模式扫描典型误报形态；本轮未做正式安全裁决，高频误报会稀释真实信号
+    impact: low
+    likelihood: n/a
+    priority: low
+    owner: engineering
+    compensating_control: 已在 full-review-2026-10-26 披露并抽查定性；不改写冻结测试迎合扫描；后续提交继续如实转述扫描输出
+    reassess_trigger: 用户授权正式深度安全扫描时裁决；或 quoted() 实现变更/该测试改接真实外部输入时重评
+    status: open-accepted
