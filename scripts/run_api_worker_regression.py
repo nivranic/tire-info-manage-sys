@@ -357,6 +357,7 @@ def bootstrap(out: Path, actual_dir: Path | None) -> dict:
         'R78_TEST_STORAGE_ROOT': str(private), 'R79_TEST_STORAGE_ROOT': str(private),
         'R80_TEST_STORAGE_ROOT': str(private),
         'R119_TEST_STORAGE_ROOT': str(private / 'r119'),
+        'TIRE_TEST_SCRATCH_ROOT': str(private / 'scratch'),
         'PYTHONPATH': os.pathsep.join(str(ROOT / p) for p in
                                     ('apps/api', 'apps/api/tests', 'apps/worker', 'scripts')),
     }

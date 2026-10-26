@@ -9,6 +9,7 @@ from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import threading
@@ -49,6 +50,11 @@ from tire_api.vehicles import VehicleManufacturer, VehicleModel
 from tire_api.webhook_delivery import seal
 
 TEST_ROOT = Path(__file__).resolve().parents[3] / '.artifacts/fact-reader-verification-20261021/t'
+
+
+def scratch_root():
+    """Managed batches confine scratch databases to the private slot."""
+    return Path(os.environ.get('TIRE_TEST_SCRATCH_ROOT') or TEST_ROOT)
 PASSWORD = 'Synthetic-reader-password-2026'
 SOURCE = 'synthetic-reader-source'
 QUERY = {'model': 'Synthetic Reader Tire'}
@@ -114,7 +120,7 @@ class Registry:
 
 class OwnedFactReaderTests(unittest.TestCase):
     def setUp(self):
-        self.directory = TEST_ROOT / uuid4().hex
+        self.directory = scratch_root() / uuid4().hex
         self.directory.mkdir(parents=True, exist_ok=False)
         self.addCleanup(lambda: shutil.rmtree(self.directory) if self.directory.exists() else None)
         self.engine = create_engine('sqlite:///' + (self.directory / 'reader.sqlite').as_posix(),

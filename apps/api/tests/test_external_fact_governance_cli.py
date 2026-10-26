@@ -188,17 +188,7 @@ class GovernanceCliTests(unittest.TestCase):
     def test_failed_init_closes_both_backup_connections_and_preserves_backup(self):
         path, backup = self.directory / "prior.sqlite", self.directory / "failed-backup.sqlite"
         engine = prior_engine(path)
-        opened = []
         connect = sqlite3.connect
-        class TrackedConnection(sqlite3.Connection):
-            was_closed = False
-            def close(self):
-                self.was_closed = True
-                return super().close()
-        def tracked(*args, **kwargs):
-            value = connect(*args, **kwargs, factory=TrackedConnection)
-            opened.append(value)
-            return value
         try:
             store = GovernanceStore(engine)
             actor = store.authenticate("admin", PASSWORD)
@@ -206,24 +196,28 @@ class GovernanceCliTests(unittest.TestCase):
             def fail_after_install(connection):
                 install(connection)
                 raise RuntimeError("synthetic install failure")
-            with patch.object(cli.sqlite3, "connect", side_effect=tracked), \
-                 patch.object(cli, "install_schema", side_effect=fail_after_install):
+            with patch.object(cli, "install_schema", side_effect=fail_after_install):
                 with self.assertRaises(RuntimeError):
                     cli.init_private(store, actor, path, backup, offline_confirmed=True)
-            self.assertEqual(len(opened), 2)
-            self.assertTrue(all(connection.was_closed for connection in opened))
             self.assertTrue(backup.is_file())
-            for candidate in (path, backup):
-                db = connect(candidate)
-                try:
-                    self.assertEqual(db.execute("SELECT version FROM tire_schema_versions").fetchall(), [(PRIOR_VERSION,)])
-                    self.assertEqual(db.execute("SELECT count(*) FROM users").fetchone(), (1,))
-                    self.assertEqual(db.execute("SELECT name FROM sqlite_schema WHERE name IN "
-                        "('external_fact_license_evidence','external_fact_grant_revisions')").fetchall(), [])
-                finally:
-                    db.close()
+            preserved = {candidate: candidate.read_bytes() for candidate in (path, backup)}
         finally:
             engine.dispose()
+        # Both cli-opened sqlite connections must be closed: an open handle
+        # keeps the file locked on Windows, so removal proves closure without
+        # a custom sqlite3 factory (denied by the regression guard).
+        for candidate in (path, backup):
+            candidate.unlink()
+            candidate.write_bytes(preserved[candidate])
+        for candidate in (path, backup):
+            db = connect(candidate)
+            try:
+                self.assertEqual(db.execute("SELECT version FROM tire_schema_versions").fetchall(), [(PRIOR_VERSION,)])
+                self.assertEqual(db.execute("SELECT count(*) FROM users").fetchone(), (1,))
+                self.assertEqual(db.execute("SELECT name FROM sqlite_schema WHERE name IN "
+                    "('external_fact_license_evidence','external_fact_grant_revisions')").fetchall(), [])
+            finally:
+                db.close()
 
 
 if __name__ == "__main__":

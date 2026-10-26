@@ -5,6 +5,7 @@ The five fixed fixtures are read unchanged; custom-table and missing006 variants
 are made only after load_private_023 has completed its original full validation.
 """
 from copy import deepcopy
+import os
 from pathlib import Path
 import re
 import shutil
@@ -27,6 +28,11 @@ from vehicle_binary_fixture import (
 )
 
 TEST_ROOT = Path(__file__).resolve().parents[3] / '.artifacts/legacy024-isolation-20261021/t'
+
+
+def scratch_root():
+    """Managed batches confine scratch databases to the private slot."""
+    return Path(os.environ.get('TIRE_TEST_SCRATCH_ROOT') or TEST_ROOT)
 VERSION_006 = '006_source_settings'
 VERSION_025 = '025_external_fact_governance'
 VERSION_026 = '026_query_ownership'
@@ -86,7 +92,7 @@ class Legacy024IsolationTests(unittest.TestCase):
             Base.metadata.remove(self.future)
 
     def fixture(self):
-        directory = TEST_ROOT / uuid4().hex
+        directory = scratch_root() / uuid4().hex
         self.addCleanup(lambda: shutil.rmtree(directory) if directory.exists() else None)
         private = load_private_023(directory)
         engine = create_engine('sqlite:///' + private.database.as_posix(), connect_args={'timeout': 30})
