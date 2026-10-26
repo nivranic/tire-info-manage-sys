@@ -75,7 +75,7 @@ def native_028(connection):
 def prior(predecessor_026):
     with predecessor_026.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_ai_pricing=False)
+        upgrade(connection, include_source_page_url_moves=False, include_ai_pricing=False)
         connection.exec_driver_sql("INSERT INTO test_event_golden_cases(id,event_id,created_at) "
             "VALUES ('prior-027-case','prior-event','2026-01-01 00:00:00')")
         versions = connection.exec_driver_sql('SELECT version FROM tire_schema_versions ORDER BY version').scalars().all()
@@ -100,7 +100,7 @@ def test_027_to_028_adds_only_price_table_index_guards_version_and_is_idempotent
         before_objects, before_rows = state(connection)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_page_monitoring=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_page_monitoring=False)
     with prior.connect() as connection:
         native_028(connection)
         after_objects, after_rows = state(connection)
@@ -113,7 +113,7 @@ def test_027_to_028_adds_only_price_table_index_guards_version_and_is_idempotent
                                      if table == 'tire_schema_versions' else rows)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_page_monitoring=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_page_monitoring=False)
     with prior.connect() as connection:
         assert state(connection) == (after_objects, after_rows)
 
@@ -124,7 +124,7 @@ def test_historical_migration_isolation_flags_do_not_append_028(prior, flag):
         before = state(connection)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, **{flag: False})
+        upgrade(connection, include_source_page_url_moves=False, **{flag: False})
     with prior.connect() as connection:
         assert state(connection) == before
 
@@ -144,7 +144,7 @@ def test_028_version_ledger_failure_rolls_back_every_added_schema_object(prior):
         with pytest.raises(RuntimeError, match='^synthetic-028-ledger-failure$'):
             with prior.begin() as connection:
                 connection.exec_driver_sql('BEGIN IMMEDIATE')
-                upgrade(connection, include_source_page_monitoring=False)
+                upgrade(connection, include_source_page_url_moves=False, include_source_page_monitoring=False)
     finally:
         event.remove(prior, 'before_cursor_execute', fail)
     assert reached == [True]
@@ -156,7 +156,7 @@ def test_native_guards_reject_update_delete_and_replace_by_each_unique_identity(
     row = price_row()
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_page_monitoring=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_page_monitoring=False)
         connection.execute(insert(AIPriceVersion).values(**row))
     with prior.connect() as connection:
         before = state(connection)
@@ -183,7 +183,7 @@ def test_orm_guards_preserve_existing_price_version(prior, action):
     values = price_row()
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_page_monitoring=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_page_monitoring=False)
         connection.execute(insert(AIPriceVersion).values(**values))
     with Session(prior) as db:
         row = db.get(AIPriceVersion, values['id'])

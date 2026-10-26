@@ -680,7 +680,7 @@ class QueryOwnershipTests(unittest.TestCase):
         before_objects, before_versions = self.migration_state(engine)
         with engine.begin() as connection:
             connection.exec_driver_sql('BEGIN IMMEDIATE')
-            upgrade(connection, include_test_event_golden=False)
+            upgrade(connection, include_source_page_url_moves=False, include_test_event_golden=False)
         after = self.migration_state(engine)
         self.assertEqual([item for item in after[0] if item[2] != 'query_run_owner_receipts'], before_objects)
         self.assertEqual([item for item in after[1] if item[0] != VERSION], before_versions)
@@ -689,7 +689,7 @@ class QueryOwnershipTests(unittest.TestCase):
             self.assertEqual(connection.exec_driver_sql('SELECT COUNT(*) FROM query_run_owner_receipts').scalar_one(), 0)
         with engine.begin() as connection:
             connection.exec_driver_sql('BEGIN IMMEDIATE')
-            upgrade(connection, include_test_event_golden=False)
+            upgrade(connection, include_source_page_url_moves=False, include_test_event_golden=False)
         self.assertEqual(self.migration_state(engine), after)
 
     def test_real_026_version_insert_failure_rolls_back_all_new_ddl_and_ledger(self):
@@ -703,7 +703,7 @@ class QueryOwnershipTests(unittest.TestCase):
         try:
             with self.assertRaisesRegex(RuntimeError, '^synthetic 026 ledger failure$'), engine.begin() as connection:
                 connection.exec_driver_sql('BEGIN IMMEDIATE')
-                upgrade(connection, include_test_event_golden=False)
+                upgrade(connection, include_source_page_url_moves=False, include_test_event_golden=False)
         finally:
             event.remove(engine, 'before_cursor_execute', fail)
         self.assertEqual(self.migration_state(engine), before)

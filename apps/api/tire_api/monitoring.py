@@ -37,7 +37,7 @@ def guard_claim(db: Session, claim: dict) -> None:
     assert_source_access(db, job.source_id, generation)
 
 
-Kind = Literal["facts_changed", "variant_observed", "page_changed"]
+Kind = Literal["facts_changed", "variant_observed", "page_changed", "url_moved"]
 FieldName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,79}$")]
 
 
@@ -103,6 +103,8 @@ class RuleSettings(StrictModel):
     def page_scope(self):
         if 'page_changed' in self.kinds and (self.kinds != ['page_changed'] or self.fields or self.conditions):
             raise ValueError('来源原文变化必须独立监控，不能同时设置规格类型、字段或技术条件')
+        if 'url_moved' in self.kinds and (self.kinds != ['url_moved'] or self.fields or self.conditions):
+            raise ValueError('来源地址迁移必须独立监控，不能同时设置规格类型、字段或技术条件')
         return self
 
 
@@ -115,6 +117,8 @@ class RuleCreate(RuleSettings):
     def page_has_no_sku(self):
         if self.kinds == ['page_changed'] and self.variant_id is not None:
             raise ValueError('来源原文变化针对固定来源查询，不接受精确 SKU 条件')
+        if self.kinds == ['url_moved'] and self.variant_id is not None:
+            raise ValueError('来源地址迁移针对固定来源查询，不接受精确 SKU 条件')
         return self
 
 
@@ -304,6 +308,8 @@ def validate_rule_target(db: Session, registry, payload: RuleCreate) -> tuple[di
         raise HTTPException(422, "请选择已接入的轮胎来源")
     if payload.kinds == ['page_changed'] and source.get('target_kind') not in (None, 'tire'):
         raise HTTPException(422, "来源原文变化当前仅支持已登记的轮胎来源")
+    if payload.kinds == ['url_moved'] and source.get('target_kind') not in (None, 'tire'):
+        raise HTTPException(422, "来源地址迁移当前仅支持已登记的轮胎来源")
     query = payload.query.canonical()
     if not query.get("model") or (source.get("supported_models") is not None and query["model"] not in source["supported_models"]):
         raise HTTPException(422, "请选择此来源已接入的型号")
@@ -379,6 +385,8 @@ def register_monitoring_routes(app: FastAPI) -> None:
             raise HTTPException(409, "请先恢复已归档规则")
         if (before.kinds == ['page_changed']) != (payload.kinds == ['page_changed']):
             raise HTTPException(422, '来源原文监控与规格监控不能互换，请新建另一规则')
+        if (before.kinds == ['url_moved']) != (payload.kinds == ['url_moved']):
+            raise HTTPException(422, '来源地址迁移监控与规格监控不能互换，请新建另一规则')
         settings = payload.model_dump(exclude={"expected_revision"})
         if "conditions" not in payload.model_fields_set:
             settings["conditions"] = before.conditions or {}
@@ -458,3 +466,5 @@ def register_monitoring_routes(app: FastAPI) -> None:
 
     from .source_page_monitoring import register_source_page_routes
     register_source_page_routes(app)
+    from .source_page_url_monitoring import register_source_page_url_routes
+    register_source_page_url_routes(app)

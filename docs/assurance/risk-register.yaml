@@ -2,10 +2,11 @@
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r82+fullreview-2026-10-26
+register_version: r82+fullreview-2026-10-26+urlmove032
 updated: 2026-10-26
 # 2026-10-26 增量同步：R-001..R-019 保持 r82 原文未动（按 AGENT-HANDOFF-2026-10-26 §6，
 # 旧条目关闭须逐项对后续轮报告核验，不做整表关闭）；本轮仅追加 R-020..R-022 三条有直接证据的新条目。
+# 2026-10-26 URL迁移切片增量：追加 R-023（里程碑触发器契约漂移，root-caused-mitigated）。
 
 risks:
   - id: R-001
@@ -239,3 +240,13 @@ risks:
     compensating_control: 已在 full-review-2026-10-26 披露并抽查定性；2026-10-26 复核补充：quoted()（vehicle_binary_fixture.py:47-48）为标准 SQLite 标识符转义（双引号翻倍），全部输入来自测试自建夹具库的 sqlite_schema 自省，无外部输入面，判定为转义正确的模式误报；不改写冻结测试迎合扫描；后续提交继续如实转述扫描输出
     reassess_trigger: 用户授权正式深度安全扫描时裁决；或 quoted() 实现变更/该测试改接真实外部输入时重评
     status: open-accepted
+  - id: R-023
+    asset: 迁移里程碑测试的触发器契约（tests/historical_migration_support.py）与受管批次覆盖
+    finding: 2026-10-26 URL迁移切片实证（git worktree 独立检出 HEAD 1416ece）：迁移 029/030/031 引入 after_create 触发器家族后未同步 _TRIGGER_CONTRACT，导致 5 个里程碑测试（ai_stream/012/013）在 HEAD 即红；受管 runner 默认清单虽含这些文件，但 R136 后的复核批全部使用显式目标列表恰好绕开它们，本地迭代亦只跑当轮文件——三层验证均未触达，潜伏约 2 轮
+    impact: medium
+    likelihood: n/a
+    priority: medium
+    owner: engineering
+    compensating_control: 已根因修复：契约补 9 表（含通知式五元组新风格）并全量回归 22 文件 463 过；证据 url-move-032-2026-10-26.md §4；新测试文件须登记 TEST_MODULES（manifest 防漂已按设计拦截本切片一次）
+    reassess_trigger: 下一次新增 after_create 守卫迁移时核对契约同步；或再次出现显式目标列表替代默认清单的全量声明时重评覆盖面
+    status: root-caused-mitigated

@@ -18,7 +18,7 @@ COLUMNS = ('request_id', 'request_fingerprint', 'actor_user_id', 'actor_session_
 def prior(predecessor_029):
     with predecessor_029.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_material_stops=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_material_stops=False)
         assert connection.exec_driver_sql('SELECT version FROM tire_schema_versions ORDER BY version').scalars().all() == EXPECTED_SCHEMA_VERSIONS[:30]
         for statement in (
             '''CREATE TABLE evidence_objects (raw_hash VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -80,7 +80,7 @@ def test_030_to_031_adds_only_stop_ledger_and_keeps_all_old_ddl_rows_and_json_by
         receipt_bytes = connection.exec_driver_sql('SELECT CAST(receipt AS BLOB),CAST(fingerprint AS BLOB) FROM source_material_outcomes ORDER BY request_id').all()
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection)
+        upgrade(connection, include_source_page_url_moves=False)
     with prior.connect() as connection:
         after_objects, after_rows = state(connection)
         assert TABLE in after_rows, '031 must create the independent stop ledger'
@@ -102,7 +102,7 @@ def test_030_to_031_adds_only_stop_ledger_and_keeps_all_old_ddl_rows_and_json_by
     assert after_rows[TABLE] == []
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection)
+        upgrade(connection, include_source_page_url_moves=False)
     with prior.connect() as connection:
         assert state(connection) == (after_objects, after_rows)
 
@@ -122,7 +122,7 @@ def test_031_ledger_failure_rolls_back_table_index_and_guards_without_old_row_dr
         with pytest.raises(RuntimeError, match='^synthetic-031-ledger-failure$'):
             with prior.begin() as connection:
                 connection.exec_driver_sql('BEGIN IMMEDIATE')
-                upgrade(connection)
+                upgrade(connection, include_source_page_url_moves=False)
     finally:
         event.remove(prior, 'before_cursor_execute', fail)
     assert reached == [True]

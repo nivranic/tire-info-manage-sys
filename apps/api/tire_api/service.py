@@ -452,6 +452,8 @@ class QueryService:
         self.db.flush()
         from .source_page_monitoring import append_page_change
         append_page_change(self.db, verification, previous_verification)
+        from .source_page_url_monitoring import append_url_move
+        append_url_move(self.db, verification, previous_verification)
         from .interest_events import publish
         for change in pending_facts:
             if isinstance(change, ChangeEvent):

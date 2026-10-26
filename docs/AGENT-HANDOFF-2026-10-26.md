@@ -77,6 +77,8 @@ R136的 `stopped_unconfirmed` **仍表示网络结果未知**。`completed_at`�
 
 > **2026-10-26 P2 更新**：下述第一、二条已由当日 P2 闭环处理——旧 Parser 两红根因定位为验收当日与扩展批并行违反独占协议的负载误伤（非代码缺陷，预算护栏保留）；扩展 guard 导入探针已根除（测试延迟导入 + runner bootstrap 预热），扩展批 `fvr-ex2` 首次严格绿（468/468 + exit 0 + 零拒绝）。证据见 [P2 闭环](assurance/evidence/p2-closeout-2026-10-26.md) 与 [全项目复核](assurance/evidence/full-review-2026-10-26.md)；旧回执全部原样保留。其余各条继续有效。
 
+> **2026-10-26 P2 二次更新（URL迁移事件切片，迁移032）**：剩余监控域推进——`url_moved` 事件全链路落地（模型+守卫+迁移032+监控/通知路由+service 挂载+16 测试），配套族 22 文件 463 过 0 败；同轮实证并修复 **HEAD 潜伏红**（迁移 029/030/031 的 after_create 守卫未同步 `_TRIGGER_CONTRACT`，ai_stream/012/013 共 5 测试在 HEAD 即红，因复核批显式目标列表绕开里程碑文件而潜伏两轮，风险 R-023）；受管正式批槽 `url032-r1`（12 模块）。证据见 [URL迁移切片报告](assurance/evidence/url-move-032-2026-10-26.md)。出界项：Web UI 集成、Worker 长周期真实观察、解析失败/隔离观察语义、来源特定噪声策略；性能C/真实账单/语义重排仍受阻于凭据与网络。
+
 - R136扩展11模块468个pytest均通过，但runner因被阻止的urllib3 IPv6导入探针 **exit3／passed:false**，不能称全量绿、预导入绕门或忽略raw拒绝。
 - 旧Parser批两项断言失败根因未定位。新完整27／27不证明旧故障已根治，也不能套用R135的长路径解释。
 - 首两UI失败、c批截图拍错区域的REQUEST_CHANGES、首资源观察failed均保留；最终d是独立完整批，不能拼接旧结果。

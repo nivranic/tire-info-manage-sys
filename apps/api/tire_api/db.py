@@ -518,6 +518,7 @@ class Database:
         from . import test_events  # noqa: F401
         from . import test_sku_link_models  # noqa: F401
         from . import source_material_models  # noqa: F401
+        from . import source_page_url_models  # noqa: F401
         from . import candidate_ai_models  # noqa: F401
         from . import webhook_models  # noqa: F401
         from . import external_api_models  # noqa: F401

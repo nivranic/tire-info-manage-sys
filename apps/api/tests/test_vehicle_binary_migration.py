@@ -46,6 +46,7 @@ VERSION_028 = '028_ai_price_versions'
 VERSION_029 = '029_source_page_monitoring'
 VERSION_030 = '030_interest_source_quality'
 VERSION_031 = '031_source_material_stops'
+VERSION_032 = '032_source_page_url_moves'
 TABLES_025 = {'external_fact_license_evidence', 'external_fact_grant_revisions'}
 TABLES_026 = {'query_run_owner_receipts'}
 TABLES_027 = {'test_event_golden_cases', 'test_event_golden_case_revisions',
@@ -53,7 +54,8 @@ TABLES_027 = {'test_event_golden_cases', 'test_event_golden_case_revisions',
 TABLES_028 = {'ai_price_versions'}
 TABLES_029 = {'source_page_changes', 'source_page_notifications'}
 TABLES_031 = {'source_material_stops'}
-CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031
+TABLES_032 = {'source_page_url_moves', 'source_page_url_move_notifications'}
+CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032
 
 
 @pytest.fixture
@@ -404,7 +406,7 @@ def test_new_application_preflight_rejects_view_only_owned_name_without_ddl(tmp_
 def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False):
     """025-029/031 add tables; previously omitted 030 only appends an interest bool."""
     after = inventory(connection)
-    added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031]
+    added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032]
     assert after['versions'] == before['versions'] + added_versions == EXPECTED_SCHEMA_VERSIONS
     assert set(after['tables']) == set(before['tables']) | CURRENT_TAIL_TABLES
     # 030's exact single-column DDL change is checked separately, with every
@@ -428,7 +430,7 @@ def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False
         if table == 'tire_schema_versions':
             assert after['tables'][table]['columns'] == expected['columns']
             assert after['tables'][table]['foreign_keys'] == expected['foreign_keys']
-            where = " WHERE version NOT IN ('025_external_fact_governance','026_query_ownership','027_test_event_golden','028_ai_price_versions','029_source_page_monitoring','030_interest_source_quality','031_source_material_stops')"
+            where = " WHERE version NOT IN ('025_external_fact_governance','026_query_ownership','027_test_event_golden','028_ai_price_versions','029_source_page_monitoring','030_interest_source_quality','031_source_material_stops','032_source_page_url_moves')"
             if backfill_024:
                 where += " AND version != '024_vehicle_binary_raw'"
             assert rows_digest(connection, table, where=where) == {

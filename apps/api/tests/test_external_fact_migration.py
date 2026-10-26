@@ -107,7 +107,7 @@ class ExternalFactMigrationTests(unittest.TestCase):
     def test_025_to_current_upgrade_is_exactly_additive_and_repeat_is_idempotent(self):
         with self.engine.begin() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
-            upgrade(connection, include_test_event_golden=False)
+            upgrade(connection, include_source_page_url_moves=False, include_test_event_golden=False)
         with self.engine.connect() as connection:
             after = state(connection)
             assert_025_native_schema(connection)
@@ -122,7 +122,7 @@ class ExternalFactMigrationTests(unittest.TestCase):
         self.assertTrue(all(after["rows"][table] == [] for table in CURRENT_TAIL_TABLES))
         with self.engine.begin() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
-            upgrade(connection, include_test_event_golden=False)
+            upgrade(connection, include_source_page_url_moves=False, include_test_event_golden=False)
         with self.engine.connect() as connection:
             self.assertEqual(state(connection), after)
 
@@ -140,7 +140,7 @@ class ExternalFactMigrationTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "^synthetic-025-before-version$"):
                 with self.engine.begin() as connection:
                     connection.exec_driver_sql("BEGIN IMMEDIATE")
-                    upgrade(connection, include_test_event_golden=False)
+                    upgrade(connection, include_source_page_url_moves=False, include_test_event_golden=False)
         finally:
             event.remove(self.engine, "before_cursor_execute", fail_before_version)
         self.assertEqual(reached, [True])

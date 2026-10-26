@@ -27,7 +27,7 @@ def prior(predecessor_028):
         # The ordinary entrypoint always checks the earlier vehicle-binary
         # physical shape. Reuse its independent historical prerequisite fixture,
         # rather than disabling that guard or fabricating a ledger-only full DB.
-        upgrade(connection, include_source_quality_interests=False, include_source_material_stops=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_quality_interests=False, include_source_material_stops=False)
         native_029(connection)
         for statement in (
             '''CREATE TABLE interests (id VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -85,7 +85,7 @@ def test_029_to_030_only_appends_false_column_and_ledger_preserving_old_rows(pri
             'CAST(changed_fields AS BLOB),CAST(fingerprint AS BLOB),CAST(name AS BLOB) FROM interest_revisions').one())
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_material_stops=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_material_stops=False)
     with prior.connect() as connection:
         after_objects, after_rows = state(connection)
         columns = [tuple(row) for row in connection.exec_driver_sql('PRAGMA table_info(interest_revisions)')]
@@ -106,7 +106,7 @@ def test_029_to_030_only_appends_false_column_and_ledger_preserving_old_rows(pri
         assert after_rows[table] == expected
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_material_stops=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_material_stops=False)
     with prior.connect() as connection:
         assert state(connection) == (after_objects, after_rows)
 
@@ -127,7 +127,7 @@ def test_030_ledger_failure_rolls_back_the_new_column_and_preserves_all_old_obje
         with pytest.raises(RuntimeError, match='^synthetic-030-ledger-failure$'):
             with prior.begin() as connection:
                 connection.exec_driver_sql('BEGIN IMMEDIATE')
-                upgrade(connection, include_source_material_stops=False)
+                upgrade(connection, include_source_page_url_moves=False, include_source_material_stops=False)
     finally:
         event.remove(prior, 'before_cursor_execute', fail)
     assert reached == [True]

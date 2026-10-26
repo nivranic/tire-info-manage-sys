@@ -13,7 +13,9 @@ from sqlalchemy import event, inspect, text
 from version_registry import EXPECTED_SCHEMA_VERSIONS
 
 
-# Fixed review contract for 013, 019-023 and 025-026. These declarations are test-owned,
+# Fixed review contract for 013, 019-023 and 025-026, plus every later additive
+# guard family (through 032) that milestone predecessors already build via
+# create_all on current shapes. These declarations are test-owned,
 # including exact conflict predicates and failure policies, not product outputs.
 _TRIGGER_CONTRACT = {
     'device_ai_preparations': ('device', 'FAIL', 'device_ai_ledger_immutable',
@@ -62,7 +64,33 @@ _TRIGGER_CONTRACT = {
         ' OR audit_event_id = NEW.audit_event_id'),
     'query_run_owner_receipts': ('after_create', 'FAIL', 'query_owner_immutable',
         'query_id = NEW.query_id OR audit_event_id = NEW.audit_event_id'),
+    # Later additive families: milestone predecessors build current table shapes, so
+    # their create-time guards are part of every frozen before-state. Notification
+    # tables use the 'notification' style: updates may only touch read_at.
+    'ai_price_versions': ('after_create', 'FAIL', 'ai_price_version_immutable',
+        'id = NEW.id OR (actor_user_id = NEW.actor_user_id AND idempotency_key = NEW.idempotency_key)'),
+    'test_event_golden_cases': ('after_create', 'FAIL', 'test_event_golden_immutable', 'id = NEW.id'),
+    'test_event_golden_case_revisions': ('after_create', 'FAIL', 'test_event_golden_immutable',
+        'id = NEW.id OR (case_id = NEW.case_id AND revision = NEW.revision)'
+        ' OR (actor_user_id = NEW.actor_user_id AND idempotency_key = NEW.idempotency_key)'),
+    'test_event_golden_case_reviews': ('after_create', 'FAIL', 'test_event_golden_immutable',
+        'id = NEW.id OR (case_id = NEW.case_id AND revision = NEW.revision)'
+        ' OR (actor_user_id = NEW.actor_user_id AND idempotency_key = NEW.idempotency_key)'),
+    'test_event_golden_set_revisions': ('after_create', 'FAIL', 'test_event_golden_immutable',
+        'id = NEW.id OR (set_id = NEW.set_id AND revision = NEW.revision)'
+        ' OR (actor_user_id = NEW.actor_user_id AND idempotency_key = NEW.idempotency_key)'),
+    'source_page_changes': ('after_create', 'FAIL', 'source_page_history_immutable',
+        'id = NEW.id OR verification_id = NEW.verification_id'),
+    'source_page_notifications': ('after_create', 'FAIL', 'source_page_notification_immutable',
+        'id = NEW.id OR (rule_id = NEW.rule_id AND event_id = NEW.event_id)', 'notification'),
+    'source_page_url_moves': ('after_create', 'FAIL', 'source_page_url_history_immutable',
+        'id = NEW.id OR verification_id = NEW.verification_id'),
+    'source_page_url_move_notifications': ('after_create', 'FAIL', 'source_page_url_notification_immutable',
+        'id = NEW.id OR (rule_id = NEW.rule_id AND event_id = NEW.event_id)', 'notification'),
 }
+
+# Fixed columns of delivery-notification rows; only read_at may ever change.
+NOTIFICATION_FIXED_COLUMNS = ('id', 'rule_id', 'rule_revision_id', 'event_id', 'delivered_at', 'fingerprint')
 
 
 def snapshot_connection(connection):
@@ -123,10 +151,19 @@ def assert_trigger_contract(state, *, device, candidate):
     """Exact independent names, owning tables, actions and immutable predicates."""
     groups = {'after_create'} | ({'device'} if device else set()) | ({'candidate'} if candidate else set())
     expected = {}
-    for table, (group, failure, reason, predicate) in _TRIGGER_CONTRACT.items():
+    for table, contract in _TRIGGER_CONTRACT.items():
+        group, failure, reason, predicate = contract[:4]
         if group not in groups:
             continue
-        for action in ('update', 'delete'):
+        if len(contract) > 4:  # delivery-notification style: read-only update instead of immutability
+            name = table + '_read_only_update'
+            expected[name] = (f'CREATE TRIGGER {name} BEFORE UPDATE ON {table} WHEN '
+                + ' OR '.join(f'NEW.{column} IS NOT OLD.{column}' for column in NOTIFICATION_FIXED_COLUMNS)
+                + f" BEGIN SELECT RAISE({failure}, '{reason}'); END")
+            actions = ('delete',)
+        else:
+            actions = ('update', 'delete')
+        for action in actions:
             name = f'{table}_no_{action}'
             expected[name] = (f'CREATE TRIGGER {name} BEFORE {action.upper()} ON {table} '
                               f"BEGIN SELECT RAISE({failure}, '{reason}'); END")

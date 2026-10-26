@@ -107,6 +107,14 @@ def checked_event(row, context, *, content=False):
         invalid()
 
 
+def latest_previous_verification_id(db, verification):
+    """The adjacent prior successful observation for the same source and query."""
+    return db.scalar(select(Verification.id).where(
+        Verification.source_id == verification.source_id, Verification.query_key == verification.query_key,
+        Verification.status.in_(['ok', 'not_modified']), Verification.id != verification.id)
+        .order_by(desc(Verification.verified_at), desc(Verification.id)).limit(1))
+
+
 def append_page_change(db, verification, previous):
     """Caller owns ingestion lock and commit. Existing events are never re-evaluated."""
     existing = db.scalar(select(SourcePageChange).where(SourcePageChange.verification_id == verification.id))
@@ -115,11 +123,7 @@ def append_page_change(db, verification, previous):
         return existing
     if verification.status != 'ok' or previous is None:
         return None
-    latest_previous = db.scalar(select(Verification.id).where(
-        Verification.source_id == verification.source_id, Verification.query_key == verification.query_key,
-        Verification.status.in_(['ok', 'not_modified']), Verification.id != verification.id)
-        .order_by(desc(Verification.verified_at), desc(Verification.id)).limit(1))
-    if latest_previous != previous.id:
+    if latest_previous_verification_id(db, verification) != previous.id:
         invalid()
     after, before = db.get(Snapshot, verification.snapshot_id), db.get(Snapshot, previous.snapshot_id)
     if after is None or before is None:

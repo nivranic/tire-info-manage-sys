@@ -188,6 +188,7 @@ TEST_MODULES = (
     'apps/api/tests/test_source_material_stop_migration.py',
     'apps/api/tests/test_source_page_migration.py',
     'apps/api/tests/test_source_page_monitoring.py',
+    'apps/api/tests/test_source_page_url_moves.py',
     'apps/api/tests/test_source_quality_interest_migration.py',
     'apps/api/tests/test_source_quality_interests.py',
     'apps/api/tests/test_source_settings.py',

@@ -150,7 +150,7 @@ def test_026_to_027_adds_only_four_tables_guards_and_version_preserving_legacy_r
         before_objects, before_rows = state(connection)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_ai_pricing=False)
+        upgrade(connection, include_source_page_url_moves=False, include_ai_pricing=False)
     with prior.connect() as connection:
         native_027(connection)
         after_objects, after_rows = state(connection)
@@ -163,7 +163,7 @@ def test_026_to_027_adds_only_four_tables_guards_and_version_preserving_legacy_r
                                      if table == 'tire_schema_versions' else rows)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_ai_pricing=False)
+        upgrade(connection, include_source_page_url_moves=False, include_ai_pricing=False)
     with prior.connect() as connection:
         assert state(connection) == (after_objects, after_rows)
 
@@ -183,7 +183,7 @@ def test_version_ledger_failure_rolls_back_every_027_schema_object(prior):
         with pytest.raises(RuntimeError, match='^synthetic-027-version-failure$'):
             with prior.begin() as connection:
                 connection.exec_driver_sql('BEGIN IMMEDIATE')
-                upgrade(connection, include_ai_pricing=False)
+                upgrade(connection, include_source_page_url_moves=False, include_ai_pricing=False)
     finally:
         event.remove(prior, 'before_cursor_execute', fail)
     assert reached == [True]
@@ -195,7 +195,7 @@ def test_version_ledger_failure_rolls_back_every_027_schema_object(prior):
 def test_all_four_tables_reject_sql_update_delete_and_replace(prior):
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_ai_pricing=False)
+        upgrade(connection, include_source_page_url_moves=False, include_ai_pricing=False)
         connection.execute(insert(TestEventGoldenCase).values(
             id='synthetic-case', event_id='prior-event'))
         connection.execute(insert(TestEventGoldenCaseRevision).values(

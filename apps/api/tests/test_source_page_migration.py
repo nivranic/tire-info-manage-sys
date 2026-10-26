@@ -118,7 +118,7 @@ def legacy_monitor_bytes(connection):
 def prior(predecessor_027):
     with predecessor_027.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_page_monitoring=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_page_monitoring=False)
         native_028(connection)
         connection.execute(insert(AIPriceVersion).values(**price_row(id='prior-028-price')))
         historical_028_monitoring(connection)
@@ -178,7 +178,7 @@ def test_028_to_029_adds_only_two_tables_guards_indexes_and_ledger(prior):
             'ix_monitor_jobs_next_due_at', 'ix_alert_rules_job_id', 'ix_alert_rule_revisions_rule_id'}
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_quality_interests=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_quality_interests=False)
     with prior.connect() as connection:
         native_029(connection)
         after_objects, after_rows = state(connection)
@@ -193,7 +193,7 @@ def test_028_to_029_adds_only_two_tables_guards_indexes_and_ledger(prior):
                                     if table == 'tire_schema_versions' else values)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, include_source_quality_interests=False)
+        upgrade(connection, include_source_page_url_moves=False, include_source_quality_interests=False)
     with prior.connect() as connection:
         assert state(connection) == (after_objects, after_rows)
         assert legacy_monitor_bytes(connection) == before_monitor_bytes
@@ -206,7 +206,7 @@ def test_historical_isolation_flags_do_not_append_029(prior, flag):
         before = state(connection)
     with prior.begin() as connection:
         connection.exec_driver_sql('BEGIN IMMEDIATE')
-        upgrade(connection, **{flag: False})
+        upgrade(connection, include_source_page_url_moves=False, **{flag: False})
     with prior.connect() as connection:
         assert state(connection) == before
 
@@ -226,7 +226,7 @@ def test_029_ledger_failure_rolls_back_all_added_objects(prior):
         with pytest.raises(RuntimeError, match='^synthetic-029-ledger-failure$'):
             with prior.begin() as connection:
                 connection.exec_driver_sql('BEGIN IMMEDIATE')
-                upgrade(connection, include_source_quality_interests=False)
+                upgrade(connection, include_source_page_url_moves=False, include_source_quality_interests=False)
     finally:
         event.remove(prior, 'before_cursor_execute', fail)
     assert reached == [True]
