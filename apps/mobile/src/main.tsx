@@ -5,6 +5,8 @@ import { setApiTransport, tireApi } from "@tire/api-client";
 import { createNativeTransport, externalLink, NativeError, openNativeExternal } from "@tire/native-client";
 import Workbench from "../../web/components/workbench";
 import { OfflineLibraryEntry } from "../../web/components/offline-library";
+import ThemePreferenceControl from "../../web/components/theme-preference-control";
+import { ThemeProvider } from "../../web/components/theme-preferences";
 import { consumeMobileBack } from "./back-navigation";
 import { restoreWorkbenchDialogs, suspendWorkbenchDialogs, type SuspendedWorkbenchDialogs } from "./modal-lifecycle";
 import { MobileDeviceAiEntry } from "./device-ai-panel";
@@ -26,7 +28,6 @@ const platform = {
     return () => { if (workbenchBack === handler) workbenchBack = undefined; };
   },
   onThemeChange(theme: "light" | "dark") {
-    document.documentElement.dataset.mobileTheme = theme;
     void native.setSystemTheme({ theme }).catch(() => { /* Theme chrome does not change request safety or form state. */ });
   },
 };
@@ -63,11 +64,13 @@ function MobileApp() {
   phaseRef.current = phase;
 
   function failConnection(cause: NativeError) {
+    window.dispatchEvent(new Event("tire-session-unavailable"));
     if (workbenchRef.current) suspendedDialogs.current = suspendWorkbenchDialogs(workbenchRef.current, suspendedDialogs.current);
     setError(cause); setPhase("failed");
   }
 
   const checkConnection = useCallback(async (reset = false) => {
+    window.dispatchEvent(new Event("tire-session-unavailable"));
     // A late failure from an earlier connection must not pause this new check or session.
     connectionGeneration += 1;
     connection.current?.abort();
@@ -92,6 +95,7 @@ function MobileApp() {
       if (!current()) return;
       validateMobileStatus(after); setStatus(after);
       connected = true; mountedRef.current = true; setMounted(true); setPhase("ready");
+      window.dispatchEvent(new Event("tire-session-revalidate"));
     } catch (cause) {
       if (current()) { connected = false; failConnection(mobileError(cause)); }
     } finally {
@@ -185,7 +189,7 @@ function MobileApp() {
   function closeSettings() { setConfirmReset(false); setSettingsOpen(false); }
 
   return <div className="mobile-native-root">
-    <header className="mobile-connection-bar" aria-label="移动端连接状态"><span className={`mobile-connection ${phase}`} role="status"><i />{phase === "ready" ? "本机调试已连接" : phase === "connecting" ? "正在检查安全连接…" : "连接未就绪"}</span><OfflineLibraryEntry platform={platform} onlineEnabled={phase === "ready"} /><MobileDeviceAiEntry plugin={native} online={phase === "ready"} platform={platform} /><button type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">连接与会话</button></header>
+    <header className="mobile-connection-bar" aria-label="移动端连接状态"><span className={`mobile-connection ${phase}`} role="status"><i />{phase === "ready" ? "本机调试已连接" : phase === "connecting" ? "正在检查安全连接…" : "连接未就绪"}</span><ThemePreferenceControl /><OfflineLibraryEntry platform={platform} onlineEnabled={phase === "ready"} /><MobileDeviceAiEntry plugin={native} online={phase === "ready"} platform={platform} /><button type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">连接与会话</button></header>
     {linkError ? <div className="mobile-link-error" role="alert"><span>{linkError}</span><button type="button" onClick={() => setLinkError("")}>关闭</button></div> : null}
     {mounted ? <div ref={workbenchRef} className="mobile-workbench" aria-hidden={phase !== "ready"} inert={phase !== "ready"}><Workbench key={workspaceEpoch} platform={platform} pwa={false} /></div> : null}
     {phase !== "ready" ? <main className="mobile-connect-screen"><section aria-labelledby="mobile-connect-title"><span className="eyebrow">LOCAL RESEARCH WORKSPACE</span><h1 id="mobile-connect-title">{phase === "connecting" ? "正在准备移动工作台" : "移动工作台尚未连接"}</h1><p>{mounted ? "当前操作内容已保留，恢复安全连接后可继续核对。不会自动重试写入操作。" : "在移动端核对同一套轮胎参数、来源和历史证据。连接本机调试通道后进入工作台。"}</p>
@@ -202,4 +206,4 @@ function MobileApp() {
   </div>;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><MobileApp /></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><ThemeProvider onThemeChange={platform.onThemeChange}><MobileApp /></ThemeProvider></StrictMode>);

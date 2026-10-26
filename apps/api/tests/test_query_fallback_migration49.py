@@ -1,4 +1,8 @@
-"""Synthetic exact pre-011 additive migration; no normal databases are read."""
+"""Current-shape fixture with a pre-011 ledger; target/full-chain preservation.
+
+This synthetic fixture is not an exact historical DB backup; no normal DB is read.
+Later current after_create and migration triggers are checked by a fixed contract.
+"""
 from datetime import timedelta
 
 import pytest
@@ -12,6 +16,9 @@ from tire_api.main import create_app
 from tire_api.query_fallback_policies import QueryFallbackPolicyRevision, QueryFallbackPreview, QueryFallbackUse
 from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import OLD_VERSIONS, snapshot
+
+from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
+    assert_trigger_contract, initialize_observing_version)
 
 NEW_TABLES = {'query_fallback_previews', 'query_fallback_policy_revisions', 'query_fallback_uses'}
 VERSIONS = [*OLD_VERSIONS, '009_ai_streaming', '010_offline_packs']
@@ -47,16 +54,21 @@ def predecessor(tmp_path, monkeypatch):
 
 def test_three_additive_tables_and_011_preserve_every_predecessor_schema_and_row(predecessor):
     before = snapshot(predecessor)
-    predecessor.initialize()
+    assert_trigger_contract(before, device=False, candidate=False)
+    stage = initialize_observing_version(predecessor, '011_query_fallback_policies')
+    assert_target_delta(before, stage, NEW_TABLES)
+    assert_trigger_contract(stage, device=False, candidate=False)
+    first = snapshot(predecessor)
     predecessor.initialize()
     after = snapshot(predecessor)
+    assert after == first
     assert after['tables'] - before['tables'] == NEW_TABLES and not before['tables'] - after['tables']
-    # 013 adds device-ledger triggers; their DDL is asserted in test_device_ai_migration013.py.
-    assert [row for row in after['schema'] if row[2] in before['tables'] and row[0] != 'trigger'] == before['schema']
+    assert_full_chain_preserved(before, after)
     assert all(before['rows'][table] == after['rows'][table] for table in before['tables'] - {'tire_schema_versions'})
     assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
     assert all(not after['rows'][table] for table in NEW_TABLES)
     with predecessor.engine.connect() as connection:
+        assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(EXPECTED_SCHEMA_VERSIONS)
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
 
 

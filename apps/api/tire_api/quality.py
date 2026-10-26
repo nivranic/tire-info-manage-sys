@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any, Callable, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, load_only
 
@@ -325,6 +325,7 @@ def register_quality_routes(app: FastAPI) -> None:
 
     @app.get("/v1/quarantines/{quarantine_id}")
     def quarantine(quarantine_id: str, request: Request, mode: Literal["history"] = Query(...),
+                   evidence_format: Literal['raw-evidence-v2'] | None = Query(None, alias='format'),
                    db: Session = Depends(get_db)) -> dict:
         row = db.get(SourceQuarantine, quarantine_id)
         if row is None:
@@ -333,15 +334,64 @@ def register_quality_routes(app: FastAPI) -> None:
             row = db.get(RejectedObservation, quarantine_id)
             if row is None:
                 raise HTTPException(404, "未找到隔离证据")
+        from .vehicle_raw import (VehicleOriginalUseNotAllowed, VehicleRawIntegrityError, VehicleUseNotAllowed,
+                                  checked_vehicle_v2_metadata, vehicle_raw_requires_v2)
+        requires_v2 = (isinstance(row, (RejectedObservation, VehicleQuarantine))
+                       and vehicle_raw_requires_v2(db, row))
+        if evidence_format is None and requires_v2:
+            raise HTTPException(409, {'code': 'binary_evidence_format_required'})
+        fields = {}
+        if evidence_format is not None:
+            if (requires_v2 or isinstance(row, VehicleQuarantine)
+                    or isinstance(row, RejectedObservation) and row.target_kind == 'vehicle'):
+                try:
+                    fields = checked_vehicle_v2_metadata(db, row, structured=isinstance(row, VehicleQuarantine))
+                except VehicleRawIntegrityError:
+                    raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+                except (VehicleOriginalUseNotAllowed, VehicleUseNotAllowed) as error:
+                    raise HTTPException(403, {'code': error.code}) from None
+            else:
+                from .captures import checked_text_raw_metadata
+                fields, _ = checked_text_raw_metadata(db, row)
         db.add(AuditEvent(session_id=request.state.session_id, action="quarantine_history_read",
                           query_id=row.query_id, detail={"quarantine_id": row.id, "source_id": row.source_id}))
         db.commit()
         if isinstance(row, RejectedObservation):
             return {**quarantine_metadata(row), "data_state": "local_snapshot", "accepted": False,
-                    "content_type": row.content_type, "body": row.raw_body.decode("utf-8"), "candidates": [],
-                    "quality": None}
+                    "content_type": row.content_type,
+                    "body": fields['body'] if fields else row.raw_body.decode("utf-8"), "candidates": [],
+                    "quality": None, **fields}
         return {**quarantine_metadata(row), "data_state": "local_snapshot", "accepted": False,
-                "content_type": row.content_type, "body": row.body,
+                "content_type": row.content_type, "body": fields['body'] if fields else row.body,
                 "candidates": row.payload["fitments"] if isinstance(row, VehicleQuarantine) else row.candidates,
                 **({"vehicle_payload": row.payload} if isinstance(row, VehicleQuarantine) else {}),
-                "quality": row.quality}
+                "quality": row.quality, **fields}
+
+    @app.get('/v1/quarantines/{quarantine_id}/content')
+    def quarantine_content(quarantine_id: str, request: Request, mode: Literal['history'] = Query(...),
+                           evidence_format: Literal['raw-evidence-v2'] | None = Query(None, alias='format'),
+                           db: Session = Depends(get_db)) -> Response:
+        row = db.get(SourceQuarantine, quarantine_id)
+        if row is None:
+            row = db.get(VehicleQuarantine, quarantine_id)
+        if row is None:
+            row = db.get(RejectedObservation, quarantine_id)
+        if row is None:
+            raise HTTPException(404, '未找到隔离证据')
+        from .vehicle_raw import (VehicleOriginalUseNotAllowed, VehicleRawIntegrityError,
+                                  checked_vehicle_original_bytes, vehicle_raw_requires_v2)
+        if isinstance(row, SourceQuarantine) or not vehicle_raw_requires_v2(db, row):
+            raise HTTPException(409, {'code': 'raw_evidence_content_unavailable'})
+        try:
+            raw = checked_vehicle_original_bytes(db, row)
+        except VehicleRawIntegrityError:
+            raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+        except VehicleOriginalUseNotAllowed as error:
+            raise HTTPException(403, {'code': error.code}) from None
+        db.add(AuditEvent(session_id=request.state.session_id, action='quarantine_evidence_downloaded',
+                          query_id=row.query_id, detail={'quarantine_id': row.id, 'source_id': row.source_id}))
+        db.commit()
+        return Response(raw, media_type='application/pdf', headers={
+            'Content-Disposition': 'attachment; filename="vehicle-evidence.pdf"',
+            'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "sandbox; default-src 'none'", 'X-Evidence-SHA256': row.raw_hash})

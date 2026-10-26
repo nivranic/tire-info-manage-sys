@@ -14,9 +14,11 @@ public final class DownloadJob {
         void result(DownloadJob job, String error);
         void finished(DownloadJob job);
     }
+    public interface Publication { void commit() throws NativeFailure; }
     private final String mime;
     private final byte[] bytes;
     private final Completion completion;
+    private final Publication publication;
     private boolean started, terminal, cancelled, settled, finished;
     private String cancellation;
     private Thread worker;
@@ -25,7 +27,10 @@ public final class DownloadJob {
 
     /** The caller transfers ownership of bytes and must never mutate them afterward. */
     public DownloadJob(String mime, byte[] bytes, Completion completion) {
-        this.mime = mime; this.bytes = bytes; this.completion = completion;
+        this(mime, bytes, completion, () -> { });
+    }
+    public DownloadJob(String mime, byte[] bytes, Completion completion, Publication publication) {
+        this.mime = mime; this.bytes = bytes; this.completion = completion; this.publication = publication;
     }
     public synchronized boolean isFinished() { return finished; }
     private synchronized void check() throws NativeFailure {
@@ -69,6 +74,8 @@ public final class DownloadJob {
         }
         try {
             check(); NativePolicy.download(destination.displayName(), mime); check();
+            // The independent authority gate finishes before Destination.open/provider I/O.
+            publication.commit();
             try (OutputStream opened = destination.open()) {
                 if (opened == null) throw new NativeFailure("DOWNLOAD_WRITE_FAILED");
                 synchronized (this) { output = opened; }

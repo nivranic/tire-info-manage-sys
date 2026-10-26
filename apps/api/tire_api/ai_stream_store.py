@@ -123,8 +123,11 @@ def append_event(database, request_id, owner_token, type, payload):
             if set(payload) != {'text'} or not isinstance(payload['text'], str) or len(payload['text']) > 2000:
                 raise ValueError('invalid_ai_stream_uncertainty')
             from .ai_recall_contract import validate_recall_uncertainty
+            from .ai_test_contract import validate_test_uncertainty
             row = db.get(AIRequest, request_id)
-            validate_recall_uncertainty(payload['text'], db.get(AIEvidencePack, row.pack_id).payload)
+            evidence_payload = db.get(AIEvidencePack, row.pack_id).payload
+            validate_recall_uncertainty(payload['text'], evidence_payload)
+            validate_test_uncertainty(payload['text'], evidence_payload)
             key = 'uncertainty'
         if _append(db, request_id, type, payload, key) is None:
             return False
@@ -188,6 +191,8 @@ def finish_execution(database, request_id, owner_token, *, state, error_code=Non
 def owned_request(db, request_id, session_id):
     from .auth import session_scope
     row = db.get(AIRequest, request_id)
+    from .candidate_ai import reject_candidate_request
+    reject_candidate_request(db, row)
     if (row is None or row.actor_session_id not in session_scope(db, session_id)
             or row.request_contract.get('delivery_mode') != 'stream'
             or row.request_contract.get('purpose') == 'rule_draft'

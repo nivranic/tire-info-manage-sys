@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { GoldenCase, GoldenCaseSummary, GoldenCaseCreate, GoldenCaseEdit, GoldenCaseRef,
   GoldenCaseReviewRequest, GoldenExpected, GoldenKind, GoldenSet, GoldenSetCreate, GoldenSetRevision,
-  ParserPage, RawCaptureEvidence, RawCaptureRecord, ReparseSummary, Source } from "@tire/domain-types";
+  ParserPage, RawCaptureRecord, ReparseSummary, Source } from "@tire/domain-types";
 import { DataTree } from "./reparse-review";
+import { RawEvidenceV2View, useRawEvidenceV2 } from "./raw-evidence-v2";
+import { assertRawEvidenceInput } from "./raw-evidence-v2-context";
 
 const stamp = (value: string) => new Date(value).toLocaleString("zh-CN");
 const short = (value: string) => `${value.slice(0, 12)}…`;
@@ -35,13 +37,12 @@ function Pages({ name, page, busy, change }: { name: string; page: { offset: num
   return <div className="reparse-pages"><button type="button" className="text-button" disabled={busy || !page || !page.offset} onClick={() => page && change(Math.max(0, page.offset - 10))}>上一页{name}</button><span>{page ? `共 ${page.total} 条 · 第 ${Math.floor(page.offset / 10) + 1} 页` : "正在读取…"}</span><button type="button" className="text-button" disabled={busy || !page || page.offset + 10 >= page.total} onClick={() => page && change(page.offset + 10)}>下一页{name}</button></div>;
 }
 
-function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind }) {
+function GoldenWorkspace({ source, kind, abortReader }: { source: string; kind: GoldenKind; abortReader: MutableRefObject<() => void> }) {
   const operation = useRef<AbortController | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [captureOffset, setCaptureOffset] = useState(0);
   const [captures, setCaptures] = useState<ParserPage<RawCaptureRecord> | null>(null);
   const [captureId, setCaptureId] = useState("");
-  const [raw, setRaw] = useState<RawCaptureEvidence | null>(null);
   const [caseOffset, setCaseOffset] = useState(0);
   const [cases, setCases] = useState<ParserPage<GoldenCaseSummary> | null>(null);
   const [caseId, setCaseId] = useState("");
@@ -74,6 +75,13 @@ function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind })
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const [historical, setHistorical] = useState<{ kind: "case" | "set"; value: GoldenCase | GoldenSet } | null>(null);
+  const reader = useRawEvidenceV2({ kind: "capture", id: captureId, selectionKey: JSON.stringify([source, kind, refresh, record?.capture_id, record?.input.raw_hash]),
+    validate(value) {
+      if (value.source_id !== source || value.target_kind !== kind || (record?.capture_id === captureId && value.raw_hash !== record.input.raw_hash)) throw new Error("原文与样本冻结来源、类型或 SHA-256 不一致。");
+      if (record?.capture_id === captureId) assertRawEvidenceInput(value, record.input);
+    } });
+  const raw = reader.metadata;
+  abortReader.current = reader.cancel;
   const locked = busy || !!pending;
   const dirty = !!record && (title !== record.title || captureId !== record.capture_id || evidenceNote !== record.evidence_note || expected !== json(record.expected));
   const rawMatches = !!record && raw?.id === record.capture_id && raw.raw_hash === record.input.raw_hash;
@@ -83,14 +91,14 @@ function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind })
   function remember(value: Attempt | null) { setPending(value); if (value) pendingBySource.set(source, value); else pendingBySource.delete(source); }
   function acceptCase(value: GoldenCase, expectedId?: string) {
     if (value.source_id !== source || value.kind !== kind || (expectedId && value.id !== expectedId)) throw new Error("样本返回范围不匹配，未展示。");
-    setRecord(value); setTitle(value.title); setCaptureId(value.capture_id); setEvidenceNote(value.evidence_note); setExpected(json(value.expected));
+    reader.cancel(); setRecord(value); setTitle(value.title); setCaptureId(value.capture_id); setEvidenceNote(value.evidence_note); setExpected(json(value.expected));
     setReviewConfirmed(false); setReason(""); setStale(!value.is_current); setHistorical(null);
   }
   function acceptSet(value: GoldenSet, expectedId?: string) {
     if (value.source_id !== source || value.kind !== kind || (expectedId && value.id !== expectedId)) throw new Error("冻结集返回范围不匹配，未展示。");
     setFrozen(value); setCollectionTitle(value.title); setSetAction("freeze"); setSelected([]); setFreezeConfirmed(false); setCollectionReason(""); setStale(false); setHistorical(null);
   }
-  function reload() { setRefresh(value => value + 1); setCaseRead(value => value + 1); setSetRead(value => value + 1); setReviewConfirmed(false); setFreezeConfirmed(false); }
+  function reload() { reader.cancel(); setRefresh(value => value + 1); setCaseRead(value => value + 1); setSetRead(value => value + 1); setReviewConfirmed(false); setFreezeConfirmed(false); }
   useEffect(() => () => operation.current?.abort(), []);
   useEffect(() => {
     const controller = new AbortController(); setCaptures(null); error("captures");
@@ -133,13 +141,7 @@ function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setId, setRead]);
   useEffect(() => {
-    setRaw(null); setShowCandidates(false); setCandidateOffset(0); setCandidates(null); setReviewConfirmed(false); error("raw");
-    if (!captureId) return;
-    const controller = new AbortController();
-    void tireApi.captureEvidence(captureId, controller.signal).then(value => {
-      if (!controller.signal.aborted) { if (value.id !== captureId || value.source_id !== source || value.target_kind !== kind) throw new Error("原文范围不匹配，未展示。"); setRaw(value); }
-    }).catch(cause => { if (!controller.signal.aborted) error("raw", errorText(cause)); });
-    return () => controller.abort();
+    setShowCandidates(false); setCandidateOffset(0); setCandidates(null); setReviewConfirmed(false); error("raw");
   }, [captureId, source, kind, refresh]);
   useEffect(() => {
     setCandidates(null); error("candidates");
@@ -153,7 +155,7 @@ function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind })
   useEffect(() => { setFreezeConfirmed(false); }, [selected, setAction, collectionTitle, collectionOperator, collectionReason]);
 
   function newCase() {
-    setCaseId(""); setRecord(null); setTitle(""); setCaptureId(""); setEvidenceNote(""); setExpected(template(kind));
+    reader.cancel(); setCaseId(""); setRecord(null); setTitle(""); setCaptureId(""); setEvidenceNote(""); setExpected(template(kind));
     setReviewConfirmed(false); setReason(""); setStale(false); setHistorical(null); error("action"); setNotice("");
   }
   async function copyCandidate(id: string) {
@@ -261,12 +263,12 @@ function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind })
     {stale ? <p className="inline-error">修订已变化，当前提交已锁定。重新读取所选样本或集合后核对；新建草稿可点击“新建待审样本”。</p> : null}
     {pending ? <section className="review-boundary"><strong>上一次写入结果待核对</strong><p>固定请求 <code>{pending.key}</code>。关闭窗口不撤销已受理的操作；同标签页重开保留相同请求，整页刷新前请先核对记录。</p><DataTree label="待核对请求的固定内容" value={pending.payload} /><button type="button" className="primary-button" disabled={busy} onClick={() => void perform(pending)}>继续核对同一次请求</button></section> : null}
     <section><div className="panel-title"><h3>1 · 样本与待审预期</h3><button type="button" className="secondary-button" disabled={locked} onClick={newCase}>新建待审样本</button></div>
-      <div className="parser-bundle-options">{cases?.items.map(item => <article key={item.id} className="golden-case-option"><button type="button" className={`report-list-item${caseId === item.id ? " selected" : ""}`} aria-pressed={caseId === item.id} disabled={locked} onClick={() => { setCaseId(item.id); setCaseRead(value => value + 1); }}><strong>{item.title}</strong><span>预期 #{item.revision} · {statuses[item.status]}</span><small>{stamp(item.created_at)} · {short(item.capture_id)}</small></button><label className="review-checkbox"><input type="checkbox" checked={selected.some(value => value.ref.case_id === item.id)} disabled={locked || item.status !== "approved" || (!selected.some(value => value.ref.case_id === item.id) && (selected.length >= 3 || selected.some(value => value.capture === item.capture_id)))} onChange={() => toggleCase(item)} /><span>将此已审核修订加入冻结选择</span></label></article>)}</div>
+      <div className="parser-bundle-options">{cases?.items.map(item => <article key={item.id} className="golden-case-option"><button type="button" className={`report-list-item${caseId === item.id ? " selected" : ""}`} aria-pressed={caseId === item.id} disabled={locked} onClick={() => { reader.cancel(); setCaseId(item.id); setCaseRead(value => value + 1); }}><strong>{item.title}</strong><span>预期 #{item.revision} · {statuses[item.status]}</span><small>{stamp(item.created_at)} · {short(item.capture_id)}</small></button><label className="review-checkbox"><input type="checkbox" checked={selected.some(value => value.ref.case_id === item.id)} disabled={locked || item.status !== "approved" || (!selected.some(value => value.ref.case_id === item.id) && (selected.length >= 3 || selected.some(value => value.capture === item.capture_id)))} onChange={() => toggleCase(item)} /><span>将此已审核修订加入冻结选择</span></label></article>)}</div>
       {cases?.total === 0 ? <p>暂无 Golden 样本。下面可从已接收原文建立第一份待审稿。</p> : null}<Pages name="样本" page={cases} busy={locked} change={setCaseOffset} />
       {caseId && !record ? <p role="status">正在读取所选样本内容…</p> : <>
         <h4>{record ? `编辑 ${record.title} · 预期 #${record.revision}` : "新建待审稿"}</h4><p>保存只生成待审修订。修改任何预期、原文或证据说明后都需要重新审核。</p>
-        <h4>选择原文收件</h4><div className="parser-capture-options">{captures?.items.map(item => <article key={item.id}><label className="review-checkbox"><input type="radio" name="golden-capture" checked={captureId === item.id} disabled={locked} onChange={() => setCaptureId(item.id)} /><span>{stamp(item.observed_at)} · {item.byte_count.toLocaleString("zh-CN")} 字节 · <code>{short(item.id)}</code><br />{JSON.stringify(item.query || {})}</span></label></article>)}</div><Pages name="原文" page={captures} busy={locked} change={setCaptureOffset} />
-        {captureId ? <div className="review-boundary"><p>选定收件 <code>{captureId}</code></p>{raw ? <><p>原文 SHA-256 <code>{raw.raw_hash}</code> · {raw.content_type}</p><p>{raw.source_url}</p><DataTree label="接收原文（纯文本，不执行内容）" value={raw.body} /><DataTree label="原文查询范围" value={raw.query} /></> : <p role="status">正在读取原文；原文可用后才能保存或审核。</p>}</div> : null}
+        <h4>选择原文收件</h4><div className="parser-capture-options">{captures?.items.map(item => <article key={item.id}><label className="review-checkbox"><input type="radio" name="golden-capture" checked={captureId === item.id} disabled={locked} onChange={() => { reader.cancel(); setCaptureId(item.id); }} /><span>{stamp(item.observed_at)} · {item.byte_count.toLocaleString("zh-CN")} 字节 · <code>{short(item.id)}</code><br />{JSON.stringify(item.query || {})}</span></label></article>)}</div><Pages name="原文" page={captures} busy={locked} change={setCaptureOffset} />
+        {captureId ? <div className="review-boundary"><p>选定收件 <code>{captureId}</code></p><RawEvidenceV2View reader={reader} /><p>原件核对或下载不代表 Golden 已经人工确认。</p>{raw ? <DataTree label="原文查询范围" value={raw.query} /> : null}</div> : null}
         <form className="review-form" onSubmit={event => { event.preventDefault(); saveCase(); }}>
           <label><span>样本标题</span><input maxLength={200} value={title} disabled={locked} onChange={event => setTitle(event.target.value)} /></label>
           <label><span>原文定位与核对说明</span><textarea rows={3} maxLength={2000} value={evidenceNote} disabled={locked} placeholder="记录行、表、段落、字段及身份判定依据；解释未知值。" onChange={event => setEvidenceNote(event.target.value)} /></label>
@@ -306,6 +308,8 @@ function GoldenWorkspace({ source, kind }: { source: string; kind: GoldenKind })
 
 function GoldenDialog({ sources, onClose }: { sources: Source[]; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const abortReader = useRef<() => void>(() => {});
+  const close = () => { abortReader.current(); onClose(); };
   const choices = sources.filter(item => !!item.parser_version && item.target_kind !== "recall" && item.id !== "xiaomi-cn-vehicles");
   const sourceChoices = [...choices, { id: "xiaomi-cn-vehicles", name: "小米汽车 · 官方配置", target_kind: "vehicle" as const }];
   const [source, setSource] = useState(sourceChoices[0]?.id || "");
@@ -314,11 +318,11 @@ function GoldenDialog({ sources, onClose }: { sources: Source[]; onClose: () => 
     const node = dialog.current; const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     node?.showModal(); return () => { node?.close(); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
   }, []);
-  return <dialog ref={dialog} className="fact-review-dialog reports-dialog golden-dialog" aria-labelledby="golden-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
-    <header className="fact-review-heading"><div><span className="eyebrow">GOLDEN EVIDENCE</span><h2 id="golden-title">Golden 真值与冻结集</h2></div><button type="button" className="icon-button" aria-label="关闭 Golden 工作区" onClick={onClose}>×</button></header>
+  return <dialog ref={dialog} className="fact-review-dialog reports-dialog golden-dialog" aria-labelledby="golden-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); close(); }}>
+    <header className="fact-review-heading"><div><span className="eyebrow">GOLDEN EVIDENCE</span><h2 id="golden-title">Golden 真值与冻结集</h2></div><button type="button" className="icon-button" aria-label="关闭 Golden 工作区" onClick={close}>×</button></header>
     <div className="reports-content"><div className="snapshot-banner"><strong>人工预期 · 本机工作区</strong><span>支持轮胎与车型原文。测试事件尚无 Parser，不在本轮范围。此处不会访问官网、采纳事实或证明完整生产 Golden 覆盖。</span></div><p className="review-boundary">署名是本地自报，不是身份认证。Agent 与 Parser 只能辅助准备待审稿；真实真值必须由人工对照证据签署，合成测试应明确标注。</p>
-      <label className="golden-field"><span>Golden 来源</span><select value={source} onChange={event => setSource(event.target.value)}>{sourceChoices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      {source ? <GoldenWorkspace key={source} source={source} kind={kind} /> : <p>没有支持的来源。</p>}
+      <label className="golden-field"><span>Golden 来源</span><select value={source} onChange={event => { abortReader.current(); setSource(event.target.value); }}>{sourceChoices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      {source ? <GoldenWorkspace key={source} source={source} kind={kind} abortReader={abortReader} /> : <p>没有支持的来源。</p>}
     </div>
   </dialog>;
 }

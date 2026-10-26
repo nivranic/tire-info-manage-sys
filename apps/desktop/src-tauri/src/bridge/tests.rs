@@ -9,6 +9,59 @@ use tokio::{
 
 const TEST_COOKIE: &str = "acd95df4-f31d-4275-8b9e-098a90cbb223";
 
+#[tokio::test]
+async fn download_identity_admission_precedes_lifecycle_queue_and_cancellation_finishes_only_own_ticket() {
+    let server = Server::start(|_| panic!("identity tasks must remain before network")).await;
+    let bridge = Arc::new(server.bridge(retained_store()));
+    let document = bridge.downloads.document().unwrap();
+    let old = bridge.downloads.prepare(&document).unwrap();
+    let reservation = bridge.downloads.reserve(&old, &document).unwrap();
+    let gate = bridge.lifecycle.write().await;
+    let mut tasks = Vec::new();
+    for (method, path) in [("POST", "/v1/%61uth/%6cogin?x=1"), ("GET", "/v1/auth/%6de?mode=history")] {
+        let mut payload = request(path); payload.method = method.into(); let id = payload.id.clone();
+        let running = bridge.clone();
+        tasks.push((id, tokio::spawn(async move { running.request(payload).await })));
+    }
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while bridge.registry.lock().unwrap().active.len() != 2 { tokio::task::yield_now().await; }
+    }).await.unwrap();
+    assert!(bridge.downloads.prepare(&document).is_err());
+    assert!(reservation.commit().is_err());
+    assert!(bridge.downloads.reserve(&old, &document).is_err());
+    let (first_id, first) = tasks.remove(0); bridge.cancel(&first_id).unwrap();
+    assert_eq!(first.await.unwrap().err(), Some("REQUEST_CANCELLED"));
+    assert!(bridge.downloads.prepare(&document).is_err());
+    let (second_id, second) = tasks.remove(0); bridge.cancel(&second_id).unwrap();
+    assert_eq!(second.await.unwrap().err(), Some("REQUEST_CANCELLED"));
+    bridge.downloads.prepare(&document).unwrap();
+    assert!(reservation.commit().is_err());
+    assert!(server.received.lock().unwrap().is_empty()); drop(gate);
+}
+
+#[tokio::test]
+async fn download_auth_end_revokes_even_when_response_reuses_identical_cookie_or_fails() {
+    for failed in [false, true] {
+        let server = Server::start(move |_| {
+            let mut reply = health_reply();
+            if let Reply::Body { status, .. } = &mut reply { if failed { *status = 401; } }
+            reply
+        }).await;
+        let bridge = server.bridge(retained_store());
+        bridge.session.data.lock().await.bootstrapped = true;
+        let document = bridge.downloads.document().unwrap();
+        for (method, path) in [("POST", "/v1/auth/login"), ("POST", "/v1/auth/logout"), ("GET", "/v1/auth/%6de?x=1"),
+            ("POST", "/v1/auth/users/a/role"), ("POST", "/v1/auth/users/a/password"), ("DELETE", "/v1/auth/users/a")] {
+            let old = bridge.downloads.prepare(&document).unwrap();
+            let mut payload = request(path); payload.method = method.into();
+            assert_eq!(bridge.request(payload).await.unwrap().status, if failed { 401 } else { 200 });
+            assert_eq!(bridge.session.data.lock().await.cookie.as_deref(), Some(TEST_COOKIE));
+            assert!(bridge.downloads.reserve(&old, &document).is_err());
+            bridge.downloads.prepare(&document).unwrap();
+        }
+    }
+}
+
 #[test]
 fn denial_metadata_requires_fixed_closed_request_and_actual_201_matching_denial() {
     let query = Uuid::new_v4().to_string();

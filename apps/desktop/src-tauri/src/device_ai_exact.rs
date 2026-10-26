@@ -707,8 +707,7 @@ fn write_canonical(node: &DeviceAiValue, depth: usize, out: &mut String) -> Devi
         DeviceAiValue::Bool(true) => out.push_str("true"),
         DeviceAiValue::Bool(false) => out.push_str("false"),
         DeviceAiValue::Text(text) => push_json_string(
-            text
-                .as_str()
+            text.as_str()
                 .ok_or_else(|| err(DeviceAiErrorCode::JsonUnicode))?,
             out,
         ),
@@ -932,7 +931,10 @@ mod tests {
     #[test]
     fn device_ai_error_codes_match_python_strings() {
         const EVERY_CODE: [(DeviceAiErrorCode, &str); 13] = [
-            (DeviceAiErrorCode::PackageCapacity, "device_ai_package_capacity"),
+            (
+                DeviceAiErrorCode::PackageCapacity,
+                "device_ai_package_capacity",
+            ),
             (DeviceAiErrorCode::JsonBom, "device_ai_json_bom"),
             (DeviceAiErrorCode::JsonUtf8, "device_ai_json_utf8"),
             (DeviceAiErrorCode::JsonDepth, "device_ai_json_depth"),
@@ -956,7 +958,10 @@ mod tests {
                 DeviceAiErrorCode::ValueTypeUnsupported,
                 "device_ai_value_type_unsupported",
             ),
-            (DeviceAiErrorCode::MaterialInvalid, "device_ai_material_invalid"),
+            (
+                DeviceAiErrorCode::MaterialInvalid,
+                "device_ai_material_invalid",
+            ),
         ];
         for (code, expected) in EVERY_CODE {
             assert_eq!(code.as_str(), expected);
@@ -967,9 +972,22 @@ mod tests {
     #[test]
     fn device_ai_number_grammar_and_finiteness() {
         for accepted in [
-            "0", "-0", "1", "9007199254740993", "-9007199254740993",
-            "123456789012345678901234567890", "1.2300", "0.0", "-0.0", "1e5", "1E+5",
-            "-1.5E-3", "5e-324", "1e-5000", "0.1000000000000000001", "1e16",
+            "0",
+            "-0",
+            "1",
+            "9007199254740993",
+            "-9007199254740993",
+            "123456789012345678901234567890",
+            "1.2300",
+            "0.0",
+            "-0.0",
+            "1e5",
+            "1E+5",
+            "-1.5E-3",
+            "5e-324",
+            "1e-5000",
+            "0.1000000000000000001",
+            "1e16",
         ] {
             let number = DeviceAiNumber::new(accepted).unwrap_or_else(|e| panic!("{e}"));
             assert_eq!(number.token(), accepted);
@@ -1084,7 +1102,9 @@ mod tests {
             DeviceAiErrorCode::PackageCapacity
         );
         assert_eq!(
-            parse_device_ai_package(b"\xEF\xBB\xBF{}").unwrap_err().code(),
+            parse_device_ai_package(b"\xEF\xBB\xBF{}")
+                .unwrap_err()
+                .code(),
             DeviceAiErrorCode::JsonBom
         );
     }

@@ -12,9 +12,17 @@ from .embedding_budget import PENDING_WINDOW, budget_usage
 from .embedding_gateway import EmbeddingError, configured_embeddings, reservation
 from .embedding_models import EmbeddingCache, EmbeddingCompletion, EmbeddingPlan, EmbeddingRequest
 from .embedding_text import TEXT_CONTRACT, bounded_batch, document_chunks
-from .knowledge_index import refresh_index
+from .knowledge_index import check_current_vehicle_heads, check_vehicle_document_use, refresh_index
 from .knowledge_models import KnowledgeDocument
 from .service import QueryService, timestamp
+
+
+LOCAL_VEHICLE_ERRORS = frozenset({'vehicle_structured_fact_use_not_allowed', 'vehicle_provider_use_not_allowed',
+                                'vehicle_raw_integrity_failed', 'vehicle_evidence_binding_failed'})
+
+
+def _binding_failed():
+    raise HTTPException(409, {'code': 'vehicle_evidence_binding_failed'})
 
 
 def require_config(db):
@@ -28,6 +36,7 @@ def require_config(db):
 
 
 def document_material(db, documents, config):
+    check_vehicle_document_use(db, documents)
     result, unique = [], {}
     for document in documents:
         privacy = document.payload['privacy_class']
@@ -55,6 +64,7 @@ def plan_view(plan):
 
 def prepare_plan(db, registry, ids, session_id):
     QueryService(db, None).lock_ingestion()
+    check_current_vehicle_heads(db)
     config = require_config(db)
     refresh_index(db, registry)
     documents = list(db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(ids))))
@@ -75,25 +85,56 @@ def prepare_plan(db, registry, ids, session_id):
     return plan_view(plan)
 
 
-def validate_plan(db, registry, plan_id, session_id, config):
+def _material_signature(values):
+    return digest([{**{key: document[key] for key in ('id', 'label', 'privacy_class')},
+                    'chunks': [item['cache_id'] for item in document['chunks']]} for document in values])
+
+
+def _checked_plan_materials(db, plan, config, *, purpose, request_payload=None, inputs=None):
+    try:
+        payload = plan.payload
+        if (type(payload) is not dict or digest(payload) != plan.fingerprint
+                or plan.model_space != config.model_space or payload['model'] != config.model
+                or payload['dimensions'] != config.dimensions or payload['text_contract'] != TEXT_CONTRACT
+                or utc(plan.expires_at) <= utcnow()):
+            _binding_failed()
+        frozen = payload['documents']
+        if type(frozen) is not list or not frozen or any(type(item) is not dict for item in frozen):
+            _binding_failed()
+        ids = [item['id'] for item in frozen]
+        if any(type(value) is not str or not value for value in ids) or len(set(ids)) != len(ids):
+            _binding_failed()
+        documents = list(db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(ids))
+                                    .execution_options(populate_existing=True)))
+        if len(documents) != len(ids):
+            _binding_failed()
+        documents.sort(key=lambda row: ids.index(row.id))
+        check_vehicle_document_use(db, documents)
+        current, missing = document_material(db, documents, config)
+        if _material_signature(current) != _material_signature(frozen):
+            _binding_failed()
+        for actual, saved in zip(current, frozen, strict=True):
+            for chunk, frozen_chunk in zip(actual['chunks'], saved['chunks'], strict=True):
+                if any(chunk[key] != frozen_chunk[key] for key in ('text', 'hash', 'cache_id', 'privacy_class')):
+                    _binding_failed()
+        if inputs is not None:
+            _bind_index_inputs(request_payload, current, inputs)
+        if purpose != 'local_structured':
+            check_vehicle_document_use(db, documents, purpose=purpose)
+        return current, missing
+    except (KeyError, TypeError, ValueError, AttributeError):
+        _binding_failed()
+
+
+def validate_plan(db, registry, plan_id, session_id, config, *, purpose='local_structured'):
     plan = db.get(EmbeddingPlan, plan_id)
     if plan is None or plan.actor_session_id != session_id:
         raise HTTPException(404, '未找到本会话的向量建立计划')
-    if (utc(plan.expires_at) <= utcnow() or digest(plan.payload) != plan.fingerprint
-            or plan.model_space != config.model_space or plan.payload['text_contract'] != TEXT_CONTRACT):
+    if (utc(plan.expires_at) <= utcnow() or type(plan.payload) is not dict or digest(plan.payload) != plan.fingerprint
+            or plan.model_space != config.model_space or plan.payload.get('text_contract') != TEXT_CONTRACT):
         raise HTTPException(409, '计划已过期或模型配置已变化，请重新预览')
     refresh_index(db, registry)
-    ids = [document['id'] for document in plan.payload['documents']]
-    documents = list(db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(ids))))
-    if len(documents) != len(ids):
-        raise HTTPException(409, '计划文档已变化或撤销，请重新检索')
-    documents.sort(key=lambda row: ids.index(row.id))
-    current, missing = document_material(db, documents, config)
-    def signature(values):
-        return digest([{**{key: document[key] for key in ('id', 'label', 'privacy_class')},
-                        'chunks': [item['cache_id'] for item in document['chunks']]} for document in values])
-    if signature(current) != signature(plan.payload['documents']):
-        raise HTTPException(409, '计划内容已变化，请重新预览')
+    current, missing = _checked_plan_materials(db, plan, config, purpose=purpose)
     return plan, current, missing
 
 
@@ -112,6 +153,14 @@ def begin_idempotent(db, session_id, key, kind, payload):
 
 
 def reserve_request(db, *, config, session_id, key, kind, request_hash, payload, inputs, plan_id=None):
+    capsules = check_current_vehicle_heads(db)
+    if kind == 'index' and (capsules or plan_id is not None):
+        if type(payload) is not dict or not plan_id or payload.get('plan_id') != plan_id:
+            _binding_failed()
+        plan = db.get(EmbeddingPlan, plan_id, populate_existing=True)
+        if plan is None or plan.actor_session_id != session_id:
+            _binding_failed()
+        _checked_plan_materials(db, plan, config, purpose='provider', request_payload=payload, inputs=inputs)
     billable = bool(inputs)
     reserve = reservation(inputs) if billable else 0
     if billable:
@@ -129,6 +178,67 @@ def reserve_request(db, *, config, session_id, key, kind, request_hash, payload,
                                kind=kind, reserved_tokens=reserve, billable=billable)
     db.commit()
     return row
+
+
+def _bind_index_inputs(payload, materials, inputs):
+    if type(payload) is not dict or type(payload.get('input_hashes')) is not list or type(inputs) is not list:
+        _binding_failed()
+    hashes = payload['input_hashes']
+    if len(hashes) != len(inputs):
+        _binding_failed()
+    allowed = {chunk['hash']: chunk['text'] for document in materials for chunk in document['chunks']}
+    for fingerprint, value in zip(hashes, inputs, strict=True):
+        if (type(fingerprint) is not str or type(value) is not str or not value
+                or digest(value) != fingerprint or allowed.get(fingerprint) != value):
+            _binding_failed()
+
+
+def check_embedding_dispatch(database, request_id, config, inputs, session_id):
+    """Fresh durable authority, closed before the caller can await a Provider."""
+    from .knowledge import KnowledgeSearch, interpret
+
+    with database.sessions() as reader:
+        with reader.no_autoflush:
+            row = reader.get(EmbeddingRequest, request_id)
+            if (row is None or row.actor_session_id != session_id or row.kind not in {'index', 'hybrid'}
+                    or reader.get(EmbeddingCompletion, row.id) is not None or type(inputs) is not list
+                    or type(row.payload) is not dict):
+                _binding_failed()
+            check_current_vehicle_heads(reader)
+            try:
+                if row.kind == 'index':
+                    if (not row.plan_id or row.payload.get('plan_id') != row.plan_id
+                            or set(row.payload) != {'plan_id', 'input_hashes'}):
+                        _binding_failed()
+                    body = {'plan_id': row.plan_id, 'allow_external_processing': True}
+                else:
+                    search = KnowledgeSearch.model_validate(row.payload)
+                    if search.model_dump() != row.payload or row.plan_id is not None:
+                        _binding_failed()
+                    body = {'search': search.model_dump(), 'allow_external_processing': True}
+                if digest({'kind': row.kind, **body}) != row.request_hash:
+                    _binding_failed()
+                if row.kind == 'hybrid' and not inputs:
+                    if config is not None or row.model_space is not None or row.billable or not interpret(search)[3]:
+                        _binding_failed()
+                    return
+                if (config is None or row.model_space != config.model_space or row.billable != bool(inputs)):
+                    _binding_failed()
+                if row.kind == 'index':
+                    plan = reader.get(EmbeddingPlan, row.plan_id)
+                    if plan is None or plan.actor_session_id != row.actor_session_id:
+                        _binding_failed()
+                    _checked_plan_materials(reader, plan, config, purpose='provider',
+                                            request_payload=row.payload, inputs=inputs)
+                else:
+                    if inputs != [search.text] or not search.text or interpret(search)[3]:
+                        _binding_failed()
+                    # Only the user's query goes to the Provider. Document rights
+                    # govern local reading, not permission to transmit this query.
+                    if not current_materials(reader, config, interpret(search)[0])[3]:
+                        _binding_failed()
+            except (KeyError, TypeError, ValueError, AttributeError):
+                _binding_failed()
 
 
 def run_view(db, row, completion=None, *, prefetched=False, include_result=True):

@@ -1,3 +1,55 @@
+export { DEVICE_AI_WIRE_CONTRACT } from "./device-ai";
+export type {
+  AIPriceProvider, AIPriceVersionCreate, AIPriceVersion, AIPriceVersionPage,
+  AIPricePlanningItem, AIPricePlanningRequest, AIPricePlanningItemResult, AIPricePlanningResult,
+} from "./ai-price-planning";
+export type {
+  WebhookChannel, WebhookReadiness, WebhookDeliveryState, WebhookAttemptState, WebhookAction,
+  WebhookTarget, WebhookTargets, WebhookSettings, WebhookCreate, WebhookEdit, WebhookStateRequest,
+  Webhook, WebhookList, WebhookBody, WebhookDeliverySummary, WebhookAttempt,
+  WebhookDelivery, WebhookDeliveryList, WebhookDeliveryActionRequest, WebhookOperation,
+} from "./webhooks";
+export type {
+  CandidateAiValue, CandidateAiPrepareRequest, CandidateAiReason, CandidateAiCandidate,
+  CandidateAiAuthorizationHead, CandidateAiDependency, CandidateAiPreparation,
+  CandidateAiAuthorizationRequest, CandidateAiAuthorization, CandidateAiSubmitRequest,
+  CandidateAiUncertaintyCode, CandidateAiAnswer, CandidateAiRecommendation,
+} from "./candidate-ai";
+export type {
+  TestCandidateReference, TestCandidateInterpretationRequest, TestCandidateLinkEvidence,
+  TestCandidateInterpretation,
+} from "./test-candidate-interpretation";
+export type {
+  PersonalFeedRequest, PersonalFeedMatch, PersonalFeedItem, PersonalFeed,
+  FitmentCandidateSelection, FitmentCandidatesRequest, FitmentCandidateRelation,
+  FitmentCandidate, FitmentCandidateExclusion, FitmentCandidates,
+} from "./personalization";
+export type {
+  InterestTextKind, InterestKind, InterestModelValue, InterestVehicleValue, InterestCondition,
+  InterestChangedField, InterestSettings, InterestPreviewRequest, InterestRevision, InterestRecord,
+  InterestDetail, InterestDomain, InterestCapabilities, InterestList, InterestEvidence, InterestEvent,
+  InterestOriginalEvidenceKind, InterestOriginalEvidence,
+  InterestCurationApplicabilityAffected, InterestCurationApplicabilityBasis, InterestCurationApplicabilityRecord,
+  InterestAcceptedEvent, InterestSourceQualityQuarantine, InterestSourceQualityBaseline,
+  InterestSourceQualityMemberReference, InterestSourceQualityMember, InterestSourceQualityCondition,
+  InterestSourceQualityCriteria, InterestSourceQualityAfter, InterestSourceQualityEvent,
+  InterestExplicitMatch, InterestSourceQualityMatch,
+  InterestMatch, InterestPreviewItem, InterestPreview, InterestNotification, InterestNotificationList,
+} from "./interests";
+export type {
+  TestMetricDimension, TestMeasurementReference, TestPreferenceLimitation,
+  TestPreferenceInterpretationErrorCode, TestPreferenceInterpretationRequest, TestPreferenceInterpretation,
+} from "./test-preference-interpretation";
+export type {
+  DeviceAiTireReferenceWire, DeviceAiVehicleReferenceWire, DeviceAiRecallReferenceWire,
+  DeviceAiRecallSearchReferenceWire, DeviceAiTestEventReferenceWire, DeviceAiReferenceWire,
+  DeviceAiTireSelectorWire, DeviceAiVehicleSelectorWire, DeviceAiRecallSelectorWire,
+  DeviceAiRecallSearchSelectorWire, DeviceAiSelectorWire, DeviceAiPrepareSelectorWire,
+  DeviceAiPrepareProjectionMode, DeviceAiProjectionMode, DeviceAiOriginBindingWire,
+  DeviceAiPrepareBody, DeviceAiProviderConsentBody, DeviceAiSubmissionBody,
+  DeviceAiStreamSubmission, DeviceAiPreparationView, DeviceAiPrepareResultView,
+} from "./device-ai";
+
 export type DataState = "live" | "live_verified_304" | "consent_required" | "source_unavailable" | "local_snapshot";
 export type { WarehouseFallbackPolicyPreviewRequest, WarehouseFallbackPolicy, WarehouseFallbackPolicyPreview,
   WarehouseFallbackPolicyApplyRequest, WarehouseFallbackPolicyList, WarehouseFallbackUse, WarehouseFallbackAuthorization } from "./warehouse-fallback";
@@ -34,7 +86,18 @@ export type { GoldenKind, GoldenVariantInput, GoldenTireExpected, GoldenVehicleE
   GoldenSigned, GoldenRevisionBinding, GoldenCaseEdit, GoldenCaseCreate, GoldenCaseReviewRequest,
   GoldenCaseReview, GoldenCaseSummary, GoldenCase, GoldenCaseRef, GoldenSetCreate, GoldenSetRevision, GoldenSet, GoldenGate,
   GoldenAggregateReport, GoldenCaseReport } from "./golden";
+export type { TestEventGoldenEventRef, TestEventGoldenLinkRef, TestEventGoldenIdentityExpectation,
+  TestEventGoldenExpected, TestEventGoldenMaterial, TestEventGoldenContent, TestEventGoldenReviewRequest,
+  TestEventGoldenCaseRef, TestEventGoldenSetWrite, TestEventGoldenEvaluateRequest, TestEventGoldenBoundary,
+  TestEventGoldenPage, TestEventGoldenReview, TestEventGoldenCaseSummary, TestEventGoldenCase,
+  TestEventGoldenSetSummary, TestEventGoldenSet, TestEventGoldenDifference,
+  TestEventGoldenCaseResult, TestEventGoldenEvaluation } from "./test-event-golden";
 export type { FitmentRelationAction, FitmentRelationState, FitmentRelationPage, FitmentRelationProvenance, FitmentVehicleSnapshot, FitmentVehicleSnapshotDetail, FitmentTireEvidenceChoice, FitmentTireEvidencePage, FitmentRelationSelection, FitmentVehicleEvidence, FitmentTireEvidence, FitmentRelationCheck, FitmentOfficialOE, FitmentRelationPreviewRequest, FitmentRelationPreview, FitmentRelationDecision, FitmentRelation, FitmentRelationRevision, FitmentRelationDetail, FitmentRelationDecisionResult } from "./fitment-relations";
+export type { BridgeAction, BridgeReviewState, BridgeEffectiveState, BridgeEvidenceLevel, BridgeSelection,
+  BridgeLocator, BridgeRights, BridgeMaterial, BridgeIdentityField, BridgeAssertion, BridgePreviewRequest,
+  BridgeOpenedMaterial, BridgeDecision, BridgeBoundary, BridgeMaterialChoice, BridgeMaterialsPage,
+  BridgeMaterialEvidence, BridgeTestEvidence, BridgeTireEvidence, BridgeCheck, BridgeHistoryItem,
+  TestSkuLinkView, TestSkuLinkPreview, TestSkuLinkDetail, TestSkuLinkPage, TestSkuLinkDecisionResult } from "./test-sku-links";
 export type { TireFilter, TireFilterValue, ExactNumericToken, TireFilterOperator, TireFilterField, TireFilterCatalog, TireQuerySelection } from "./filters";
 export type { RecallQuery, RecallRecord, RecallRevision, RecallResult, RecallHistory, RecallEvidence, RecallRuleSettings, RecallRule, RecallRuleDetail, RecallNotification, RecallPage, RecallAnalysisReference, RecallBoundary } from "./recalls";
 export type { RecallSearchQuery, RecallSearchCampaign, RecallSearchProduct, RecallSearchResult, RecallSearchEvidence } from "./recalls";
@@ -137,8 +200,18 @@ export interface AIEvidence {
   previous_snapshot_id?: string | null; previous_source_url?: string | null;
   previous_raw_hash?: string | null; previous_observed_at?: string | null;
 }
+export interface TestAnalysisBoundary {
+  schema: "test-analysis-boundary@1";
+  policy_version: "test-grounding@1";
+  mode: "fact_selection_only";
+  participant_identity: "participant_only";
+  sku_link: "not_established";
+  verification_status: "unverified";
+  notice: string;
+}
 export interface AIPack {
   purpose?: string;
+  test_boundary?: TestAnalysisBoundary;
   recall_policy?: { version: "recall-fact-selection@1"; digest: string };
   recall_boundary?: import("./recalls").RecallBoundary;
   field_policy?: import("./field-authority").FieldPolicy;
@@ -163,6 +236,7 @@ export interface AIAnalysis {
   created_at: string; completed_at: string | null; state: "pending" | "outcome_unknown" | "failed" | "completed";
   reserved_tokens: number; usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
   error_code: string | null; answer: {
+    test_boundary?: TestAnalysisBoundary;
     recall_boundary?: import("./recalls").RecallBoundary;
     claims: AIClaim[];
     uncertainty: string; conflicts: Record<string, unknown>[]; source_state: string; data_state: DataState; notice: string;
@@ -217,6 +291,7 @@ export interface ReportExport {
 }
 export interface EvidenceReportDetail extends EvidenceReportRecord {
   body: {
+    test_boundary?: TestAnalysisBoundary;
     recall_boundary?: import("./recalls").RecallBoundary;
     recall_policy?: { version: "recall-fact-selection@1"; digest: string };
     field_policy?: import("./field-authority").FieldPolicy;
@@ -244,11 +319,19 @@ export interface EvidenceDocument extends EvidenceDocumentMetadata {
   status: "unparsed_receipt"; accepted_as_facts: false;
 }
 
+export type {
+  SourceMaterialRights, SourceMaterialPolicy, SourceMaterialPolicies,
+  SourceMaterialPreviewRequest, SourceMaterialPreview, SourceMaterialCaptureRequest,
+  SourceMaterialStopRequest, SourceMaterialStop, SourceMaterialStopResult,
+  SourceMaterialRedirect, SourceMaterialRobots, SourceMaterialReceipt,
+  SourceMaterialRequestView, SourceMaterialCaptureResult, SourceMaterialRequests,
+} from "./source-materials";
+
 export interface AlertRuleSettings {
   name: string;
   interval_seconds: number;
   enabled: boolean;
-  kinds: ("facts_changed" | "variant_observed")[];
+  kinds: ("facts_changed" | "variant_observed" | "page_changed")[];
   fields: string[];
   conditions: { technology?: string };
 }
@@ -277,7 +360,7 @@ export interface AIRuleDraftPack {
   source: { id: string; name: string; region: string; homepage: string; requires_size?: boolean };
   supported_models: string[]; instruction: string;
   capabilities: {
-    kinds: AlertRuleSettings["kinds"]; fields: { key: string; label: string }[]; technologies: string[];
+    kinds: ("facts_changed" | "variant_observed")[]; fields: { key: string; label: string }[]; technologies: string[];
     interval_seconds: { minimum: number; maximum: number; default: number };
     notification_channels: string[]; unsupported_features: string[];
   };
@@ -304,6 +387,11 @@ export interface LocalNotification {
   changes: Record<string, { before: unknown; after: unknown; before_present: boolean; after_present: boolean }>;
   snapshot_id: string; previous_snapshot_id: string | null;
 }
+
+export type {
+  SourcePageEvidenceSide, SourcePageChange, SourcePageNotification,
+  SourcePageNotifications, SourcePageNotificationDetail, SourcePageNotificationRead,
+} from "./source-page-monitoring";
 
 export interface Variant {
   field_resolution?: import("./field-authority").FieldResolution;
@@ -866,7 +954,7 @@ export interface SavedComparisonDetail extends SavedComparisonRecord {
 export type DrivingWeightKey = "dry" | "wet" | "quiet" | "comfort" | "wear" | "energy" | "appearance";
 export type DrivingWeights = Record<DrivingWeightKey, number>;
 export interface DrivingPreferenceState {
-  scope: "local_workspace" | "actor"; revision: number; weights: DrivingWeights | null; updated_at: string | null;
+  scope: "local_workspace" | "actor"; revision: number; fingerprint: string; weights: DrivingWeights | null; updated_at: string | null;
   history_truncated: boolean; notice: string;
   history: { revision: number; weights: DrivingWeights | null; created_at: string }[];
 }
@@ -876,3 +964,190 @@ export interface AuthUserListItem { id: string; username: string; display_name: 
 export interface RoleUpdateRequest { is_admin: boolean }
 export interface PasswordResetRequest { new_password: string }
 export interface ProfileUpdateRequest { username?: string; display_name?: string }
+export * from "./external-api";
+
+
+/** V2 is independent of the legacy body:string evidence DTOs. */
+export type RawEvidenceJsonValueV2 = null | boolean | number | string | RawEvidenceJsonValueV2[] | { [key: string]: RawEvidenceJsonValueV2 };
+/** Only the existing source query/facts material is open JSON, never an endpoint envelope. */
+export type RawEvidenceJsonObjectV2 = { [key: string]: RawEvidenceJsonValueV2 };
+export interface RawEvidenceTextV2 {
+  evidence_format: "raw-evidence-v2";
+  body_encoding: "utf-8";
+  body: string;
+  raw_capture_id: string | null;
+  raw_hash: string;
+  byte_count: number;
+  content_type: "text/html" | "application/json" | "text/javascript" | "application/javascript" | "text/plain";
+  content_path: null;
+  parse_method: null;
+  mapping_id: null;
+}
+export interface RawEvidenceBinaryV2 {
+  evidence_format: "raw-evidence-v2";
+  body_encoding: "binary";
+  body: null;
+  raw_capture_id: string;
+  raw_hash: string;
+  byte_count: number;
+  content_type: "application/pdf";
+  content_path: string;
+}
+export interface RawEvidenceParsedBinaryV2 extends RawEvidenceBinaryV2 {
+  parse_method: "sha256_bound_reviewed_mapping";
+  mapping_id: string;
+}
+export interface RawEvidenceUnparsedBinaryV2 extends RawEvidenceBinaryV2 {
+  parse_method: null;
+  mapping_id: null;
+}
+export interface VehicleEvidenceDocumentV2 {
+  url: string;
+  title: string | null;
+  status: "official_source_link";
+}
+export interface VehicleRawPayloadV2 {
+  vehicle: VehicleDescription;
+  trims: VehicleTrim[];
+  fitments: WheelFitment[];
+  footnotes?: string[];
+  documents?: VehicleEvidenceDocumentV2[];
+  coverage?: {
+    axle_sizes: boolean; wheel_options: boolean; trim_mapping: boolean;
+    model_year: boolean; exact_tire_sku: boolean; oe_mark: boolean; notice: string;
+  };
+  parse_method?: "sha256_bound_reviewed_mapping";
+  mapping_id?: string;
+  parse_provenance?: {
+    contract: "vehicle-pdf-parse@1"; method: "sha256_bound_reviewed_mapping";
+    mapping_id: string; source_raw_hash: string; bundle_id: string; mapping_file_sha256: string;
+  };
+}
+export interface VehicleEvidenceMetadataV2 {
+  id: string;
+  vehicle_id: string;
+  snapshot_id: string;
+  source_id: string;
+  source_url: string;
+  source_page: string;
+  parser_version: string;
+  parser_identity: ParserIdentity | null;
+  observed_at: string;
+  evidence_path: string;
+  quality_review: QuarantineReviewEvent | null;
+  verified_at: string | null;
+  data_state: "local_snapshot";
+  documents: VehicleEvidenceDocumentV2[];
+}
+export type VehicleEvidenceV2 = VehicleEvidenceMetadataV2 & (RawEvidenceTextV2 | (RawEvidenceParsedBinaryV2 & { parser_identity: ParserIdentity }));
+export interface RawCaptureEvidenceMetadataV2 {
+  id: string;
+  query_id: string;
+  source_id: string;
+  target_kind: "tire" | "vehicle" | "recall";
+  source_url: string;
+  parser_version: string;
+  observed_at: string;
+  parser_identity: ParserIdentity | null;
+  query_state: string;
+  query_reason: string | null;
+  query: RawEvidenceJsonObjectV2;
+  processing_unconfirmed: boolean;
+  evidence_path: string;
+  data_state: "local_snapshot";
+  receipt_only: true;
+  storage_kind: "object_store" | "database_legacy";
+}
+export type RawCaptureEvidenceV2 = RawCaptureEvidenceMetadataV2 & ((RawEvidenceTextV2 & { raw_capture_id: string }) | (RawEvidenceUnparsedBinaryV2 & { parser_identity: ParserIdentity }));
+export interface TireQuarantineCandidateV2 {
+  brand: string; model: string; manufacturer_product_code: string | null;
+  region: string; size: string; load_index: string | null; speed_rating: string | null;
+  xl: boolean | null; hl: boolean | null; oe_mark: string | null;
+  acoustic_technology: string | null; run_flat: boolean | null;
+  source_variant_name: string | null;
+  facts: RawEvidenceJsonObjectV2;
+}
+export interface RawEvidenceQualityReportV2 extends QualityReport {
+  namespace_reference_alignments?: { baseline_key: string; candidate_key: string; entity_equivalence: false }[];
+}
+export interface QuarantineEvidenceMetadataV2 {
+  id: string;
+  query_id: string;
+  source_id: string;
+  source_url: string;
+  parser_version: string;
+  observed_at: string;
+  previous_snapshot_id: string | null;
+  status: "quarantined";
+  reason_codes: string[];
+  evidence_path: string;
+  data_state: "local_snapshot";
+  accepted: false;
+}
+export type TireQuarantineEvidenceV2 = QuarantineEvidenceMetadataV2 & RawEvidenceTextV2 & {
+  kind: "field_loss"; target_kind: "tire";
+  metrics: QualityMetrics; candidates: TireQuarantineCandidateV2[]; quality: RawEvidenceQualityReportV2;
+};
+export type VehicleQuarantineEvidenceV2 = QuarantineEvidenceMetadataV2 & (RawEvidenceTextV2 | RawEvidenceParsedBinaryV2) & {
+  kind: "field_loss"; target_kind: "vehicle"; vehicle_id: string;
+  metrics: QualityMetrics; candidates: WheelFitment[]; vehicle_payload: VehicleRawPayloadV2; quality: RawEvidenceQualityReportV2;
+};
+export type RejectedQuarantineEvidenceV2 = QuarantineEvidenceMetadataV2 & (RawEvidenceTextV2 | RawEvidenceUnparsedBinaryV2) & {
+  kind: "response_rejected"; target_kind: "tire" | "vehicle" | "recall";
+  stage: "parser" | "schema"; previous_snapshot_id: null;
+  metrics: null; candidates: []; quality: null;
+};
+export type QuarantineEvidenceV2 = TireQuarantineEvidenceV2 | VehicleQuarantineEvidenceV2 | RejectedQuarantineEvidenceV2;
+
+/** Binary approval has its own metadata-only envelope; it grants no content path. */
+export interface BinaryQuarantineReviewRequestV2 {
+  action: "approve" | "keep_quarantined";
+  expected_revision: number;
+  operator: string;
+  reason: string;
+  confirmed_loss: true;
+  expected_binding_hash: string;
+}
+export interface BinaryQuarantineParseProvenanceV2 {
+  contract: "vehicle-pdf-parse@1";
+  method: "sha256_bound_reviewed_mapping";
+  mapping_id: string;
+  source_raw_hash: string;
+  bundle_id: string;
+  mapping_file_sha256: string;
+}
+export type BinaryQuarantinePayloadV2 = Omit<VehicleRawPayloadV2, "parse_method" | "mapping_id" | "parse_provenance"> & {
+  parse_method: "sha256_bound_reviewed_mapping";
+  mapping_id: string;
+  parse_provenance: BinaryQuarantineParseProvenanceV2;
+};
+export interface BinaryQuarantineReviewEvidenceV2 {
+  body_encoding: "binary";
+  body: null;
+  raw_capture_id: string;
+  raw_hash: string;
+  byte_count: number;
+  content_type: "application/pdf";
+  source_url: string;
+  parser_version: string;
+  parser_identity: ParserIdentity;
+  parse_provenance: BinaryQuarantineParseProvenanceV2;
+}
+export interface BinaryQuarantineReviewStateV2 {
+  quarantine_id: string;
+  scope: "local_workspace";
+  state: QuarantineReviewState["state"];
+  revision: number;
+  can_approve: boolean;
+  restriction: "identity_or_alignment_requires_repair" | null;
+  baseline_snapshot_id: string;
+  current_snapshot_id: string | null;
+  applied_query_id: string | null;
+  comparison: { before: BinaryQuarantinePayloadV2; candidate: BinaryQuarantinePayloadV2 };
+  history: QuarantineReviewEvent[];
+  history_truncated: boolean;
+  evidence_format: "raw-evidence-v2";
+  binding_contract: "vehicle-binary@1";
+  binding_hash: string;
+  raw_evidence: BinaryQuarantineReviewEvidenceV2;
+}

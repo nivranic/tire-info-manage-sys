@@ -1,0 +1,111 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/Contents 7 0 R /MediaBox [ 0 0 595 842 ] /Parent 6 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+4 0 obj
+<<
+/PageMode /UseNone /Pages 6 0 R /Type /Catalog
+>>
+endobj
+5 0 obj
+<<
+/Author (Project synthetic fixture authors) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (SYNTHETIC CONTRACT FIXTURE - synthetic-same-code-different-namespace) /Trapped /False
+>>
+endobj
+6 0 obj
+<<
+/Count 1 /Kids [ 3 0 R ] /Type /Pages
+>>
+endobj
+7 0 obj
+<<
+/Length 2734
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 8 Tf 9.6 TL ET
+BT 1 0 0 1 24 818 Tm (SYNTHETIC CONTRACT FIXTURE - NOT A REAL PROFESSIONAL TEST) Tj T* ET
+BT 1 0 0 1 24 800 Tm (SYNTHETIC synthetic-same-code-different-namespace) Tj T* ET
+BT 1 0 0 1 24 782 Tm (https://fixture.invalid/professional-golden/synthetic-same-code-different-namespace) Tj T* ET
+BT 1 0 0 1 24 764 Tm (SYNTHETIC participant a) Tj T* ET
+BT 1 0 0 1 24 746 Tm (SYNTHETIC brand = Synthetic) Tj T* ET
+BT 1 0 0 1 24 728 Tm (SYNTHETIC model = Synthetic Tire) Tj T* ET
+BT 1 0 0 1 24 710 Tm (SYNTHETIC manufacturer_product_code = SYNTHETIC-001) Tj T* ET
+BT 1 0 0 1 24 692 Tm (SYNTHETIC region = CN) Tj T* ET
+BT 1 0 0 1 24 674 Tm (SYNTHETIC size = 245/40R20) Tj T* ET
+BT 1 0 0 1 24 656 Tm (SYNTHETIC load_index = 101) Tj T* ET
+BT 1 0 0 1 24 638 Tm (SYNTHETIC speed_rating = Y) Tj T* ET
+BT 1 0 0 1 24 620 Tm (SYNTHETIC xl = True) Tj T* ET
+BT 1 0 0 1 24 602 Tm (SYNTHETIC hl = False) Tj T* ET
+BT 1 0 0 1 24 584 Tm (SYNTHETIC oe_mark = SYNTH) Tj T* ET
+BT 1 0 0 1 24 566 Tm (SYNTHETIC acoustic_technology = Synthetic acoustic) Tj T* ET
+BT 1 0 0 1 24 548 Tm (SYNTHETIC run_flat = False) Tj T* ET
+BT 1 0 0 1 24 530 Tm (SYNTHETIC product_code_type = MSPN) Tj T* ET
+BT 1 0 0 1 24 512 Tm (SYNTHETIC participant b) Tj T* ET
+BT 1 0 0 1 24 494 Tm (SYNTHETIC brand = Synthetic) Tj T* ET
+BT 1 0 0 1 24 476 Tm (SYNTHETIC model = Synthetic Tire) Tj T* ET
+BT 1 0 0 1 24 458 Tm (SYNTHETIC manufacturer_product_code = SYNTHETIC-001) Tj T* ET
+BT 1 0 0 1 24 440 Tm (SYNTHETIC region = CN) Tj T* ET
+BT 1 0 0 1 24 422 Tm (SYNTHETIC size = 245/40R20) Tj T* ET
+BT 1 0 0 1 24 404 Tm (SYNTHETIC load_index = 101) Tj T* ET
+BT 1 0 0 1 24 386 Tm (SYNTHETIC speed_rating = Y) Tj T* ET
+BT 1 0 0 1 24 368 Tm (SYNTHETIC xl = True) Tj T* ET
+BT 1 0 0 1 24 350 Tm (SYNTHETIC hl = False) Tj T* ET
+BT 1 0 0 1 24 332 Tm (SYNTHETIC oe_mark = SYNTH) Tj T* ET
+BT 1 0 0 1 24 314 Tm (SYNTHETIC acoustic_technology = Synthetic acoustic) Tj T* ET
+BT 1 0 0 1 24 296 Tm (SYNTHETIC run_flat = False) Tj T* ET
+BT 1 0 0 1 24 278 Tm (SYNTHETIC product_code_type = EAN) Tj T* ET
+BT 1 0 0 1 24 260 Tm (SYNTHETIC 20 C; local contract exercise; no real road observations) Tj T* ET
+BT 1 0 0 1 24 242 Tm (SYNTHETIC metric wet: SYNTHETIC wet method; unit=m) Tj T* ET
+BT 1 0 0 1 24 224 Tm (SYNTHETIC metric noise: SYNTHETIC noise method; unit=dB) Tj T* ET
+BT 1 0 0 1 24 206 Tm (SYNTHETIC metric dry: SYNTHETIC signed-zero method; unit=points) Tj T* ET
+BT 1 0 0 1 24 188 Tm (SYNTHETIC A 38.00 m rank 3) Tj T* ET
+BT 1 0 0 1 24 170 Tm (SYNTHETIC B 40.0 m rank 5) Tj T* ET
+BT 1 0 0 1 24 152 Tm (SYNTHETIC A 70 dB) Tj T* ET
+BT 1 0 0 1 24 134 Tm (SYNTHETIC A -0 points) Tj T* ET
+BT 1 0 0 1 24 116 Tm (SYNTHETIC B 0 points rank 8) Tj T* ET
+ 
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000061 00000 n 
+0000000092 00000 n 
+0000000199 00000 n 
+0000000392 00000 n 
+0000000460 00000 n 
+0000000805 00000 n 
+0000000864 00000 n 
+trailer
+<<
+/ID 
+[<94f448da98fab86093c73b39c5cb8b7e><94f448da98fab86093c73b39c5cb8b7e>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 5 0 R
+/Root 4 0 R
+/Size 8
+>>
+startxref
+3649
+%%EOF

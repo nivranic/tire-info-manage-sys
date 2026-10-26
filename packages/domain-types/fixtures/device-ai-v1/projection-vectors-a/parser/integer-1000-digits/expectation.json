@@ -1,0 +1,24 @@
+{
+  "canonical_ast": {
+    "byte_count": 1010,
+    "path": "parser/integer-1000-digits/canonical.json",
+    "sha256": "5b08db4c1704f8435374384d7a7e2ed61364f15590f328330d7f3671b380a933"
+  },
+  "core_sha256": "c8633ac0108b2b624e532afc157b91568d0381190f18aa70160931a5c7a2f774",
+  "expected_error_code": null,
+  "input": {
+    "byte_count": 1010,
+    "path": "parser/integer-1000-digits/input.bin",
+    "sha256": "5b08db4c1704f8435374384d7a7e2ed61364f15590f328330d7f3671b380a933"
+  },
+  "schema": "internal-device-ai-parser-vector@1",
+  "source_backed_domain_fact": false,
+  "source_kind": "synthetic_parser_literal",
+  "state": "accepted",
+  "token_dto_ast": {
+    "byte_count": 1055,
+    "path": "parser/integer-1000-digits/tokens.json",
+    "sha256": "6fea25c4d5b2bdfde87ae8ae6ed51f160f8e8e9dd4047eff5b08df83ab2b49a0"
+  },
+  "warning": "Synthetic JSON grammar/lexeme example, not a tire measurement or a frozen domain fact. Floating tokens retain source binary64 semantics, including finite underflow; lexeme retention adds no precision. No Host parity run or public wire freeze."
+}

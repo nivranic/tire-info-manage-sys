@@ -1,5 +1,5 @@
 /**
- * device-ai internal, wire not frozen (roundtable D15 layered strategy).
+ * Internal projection implementation for the frozen device-AI @1 contracts.
  *
  * Host-side port of the server projection core (apps/api/tire_api/
  * device_ai_projection.py). Round 50 P1-4b extends the phase-A tire
@@ -42,22 +42,14 @@ import {
   type DeviceAiErrorCode,
   type DeviceAiJsonAst,
 } from "./device-ai-exact";
-import type { DeviceAiSelectorWire, DeviceAiTireSelectorWire } from "./device-ai-host";
+import type { DeviceAiProjectionMode, DeviceAiSelectorWire, DeviceAiTireSelectorWire } from "@tire/domain-types";
+export type { DeviceAiProjectionMode } from "@tire/domain-types";
 
 export const DEVICE_AI_PROJECTION_POLICY_VERSION = "device-ai-projection@1";
 export const DEVICE_AI_MAX_PROJECTION_BYTES = 44_000;
 export const DEVICE_AI_MAX_PACKAGE_BYTES_PORT = 8 * 1024 * 1024;
 export const DEVICE_AI_MAX_META_INTEGER = 9_007_199_254_740_991;
 export const DEVICE_AI_SELECTION_NAMESPACE = "device-ai-selection@1";
-
-/** The six projection modes of the Python core gate (L718-720). */
-export type DeviceAiProjectionMode =
-  | "single_observation"
-  | "frozen_decision_closure"
-  | "complete_observation"
-  | "complete_formal_observation"
-  | "candidate_page_context"
-  | "complete_event_context";
 
 const PROJECTION_MODES: ReadonlySet<string> = new Set([
   "single_observation", "frozen_decision_closure", "complete_observation",

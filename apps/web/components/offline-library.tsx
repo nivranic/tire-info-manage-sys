@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { GarageRecord, OfflineHostStatus, AnyOfflinePlan as OfflinePlan, OfflineReferenceV2 as OfflineReference, OfflineReadResult, OfflineScopeV2 as OfflineScope, OfflineSearchResult, OfflineSlot, WatchItem } from "@tire/domain-types";
 import { useWorkbenchPlatform, type WorkbenchPlatform } from "./workbench-platform";
+import { useThemePreferences } from "./theme-preferences";
 import { defaultOfflineScope } from "./offline-values";
 import { offlineError } from "./offline-crypto";
 import { resetBrowserOfflineOwner } from "./browser-offline-store";
@@ -131,7 +132,7 @@ export default function OfflineLibraryDialog({ platform: supplied, references, o
   platform?: WorkbenchPlatform; references?: OfflineReference[]; onlineEnabled?: boolean; onClose: () => void;
 }) {
   const inherited = useWorkbenchPlatform(), platform = supplied || inherited, storage = platform.offline;
-  const [portalTheme] = useState(() => typeof document === "undefined" ? "light" : document.querySelector<HTMLElement>(".app-shell")?.dataset.theme || document.documentElement.dataset.mobileTheme || "light");
+  const { appearance } = useThemePreferences();
   const dialog = useRef<HTMLDialogElement>(null), generation = useRef(0);
   const [status, setStatus] = useState<OfflineHostStatus | null>(null), [items, setItems] = useState<OfflineSlot[]>([]);
   const [selected, setSelected] = useState<OfflineSlot | null>(null), [search, setSearch] = useState<OfflineSearchResult | null>(null), [detail, setDetail] = useState<OfflineReadResult | null>(null);
@@ -187,7 +188,7 @@ export default function OfflineLibraryDialog({ platform: supplied, references, o
     });
   }
   if (typeof document === "undefined") return null;
-  return createPortal(<div className="offline-portal" data-theme={portalTheme}><dialog ref={dialog} className="fact-review-dialog offline-dialog" aria-labelledby="offline-library-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
+  return createPortal(<div className="offline-portal" data-theme={appearance.palette}><dialog ref={dialog} className="fact-review-dialog offline-dialog" aria-labelledby="offline-library-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">DEVICE HISTORY</span><h2 id="offline-library-title">设备离线资料库</h2><p>主动查看本设备保存的历史资料。</p></div><button type="button" className="text-button" onClick={onClose}>关闭</button></header>
     <div className="offline-content"><div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 与在线查询分别使用</strong><span>打开此库不需要 API 连接。这里的资料不表示当前参数、当前召回状态或具体轮胎适用性，也不会自动回填在线查询。</span></div>
       {storage ? <DeviceFallbackPolicySummary storage={storage} /> : null}

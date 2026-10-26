@@ -1,5 +1,5 @@
 /**
- * device-ai internal, wire not frozen (roundtable D15 layered strategy).
+ * Host SDK for the frozen device-AI @1 request contracts.
  *
  * Host-side SDK layer for the device-AI bridge (round 50, P1-3 host step 2).
  * Four concerns, none of them a Provider call and none of them a new wire:
@@ -27,9 +27,8 @@
  *     authoritative vectors) across tire single_observation /
  *     frozen_decision_closure plus the vehicle / recall / recall_search
  *     domains, so projection_sha256 and the resolved closure are recomputed
- *     locally (projection_binding="recomputed"). The three new namespaces are
- *     proposals pending Root approval; they are centralized below so a rename
- *     is a single edit.
+ *     locally (projection_binding="recomputed"). The namespaces were approved
+ *     by Root and are centralized below (decoder-spec 4.3 / ADR-2026-052).
  *  3. DeviceAiJournal — AES-GCM encrypted append-only journal with the five
  *     fences: owner, generation, SHA chain, monotonic clock, session. The key
  *     is injected by the Host (Web uses the same non-extractable IndexedDB
@@ -39,9 +38,9 @@
  *  4. resolveUnknownOutcome — N18 lookup-first recovery after a disconnect or
  *     crash. Read-only; it never resubmits on its own.
  *
- * Deliberately NOT exported from index.ts: the wire is not frozen. Import this
- * module by path (packages/api-client/src/device-ai-host.ts) until the
- * protocol is approved and frozen.
+ * Shared DTOs live in @tire/domain-types and are re-exported here for existing
+ * source-path consumers. The public package entry also exports this SDK. Host
+ * AST, journal and preview inputs remain SDK implementation types, not API DTOs.
  */
 import { ApiError, deviceAiInternalRequest, deviceAiInternalStreamDetail } from "./index";
 import {
@@ -50,12 +49,27 @@ import {
   deviceAiDigest,
   type DeviceAiJsonAst,
 } from "./device-ai-exact";
-import { projectDeviceAiPack, type DeviceAiProjectionMode } from "./device-ai-projection";
-import type { AIStreamAcceptance, AIStreamDetail } from "@tire/domain-types";
+import { projectDeviceAiPack } from "./device-ai-projection";
+import type {
+  AIStreamAcceptance, AIStreamDetail,
+  DeviceAiTireSelectorWire, DeviceAiSelectorWire, DeviceAiPrepareSelectorWire,
+  DeviceAiPrepareProjectionMode, DeviceAiProjectionMode, DeviceAiOriginBindingWire,
+  DeviceAiPrepareBody, DeviceAiProviderConsentBody, DeviceAiSubmissionBody,
+  DeviceAiStreamSubmission, DeviceAiPreparationView, DeviceAiPrepareResultView,
+} from "@tire/domain-types";
+export type {
+  DeviceAiTireReferenceWire, DeviceAiVehicleReferenceWire, DeviceAiRecallReferenceWire,
+  DeviceAiRecallSearchReferenceWire, DeviceAiTestEventReferenceWire, DeviceAiReferenceWire,
+  DeviceAiTireSelectorWire, DeviceAiVehicleSelectorWire, DeviceAiRecallSelectorWire,
+  DeviceAiRecallSearchSelectorWire, DeviceAiSelectorWire, DeviceAiPrepareSelectorWire,
+  DeviceAiPrepareProjectionMode, DeviceAiProjectionMode, DeviceAiOriginBindingWire,
+  DeviceAiPrepareBody, DeviceAiProviderConsentBody, DeviceAiSubmissionBody,
+  DeviceAiStreamSubmission, DeviceAiPreparationView, DeviceAiPrepareResultView,
+} from "@tire/domain-types";
 
 // ---------------------------------------------------------------------------
-// Namespaces and schemas (proposals pending Root approval; fingerprint-spec
-// sections 2/3/4 and the journal schemas are Host-side internal contracts).
+// Approved namespaces (fingerprint-spec sections 2/3/4, ADR-2026-052).
+// Journal schemas remain Host-side contracts, separate from the HTTP DTOs.
 // ---------------------------------------------------------------------------
 
 export const DEVICE_AI_SELECTION_NAMESPACE = "device-ai-selection@1";
@@ -184,100 +198,12 @@ export async function questionSha256(normalizedQuestion: string): Promise<string
 }
 
 // ---------------------------------------------------------------------------
-// selector wire shapes. The server prepare DTO is four-domain (P1-4a:
-// tire / vehicle / recall / recall_search); the local preview additionally
-// accepts test_event so computeLocalPreview can reproduce the projection
-// port's restricted-rejection for it (the prepare assertion stays closed to
-// the four open domains — assertDeviceAiPrepareSelector).
-// ---------------------------------------------------------------------------
-
-export interface DeviceAiTireReferenceWire {
-  kind: "tire";
-  snapshot_id: string;
-  variant_id: string;
-  verification_id: string;
-}
-export interface DeviceAiVehicleReferenceWire {
-  kind: "vehicle";
-  snapshot_id: string;
-  verification_id: string;
-}
-export interface DeviceAiRecallReferenceWire {
-  kind: "recall";
-  snapshot_id: string;
-  recall_revision_id: string | null;
-  verification_id: string;
-}
-export interface DeviceAiRecallSearchReferenceWire {
-  kind: "recall_search";
-  snapshot_id: string;
-  verification_id: string;
-}
-export interface DeviceAiTestEventReferenceWire {
-  kind: "test_event";
-  event_id: string;
-  event_revision: number;
-}
-export type DeviceAiReferenceWire =
-  | DeviceAiTireReferenceWire
-  | DeviceAiVehicleReferenceWire
-  | DeviceAiRecallReferenceWire
-  | DeviceAiRecallSearchReferenceWire
-  | DeviceAiTestEventReferenceWire;
-export interface DeviceAiTireSelectorWire {
-  kind: "tire";
-  member_key: string;
-  document_id: string | null;
-  record_index: number | null;
-  reference: DeviceAiTireReferenceWire;
-}
-export interface DeviceAiVehicleSelectorWire {
-  kind: "vehicle";
-  member_key: string;
-  document_id: string | null;
-  record_index: number | null;
-  reference: DeviceAiVehicleReferenceWire;
-}
-export interface DeviceAiRecallSelectorWire {
-  kind: "recall";
-  member_key: string;
-  document_id: string | null;
-  record_index: number | null;
-  reference: DeviceAiRecallReferenceWire;
-}
-export interface DeviceAiRecallSearchSelectorWire {
-  kind: "recall_search";
-  member_key: string;
-  document_id: string | null;
-  record_index: number | null;
-  reference: DeviceAiRecallSearchReferenceWire;
-}
-export interface DeviceAiSelectorWire {
-  kind: DeviceAiReferenceWire["kind"];
-  member_key: string;
-  document_id: string | null;
-  record_index: number | null;
-  reference: DeviceAiReferenceWire;
-}
-
-// ---------------------------------------------------------------------------
 // Prepare-wire domain set (P1-4c). The server DeviceSelector Literal is exactly
 // tire / vehicle / recall / recall_search (device_ai.py L121; test_event stays
 // out — N27 closed set, DTO-layer 422), and DeviceAIPrepareRequest.projection_
 // mode is the five-value Literal WITHOUT complete_event_context (L157-158).
 // ---------------------------------------------------------------------------
 
-export type DeviceAiPrepareSelectorWire =
-  | DeviceAiTireSelectorWire
-  | DeviceAiVehicleSelectorWire
-  | DeviceAiRecallSelectorWire
-  | DeviceAiRecallSearchSelectorWire;
-export type DeviceAiPrepareProjectionMode =
-  | "single_observation"
-  | "frozen_decision_closure"
-  | "complete_observation"
-  | "complete_formal_observation"
-  | "candidate_page_context";
 export const DEVICE_AI_PREPARE_PROJECTION_MODES: ReadonlySet<string> = new Set([
   "single_observation", "frozen_decision_closure", "complete_observation",
   "complete_formal_observation", "candidate_page_context",
@@ -462,8 +388,13 @@ export async function deviceContextFingerprint(input: DeviceAiContextIdentityInp
   const canonicalBytesOrder = (nodes: DeviceAiJsonAst[]): DeviceAiJsonAst[] =>
     // Spec section 3: sort by the node's canonical bytes, but keep the ORIGINAL
     // AST nodes (a JSON.parse round-trip would destroy number lexemes).
-    nodes.map(node => ({ node, text: canonicalDeviceAiJson(node) }))
-      .sort((a, b) => (a.text < b.text ? -1 : a.text > b.text ? 1 : 0)).map(pair => pair.node);
+    nodes.map(node => ({ node, bytes: new TextEncoder().encode(canonicalDeviceAiJson(node)) }))
+      .sort((a, b) => {
+        for (let i = 0; i < Math.min(a.bytes.length, b.bytes.length); i++) {
+          if (a.bytes[i] !== b.bytes[i]) return a.bytes[i] - b.bytes[i];
+        }
+        return a.bytes.length - b.bytes.length;
+      }).map(pair => pair.node);
   const ast: DeviceAiJsonAst = {
     device_citations: canonicalBytesOrder(input.device_citations),
     domain_boundaries: canonicalBytesOrder(input.domain_boundaries),
@@ -488,17 +419,6 @@ export async function deviceContextFingerprint(input: DeviceAiContextIdentityInp
 // authorization objects and must never share a fingerprint.
 // ---------------------------------------------------------------------------
 
-export interface DeviceAiOriginBindingWire {
-  expected_profile_id: string;
-  expected_owner_epoch: number;
-  slot_id: string;
-  expected_generation: number;
-  package_id: string;
-  expected_sha256: string;
-  expected_byte_count: number;
-  owner_scope_id: string;
-  package_schema: "offline-pack@1" | "offline-pack@2";
-}
 export interface DeviceAiLocalPreviewInput {
   questionSha256Value: string;
   includeContextIds: string[];
@@ -989,71 +909,6 @@ export class DeviceAiJournal {
 // Host client — prepare/lookup/read + stream submit + attempt lookup.
 // ---------------------------------------------------------------------------
 
-export type DeviceAiPrepareBody = {
-  package_id: string;
-  expected_sha256: string;
-  expected_byte_count: number;
-  expected_schema: "offline-pack@1" | "offline-pack@2";
-  expected_owner_scope_id: string;
-  selectors: DeviceAiPrepareSelectorWire[];
-  projection_mode: DeviceAiPrepareProjectionMode;
-  approved_closure: DeviceAiPrepareSelectorWire[] | null;
-  expected_projection_sha256: string;
-  question_sha256: string;
-  host_receipt_id: string;
-  intent_id: string;
-};
-
-export interface DeviceAiProviderConsentBody {
-  expected_pack_fingerprint: string;
-  expected_device_context_fingerprint: string;
-  question_sha256: string;
-  provider: string;
-  model: string;
-  expected_provider_policy_fingerprint: string;
-}
-
-export interface DeviceAiSubmissionBody {
-  prepare_id: string;
-  host_receipt_id: string;
-  device_context_fingerprint: string;
-  provider_consent: DeviceAiProviderConsentBody;
-}
-
-export interface DeviceAiStreamSubmission {
-  pack_id: string;
-  /** Raw question text; normalized (trim-once) exactly once before dispatch. */
-  question: string;
-  prepare_id: string;
-  host_receipt_id: string;
-  device_context_fingerprint: string;
-  provider_consent: DeviceAiProviderConsentBody;
-}
-
-/** Server preparation view (device_ai_routes.py _view), replay-tolerant. */
-export interface DeviceAiPrepareResultView {
-  id: string;
-  created_at: string;
-  expires_at: string;
-  expired: boolean;
-  idempotency_key: string;
-  host_receipt_id: string;
-  intent_id: string;
-  pack_id: string;
-  offline_pack_id: string;
-  question_sha256: string;
-  selection_sha256: string;
-  projection_sha256: string;
-  projection_byte_count: number;
-  device_context_fingerprint: string;
-  request_hash: string;
-  contract: Record<string, unknown>;
-  pack: Record<string, unknown>;
-  replayed: boolean;
-  /** Present on fresh creation only (server replay branch omits it). */
-  provider_preview?: Record<string, unknown>;
-}
-
 const assertClosedFields = (body: object, fields: readonly string[], label: string): void => {
   const keys = Object.keys(body);
   const expected = [...fields];
@@ -1189,17 +1044,25 @@ export function buildDeviceAiPrepareBody(input: DeviceAiPrepareBodyInput): Devic
   return body;
 }
 
-function checkedDeviceAiPrepareView(value: unknown): DeviceAiPrepareResultView {
+function checkedDeviceAiPreparationView(value: unknown): DeviceAiPreparationView {
   if (!value || typeof value !== "object") throw new Error("设备 AI 准备记录响应格式不完整。");
-  const view = value as Partial<DeviceAiPrepareResultView>;
+  const view = value as Partial<DeviceAiPreparationView>;
   if (!isPlainString(view.id, 64) || !isPlainString(view.pack_id, 64)
     || !isHash64(view.projection_sha256) || !isHash64(view.device_context_fingerprint)
     || !isHash64(view.question_sha256) || !isHash64(view.selection_sha256)
-    || typeof view.replayed !== "boolean" || typeof view.expired !== "boolean"
+    || typeof view.expired !== "boolean"
     || !isRfc3339WithOffset(view.expires_at)) {
     throw new Error("设备 AI 准备记录响应格式不完整。");
   }
-  return value as DeviceAiPrepareResultView;
+  return value as DeviceAiPreparationView;
+}
+
+function checkedDeviceAiPrepareResult(value: unknown): DeviceAiPrepareResultView {
+  const view = checkedDeviceAiPreparationView(value);
+  if (typeof (view as Partial<DeviceAiPrepareResultView>).replayed !== "boolean") {
+    throw new Error("设备 AI 准备记录响应格式不完整。");
+  }
+  return view as DeviceAiPrepareResultView;
 }
 
 export class DeviceAiHostClient {
@@ -1222,23 +1085,23 @@ export class DeviceAiHostClient {
       }),
       signal,
     });
-    return checkedDeviceAiPrepareView(value);
+    return checkedDeviceAiPrepareResult(value);
   }
 
   /** GET /v1/ai/device-evidence-packs/lookup — read-only recovery by key. */
-  async lookupPrepare(key: string, signal?: AbortSignal): Promise<DeviceAiPrepareResultView> {
+  async lookupPrepare(key: string, signal?: AbortSignal): Promise<DeviceAiPreparationView> {
     const idempotencyKey = canonicalDeviceAiUuid(key);
     const value = await deviceAiInternalRequest<unknown>(
       `/v1/ai/device-evidence-packs/lookup?${new URLSearchParams({ mode: "history", idempotency_key: idempotencyKey })}`, { signal });
-    return checkedDeviceAiPrepareView(value);
+    return checkedDeviceAiPreparationView(value);
   }
 
   /** GET /v1/ai/device-evidence-packs/{prepare_id} — owned immutable read. */
-  async readPrepare(prepareId: string, signal?: AbortSignal): Promise<DeviceAiPrepareResultView> {
+  async readPrepare(prepareId: string, signal?: AbortSignal): Promise<DeviceAiPreparationView> {
     if (!isPlainString(prepareId, 64)) hostFail("device_ai_host_invalid_argument");
     const value = await deviceAiInternalRequest<unknown>(
       `/v1/ai/device-evidence-packs/${encodeURIComponent(prepareId)}?mode=history`, { signal });
-    return checkedDeviceAiPrepareView(value);
+    return checkedDeviceAiPreparationView(value);
   }
 
   /**

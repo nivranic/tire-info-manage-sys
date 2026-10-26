@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import threading
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -96,7 +97,11 @@ def allowed_origins() -> list[str]:
     return result
 
 
-def create_app(database_url: str | None = None, adapter_registry: Any = None) -> FastAPI:
+def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
+               external_fact_routing: dict[str, str] | None = None) -> FastAPI:
+    from .material_source_policy import load_policies
+    from .material_source_transport import MaterialSourceTransport
+    material_policies = load_policies()
     if adapter_registry is None:
         from .adapters import registry
         adapter_registry = registry
@@ -126,16 +131,39 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(_request: Request, error: RequestValidationError) -> JSONResponse:
+        if getattr(_request.scope.get('route'), 'path', None) in {
+                '/v1/ai/price-versions', '/v1/ai/price-planning'}:
+            # Never echo submitted URL credentials, cookie identities or validation context.
+            return JSONResponse(status_code=422, headers={'Cache-Control': 'no-store'}, content={'detail': {
+                'code': 'ai_price_invalid_request', 'message': '费用规划请求格式不正确，请核对填写内容。'}})
         # Do not echo rejected bodies: non-finite JSON values also cannot be
         # serialized by the default handler, turning a client error into a 500.
-        return JSONResponse(status_code=422, content={"detail": [
+        errors = [
             {"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
-            for item in error.errors()[:20]]})
+            for item in error.errors()[:20]]
+        if (_request.method == "POST" and getattr(_request.scope.get("route"), "path", None)
+                == "/v1/test-events/{event_id}/preference-interpretation"):
+            return JSONResponse(status_code=422, content={"detail": {
+                "code": "invalid_preference_interpretation", "message": "本次个人解读请求格式不正确，请核对选择与绑定。",
+                "errors": errors}})
+        if (_request.method == "POST" and getattr(_request.scope.get("route"), "path", None)
+                == "/v1/test-events/{event_id}/candidate-interpretation"):
+            return JSONResponse(status_code=422, headers={"Cache-Control": "no-store"}, content={"detail": {
+                "code": "test_candidate_invalid_request", "message": "本次候选解读请求格式不正确，请核对选择与绑定。",
+                "errors": errors}})
+        return JSONResponse(status_code=422, content={"detail": errors})
     app.state.database = database
     app.state.registry = adapter_registry
     app.state.telemetry = telemetry
     from .auth import register_auth_routes
     register_auth_routes(app)
+    from .webhooks import register_webhook_routes
+    register_webhook_routes(app)
+    from .external_api import register_external_api_routes
+    from .external_fact_reader import OwnedFactReader
+    fact_reader = OwnedFactReader(database.engine,
+        {} if external_fact_routing is None else external_fact_routing, adapter_registry)
+    register_external_api_routes(app, fact_reader=fact_reader)
     from .source_settings import register_source_setting_routes
     register_source_setting_routes(app)
     from .vehicles import register_vehicle_routes
@@ -184,6 +212,26 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
     register_review_routes(app)
     from .test_events import register_test_event_routes
     register_test_event_routes(app)
+    from .test_sku_links import register_test_sku_link_routes
+    register_test_sku_link_routes(app)
+    from .test_event_golden import register_test_event_golden_routes
+    register_test_event_golden_routes(app)
+    from .ai_pricing import register_ai_pricing_routes
+    register_ai_pricing_routes(app)
+    from .source_materials import register_source_material_routes
+    app.state.material_policies = material_policies
+    app.state.material_transport = MaterialSourceTransport()
+    register_source_material_routes(app)
+    from .interests import register_interest_routes
+    register_interest_routes(app)
+    from .personalized_feed import register_personal_feed_routes
+    register_personal_feed_routes(app)
+    from .recommendation_candidates import register_fitment_candidate_routes
+    register_fitment_candidate_routes(app)
+    from .candidate_ai import register_candidate_ai_routes
+    register_candidate_ai_routes(app)
+    from .test_candidate_interpretation import register_test_candidate_interpretation_routes
+    register_test_candidate_interpretation_routes(app)
     from .ai_analysis import register_ai_routes
     register_ai_routes(app)
     from .ai_stream_routes import register_ai_stream_routes
@@ -213,6 +261,11 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
             return JSONResponse(status_code=403, content={"detail": "不允许此请求来源"})
         if request.headers.get("sec-fetch-site") == "cross-site":
             return JSONResponse(status_code=403, content={"detail": "不允许跨站请求"})
+        from .external_api import external_namespace
+        if external_namespace(request.url.path):
+            # The outer Bearer boundary already authenticated and counted this
+            # request. Cookies never create, bind or renew an external session.
+            return await call_next(request)
         sync_markers = request.headers.getlist("x-tire-offline-sync")
         expected_owners = request.headers.getlist("x-tire-offline-expected-owner")
         offline_sync = bool(sync_markers or expected_owners)
@@ -278,6 +331,11 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
                        allow_headers=["Content-Type", "Idempotency-Key", "X-Tire-Offline-Sync",
                                       "X-Tire-Offline-Expected-Owner"],
                        expose_headers=[OFFLINE_SYNC_OWNER_HEADER])
+    @app.middleware('http')
+    async def separate_external_authentication(request: Request, call_next):
+        from .external_api import external_boundary
+        return await external_boundary(request, call_next, database, origins=origins)
+
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]", "testserver"])
     app.add_middleware(RequestTelemetryMiddleware, runtime=telemetry)
 
@@ -326,8 +384,14 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
     @app.post("/v1/sources/{source_id}/live-query")
     async def live_query(source_id: str, payload: LiveQueryRequest, request: Request,
                          db: Session = Depends(get_db)) -> dict[str, Any]:
-        return await QueryService(db, adapter_registry).execute(source_id, payload, request.state.session_id,
-                                                              audience='programmatic')
+        from .query_ownership import QueryOwnershipError, capture_query_actor
+        try:
+            actor = None if payload.consent_id else capture_query_actor(db, request.state.session_id)
+            return await QueryService(db, adapter_registry).execute(
+                source_id, payload, request.state.session_id, audience='programmatic', owner_actor=actor)
+        except QueryOwnershipError as error:
+            status = 401 if error.code == 'query_actor_invalid' else 409
+            raise HTTPException(status, {'code': error.code}) from None
 
     @app.post("/v1/fallback-consents", status_code=201)
     def consent(payload: ConsentRequest, request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -437,4 +501,22 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None) ->
     return app
 
 
-app = create_app()
+app: FastAPI
+_default_app_lock = threading.Lock()
+_default_app_owner: int | None = None
+
+
+def __getattr__(name: str) -> Any:
+    global _default_app_owner
+    if name != "app":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    if _default_app_owner == threading.get_ident():
+        raise RuntimeError("recursive default app initialization")
+    with _default_app_lock:
+        if "app" not in globals():
+            _default_app_owner = threading.get_ident()
+            try:
+                globals()["app"] = create_app()
+            finally:
+                _default_app_owner = None
+        return globals()["app"]

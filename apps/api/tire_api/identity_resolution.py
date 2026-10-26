@@ -322,6 +322,9 @@ def append_decision(db, variant_id, payload, session_id, idempotency_key):
     db.add(row)
     shared.audit(session_id, 'identity_resolution_changed', variant_id=variant_id, target_id=payload.target_id,
                  revision=row.revision, event_id=row.id, action_kind=row.action)
+    db.flush()
+    from .interest_events import publish
+    publish(db, 'tire_identity', row, allow_indeterminate=True)
     db.commit()
     return {'event': serialize(row), 'review': review(db, variant_id), 'idempotent_replay': False}
 

@@ -1,0 +1,18 @@
+{
+  "canonical_projection": {
+    "byte_count": 2197,
+    "path": "domain/empty-vehicle-complete/projection.canonical.json",
+    "sha256": "d88874aeffbe13238bac2c866727da10cda622cd75c46fc4ead60b3ec6b95c9e"
+  },
+  "data_state": "local_snapshot",
+  "expected_error_code": null,
+  "member_count": 1,
+  "privacy_class": "private",
+  "source_refresh_performed": false,
+  "state": "accepted",
+  "token_dto_projection": {
+    "byte_count": 2422,
+    "path": "domain/empty-vehicle-complete/projection.tokens.json",
+    "sha256": "b7d13422742506b47e5b79b73441a338541f9797fca537d320cb58950301303b"
+  }
+}

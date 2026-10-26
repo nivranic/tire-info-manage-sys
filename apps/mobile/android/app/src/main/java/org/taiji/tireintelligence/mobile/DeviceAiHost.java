@@ -632,6 +632,7 @@ final class DeviceAiHost {
         List<JSONObject> selected = selectorList(input.opt("selected"));
         List<JSONObject> closure = selectorList(input.opt("resolved_closure"));
         if (selected.isEmpty() || closure.isEmpty()) throw fail("device_ai_host_invalid_argument");
+        closure.sort(DeviceAiHost::byMemberKey);
         JSONObject origin = input.optJSONObject("origin");
         requireOrigin(origin);
         Map<String, Object> intent = new LinkedHashMap<>();
@@ -1242,10 +1243,18 @@ final class DeviceAiHost {
         if (!isPlainString(value.opt("id"), 64) || !isPlainString(value.opt("pack_id"), 64)
             || !isHash64(value.opt("projection_sha256")) || !isHash64(value.opt("device_context_fingerprint"))
             || !isHash64(value.opt("question_sha256")) || !isHash64(value.opt("selection_sha256"))
-            || !(value.opt("replayed") instanceof Boolean) || !(value.opt("expired") instanceof Boolean)
+            || !(value.opt("expired") instanceof Boolean)
             || !isPlainString(value.opt("expires_at"), 64) || !parseableTime(value.optString("expires_at")))
             throw new IllegalStateException("设备 AI 准备记录响应格式不完整。");
         return value;
+    }
+
+    /** Replay metadata belongs to the prepare POST response, not the owned GET view. */
+    static JSONObject checkedPrepareResponse(JSONObject value) {
+        JSONObject view = checkedPrepareView(value);
+        if (!(view.opt("replayed") instanceof Boolean))
+            throw new IllegalStateException("设备 AI 准备记录响应格式不完整。");
+        return view;
     }
 
     /** Closed subset of the sealed TS checkedAIStreamDetail shape check. */
@@ -1333,7 +1342,7 @@ final class DeviceAiHost {
             Map<String, String> headers = new LinkedHashMap<>();
             headers.put("content-type", "application/json");
             headers.put("idempotency-key", idempotencyKey);
-            return checkedPrepareView(dispatch("POST", "/v1/ai/device-evidence-packs", headers,
+            return checkedPrepareResponse(dispatch("POST", "/v1/ai/device-evidence-packs", headers,
                 objectWire(PREPARE_REQUEST_FIELDS, wire, new LinkedHashMap<>()).getBytes(StandardCharsets.UTF_8)));
         }
 

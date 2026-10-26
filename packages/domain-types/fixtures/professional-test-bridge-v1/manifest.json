@@ -1,0 +1,119 @@
+{
+  "schema": "professional-test-bridge-corpus@1",
+  "files": [
+    {
+      "path": "cases/real-r74-trwp-identity-unknown.json",
+      "role": "case",
+      "byte_count": 3507,
+      "sha256": "0e9a4aaa87afa5dc800d7af95804533320003e6117290799a1383600431b8f44"
+    },
+    {
+      "path": "cases/synthetic-exact-two.json",
+      "role": "case",
+      "byte_count": 18220,
+      "sha256": "c593b97c0ae3f4cb80f668251d3a70a97dce80a86691bb02c90dafbf67050c68"
+    },
+    {
+      "path": "cases/synthetic-identity-conflict.json",
+      "role": "case",
+      "byte_count": 15306,
+      "sha256": "3368167058ff3bf8f9bf53c273a5b3e5cc7e0c373647451f8c44a8ef8d4f747d"
+    },
+    {
+      "path": "cases/synthetic-incomplete-explicit.json",
+      "role": "case",
+      "byte_count": 14758,
+      "sha256": "d61891f07a58d7e43ef4d081b121b0d261c7bd480516e40be3df924d8dfa15ad"
+    },
+    {
+      "path": "cases/synthetic-manual-unknown.json",
+      "role": "case",
+      "byte_count": 8824,
+      "sha256": "8c40864c4c9c4bef7bccdf98302f0f06d76ae09ec0a6391b0bbe539169f6e868"
+    },
+    {
+      "path": "cases/synthetic-revoked-selection.json",
+      "role": "case",
+      "byte_count": 17019,
+      "sha256": "f024d5cbe8167820f1eb11488f3fa243df5ff19238a50cc702e23a11e0a7299c"
+    },
+    {
+      "path": "cases/synthetic-same-code-different-namespace.json",
+      "role": "case",
+      "byte_count": 18377,
+      "sha256": "d86453d1c19ed473323950b207e740f83076b7060d91111060355ab834372dae"
+    },
+    {
+      "path": "README.md",
+      "role": "readme",
+      "byte_count": 3002,
+      "sha256": "898a87c5d7155d5e97b682d70750a875b30425d056638fda6b9d61a15bc67992"
+    }
+  ],
+  "case_ids": [
+    "real-r74-trwp-identity-unknown",
+    "synthetic-exact-two",
+    "synthetic-identity-conflict",
+    "synthetic-incomplete-explicit",
+    "synthetic-manual-unknown",
+    "synthetic-revoked-selection",
+    "synthetic-same-code-different-namespace"
+  ],
+  "human_truth_qualification": "pending_external_review",
+  "external_refs": [
+    {
+      "ref_id": "synthetic-exact-two-original",
+      "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-exact-two.pdf",
+      "byte_count": 3961,
+      "sha256": "946e9122c017b3cb5b8f5ebad948849d069298c730e5c18fcf1fff50aad1e012"
+    },
+    {
+      "ref_id": "synthetic-manual-unknown-original",
+      "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-manual-unknown.pdf",
+      "byte_count": 3976,
+      "sha256": "0e402e0406ac70e4343222909b91729ebb8a109954f92d34bc4a38e39f15a050"
+    },
+    {
+      "ref_id": "synthetic-incomplete-explicit-original",
+      "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-incomplete-explicit.pdf",
+      "byte_count": 3873,
+      "sha256": "ed2dfea1701fe206be56bd9545a8d0da82626d47886fd296d9d2f5f884d42b82"
+    },
+    {
+      "ref_id": "synthetic-revoked-selection-original",
+      "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-revoked-selection.pdf",
+      "byte_count": 3985,
+      "sha256": "b49decaf8662d32eb00ca93ab56c3c68d61c088686a89ff23ecfa2d562ffadba"
+    },
+    {
+      "ref_id": "synthetic-same-code-different-namespace-original",
+      "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-same-code-different-namespace.pdf",
+      "byte_count": 4020,
+      "sha256": "0da34e3b73c25aa5dbfb19f26f2e46cfa0d710441b39a847620f881eac79a026"
+    },
+    {
+      "ref_id": "synthetic-identity-conflict-original",
+      "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-identity-conflict.pdf",
+      "byte_count": 3995,
+      "sha256": "b7fc8661a7991eb632964ca9ef2a3c2cc1557cd5747cc81a7a3310bc2bc31734"
+    },
+    {
+      "ref_id": "real-r74-trwp-identity-unknown-original",
+      "path": ".artifacts/r74-live-c726bf6f944a4e6fb094e7ec79188e23/review-original.pdf",
+      "byte_count": 3302848,
+      "sha256": "33471a0b0d0a8c2f172b61b034a8300c65e3ff2372c79782562048133606f635"
+    },
+    {
+      "ref_id": "real-r74-trwp-identity-unknown-capture_receipt",
+      "path": ".artifacts/r74-live-c726bf6f944a4e6fb094e7ec79188e23/capture-response.json",
+      "byte_count": 5395,
+      "sha256": "f783be6bb8a1dd10631e4e297df8104f238297db39c8e73eaa3f0cf5761547da"
+    },
+    {
+      "ref_id": "real-r74-trwp-identity-unknown-agent_review_record",
+      "path": ".artifacts/r74-pdf-review-8ef032fe57a44573b3c1f5e7cb771ad5/findings.json",
+      "byte_count": 6583,
+      "sha256": "3387534e41103f9b2d4e34b92631f2e9661243a1ceacb3f8fe0bc08eca0692c8"
+    }
+  ]
+}

@@ -12,6 +12,110 @@ from .domain import StrictModel, parse_size
 from .lifecycle import annotate_variants
 from .service import QueryService, timestamp
 from .vehicles import VehicleSnapshot, vehicle_provenance
+from .vehicle_raw import (FIRST_GENERATION_ID, PDF_URL, SOURCE_ID, SUPPORTED_RAW_SHA256,
+                          VehicleRawIntegrityError, VehicleUseNotAllowed,
+                          checked_vehicle_consumer_capsule, require_vehicle_consumer_use)
+
+
+def _binding_failed():
+    raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'})
+
+
+def restricted_vehicle_reference(reference):
+    """Frozen positive markers survive missing rows and illegal UTF-8 downgrades."""
+    return (reference.get('source_url') == PDF_URL or reference.get('raw_hash') == SUPPORTED_RAW_SHA256
+            or reference.get('vehicle_id') == FIRST_GENERATION_ID)
+
+
+def checked_vehicle_reference(db, reference, *, vehicle_id=None, frozen=False):
+    """Check identity/binding without rereading a genuine legacy frozen body."""
+    if type(reference) is not dict or type(reference.get('snapshot_id')) is not str or not reference['snapshot_id']:
+        _binding_failed()
+    if any(key not in reference for key in ('source_id', 'source_url', 'raw_hash', 'parser_version',
+                                            'parser_identity', 'observed_at')):
+        _binding_failed()
+    with db.no_autoflush:
+        snapshot = db.get(VehicleSnapshot, reference['snapshot_id'], populate_existing=True)
+        restricted = (restricted_vehicle_reference(reference) or vehicle_id == FIRST_GENERATION_ID
+            or snapshot is not None and (snapshot.body_encoding == 'binary'
+                or snapshot.source_id == SOURCE_ID and snapshot.vehicle_id == FIRST_GENERATION_ID))
+        try:
+            capsule = checked_vehicle_consumer_capsule(db, reference['snapshot_id'],
+                verification_id=reference.get('verification_id')) if restricted else None
+            if restricted and capsule is None:
+                _binding_failed()
+            if snapshot is None:
+                # Only a complete frozen member can prove a missing source was
+                # legacy. A garage-only reference has no frozen vehicle id.
+                if not frozen or type(vehicle_id) is not str or not vehicle_id or restricted:
+                    _binding_failed()
+                return None
+            if capsule is None and snapshot.body_encoding != 'utf-8':
+                _binding_failed()
+            if vehicle_id is not None and snapshot.vehicle_id != vehicle_id:
+                _binding_failed()
+            expected = capsule['provenance'] if capsule else vehicle_provenance(snapshot)
+            for key in ('source_id', 'source_url', 'raw_hash', 'parser_version', 'parser_identity', 'observed_at'):
+                if key not in reference or reference[key] != expected[key]:
+                    _binding_failed()
+            for key in ('source_page', 'evidence_path'):
+                if key in reference and reference[key] != expected[key]:
+                    _binding_failed()
+            if capsule:
+                for key in ('verification_id', 'verified_at', 'fact_hash'):
+                    if key in reference and reference[key] != capsule[key]:
+                        _binding_failed()
+            return capsule
+        except VehicleRawIntegrityError:
+            _binding_failed()
+
+
+def require_vehicle_reference_use(capsule, purpose):
+    try:
+        require_vehicle_consumer_use(capsule, purpose)
+    except VehicleUseNotAllowed as error:
+        raise HTTPException(403, {'code': error.code}) from None
+
+
+def checked_fitment_reference(db, reference, *, purpose='local_structured', copied=False, frozen=False):
+    """A retained source reference remains binding after personal profile edits."""
+    if reference is None:
+        if copied:
+            _binding_failed()
+        return None
+    capsule = checked_vehicle_reference(db, reference, frozen=frozen)
+    snapshot = db.get(VehicleSnapshot, reference['snapshot_id'])
+    payload = capsule['payload'] if capsule else snapshot.payload
+    try:
+        expected = capsule['provenance'] if capsule else vehicle_provenance(snapshot)
+        if any(key not in reference or reference[key] != value for key, value in expected.items()):
+            _binding_failed()
+        fits = [item for item in payload['fitments'] if item['id'] == reference.get('fitment_id')]
+        if len(fits) != 1 or fits[0]['availability'] not in {'standard', 'optional'}:
+            _binding_failed()
+        fitment = fits[0]
+        if any(reference.get(key) != fitment.get(key, [] if key == 'constraints' else None)
+               for key in ('availability', 'constraints', 'source_description')):
+            _binding_failed()
+        receipt_keys = {'verification_id', 'verified_at', 'fact_hash'}
+        if capsule and receipt_keys & reference.keys() and not receipt_keys.issubset(reference):
+            _binding_failed()
+    except (KeyError, TypeError, AttributeError):
+        _binding_failed()
+    require_vehicle_reference_use(capsule, purpose)
+    return capsule
+
+
+def checked_garage_revision(db, row, *, purpose='local_structured'):
+    copied = row.basis == 'copied_fitment' or row.operation == 'from_fitment'
+    if row.fitment_reference is None and not copied:
+        # Public writes cannot clear this reference. Detect a damaged later
+        # revision even if its personal edit changed basis to user_entry.
+        history = db.execute(select(GarageRevision.fitment_reference, GarageRevision.operation, GarageRevision.basis)
+            .where(GarageRevision.vehicle_id == row.vehicle_id, GarageRevision.revision <= row.revision)).all()
+        copied = any(reference is not None or operation == 'from_fitment' or basis == 'copied_fitment'
+                     for reference, operation, basis in history)
+    return checked_fitment_reference(db, row.fitment_reference, copied=copied, purpose=purpose)
 
 
 class GarageAxle(StrictModel):
@@ -74,6 +178,7 @@ def current(db: Session, vehicle_id: str, expected_revision: int | None = None) 
         raise HTTPException(404, "未找到车库记录")
     if expected_revision is not None and row.revision != expected_revision:
         raise HTTPException(409, "车库记录已更新，请重新载入并核对后提交")
+    checked_garage_revision(db, row)
     return row
 
 
@@ -116,6 +221,7 @@ def validate_tires(db: Session, profile: dict, previous: dict | None = None) -> 
 def append(db: Session, vehicle_id: str, profile: dict, session_id: str, *, operation: str,
            previous: GarageRevision | None = None, archived: bool = False,
            basis: str = "user_entry", reference: dict | None = None) -> dict:
+    checked_fitment_reference(db, reference, copied=basis == 'copied_fitment' or operation == 'from_fitment')
     if previous is None:
         db.add(GarageVehicle(id=vehicle_id))
         db.flush()
@@ -142,6 +248,8 @@ def register_garage_routes(app: FastAPI) -> None:
             .where(GarageRevision.archived == archived))
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = db.scalars(statement.order_by(desc(GarageRevision.created_at), desc(GarageRevision.id)).offset(offset).limit(100)).all()
+        for row in rows:
+            checked_garage_revision(db, row)
         tires = tire_identities(db, [row.profile for row in rows])
         return {"data_state": "local_snapshot", "scope": "local_workspace", "items": [representation(row, tires) for row in rows],
                 "limit": 100, "offset": offset, "total": total}
@@ -155,31 +263,44 @@ def register_garage_routes(app: FastAPI) -> None:
     def from_fitment(payload: GarageFromFitment, request: Request, db: Session = Depends(get_db)) -> dict:
         QueryService(db, None).lock_ingestion()
         snapshot = db.get(VehicleSnapshot, payload.snapshot_id)
-        fitment = next((row for row in snapshot.payload["fitments"] if row["id"] == payload.fitment_id), None) if snapshot else None
+        if snapshot is None:
+            raise HTTPException(422, "请选择已采纳车型快照中的标配或选配轮毂")
+        try:
+            capsule = checked_vehicle_consumer_capsule(db, snapshot.id)
+        except VehicleRawIntegrityError:
+            _binding_failed()
+        require_vehicle_reference_use(capsule, 'local_structured')
+        source_payload = capsule['payload'] if capsule else snapshot.payload
+        fitment = next((row for row in source_payload["fitments"] if row["id"] == payload.fitment_id), None)
         if fitment is None or fitment["availability"] not in {"standard", "optional"}:
             raise HTTPException(422, "请选择已采纳车型快照中的标配或选配轮毂")
-        vehicle = snapshot.payload["vehicle"]
-        trim = next((row for row in snapshot.payload["trims"] if row["id"] == fitment["trim_id"]), {})
+        vehicle = source_payload["vehicle"]
+        trim = next((row for row in source_payload["trims"] if row["id"] == fitment["trim_id"]), {})
         year = trim.get("model_year") if trim.get("model_year") is not None else vehicle.get("model_year")
         try:
             profile = GarageProfile(nickname=payload.nickname, manufacturer=vehicle["manufacturer"]["name"],
                 model=vehicle["model"], model_year=year, generation=vehicle["generation"],
                 trim=fitment["trim_name"], wheel_option=fitment["wheel_option_name"],
-                optional_wheels=list(dict.fromkeys(row["wheel_option_name"] for row in snapshot.payload["fitments"]
+                optional_wheels=list(dict.fromkeys(row["wheel_option_name"] for row in source_payload["fitments"]
                     if row["trim_id"] == fitment["trim_id"] and row["availability"] == "optional")),
                 front=GarageAxle(size=fitment["front"]["size"]), rear=GarageAxle(size=fitment["rear"]["size"]))
         except (ValidationError, KeyError, TypeError):
             raise HTTPException(422, "此历史配置的车辆信息未通过车库校验，请核对来源后重新保存") from None
-        return append(db, uid(), profile.model_dump(), request.state.session_id, operation="from_fitment",
-            basis="copied_fitment", reference={**vehicle_provenance(snapshot), "fitment_id": fitment["id"],
+        reference = {**(capsule['provenance'] if capsule else vehicle_provenance(snapshot)), "fitment_id": fitment["id"],
                 "availability": fitment["availability"], "constraints": fitment.get("constraints", []),
-                "source_description": fitment["source_description"]})
+                "source_description": fitment["source_description"]}
+        if capsule:
+            reference.update({key: capsule[key] for key in ('verification_id', 'verified_at', 'fact_hash')})
+        return append(db, uid(), profile.model_dump(), request.state.session_id, operation="from_fitment",
+                      basis="copied_fitment", reference=reference)
 
     @app.get("/v1/garage/{vehicle_id}")
     def detail(vehicle_id: str, mode: Literal["history"] = Query(...), db: Session = Depends(get_db)) -> dict:
         row = current(db, vehicle_id)
         history = db.scalars(select(GarageRevision).where(GarageRevision.vehicle_id == vehicle_id)
                             .order_by(desc(GarageRevision.revision)).limit(51)).all()
+        for item in history[:50]:
+            checked_garage_revision(db, item)
         return {**representation(row, tire_identities(db, [row.profile])), "history_truncated": len(history) > 50,
                 "history": [{"revision": item.revision, "operation": item.operation, "archived": item.archived,
                              "profile": item.profile, "basis": item.basis, "created_at": timestamp(item.created_at)} for item in history[:50]]}

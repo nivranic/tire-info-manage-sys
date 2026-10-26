@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "./icons";
 
 export type CommandItem = { id: string; label: string; hint?: string; run: () => void };
@@ -9,70 +9,113 @@ export type CommandItem = { id: string; label: string; hint?: string; run: () =>
 export default function CommandPalette({ open, commands, onClose }: { open: boolean; commands: CommandItem[]; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const id = useId();
+  const listboxId = `${id}-listbox`;
+  const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef<HTMLElement | null>(null);
+  const focusFrame = useRef<number | null>(null);
+  const closing = useRef(false);
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return commands;
     return commands.filter(command => command.label.toLowerCase().includes(needle) || (command.hint ? command.hint.toLowerCase().includes(needle) : false));
   }, [commands, query]);
+  const activeIndex = filtered.length ? Math.max(0, Math.min(active, filtered.length - 1)) : -1;
+  const optionId = (index: number) => `${id}-option-${index}`;
+  const cancelFocusFrame = () => {
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current);
+    focusFrame.current = null;
+  };
+  const closePalette = () => {
+    if (closing.current) return;
+    closing.current = true;
+    cancelFocusFrame();
+    // Exit the modal layer before commands focus a field or open another dialog.
+    dialog.current?.close();
+    onClose();
+  };
   useEffect(() => {
-    if (!open) return;
+    const node = dialog.current;
+    if (!open || !node) return;
+    closing.current = false;
     restoreFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setQuery(""); setActive(0);
-    requestAnimationFrame(() => input.current?.focus());
+    if (!node.open) node.showModal();
+    focusFrame.current = requestAnimationFrame(() => {
+      focusFrame.current = null;
+      if (node.isConnected && node.open && !closing.current && node.contains(document.activeElement)) input.current?.focus();
+    });
     return () => {
-      if (restoreFocus.current && document.activeElement === document.body) restoreFocus.current.focus();
+      cancelFocusFrame();
+      if (node.open) node.close();
+      const previous = restoreFocus.current;
+      // Native close normally restores focus; preserve any command's new target.
+      if (previous?.isConnected && (document.activeElement === document.body || node.contains(document.activeElement))) previous.focus({ preventScroll: true });
       restoreFocus.current = null;
     };
   }, [open]);
-  useEffect(() => { setActive(0); }, [query]);
+  useEffect(() => { setActive(previous => Math.max(0, Math.min(previous, filtered.length - 1))); }, [filtered.length]);
   useEffect(() => {
     if (!open) return;
-    const option = list.current?.querySelectorAll<HTMLElement>(".palette-option")[active];
+    const option = list.current?.querySelectorAll<HTMLElement>(".palette-option")[activeIndex];
     option?.scrollIntoView({ block: "nearest" });
-  }, [active, open, query]);
+  }, [activeIndex, open, filtered]);
   if (!open) return null;
   const runCommand = (index: number) => {
     const command = filtered[index];
-    if (!command) return;
-    onClose();
+    if (!command || closing.current) return;
+    closePalette();
     command.run();
   };
-  return <div className="palette-backdrop" onClick={onClose}>
-    <div className="command-palette" role="presentation" onClick={event => event.stopPropagation()}>
+  return <dialog ref={dialog} className="palette-backdrop" aria-label="命令面板" aria-modal="true"
+    onCancel={event => { event.preventDefault(); closePalette(); }}
+    onClick={event => { if (event.target === event.currentTarget) closePalette(); }}
+    onKeyDown={event => {
+      if (event.nativeEvent.isComposing) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault(); event.stopPropagation(); closePalette();
+      } else if (event.key === "Escape") {
+        event.preventDefault(); event.stopPropagation(); closePalette();
+      } else if (event.key === "Tab") {
+        // Keep the combobox's two Tab stops inside the modal, including focus
+        // placed on a non-tabbable option by a pointer or assistive technology.
+        const optionFocused = event.target instanceof Element && !!event.target.closest(".palette-option");
+        if (optionFocused || event.target === event.currentTarget || event.shiftKey && event.target === input.current || !event.shiftKey && event.target === closeButton.current) {
+          event.preventDefault();
+          (event.shiftKey ? closeButton.current : input.current)?.focus();
+        }
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (filtered.length) setActive(Math.max(0, Math.min(activeIndex + (event.key === "ArrowDown" ? 1 : -1), filtered.length - 1)));
+        input.current?.focus();
+      } else if (event.key === "Enter" && (event.target === input.current || event.target instanceof Element && event.target.closest(".palette-option"))) {
+        event.preventDefault(); runCommand(activeIndex);
+      }
+    }}>
+    <div className="command-palette">
       <div className="palette-input-row">
         <Icon name="search" size={16} />
-        <input ref={input} role="combobox" aria-expanded="true" aria-controls="palette-listbox" aria-autocomplete="list" aria-label="搜索命令" autoComplete="off" spellCheck={false}
+        <input ref={input} role="combobox" aria-expanded="true" aria-controls={listboxId} aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined} aria-autocomplete="list" aria-label="搜索命令" autoComplete="off" spellCheck={false}
           value={query} placeholder="跳转视图或执行操作…"
-          onChange={event => setQuery(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === "ArrowDown") { event.preventDefault(); setActive(previous => Math.min(previous + 1, filtered.length - 1)); }
-            else if (event.key === "ArrowUp") { event.preventDefault(); setActive(previous => Math.max(previous - 1, 0)); }
-            else if (event.key === "Enter") { event.preventDefault(); runCommand(active); }
-            else if (event.key === "Escape") { event.preventDefault(); onClose(); }
-            else if (event.key === "Tab") {
-              // 焦点圈禁：Tab 在面板内循环，不游移到被遮盖的背景内容。
-              event.preventDefault();
-              const options = list.current?.querySelectorAll<HTMLElement>(".palette-option");
-              if (options && options.length) {
-                const next = event.shiftKey ? (active <= 0 ? options.length - 1 : active - 1) : (active >= options.length - 1 ? 0 : active + 1);
-                setActive(next);
-              }
-            }
-          }} />
-        <kbd>Esc</kbd>
+          onChange={event => { setQuery(event.target.value); setActive(0); }} />
+        <button ref={closeButton} type="button" className="palette-close" aria-label="关闭命令面板" onClick={closePalette}><kbd aria-hidden="true">Esc</kbd><Icon name="close" size={16} /></button>
       </div>
-      <div className="palette-list" id="palette-listbox" role="listbox" aria-label="命令列表" ref={list}>
-        {filtered.length ? filtered.map((command, index) => <button type="button" role="option" aria-selected={index === active} key={command.id}
-          className={["palette-option", index === active ? "active" : ""].filter(Boolean).join(" ")}
+      <div className="palette-list">
+        <div id={listboxId} role="listbox" aria-label="命令列表" ref={list}>
+        {filtered.map((command, index) => <button type="button" role="option" id={optionId(index)} aria-selected={index === activeIndex} tabIndex={-1} key={command.id}
+          className={["palette-option", index === activeIndex ? "active" : ""].filter(Boolean).join(" ")}
           onPointerEnter={() => setActive(index)}
+          onFocus={() => setActive(index)}
           onClick={() => runCommand(index)}>
           <span>{command.label}</span>
           {command.hint ? <small>{command.hint}</small> : null}
-        </button>) : <p className="palette-empty">没有匹配的命令。</p>}
+        </button>)}
+        </div>
+        {!filtered.length ? <p className="palette-empty" role="status">没有匹配的命令。</p> : null}
       </div>
     </div>
-  </div>;
+  </dialog>;
 }

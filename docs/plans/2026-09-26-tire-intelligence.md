@@ -1,6 +1,11 @@
 # 轮胎情报系统实施计划
 
-> 当前状态：第47轮普通轮胎查询的一次设备历史授权已实现并通过限定范围验收；第46轮三端手动离线包已验收。Windows真实凭据库/WebView2、Android API34 Keystore/SQLite/FTS5与PWA加密IndexedDB分别取得运行证据。完整Goal仍active，条件后台更新、高级筛选/车型/召回/AI设备回退、完整平台矩阵、真实模型、更多来源及生产发布Gate等范围未完成。以下各轮摘要保留其当时状态，不能替代最新结果。
+> **最近验证（2026-10-19，第82轮）：**正式148模块实际4063主项为4058通过/5失败，另77子测试通过，原全套红保留；精确修复后五模块89/89通过，严格660输入对比恰6文件变更/654不变。阶段不相加，不声明最新源码全148绿色。
+> 详见[最新交接卡](E:/Mix/project/tire-info-manage-sys/docs/HANDOFF.md)及[第82轮验证报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-82-api-worker-regression.md)。完整V1未完成；正常数据库本轮未启动，真实Provider/receiver未新调用，未提交推送。以下各轮保留其历史身份。
+
+> 第66轮历史摘要（2026-10-18）：第65轮同场偏好解读后，新增七类/组合兴趣、四域本地事件与私有通知，支持精确字段和冻结条件解释。API44、桌面UI20/手机UI4条有效断言通过，另有独立32项、分阶段核心/producer回归与Parser环境修复10项目标验证；SDK/类型/三端前端生产构建通过。未重跑完整API/Worker或迁移正常库，旧全量只绑定第63轮源码；未提交推送，完整V1未完成。先读[最新交接卡](E:/Mix/project/tire-info-manage-sys/docs/HANDOFF-2026-10-18.md)与[第66轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-66-interest-following.md)，以下摘要按历史日期保留。
+
+> 第47轮历史摘要：第47轮普通轮胎查询的一次设备历史授权已实现并通过限定范围验收；第46轮三端手动离线包已验收。Windows真实凭据库/WebView2、Android API34 Keystore/SQLite/FTS5与PWA加密IndexedDB分别取得运行证据。完整Goal仍active，条件后台更新、高级筛选/车型/召回/AI设备回退、完整平台矩阵、真实模型、更多来源及生产发布Gate等范围未完成。以下各轮摘要保留其当时状态，不能替代最新结果。
 
 > 第三十六轮历史摘要：已实现真实 OpenTelemetry SDK 的 API/来源/AI/Embeddings/数据库采纳锁/Worker 关联、Prometheus 本机读取与有界安全日志。相关17文件360项、最新四文件63项、私有真实HTTP7项通过，各组不相加；默认没有网络exporter，Worker仅显式指定metrics端口才监听。当前builtin离线Parser子进程通过，旧33归档因新增5个依赖被预期环境拒绝、0 child，未放宽兼容性校验。正常API重启及桌面/手机只读复看、真实metrics与唯一after通过；85表旧schema/旧行保全，正常7张Parser表均空。本轮无前端改动或重build，最终runtime检查通过、正常API/Web保持回环监听；本轮未新增官网/真实模型调用验收，历轮真实来源证据保留；更多来源、真实模型、设备离线包、Grafana/Collector部署、生产SLO与完整原需求仍未完成，完整Goal active。
 
@@ -3289,3 +3294,212 @@ Root继续实现 `proposal-a.json` 已列出的两类服务端记录，独占新
 **C 路角落补查零实质发现**：scripts 全部脚本路径/逻辑、根配置（compose/.env.example/.gitignore/package.json）、packages 两包客户端封装与后端路由抽查匹配、worker 两套测试一致性、全仓凭据模式扫描（仅合成占位与运行时随机）——防沉默清单 20+ 项全过。**备案不修**（A 路边界观察）：aiohttp 对 IP 字面量主机短路自定义 resolver，操作者可用私网 IP base URL 绕过"仅公网"围栏——预存在行为、操作者自配端点在 ADR-054 D-C 信任边界内，部署轮处理。
 
 **验证**：目标测试 137 绿（auth_lifecycle 14+迁移哨兵+AI 域家族含 stream/rule_drafts/reports/monitoring）；typecheck 五包过；web 单测 5/5；web 生产构建+PWA 白名单校验绿（17 项资产，版本 a5912845…）；全量回归（apps/api/tests + worker 两套）**2694 passed + 77 子测试 + 0 失败**（29:28；口径拆分：tests 2671=第61轮 2670+新增 1，worker 23）。服务已重启载入第62轮代码（/health ok；新会话 cookie Max-Age=1209600 实测下发）。未验证如实：14 天真实浏览器 cookie 老化未实机验证（基于标准 cookie 语义+TestClient 断言）；desktop/mobile 端本轮未跑构建（改动仅 web 组件 monitor-rule-draft.tsx 与后端，三端共享 device-ai 面板未触碰）。
+## 第 63 轮：设备 AI v1 共享协议与可移交验证资产（2026-10-18，实施中）
+
+**当前依据**：工作区干净起步，HEAD 为第62轮 `4d0ef60`；旧 HANDOFF 主体及顶部部分勘误已过时，以最新源码、ADR-2026-052/053与第62轮记录核对。R-004 的冻结前置已闭合，但共享领域包未发布设备 AI wire，R-007 的测试仍引用被忽略的 `.artifacts`。本轮继续完整目标，只处理这些明确缺口，不把它们当成 V1 完成。
+
+**实施边界与分工**：
+
+1. 将现行 Python closed DTO 与 SDK 实际使用的 Reference/Selector/Prepare/Consent/Submission 类型迁入 `packages/domain-types/src/device-ai.ts`；SDK 公共出口提供可消费接口，旧路径保持兼容。旧 draft b 中尚未实现的分层字段不复活，历史文件原样保留。`wire_frozen` 只说明 v1 合同冻结，不代表生产、真实模型或全平台验收；test_event、mixed-domain及个人上下文仍按既有裁决保留未来义务。
+2. 将既有合成合同向量按原字节和原SHA导入受版本控制的 `packages/domain-types/fixtures/device-ai-v1/`，记录来源/逐文件哈希，改四端测试读取新载体。旧 `.artifacts` 不改写；不复制正常库、凭据或本机用户资料。
+3. Root 独立核对公共SDK消费、闭合字段与服务端DTO一致性，执行与变动匹配的类型/合同/纯模块验证，再同步风险与使用文档。各agent有明确文件所有权，保留他人修改。
+
+**验证计划**：根工作区 typecheck、公开包导入/编译见证、TS Host+decoder测试、Python DTO/decoder及受影响纯模块、Rust/Java对应向量runner（本机工具可用时）。所有新增输出进入新的证据目录，不启动正常服务、正常迁移、真实Provider/官网或设备仪器。本节尚未声明任何新验证通过。
+### 第63轮当前结果与待收尾（2026-10-18）
+
+**实现已落工作区**：现行20种实际共享类型迁入domain-types；SDK公共出口显式导出Host客户端/操作及必要类型，旧路径兼容；元数据明确只冻结12/6/4请求与selector/reference，不将opaque响应、历史draft想象的Host消息或未来value/citation合同冒称已冻结。127项合成输入（920,391B）原字节迁入仓库corpus，provenance SHA为 `278e8cacad9a8537264781e49ce381111e6ed50b17a224aa32ccdf066012172d`；四端loader校验pin及实际SHA/size，Git属性禁止字节换行转换。源码/输入均未提交或推送，移交须带完整工作区。
+
+**实际目标验证**（范围有重叠，分别记录）：
+
+- Root最终根typecheck通过；SDK最终188 Host、34 decoder通过，公开包入口tsc正负例与注入transport prepare/独立Provider同意submit消费通过，no-artifacts门生效。日志 `.artifacts/round63-contract-cbf07235ce274e848d82cd35fbf5ead1/{typecheck-final.log,sdk-hook-final.log}`。
+- Root Python DTO/数值encoder/公共SDK字段对拍共71通过，日志同目录 `pure-contract.log` / `pure-contract.xml`。这是纯合同与编码，不是当前API业务整链验收。
+- corpus负责人相关Python目标原296通过/2项失败；精确定位为沙箱对合成文件 `os.link` 拒绝（errno13/winerror5），短路径也复现。生产存储不改；同3个文件存储目标在sandbox外全通过，日志 `.artifacts/9352c79bb3c84db29a453c34b8bf154c/archive.{log,xml}`。旧失败及诊断保留于 `.artifacts/r007-corpus-validation-cf354596d19f4e1a8f1fc500191fa782/`。
+- 两个flagless Node纯QA合同脚本13/13通过。测试内联加载器遇到新SDK出口合法ESM环时暴露未决await，改测试hook使用真实模块URL与Node TypeScript transform；保留原启动方式。旧policy探针补齐Provider参数，纯Python参考计算确认原expected哈希不变。不是新增真实浏览器验收。
+- Rust限定10+1+1通过（integration包含68条E1向量；decoder回放25例）；Java JVM四类129通过=68 E1+25 decoder+34 Host+2 corpus负例，0失败/错误/跳过。最终回执 `.artifacts/wire-freeze-native-3df52ac41d074cfab953af58630fa40a/verification-final.json`，SHA `2d2306fc7f36f56ac028d0967d34ebaa57c284ef7acc63cd5aa2aa2279310139`。初次XML收集位置错误的回执已标superseded，不代替最终回执；四份最终XML和8个native源SHA已独立复核。
+- 独立只读审查127项输入与原封存字节、provenance、四端消费和native回执，未发现可行动缺陷；Root静态diff/文档链接、PyYAML解析15条有owner的风险均通过。
+
+**完整回归已启动，尚未出终态**：目录 `.artifacts/r63-full-cdf0a0d13bb8/`，范围为 `apps/api/tests` 加Worker两套测试；`TIRE_DATABASE_URL`、对象根、basetemp全部指向本轮新隔离目录，AI/Embeddings/observability关闭。为避免已实证的合成文件硬链接沙箱拒绝，经自动审查批准在sandbox外运行。没有访问正常库、正常服务或真实Provider。`full.log/full.xml/exit.json` 为本轮输出，`exit.json` 只在实际结束时生成。
+
+接续时先轮询已确认活跃的 unified exec **session_id=79721**（Root最后一次 `write_stdin` 已确认仍运行），不要另开第二套全量。观察超时不能判终止；若句柄消失，核对真实进程/终态文件后再决定。运行中采集的 `source-during-run.json` 绑定826个apps/packages/scripts文件，已复核无变化；它不是启动前快照，终态仍须再核并解释任何差异。R-004保持 `implemented-pending-full-regression`，不宣布全套绿或完整V1达成。R-007在本轮工作区的合同输入依赖已消除；不扩称所有其他历史QA可无artifact运行。
+
+**完整目标仍待**：R-005的8MiB权威边界/多成员闭包向量、更多真实来源与人工Golden/首代SU7 OE、设备与平台矩阵、完整推荐/偏好解释和非SKU关注、真实模型端到端/多Provider产品治理、生产安全/运维及全部发布Gate。下一批可从显式指标→驾驶偏好维度的同场解释或非SKU兴趣建模推进；不得猜自由指标名归类或把个性化偏好改写成客观总排名。
+
+### 第63轮终态与交接追加（2026-10-18 11:01以后）
+
+上文“完整回归运行中”及旧过程回执保留。本次已观察unified exec session79721真正结束exit0，`exit.json`记录2026-10-18T11:01:00.9066023+08:00。完整API＋Worker两套 **2705 passed、77 subtests passed、1条既有Starlette弃用warning**，耗时1585.71秒；`full.xml`为2782 testcase、0 failures/errors/skipped。目录为 `.artifacts/r63-full-cdf0a0d13bb8/`，无需继续等待或另开全量。
+
+终态后逐SHA复核 `source-during-run.json` 中826个apps/packages/scripts文件，当前清单同为826，0变化/0缺失/0新增；新回执 `handoff-source-check.json` 同时绑定full.log/full.xml/exit.json及原清单SHA。该基线采于10:34:58运行中，**不是启动前快照**。没有修改实现代码、正常库、服务或真实Provider，旧 `summary-awaiting-full.json` 等过程文件不覆盖。
+
+R-004现行请求合同与R-007限定合同输入移交问题按本轮范围关闭；R-005及opaque响应/value/citation/mixed/personal/test_event等后续义务继续保留，完整V1未完成。本轮代码、向量与交接文档尚未提交/推送。
+
+应用户要求本次转为交接整理：[最新交接卡](E:/Mix/project/tire-info-manage-sys/docs/HANDOFF-2026-10-18.md)列出原规格统计、16域覆盖、来源/平台/模型边界及接手顺序。下一批[同场偏好解读](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-10-18-test-preference-interpretation.md)仅有原则设计，尚未实施；hash精确结构、逐指标证据响应DTO、稳定错误code仍须实施前冻结。本次未补做新功能或启动新测试套件。
+
+## 第64轮：交接目标独立复核与三端准备记录恢复补修（2026-10-18）
+
+用户要求核查其他agent的交接完成声明并补充优化。三路ultra独立审查确认第63轮限定证据与交接统计可信，同时发现两项实际问题：三端Host将GET存储视图按POST结果校验（服务端GET无replayed，SDK/Rust/Java却强求），以及Windows autocrlf会改变两份E1 SHA绑定源码。已分别拆基础GET视图/POST结果且保留POST boolean门，补真实GET与拒绝测试；根Git属性只将两份来源源码固定LF，不改源码/expected。原始需求新增仓内原字节副本，53843B、SHA f8a2a4434d83824afe36d3e46730ee183e4506acc0c91041b8a122b36e6fc46d，便于跨目录移交。
+
+新验证：SDK192 Host＋34 decoder、公开类型与运行消费通过；实际FastAPI路由fresh/replay/lookup/detail原样经公共SDK消费的跨语言回归及相关目标共5通过（19未选）；Rust Host23通过、1项OS凭据测试仍ignored；Java JVM36通过；E1 73通过；工作区typecheck通过。修前GET的TS/Rust/Java红灯均保留；Rust首轮sandbox 22通过/1文件journal失败/1ignored，同目标sandbox外23通过；Python新测试首跑漏显式null后仅修请求构造，原失败保留。没有放宽Parser、产品decoder或修改封存预期。
+
+详细命令、失败/成功日志、限制见[复核报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-64-handoff-review.md)，新机器回执 `.artifacts/review-recovery-d709c14ee6b74900824863dc350dd448/handoff-final.json`绑定当前HEAD/dirty逐文件SHA、原文、必要证据及历史/新目标的适用范围。旧2705＋77完整结果仅为第63轮历史版本，本轮未重跑完整API/Worker；没有浏览器UI、正常库、真实来源/Provider、原生宿主/系统凭据/设备或分发验收。本轮未提交、推送或发布；完整目标继续active，同场偏好解读尚未实施。
+
+## 第65轮：同场驾驶偏好解读（2026-10-18）
+
+在第64轮交接补修之后继续原完整目标。新增精确六字段的只读preference-interpretation路由、本人偏好fingerprint、共享类型/SDK、三端共用映射与结果面板。事件和偏好双修订/指纹绑定，显式指标→七维或null；Decimal比较、原小数/名次/证据不变，覆盖按唯一维度计权且不归一。合同的hash、完整DTO、稳定证据ID与404/409/422顺序已冻结在[切片计划末节](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-10-18-test-preference-interpretation.md)，取代旧交接§7建议。
+
+内联复用偏好编辑器，AuthProvider增加owner代次与在途身份写入保护；身份/选择/映射/偏好变化清空及abort，迟到响应不回填。原生入口发出连接失效/恢复通知，重核后才能重新计算。独立ultra审查发现逐成绩引用只开整场的缺口，已传完整reference，在绑定历史加载后精确展开并聚焦对应原始成绩；补修复核通过。
+
+本轮验证分别记录：纯计算20、新API50、既有偏好11通过；SDK192 Host＋34 decoder及公共/新增偏好合同通过；工作区类型检查与三端前端生产构建通过。真实私有API/Chrome完成默认null、60/40/40/20覆盖、精确原值/负零并列、缺口、内联保存清除、双陈旧409、键盘重载、历史定位及取消/参测/账户变化迟到响应检查；1440桌面及390手机无整页横向溢出。浏览器最终23条断言含准备检查与重试，不等同23独立场景。完整API/Worker未重跑，连接事件分发不替代物理网络故障或原生宿主运行。
+
+详细证据、修前失败/工装修正、制品/源码SHA及未验边界见[第65轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-65-test-preference-interpretation.md)。私有API已正常shutdown退出0，私有dev已终止；正常库、官网、真实模型、迁移、原生打包/设备均未触碰。原始完整目标继续active，完整推荐/非SKU关注/私人模板/真实数据与Golden/平台/AI质量/发布Gate都未取消；后续可继续主体私有的非SKU兴趣关注与相关变化解释。本轮未提交、推送或发布。
+
+## 第66轮：交接复核与七类非SKU兴趣（2026-10-18）
+
+先独立复核第65轮v2交接清单：采集于香港12:45:19–21，834源码、197展开dirty、33证据、7文档与原始需求的路径/长度/SHA全部匹配，124本地链接存在。该结果只绑定修改前快照，随后新增实现使用本轮新机器清单，不覆盖旧回执。
+
+新增本人所属兴趣、追加修订、四域冻结事件与私有通知。七类为品牌、带品牌的型号、尺寸、OE、静音技术、测试机构、已有稳定ID的车型适配；条件组AND、组内备选OR，同类多组仍AND。精确文本不猜别名/后继，R/ZR不同；UTQG三项与胎纹深度等精确字段按真实变化路径筛选，测试指标按原始key选择。无证据返回无法判定而不通知；旧历史显式只读预览，不补发。来源轮胎、测试修订、车型事实版本、人工关系在原采纳事务内发布，通知失败回滚该次业务写入；没有新增来源抓取或自动轮询。
+
+车型直接声明的轴位尺寸与精确SKU关系分别处理。有已复核双侧冻结关系时，后续同SKU事实可关联该车型；关系撤销或已知身份/适配要求变化后不得借旧链推断。新事实、原关系和核对的车型快照都冻结引用。合法跨query 304恢复时，原快照成员v1、本次actual事实v3及before v2分别绑定，不强行要求快照成员版本等于本次事实版本。通知保存当时三键criteria与兴趣原修订；三端共用UI可按绑定版本重读轮胎前后原文、测试/适配关系旧修订和车型原文，读失败不替换成当前记录。
+
+独立审查补修了空对象/类型转换漏记变化路径、首次观察精确字段漏报、依赖字段冲突及无效历史证据传播等边界。额外定位Windows Parser白名单剥离CPU架构变量导致parent/child机器类型不一致；只允许严格枚举的PROCESSOR_ARCHITECTURE与PROCESSOR_ARCHITEW6432，8秒墙钟、CPU5秒、384MiB及最多2进程不变。
+
+实际验证分开记录：独立32项通过；核心/producer阶段150通过、1项并行源码变化受封存校验拒绝、2个Parser节点按分工排除，该单节点在冻结源码后复测通过；Parser架构/环境/原2节点在宿主10项通过，sandbox初轮7通过/3隔离不可用保留。SDK192 Host/34 decoder及公共合同、工作区typecheck与最终三端前端生产构建通过，Web静态页5/5。真实私有API44条、桌面UI20条及390手机UI4条有效断言通过，另保留工装选错前后引用的superseded失败；它们不是68个独立场景。初始合成资料格式/地区不符被正式门挡住，修正工装后重验，没有放宽业务或Parser门。
+
+沿用本机session_scope政策：同cookie会话注册/重登录后原会话数据会归入新账户，独立cookie资料隔离和ownerEpoch防迟到响应不代表严格服务器账户隔离。浏览器unavailable事件不是物理断网，手机视口不是原生验收。私有API shutdown退出0、dev已终止、测试页关闭，next-env恢复且sw/tsconfig未变。本轮无正常库启动/迁移、真实官网/Provider、完整API/Worker/真实PG或原生运行；未提交推送，Goal继续active。
+
+详见[本轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-66-interest-following.md)与[冻结合同](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-10-18-interest-following.md)。本轮清单入口`.artifacts/r66-interests-8d035c091972b1792299434827/verification-final-v2.json`只包含明确allowlist证据和哈希，不是归档，不携带私有SQLite/凭据。v1保持为修正旧交接页原始需求链接前的历史快照，产品源码未改。下一切片应补手工纠错、SKU生命周期/身份/目录事件适配；首代SU7/OE、真实来源/Golden、完整推荐/信息流、平台和发布Gate继续待办。
+
+## 第67轮：四类治理兴趣与目录审核链复核（2026-10-18）
+
+本轮实施前核对R66-v2的848源码、9文档、92证据与原始需求一致，随后按新切片修改。七类兴趣条件不变，本地事件扩至八域：新增手工参数纠错、SKU本地撤销/恢复、身份映射correct/merge/clear及同来源/查询目录成员added/removed。业务行、事件与通知在同一事务写入；缺少可核验身份的旧治理仍可保存但不通知，不跨来源拼接AND条件。新迁移017只在隔离库测试，没有启动或迁移正常库。
+
+新增`interest-original-evidence@1`，按四类kind和原行ID精确读取，校验实体/修订/不可变公共行fingerprint，不将动态valid_to或内部session/idempotency数据纳入指纹。目录冻结前后完整快照、查询、核验、原文/解析/成员哈希与定位；缺席侧不虚构成员，304不造变化，重复A→B→A按新verification origin保留。共用界面可重开四类原行和目录前后完整正文，并核对原文SHA256；读取失败不换成当前记录。
+
+独立反例发现并修复P1：目录移出再重入后页面已显示关系待审核，但后续UTQG仍沿旧reviewed_context推送。现在按成功Verification历史计算目录transition，与关系冻结catalogs比较；退出使用明确previous verification边界，兼容017前历史。目录重入、SKU恢复和撤回身份映射都须重新review，不自动复活旧链；合法非适配UTQG变化仍可沿用已审精确身份，匹配器的顶层evidence_valid=false不可绕过。
+
+验证分阶段记录：后端新目标3通过；旧相关组136通过/2失败，两个旧测试前提分别修正总事件计数与pre017迁移fixture，之后3治理/5迁移/2旧失败共10通过；P1反例及合法UTQG正例5通过，最终相关兴趣回归35通过。独立最终20项通过并核对20文件SHA稳定，修前失败保留。PostgreSQL只做DDL编译，没有真实PG运行。SDK注入合同、工作区typecheck、Web/Desktop/Mobile前端生产构建五阶段exit0，Web5/5静态页；16源码稳定、22制品哈希，7生成文件恢复原字节，既有chunk提示保留。各阶段不相加为一次全量，未重跑完整API/Worker。
+
+真实隔离API95条、桌面1440及手机390各19条断言通过。旧manual450、生命周期revoke、identity correct及目录首次移出原行在后续恢复/修订/来源更新后仍精确；目录前后完整正文仍为当时300而非当前333。目录退出before通知保留，重入及后续UTQG不恢复mixed旧链；49通知只是合成fixture数量。桌面/手机截图已目视，无整页横向溢出。首轮工装2→1触发行损失门、第二轮控制行超query触发schema拒绝、UI文案断言差异均保留失败回执；修正工装，没有放宽产品门。sandbox ready但跨会话端口不可访问后改为已审宿主运行，没有产品改动。
+
+私有API shutdown实测exit0；私有dev Ctrl+C exit1为主动停止，8957/3369/8483/19223无监听，测试页关闭，仅保留原空白页。next-env/tsconfig/sw按QA前SHA恢复。最终fixture external/provider/parser children均0，正常库未用。详细证据与命令见[第67轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-67-interest-governance.md)和[合同终态](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-10-18-interest-governance.md)。本轮新机器清单入口`.artifacts/r67-interest-governance-1792303216270-bd0c521d/verification-final.json`，以最终生成/独立审计为准，清单不是文件归档或私有资料备份。旧R66清单、生成器和回执保持历史身份。
+
+完整Goal保持active。本轮没有真实来源/模型、新原生运行/打包/设备、真实PG、生产或完整V1 Gate验收，未提交或推送。下一切片是来源刷新使旧manual overlay失效的衍生通知，须绑定原人工决定及前后事实，不能伪造ManualFactRevision；来源拒收/隔离与仅元数据核验继续明确未覆盖。完整推荐/信息流、首代SU7/OE与人工Golden、其余来源与平台、AI质量与发布Gate均保留。
+
+## 第68轮：人工处理适用性派生通知（2026-10-18）
+
+本轮继续第67轮剩余项，实施前只读核对R67最终清单的854源码、233展开dirty、11文档、178证据、194链接与15风险owner一致。旧清单保持历史身份。确认人工处理按variant/source绑定整条FactVersion，query不参与；304也会协调跨query的实际事实头，因此必须以真实新fact使当前人工处理失效为准，不能按“所有刷新”或“所有304”判断。
+
+新增018追加表 `tire_curation_applicability_events` 和第九域 `tire_curation_validity`。每个新actual fact聚合同variant/source当时仍适用的最新manual_override/revoke头，记录独立派生revision、人工revision watermark、affected原行/修订/公共指纹、前后actual fact及各自snapshot/member/verification证明。clear、旧base、已needs_review、仅新正文或无新fact核验不产生失效；重新人工核验后可发生下一次真实转换，原ManualFactRevision不改、不伪造人工决定。before为旧source加当时有效人工处理，after为新source；0/null/缺席分别保留，有效值相等不假报facts变化。目录、生命周期、身份的旧审核链失效规则独立保留，不因派生事件复活。
+
+新增kind `tire_curation_applicability_event`复用精确原行reader与`interest-original-evidence@1`。账本、事实/快照/核验、目录与兴趣通知同事务，失败整体回滚；历史预览不补发，不回填旧派生账本。前后query各自核对，支持合法304 actual/member不同；缺少历史证明的合法采纳可保留indeterminate而不通知。共用UI区分“派生适用性修订”和“原人工修订”，可按原ID重开旧人工决定及派生记录，分别读取两侧完整来源原文并核SHA256。保存关注仍不抓取或建立任务，本机session_scope政策保持原范围。
+
+后端先3红；首集成3失败为fixture误将未类型编码SKU跨query当同一主体，修同scope后3通过，未放宽身份。受影响回归69通过且18具名文件SHA稳定。独立早期字段未接完的1红、其后23绿/4目标绿均保留；最终27通过、0失败/错误/跳过，31具名产品/测试/helper/runner前后及报告时SHA一致，涵盖018旧行/DDL事务/SQLite真实FK和unique、PG DDL编译、future-only、同时间watermark、合法跨query304、无假值差异、三类旧车型链反例与事务回滚。各阶段重叠，不相加为全量；没有真实PG或完整API/Worker运行。
+
+前端SDK注入合同、workspace types、Web/Desktop/Mobile前端生产构建五阶段exit0，16相关源码无漂移；Web5/5静态页、PWA17项allowlist、22制品哈希、7生成配置原字节恢复，既有chunk提示保留。真实私有API83条、1440桌面及390手机UI各30条断言通过，断言数不是独立场景数。4派生/29通知只是合成fixture数据；当前来源334时仍能重开旧人工450、纯状态0→0、cross实际fact7/member5与6侧当时原文。截图已目视，无整页横向溢出。首次dev误用apps/web/node_modules入口导致MODULE_NOT_FOUND，原日志与未知exit code保留，修为根node_modules解析入口后成功，没有产品改动。
+
+API shutdown HTTP200且实测exit0，Next主动Ctrl+C exit1；宿主检查8958/3370无监听，测试页13关闭、既有空白页12保留。浏览器阶段next-env/tsconfig/sw按QA前SHA恢复，与构建7文件分别记账。最终fixture为10次采纳、6兴趣/6修订/31事件/29通知/8目录/4适用性/6人工修订；外网、Provider、Parser子进程、正常库尝试均0。护栏计数只覆盖相应API/runner，不扩大为整个工作站。Parser预算仍8秒/并发2/CPU5秒/384MiB。
+
+详细证据与范围见[第68轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-68-interest-manual-applicability.md)及[合同终态](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-10-18-interest-manual-applicability.md)。当前机器清单入口`.artifacts/r68-manual-applicability-8f4317b509ec402c9555f52c758d4f50/verification-final.json`以实际生成/独立审计为准，只绑定现场与明确allowlist，不是文件归档或私有数据备份。正常库迁移、真实来源/模型、原生宿主/设备/凭据、生产与完整V1 Gate均未由本轮验收，未提交推送；完整Goal保持active。后续推进本人兴趣/偏好的个性化信息流、车型与精确SKU推荐，先冻结证据与覆盖语义；拒收/隔离与仅元数据核验仍作为明确未覆盖兴趣事件保留，其余来源/Golden/SU7/OE、平台和发布Gate不缩减。
+
+## 第69轮：交接复核、个人历史流与已审轴位候选（2026-10-18）
+
+修改前重新复核R68机器清单：860源码/241展开dirty/244证据/13文档/237链接/15owner一致，旧证据原字节保留。原Goal仍active，不因交接整理或单轮通过标为完整V1完成。
+
+新增两个只读投影：本人当前兴趣独立匹配九域原始历史，含订阅前记录、多兴趣理由合并/待核对、扫描空页续读及HMAC游标；游标绑定主体、完整兴趣/标签修订、领域/预算、策略与候选成员摘要，变化显式失效。最多100兴趣/50000元数据/每页50事件重建，超限不假装完整。已审候选按精确车型配置/轮毂/轴位收窄，最多核200关系且truncated明确；保留双侧原版本、未知项、偏好双绑定及同fact新元数据快照兼容，不借同名/尺寸或旧审核复活。无性能分、无跨场总榜、无官方原配推断。
+
+独立发现1个canonical冻结详情核验根因，facts/locator/完整vehicle三个损坏反例均已修；坏stored InterestEvent亦拒绝。独立fixture的Verification微秒时序及目录整替换质量隔离仅修fixture，不改历史/来源门禁。R69后端最终195通过/1deselected（非Web初始化子进程目标未选）/exit0、27具名SHA稳定；独立最终同次69通过。原46红、59通过4失败、68通过1fixture失败、目录1目标通过分别保留，不累加。
+
+SDK注入合同、workspace types、导航6/6通过；仅CSS后变更由两批独立输出构建分别验证，最终Web/Desktop/Mobile exit0、20源无运行漂移、23制品、Web静态5/5/PWA18 allowlist、7生成文件恢复。真实私有API39条，最终1440×1000与390×844各24条UI断言通过；实际空扫描续读、原版本重开、恶意名称按文本、换轴清旧值、真实HTTP延迟加合成session-unavailable事件均有观察。宽屏信息流/候选1.25:1，候选顶端在该fixture由2508px前移至450px；手机单列且整页无横溢。手机顶栏仍拥挤，完整移动体验与无障碍未验。
+
+沙箱监听不能连通的初尝试exit1保留，宿主相同隔离配置重启后成功；Chrome指定文件路径根配置拒绝后改为内联执行和当前工作区存脱敏回执。首轮QA无关测试机构条件带入indeterminate与查询h1判断错误都仅修测试预期。最终API HTTP200停止且exit0，Next主动Ctrl+C exit1，宿主3369/8969无监听；测试页14关闭/既有12保留，next-env/tsconfig/sw按QA前SHA恢复。所有相应进程外联/Provider/Parser子进程/正常库计数0，原预算不变。
+
+详细入口：[第69轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-69-personalized-workbench.md)、[合同及终态](E:/Mix/project/tire-info-manage-sys/docs/plans/2026-10-18-personalized-workbench.md)。当前机器清单`.artifacts/r69-personalized-workbench-dc2120e1121243b99106c8f2e2506b00/verification-final.json`以实际封存与审计为准，不是归档。合同终态为测试后文档追加，运行前后源码稳定不等于后追加文档也保持旧SHA。
+
+性能/AI推荐仍缺可复核参测对象↔精确SKU证据桥和真实专业样本/模型质量；既有资料归属、更多事件/来源、Golden/首代SU7/OE、平台/原生矩阵与全部发布Gate不缩减。未跑新完整API/Worker/真实PG，未迁移正常库、未调用真实来源/模型、未做新原生验收、未提交/推送或发布。
+
+## 第70轮：交接复核、测试AI边界补修与窄屏/SSE优化（2026-10-18）
+
+见[本轮报告](../assurance/evidence/round-70-test-ai-grounding.md)、[实施合同](2026-10-18-test-ai-grounding.md)和[后续身份桥设计卡](2026-10-18-test-sku-evidence-bridge-design.md)。R69修改前现场清单复核通过，旧回执/证据原字节保持。完整V1、性能与AI推荐尚未完成，Goal仍active。
+
+确认并修复引用ID有效却可将无桥测试移植为精确SKU推荐的漏洞：整个含仓库TestEvent包仅允许服务器事实摘录，拒绝inference、原始非空text/uncertainty（含trim绕过），单test claim限定同evidence/最多一participant。普通SKU、设备和召回合同保留，混召回同时严格。新测试报告冻结schema@4与renderer@5，旧报告schema@1/@2/@3及renderer@4保留，九份导出基线保持；保存/三格式导出不成为绕过。原始成绩/名次、人工未核验状态与R65同场偏好保持。
+
+真实浏览器另发现终态SSE仍等待25秒窗口，已在terminal且页耗尽时结束；pending窗口/心跳、分页/cap/reset继续保持，独立机制验证12项。移动顶栏两行保留API完整状态和44px动作，在390/320宽均无整页横向溢出。
+
+后端核心212、独立66、报告126、SSE追加12同次分阶段通过，不相加为全量；类型和三端前端构建exit0、25具名源稳定/23制品/7文件恢复。最终私有API29条、1440桌面16条及390/320各18条断言通过；合成模型路径终态展示1169/1166/1180ms，不是生产SLO/真实模型质量。运行3配置恢复、两次APIexit0、Next主动停止exit1，宿主8970/3371无监听，测试页15关闭/原页12保留。所有早期失败与夹具诊断保留，未放宽Parser预算或改产品存储。
+
+当前清单`.artifacts/r70-test-ai-grounding-f94df0c513fd4c05bc9138f955e3d737/verification-final-v2.json`以实际封存审计为准。桥设计只给出后续来源材料/声明/复核/版本失效与A/B/C交付顺序，未实现。完整API/Worker/PG、真实来源或Provider、正常库迁移、新原生设备、Golden/首代SU7/OE及全部发布Gate未由本轮验收；未提交/推送/发布。
+
+
+## 第71轮：测试对象与精确SKU的有限人工证据桥（2026-10-18）
+
+工程工作流已实现并取得限定验证，完整V1仍未完成。当前入口：[第71轮报告](../assurance/evidence/round-71-test-sku-evidence-bridge.md)、[冻结合同](2026-10-18-test-sku-evidence-bridge.md)。R70草案的A工程部分已落实，但有真实来源支持的身份桥及代表性Golden仍未验收，B条件化解释/C专用AI推荐继续待办。
+
+新增独立Link/Revision与019 additive注册；供审PDF原字节、完整TestRevision/participant与SKU原成员/FactVersion/定位、逐字段原值/短引文/哈希、双账户管理员复核和精确历史。材料仍operator_supplied/unverified，最高conditional_reviewed_transcription；不修改Participant/厂商facts/R65，也不解除R70测试AI事实摘录门禁。状态/身份/生命周期/目录ABA失效，正常participant移除仍能读旧历史。UUID按稳定user幂等，原请求跨事件修订仍可找回，不能换账户/署名自审。
+
+最终后端相关110 passed/1具名未选（另有fresh非Web初始化验证），独立初验119/兼容补修后相关13、SDK12分别通过；不相加为全量。旧pre016测试发现after_create未装新表trigger的兼容问题已补修，旧测试和预期保持。workspace类型及三端前端生产构建exit0，291源前后及运行结束当前匹配，7生成文件恢复。真实私有API34、实际1441×934桌面React34、390×844及320×740布局读取各11条断言通过；合成PDF不代表专业测试Golden，手机没有重复创建/复核完整流程，更不等于原生设备验收。
+
+两次GUID私有API均shutdown exit0，最终15源稳定，外联/子进程/正常库尝试0；Next主动退出1，端口8971/3372无监听，page16关闭/原page12保留，3运行配置字节恢复。首组夹具/runner/sandbox os.link/Next启动/QA选择器失败保留，未放宽产品存储或Parser预算。最终清单入口`.artifacts/r71-test-sku-bridge-7624690bfc8e4cf6b490ef19559734df/verification-final.json`以实际封存审计为准，不是归档或私有库备份。
+
+后续优先许可专业来源固定地址捕获及真实实体字节/来源策略记录、代表性人工Golden，再冻结B/C。完整API/Worker、PG运行、真实Provider/来源、正常库019迁移、新原生设备、其他来源/SU7/OE/全部发布Gate未由本轮验收；未提交/推送/发布，Goal保持active。
+
+
+## 第72轮：固定许可策略PDF原件捕获与传输凭证（2026-10-18）
+
+R71有限人工桥工程已交付，本轮继续实现其真实材料前置通道。见[第72轮报告](../assurance/evidence/round-72-source-material-capture.md)、[冻结实施合同（验收前原字节）](2026-10-18-source-material-capture.md)、[来源配置指引](../SOURCE-MATERIAL-POLICY.md)与[默认空示例](../source-material-policies.example.json)。固定许可策略的原件捕获工程已实现，不应重做；默认专业材料目录为空。具体真实材料URL/适用许可、公网DNS/TLS及代表性专业Golden仍未验，A不能全关，B条件化解释/C专用AI推荐与完整V1继续待办，Goal保持active。
+
+冻结实施合同保留验收前原字节，其顶部“尚未验收”是冻结时的阶段状态；当前实施终态以新报告及交接卡为准。
+
+新增可信本地JSON加载的不可变策略快照、专用PDF transport、请求预留/唯一终态追加账本及020迁移。引用页与实际初始/最终下载地址分开，许可/机构/引用页关系只是配置声明。仅固定GET、公网DNS/TLS门、精确跳转和各目标robots、identity编码完整200/PDF/1–8MiB；保存实际HTTP实体body bytes、robots对象及完整跳转/时间/hash/size/metadata凭证，不改旧文本captures或Parser预算，不做PDF语义抽取、内容/版权真伪认证。成功对象/文档/终态原子登记；同bytes旧手工上传不追认，新文档刷新原件列表供R71人工选择。传输记录不提高R71 operator_supplied/unverified与conditional_reviewed_transcription上限，也不解除R70测试AI事实摘录门禁。
+
+固定稳定user.id+UUID和完整payload；预留后才联网，网络期间不持摄取锁/事务，回来重核账户与管理员。真实HTTP保存成功后注入丢响应，界面换账户清理private pending，再回原账户恢复原UUID并只GET找回，确认仅一份新文档、无再次上游请求。失败/未确认不自动重抓，也不把processing_unconfirmed说成后台仍在下载；重新捕获需显式新UUID。历史按冻结策略和document ID读取，原件/robots/元信息/凭证损坏拒绝，不改读当前版本；坏SHA拒绝Blob发布，完整好SHA/大小校验后发起下载，下载不证明阅读。
+
+最终后端相关156通过、38源SHA稳定；独立最终148通过、22项输入稳定；SDK12通过，分阶段记录不相加为全量。补修重复Content-Encoding及Content-Type的歧义拒绝，实际aiohttp3.14.3 requestloop/parser反例通过；合法空robots支持。workspace typecheck及Web/Desktop/Mobile前端生产构建exit0，296前端源前后稳定、7构建生成文件按字节恢复；前端构建不代表原生宿主验收。
+
+默认空目录的真实HTTP/React9条、真实私有API43条、实际1442×934桌面React27条通过；390×844与320×740各12条仅布局及既有凭证读取，没有在手机视口重复捕获全流程，更不代表native。实际执行生产source transport、HTTP端点和React，上游为受控内存aiohttp session；没有实际公网DNS/TLS、出版者身份、真实专业材料或许可验证。合成PDF/受控响应只验证工程，不替代专业样本/Golden。工装修正与早期过程证据保留，不放宽产品规则。
+
+emptyAPI68676及finalAPI13600均HTTP shutdown exit0；Next62663主动Ctrl+C、wrapper KeyboardInterrupt exit1，宿主8972/3373无监听，页17关闭、原空白页12保留。3运行配置按原字节恢复，与7构建生成文件另记；私有库/对象根保留取证，没有触碰正常库020/PG/Provider或原生设备。当前清单入口`.artifacts/r72-source-capture-a0f445f16990410b99bc68ef75bf1b77/verification-final.json`以实际生成与独立审计为准，不是文件归档或私有数据备份；R71封存及旧轮正文保持历史身份，不绑定本轮当前树。
+
+下一步由具体合法引用页/实际PDF地址、允许跳转及适用留存/共享依据完成策略配置，实测真实来源样本的原字节捕获/凭证/重开，再做代表性测试对象↔精确SKU人工Golden。未有当前材料不等于永久技术阻塞，不凭公开可访问推导全文许可；已有R71/R72工程不重做。B/C另冻同场条件/偏好/双侧身份/模型及语义验收；其余来源、首代SU7/OE、平台矩阵、生产安全与全部V1 Gate继续保留。未重跑完整API/Worker，未验正常库020保全/迁移、PG、新原生设备、真实Provider或生产发布；未提交/推送/发布，完整Goal仍active。
+
+
+## 第73轮：设备AI真实容量与双成员闭包权威覆盖、排序补修（2026-10-18）
+
+见[本轮报告](../assurance/evidence/round-73-device-ai-capacity-closure.md)及[冻结实施合同（验收前原字节）](2026-10-18-device-ai-capacity-closure.md)。冻结合同保留验收前原字节及验收前勘误，其“尚未验收”为冻结阶段状态，当前实现/验证以新报告及交接卡为准。旧第72轮及更早正文、corpus/pins/expected与证据不改，不再拿旧清单绑定变化后的当前树。
+
+新增独立合成corpus：22个绑定文件，真实展开ASCII N-1/N/N+1与非BMP、BOM、坏UTF-8、空输入共10条，4份完整包和17份完整闭包（5成功/12拒绝），再分别核selection/context/preview字面预像。8MiB指完整未加密原始UTF-8 JSON body含envelope/空白，不能用字符数、metadata字段或小上限替代。N-1/N完整处理，N+1整次拒绝；容量门先于BOM/UTF-8。包padding只是人工合成后代，不冒称producer曾产出8MiB；原SHA和投影archive.sha256一起改变，业务observations等价。计划初稿错误在验收前勘误，初稿原字节另存，不为凑摘要改产品或旧expected。
+
+实际双成员闭包中A由完整candidate来源证明依赖B，B自依赖终止；D及vehicle未进入，完整reference/document/index参与精确等值。approved排列不改规范集合语义，selected保留请求序；缺失/重复/超集、错误document/index/receipt、跨variant、non-tire与restricted依赖按各层适用闭合码拒绝。6接受/7拒绝只验证prepare selectors/approved各6的wire预算，不代表六成员投影；内部resolved200不能用来放宽公开wire。3级链及6/7成员投影等更广向量未新补，所以R-005按精确范围partially-closed，仍是low风险，不将低风险验证切片充当完整产品推进。
+
+Java localPreviewFingerprint的一行member_key排序及TS context canonical UTF-8比较均先取得真实红例再最小修复，原始失败/未修源码保留。合法recall boundary的U+E000/U+10000证明JS UTF-16比较与规范UTF-8次序不同，不靠扩DTO或未来协议形状制造案例。旧127输入、provenance与两E1核心原字节不变；prepare12/consent6/submission4、44k投影/48k出站、包200证据/4000文档及Parser生产预算不变。
+
+Python新45/旧133、TS新45/旧Host192及decoder34、Java JVM110、Rust新6/旧E1 integration10及纯Host3分别有通过阶段，不累加为全量。workspace typecheck exit0、294输入稳定，Web tsbuildinfo按原字节恢复；Root独立oracle22绑定/10原字节/4完整包/5指纹与95项闭包静态规范核对分开。Python真实archive在私有三表库完成N-1/N对象put/get/读取/投影，超限metadata拒绝且对象reads0；不是正常库迁移。沙盒硬链接与长路径、runner平台探测、Gradle前置资产阻断及原始失败均留档，不将临时路径规避称产品存储根因修复。
+
+Rust/Java验证parser与selection/context/preview纯helper，native preview仍只支持单tire/single_observation；没有完整native闭包实现或设备验收。Java是当前源码直接JVM/JUnit目标（依赖签名用缓存类），不称Gradle构建完成；Rust旧HTTP loopback/OS keyring目标未选。新增完整性补修已终态封存：native loader每次读取先校验全部22绑定文件，对未读取projection的缺失/同长度损坏也拒绝；Java新类8/8与Rust新target8/8分别通过，原JVM110/capacity6及旧回归保留为先前阶段，不冒称已按新测试文件重跑。见[native补修回执](../../.artifacts/r73-e1-coverage-1448d1d36249471eaba4d16092b65a93/native/integrity-followup-df61cd2678e14decba3a22e0ee723ac9/REPORT.md)及其新freeze。generator已解除两处ignored证据读取依赖，仅7份受管理输入在无.artifacts/产品源码的空checkout逐字节重生23文件，缺失/损坏人工authority均写前拒绝，所有护栏0；Python新45/旧133重跑通过，各157运行输入当前匹配，generator本身另由复现回执及30 managed+2 sealed新freeze绑定，未冒称它在157运行输入中。Node159输入未变，沿用原45/192/34终态回执。见[生成器补修回执](../../.artifacts/r73-e1-coverage-1448d1d36249471eaba4d16092b65a93/corpus/generator-portable-9eae30ba2d134b3186154d30f09c75c5/REPORT.md)。当前机器清单入口`.artifacts/r73-e1-coverage-1448d1d36249471eaba4d16092b65a93/verification-final.json`以实际生成和独立审计为准，不是归档或私有资料备份。
+
+用户已对真实专业材料选源/许可公开核验授权“你自行决定，不用过问”，由agent自主找合法公开固定URL并核许可/第三方例外与robots，不再等待用户指定材料。R74有限JRC/MDPI/OP候选研究尚无成功准入，不能称真实专业捕获/Golden通过；不得登录、付费或绕robots，也不推导其余P0/P2全部获授权。默认专业目录仍空，R71人工桥/R72捕获工程不重做；下一步真实许可材料与代表性人工Golden，再冻结B条件化解释/C专用AI推荐。未重跑浏览器/前端构建/完整API与Worker，正常库020/PG/Provider/原生设备未触，真实专业来源、完整性能/AI推荐、其余来源/SU7/OE、平台/生产IAM与完整V1全部Gate仍未完成；未提交/推送/发布，原Goal保持active。
+
+
+## 第74轮：首个真实公开材料生产HTTPS捕获与独立内容核对（2026-10-18）
+
+见[真实公开材料捕获报告](../assurance/evidence/round-74-real-professional-material.md)。用户已授权agent自主选择合法公开来源，不再等待URL。R73及更早正文、受管理语料、原件期望和旧证据均保留原字节，本节只追加；本轮没有产品代码改动或重跑历史产品测试。
+
+通过既有R72真实生产MaterialSourceTransport及ASGI API，在GUID私进程策略和s/e.db私库实际捕获Frontiers CC BY4.0文章，DOI10.3389/fenvs.2023.1258922；真实公网DNS/TLS及HTTPS请求、robots/固定URL/8MiB/20秒合同实际执行，没有mock fetch/DNS/TLS/HTTP/对象仓库/数据库/PDF。原件3302848字节，SHA33471a0b0d0a8c2f172b61b034a8300c65e3ff2372c79782562048133606f635。捕获、真实对象读回、同UUID重放不联网/改payload冲突、持久lookup/冻结凭证/原件下载，以及新私app生命周期后同用户重开历史与相同PDF共20检查通过；943份运行输入前后一致并匹配当前字节，5类护栏计数均0。只使用s/e.db；正常数据库没有打开。
+
+首次harness对SQLite数据库URL的显示编码作字符串比较误判，在lifespan、数据库/网络前失败。新GUID只改为核SQLite backend和resolved engine.url.database路径；旧runner/失败回执/诊断保留，不覆盖、不称为产品数据库修复，也不将第一次失败计为外联或真实capture。新回执与harness-correction明确绑定两阶段。
+
+本次是in-process ASGI与可观察socket审计的SelectorLoop，不启动监听服务或浏览器，不是正常部署、浏览器或原生设备验收。normal默认专业目录仍空；单篇policy仅在本轮私进程生效，不自动配置normal，不新增Parser来源数。私库含合成账户/会话，SHA清单不是私有数据/原件备份，交接须分别保全。
+
+独立agent提取15页文本并实际目视第1/2/3/4/9/13六关键页；原件是Original Research道路模拟器TRWP原始实验研究，不是综述或整胎消费者性能横评。首页实际CC BY4.0链接支持本次限定使用，图1的Mats Gustafsson/VTI署名与原出处须保留；文面未观察到明确第三方图表排除，不据此证明外链/补充材料或权利真实性。表1九商品名/代号未建立精确SKU，表2为样本方法矩阵，表3是次弹性颗粒分类占比，不是轮胎磨耗率/寿命/抓地；常规50km/h×4h、初始10℃，Summer A混凝土60km/h×7h例外不可混排。真实捕获与agent阅读只支持材料方法/条件/数值及未知SKU负样本，不证明精确SKU/真人Golden、性能推荐或全部数据可迁移。保留署名、DOI、CC BY4.0与内容范围；材料provider_use/export仍false，receipt content_authenticity仍unverified、source_reference_relation仍operator_configured、accepted_as_facts仍false。R71人工材料的operator_supplied/unverified及conditional_reviewed_transcription上限不变，双账户不证明两名真人；R70仓库含测试AI包仍只作服务器事实摘录。
+
+R-002按本篇实网/许可范围partially-closed，广域asset/owner保留；R-017原R71/R72验证文字保留历史身份，在finding/control/trigger末尾补R74限定增量，精确SKU/真人Golden/B/C等仍开放；R-005仍是R73限定partially-closed。下一步首选B本地只读连接层（R69候选＋R71当前最新有效桥＋R65同场偏好解释）和专业TestEvent→精确SKU Golden评估器：既有Parser Golden不支持TestEvent，不能冒称此能力已有；B须核最新bridge head及完整组合绑定，不按名字/尺寸推桥。代码工程可在私有合成样本下推进，真实专业身份材料/真人Golden继续自主核验；不再等待URL或重复实现捕获，C须另冻许可/同意、专用模型合同及真实质量验收，不能放宽R70。
+
+当前清单入口`.artifacts/r74-live-c726bf6f944a4e6fb094e7ec79188e23/verification-final.json`，以实际生成和独立审计为准。未重跑产品测试/typecheck/前端构建/浏览器、完整API与Worker、正常库020/PG/Provider或原生设备，未提交/推送/发布；其他来源、代表性Golden、B/C、平台/生产IAM及完整V1仍未完成，原Goal保持active。
+
+## 第81轮：首代官方原件恢复、来源核验与当前收集前置（2026-10-19）
+
+见[本轮报告](../assurance/evidence/round-81-source-verification.md)与[分阶段计划](2026-10-19-official-vehicle-pdf.md)。第75–80轮完整工程与验证分别见各轮报告及最新交接卡，保留其历史绑定；本节不将其目标测试累加成当前全套通过。
+
+真实取得两份首代SU7官方历史PDF，Root和独立agent逐行目视第三页五轮毂×三配置；灰色尺寸被默认文本提取遗漏，SU7/Pro20寸套装实际前后245/40R20。原字节/页图/SHA/locator已封存，仅本机研究；未证明开放全文再分发/Provider许可、完整SKU/OE、年款或当前全生命周期配置。首代目录链接与描述已更正；自动采集及完整PDF证据链仍未实现，未改ready。两个既有车型目标回归通过，禁止外网/子进程/正常DB尝试各0，源码稳定。
+
+EPREL用户明确目前没有Key并要求独立继续；官方条款/候选文档403/robots200HTML已核，schema和本地更正/限制/删除生命周期未闭合，不猜wire，不重复索要Key或URL。专业材料KIT/Zenodo/DVSA有界审查收尾，均未产生完整精确SKU或真人Golden正例，不绕禁止archive或将研究编号当MPN。
+
+当前146API+2Worker模块仅完成pytest收集：4063唯一nodeid，581输入稳定，收集工装测试体0；一次urllib3导入时本机IPv6能力探测在bind前被阻止，原runner严格红判据/exit3保留，pytest收集exit0。Root限定分类为收集通过、已知被拒探测1、其它意外拒绝0，不称网络尝试0或4063测试通过。全套执行工装的精确子进程/动态metrics权限仍待实现；正常库未启动，无新迁移/真实Provider/receiver，未提交推送，原Goal保持active。下一步按新计划闭合运行工装及首代PDF原字节证据与所有消费者，完整V1各Gate仍未完成。

@@ -20,6 +20,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 import pytest
+from device_ai_fixture_corpus import read_producer_sample
 from sqlalchemy import event, func, select, text
 
 from tire_api import ai_analysis, ai_execution
@@ -37,7 +38,6 @@ from tire_api.offline_models import OfflinePack, OfflinePackPlan
 from test_core import FixtureRegistry
 
 ROOT = Path(__file__).resolve().parents[3]
-SAMPLES = ROOT / '.artifacts/query-fallback49/producer-v2-samples-a'
 QUESTION = 'P225 这条轮胎的历史参数如何解读？'
 OTHER_QUESTION = '这条轮胎的载重与速度级别如何解读？'
 FACT_TEXT = '该观察记录的胎面宽度字段为 225（历史快照，未在线核验）'
@@ -106,8 +106,8 @@ class RouteEnv:
         self.client, self.app, self.session_id, self.model = client, app, session_id, model
 
     def seed(self, *, name='nonempty'):
-        original = (SAMPLES / f'{name}-pack.json').read_bytes()
-        descriptor = json.loads((SAMPLES / f'{name}-descriptor.json').read_bytes())
+        original = read_producer_sample(f'{name}-pack.json')
+        descriptor = json.loads(read_producer_sample(f'{name}-descriptor.json'))
         envelope = json.loads(original)
         envelope['owner_scope_id'] = digest({'namespace': 'offline-owner-scope@1', 'session': self.session_id})
         raw, sha = finalize_bytes(envelope)

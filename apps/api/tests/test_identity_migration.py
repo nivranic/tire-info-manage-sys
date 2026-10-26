@@ -479,6 +479,10 @@ def test_backup_replay_keeps_every_original_column_and_row(tmp_path):
         with sqlite3.connect(private) as target:
             source.backup(target)
     database = Database(f'sqlite:///{private.as_posix()}')
+    # The immutable original remains read-only. Only its private copy may pass
+    # the explicit controlled pre024/additive and physical023 -> 024 rehearsal.
+    from tire_api.vehicle_binary_migration import migrate_sqlite
+    migrate_sqlite(database.engine)
     database.initialize()
     with database.sessions() as db:
         preview = migration_preview(db)
@@ -507,6 +511,5 @@ def test_backup_replay_keeps_every_original_column_and_row(tmp_path):
         'tables': {name: {'columns': columns[name], 'before_count': before[name]['count'],
             'after_count': after[name]['count'], 'before_hash': before[name]['hash'],
             'after_hash': after[name]['hash']} for name in tables}}
-    output = root / '.artifacts/runtime/round38-migration-tests/backup-replay.json'
-    output.parent.mkdir(parents=True, exist_ok=True)
+    output = tmp_path / 'backup-replay.json'
     output.write_text(json.dumps(report, indent=2), encoding='utf-8')

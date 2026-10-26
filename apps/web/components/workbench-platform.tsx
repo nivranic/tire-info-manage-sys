@@ -3,11 +3,13 @@
 import { createContext, useContext } from "react";
 import type { OfflineStorage } from "@tire/domain-types";
 import { browserOfflineStorage } from "./browser-offline-store";
+import { deliverBrowserRawDownload } from "./raw-evidence-v2-context";
 
 export interface SaveDownload {
   blob: Blob;
   filename: string;
   signal?: AbortSignal;
+  assertCurrent?: () => void;
 }
 
 export interface WorkbenchPlatform {
@@ -23,19 +25,12 @@ export const browserPlatform: WorkbenchPlatform = {
   kind: "web",
   sessionLabel: "本浏览器会话",
   offline: browserOfflineStorage,
-  async saveDownload({ blob, filename, signal }) {
-    if (signal?.aborted) throw new DOMException("操作已取消", "AbortError");
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    try { link.click(); }
-    finally {
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-    }
-    return { saved: true };
+  async saveDownload(download) {
+    return deliverBrowserRawDownload(download, {
+      createObjectURL: blob => URL.createObjectURL(blob), revokeObjectURL: url => URL.revokeObjectURL(url),
+      createLink: () => document.createElement("a"), appendLink: link => document.body.appendChild(link as HTMLAnchorElement),
+      deferRevoke: callback => { window.setTimeout(callback, 60000); },
+    });
   },
 };
 

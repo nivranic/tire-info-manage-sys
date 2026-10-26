@@ -10,6 +10,8 @@
     "allow-api-cancel",
     "allow-reset-session",
     "allow-save-download",
+    "allow-prepare-download",
+    "allow-release-download",
     "allow-open-external",
     "allow-offline-status",
     "allow-offline-list",

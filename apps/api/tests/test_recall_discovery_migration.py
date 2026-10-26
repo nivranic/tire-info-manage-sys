@@ -1,4 +1,8 @@
-"""Purely synthetic predecessor schema; never reads a normal DB or its backup."""
+"""Current-shape fixture with a pre-008 ledger; target/full-chain preservation.
+
+This synthetic fixture is not an exact historical DB backup; no normal DB is read.
+Later current after_create and migration triggers are checked by a fixed contract.
+"""
 from datetime import timedelta
 
 import pytest
@@ -14,6 +18,9 @@ from tire_api.recall_models import (RecallMonitorJob, RecallMonitorRun, RecallMo
                                     RecallRuleRevision, SOURCE_ID)
 from tire_api.recall_discovery_monitor_models import RecallDiscoveryJob, RecallDiscoveryPage
 from tire_api.knowledge_models import initialize_search
+
+from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
+    assert_trigger_contract, initialize_observing_version)
 
 NEW_TABLES = {'recall_discovery_jobs', 'recall_discovery_rules', 'recall_discovery_rule_revisions',
     'recall_discovery_runs', 'recall_discovery_pages', 'recall_discovery_candidates',
@@ -93,12 +100,16 @@ def test_nine_additive_tables_preserve_all_old_schema_rows_and_cursors(predecess
     database, owner, histories = predecessor
     before = snapshot(database)
     assert not before['tables'] & NEW_TABLES
-    database.initialize()
+    assert_trigger_contract(before, device=False, candidate=False)
+    stage = initialize_observing_version(database, '008_recall_discovery_monitoring')
+    assert_target_delta(before, stage, NEW_TABLES)
+    assert_trigger_contract(stage, device=False, candidate=False)
+    first = snapshot(database)
     database.initialize()
     after = snapshot(database)
+    assert after == first
     assert after['tables'] - before['tables'] == NEW_TABLES
-    # 013 adds device-ledger triggers; their DDL is asserted in test_device_ai_migration013.py.
-    assert [row for row in after['schema'] if row[2] in before['tables'] and row[0] != 'trigger'] == before['schema']
+    assert_full_chain_preserved(before, after)
     for table in before['tables'] - {'tire_schema_versions'}:
         assert after['rows'][table] == before['rows'][table], table
     assert set(before['rows']['tire_schema_versions']) < set(after['rows']['tire_schema_versions'])
@@ -114,6 +125,7 @@ def test_nine_additive_tables_preserve_all_old_schema_rows_and_cursors(predecess
         assert tasks.task_list(db, scope, kind='recall_discovery')['total'] == 0
         assert tasks.task_list(db, scope)['total'] == 2
     with database.engine.connect() as connection:
+        assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == set(EXPECTED_SCHEMA_VERSIONS)
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         checks = inspect(connection).get_check_constraints('monitor_task_attempts')
         assert any(row['sqltext'] == "kind IN ('tire', 'recall')" for row in checks)

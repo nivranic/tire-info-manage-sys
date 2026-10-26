@@ -30,8 +30,7 @@
  *   H. resolveUnknownOutcome (N18): lookup-first, never resubmit.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { readCorpusBytes, readCorpusJson } from "./corpus.mjs";
 import { ApiError, setApiTransport } from "../../src/index.ts";
 import {
   DeviceAiHostError,
@@ -62,16 +61,15 @@ import {
 import { deviceAiDigest, parseDeviceAiJson } from "../../src/device-ai-exact.ts";
 import { DeviceAiProjectionPortError, type DeviceAiProjectionMode } from "../../src/device-ai-projection.ts";
 
-const HERE = fileURLToPath(new URL(".", import.meta.url));
-const EXPECTED = JSON.parse(readFileSync(HERE + "host-expected-fingerprints.json", "utf8")) as {
+const EXPECTED = readCorpusJson<{
   question_sha256: Record<string, string>;
   selection_sha256: string;
   device_context_fingerprint: string;
   local_preview_fingerprint: string;
-};
-const E1 = JSON.parse(readFileSync(HERE + "../../../../.artifacts/device-ai50/specs/e1-canonical-vectors-a.json", "utf8")) as {
+}>("host-sdk-selftest/host-expected-fingerprints.json");
+const E1 = readCorpusJson<{
   vectors: { id: string; input: { form: string; text?: string }; state: string; sha256?: string }[];
-};
+}>("specs/e1-canonical-vectors-a.json");
 
 let passed = 0;
 const failures: string[] = [];
@@ -274,16 +272,14 @@ async function sectionD(): Promise<void> {
 // E. computeLocalPreview over the SEALED projection vectors (P1-4b): four
 // domains + frozen_decision_closure, projection re-computed on-device.
 // ---------------------------------------------------------------------------
-// The sealed vector corpus stays in .artifacts (read-only evidence); from the
-// repo copy that is four levels up from this directory.
-const VECTORS_DIR = HERE + "../../../../.artifacts/device-ai50/projection-vectors-a/";
-const VECTOR_MANIFEST = JSON.parse(readFileSync(VECTORS_DIR + "manifest.json", "utf8")) as {
+// Tracked, exact-byte copies retain the original sealed manifest and hashes.
+const VECTOR_MANIFEST = readCorpusJson<{
   source_core: { sha256: string };
   domain_vectors: { case: string; state: string; member_count?: number; input: { path: string }; expectation: { path: string } }[];
-};
+}>("projection-vectors-a/manifest.json");
 const PACKS_BY_SHA = new Map<string, Uint8Array>();
 for (const name of ["legacy-pack.json", "nonempty-pack.json", "empty-pack.json"]) {
-  const raw = new Uint8Array(readFileSync(VECTORS_DIR + "inputs/" + name));
+  const raw = readCorpusBytes("projection-vectors-a/inputs/" + name);
   PACKS_BY_SHA.set(createHash("sha256").update(raw).digest("hex"), raw);
 }
 const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
@@ -305,8 +301,8 @@ interface LoadedCase {
 function loadVectorCase(name: string): LoadedCase {
   const vector = VECTOR_MANIFEST.domain_vectors.find(item => item.case === name);
   if (!vector) throw new Error(`sealed vector missing: ${name}`);
-  const input = JSON.parse(readFileSync(VECTORS_DIR + vector.input.path, "utf8")) as LoadedCase["input"];
-  const expectation = JSON.parse(readFileSync(VECTORS_DIR + vector.expectation.path, "utf8")) as LoadedCase["expectation"];
+  const input = readCorpusJson<LoadedCase["input"]>("projection-vectors-a/" + vector.input.path);
+  const expectation = readCorpusJson<LoadedCase["expectation"]>("projection-vectors-a/" + vector.expectation.path);
   if (input.core_sha256 !== VECTOR_MANIFEST.source_core.sha256) throw new Error(`core sha drift on ${name}`);
   const bytes = PACKS_BY_SHA.get(input.binding.sha256);
   if (!bytes || bytes.byteLength !== input.binding.byte_count || sha256Hex(bytes) !== input.binding.sha256) {
@@ -636,12 +632,25 @@ async function sectionG(): Promise<void> {
       ok("G8 409 closed code passthrough", error instanceof ApiError && error.status === 409 && error.code === "device_ai_prepare_conflict", String(error));
     }
 
-    responder = () => new Response(JSON.stringify(prepareView), { status: 200 });
-    await client.lookupPrepare(key);
+    const { replayed: _postReplay, provider_preview: _postPreview, ...readView } = prepareView;
+    responder = () => new Response(JSON.stringify(readView), { status: 200 });
+    const lookupView = await client.lookupPrepare(key);
     eq("G9 lookup path", calls.at(-1)!.path, `/v1/ai/device-evidence-packs/lookup?mode=history&idempotency_key=${canonicalKey}`);
     eq("G10 lookup is GET (fetch default)", calls.at(-1)!.method ?? "GET", "GET");
-    await client.readPrepare("prep-1");
+    ok("G26 lookup accepts server GET shape without inventing replay status", lookupView.id === "prep-1" && !("replayed" in lookupView));
+    const detailView = await client.readPrepare("prep-1");
     eq("G11 read path", calls.at(-1)!.path, "/v1/ai/device-evidence-packs/prep-1?mode=history");
+    ok("G27 read accepts server GET shape without inventing replay status", detailView.id === "prep-1" && !("replayed" in detailView));
+
+    responder = () => new Response(JSON.stringify(readView), { status: 201 });
+    threw = false;
+    try { await client.prepare(prepareBody, key); } catch { threw = true; }
+    ok("G28 POST still rejects a missing replayed field", threw);
+
+    responder = () => new Response(JSON.stringify({ ...prepareView, replayed: "false" }), { status: 201 });
+    threw = false;
+    try { await client.prepare(prepareBody, key); } catch { threw = true; }
+    ok("G29 POST still rejects a non-boolean replayed field", threw);
 
     responder = () => new Response(JSON.stringify({ detail: "未找到本会话的设备 AI 准备记录" }), { status: 404 });
     try { await client.lookupPrepare(key); ok("G12 404 throws", false); }

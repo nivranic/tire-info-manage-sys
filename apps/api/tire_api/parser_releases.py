@@ -6,6 +6,7 @@ from datetime import timedelta
 import json
 import hashlib
 import re
+from types import SimpleNamespace
 from typing import Literal
 from uuid import UUID
 
@@ -17,12 +18,12 @@ from pydantic import Field, StrictBool, StrictInt, field_validator, model_valida
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
-from .captures import checked_capture_bytes
 from .db import AuditEvent, QueryRun, RawCapture, Snapshot, Verification, uid, utc, utcnow
 from .domain import StrictModel, digest, stable_json
 from .parser_release_models import (ParserBundle, ParserDeploymentRevision, ParserEvaluation,
     ParserEvaluationCompletion, ParserEvaluationReview, ParserExecution, ParserSelection)
-from .reparse import MAX_BASELINE_BYTES, capture_input, compare_candidate, validate_candidate
+from .reparse import (MAX_BASELINE_BYTES, capture_input, checked_history_capture_bytes,
+                      compare_candidate, validate_candidate)
 from .service import QueryService
 
 SCOPE = {'scope': 'local_workspace', 'production_deployment': False}
@@ -401,9 +402,24 @@ def _reference_snapshot(db, capture):
         statement = (select(Snapshot).join(Verification, Verification.snapshot_id == Snapshot.id)
             .where(Verification.query_id == capture.query_id, Snapshot.source_id == capture.source_id,
                    Snapshot.query_key == capture.query_key, Snapshot.raw_hash == capture.raw_hash))
-    row = db.scalar(statement.limit(1))
+    row = db.scalar(statement.limit(1).execution_options(populate_existing=True))
     if row is None:
         return None
+    if capture.target_kind == 'vehicle':
+        from .vehicle_raw import FIRST_GENERATION_ID, SOURCE_ID, checked_vehicle_history_baseline
+        if row.body_encoding == 'binary' or (row.source_id == SOURCE_ID
+                and row.vehicle_id == FIRST_GENERATION_ID):
+            from .vehicle_raw import VehicleRawIntegrityError
+            try:
+                verification = db.scalar(select(VehicleVerification).where(
+                    VehicleVerification.snapshot_id == row.id,
+                    VehicleVerification.query_id == capture.query_id)
+                    .execution_options(populate_existing=True))
+                if verification is None:
+                    raise VehicleRawIntegrityError()
+                checked_vehicle_history_baseline(db, row, verification)
+            except VehicleRawIntegrityError:
+                raise ParserDeploymentError('vehicle_raw_integrity_failed', 503) from None
     reference = {'snapshot_id': row.id, 'raw_hash': row.raw_hash, 'observed_at': utc(row.observed_at).isoformat(),
                  'payload': deepcopy(row.payload if capture.target_kind == 'vehicle' else row.parsed_variants)}
     if len(stable_json(reference).encode('utf-8')) > MAX_BASELINE_BYTES:
@@ -545,6 +561,9 @@ def create_evaluation(db, payload: EvaluationCreate, actor_session_id, idempoten
     row.input_hash = digest(_evaluation_input(row))
     db.add(row)
     db.commit()
+    # Plain frozen values: no expired ORM access can reopen a parent read transaction across children.
+    execution_context = SimpleNamespace(source_id=row.source_id, target_bundle_id=row.target_bundle_id,
+                                        deployment_revision=row.deployment_revision)
     results, hard_blocks, gaps = [], [], []
     for binding in bindings:
         source_input, reference = binding['input'], binding['reference']
@@ -555,7 +574,8 @@ def create_evaluation(db, payload: EvaluationCreate, actor_session_id, idempoten
         if binding.get('golden'):
             item['golden_report'] = None
         try:
-            raw, _ = checked_capture_bytes(db, db.get(RawCapture, capture_id))
+            raw, _ = checked_history_capture_bytes(db, db.get(RawCapture, capture_id),
+                frozen_input=source_input if source_input.get('body_encoding') == 'binary' else None)
             if len(raw) != source_input['byte_count'] or hashlib.sha256(raw).hexdigest() != source_input['raw_hash']:
                 raise ValueError('frozen capture mismatch')
             db.commit()
@@ -567,16 +587,30 @@ def create_evaluation(db, payload: EvaluationCreate, actor_session_id, idempoten
             continue
         for kind, manifest in (('control', control_manifest), ('candidate', target_manifest)):
             try:
-                descriptor = _verify(manifest, row.source_id)
+                descriptor = _verify(manifest, execution_context.source_id)
                 from .parser_runtime import parse_isolated
-                parsed = asyncio.run(parse_isolated(row.source_id, raw, source_input['query'],
+                parsed = asyncio.run(parse_isolated(execution_context.source_id, raw, source_input['query'],
                     descriptor['parser_version'], descriptor['parser_digest'], bundle_manifest=manifest,
-                    deployment_revision=row.deployment_revision))
+                    deployment_revision=execution_context.deployment_revision))
                 item[kind + '_receipt'] = parsed['receipt']
-                item[kind] = validate_candidate(parsed['payload'], source_input, raw)
+                if source_input.get('body_encoding') == 'binary':
+                    # This session owns only attestation reads and closes before the next child.
+                    with Session(db.get_bind(), info=dict(db.info)) as history_db:
+                        item[kind] = validate_candidate(parsed['payload'], source_input, raw, db=history_db,
+                            bundle_manifest=manifest, receipt=parsed['receipt'],
+                            deployment_revision=execution_context.deployment_revision)
+                else:
+                    item[kind] = validate_candidate(parsed['payload'], source_input, raw)
             except Exception as error:
                 item[kind + '_error'] = safe_code(error, 'candidate_validation_failed')
-                item[kind + '_receipt'] = getattr(error, 'receipt', {}) or {}
+                if source_input.get('body_encoding') == 'binary':
+                    if getattr(error, 'receipt', None):
+                        item[kind + '_receipt'] = error.receipt
+                else:
+                    item[kind + '_receipt'] = getattr(error, 'receipt', {}) or {}
+        if source_input.get('body_encoding') == 'binary' and item['control_error']:
+            item['control_capability_gap'] = item['control_error']
+            hard_blocks.append({'capture_id': capture_id, 'code': 'binary_control_failed'})
         if reference is None:
             gaps.append(capture_id)
         if item['candidate'] is None:
@@ -593,7 +627,7 @@ def create_evaluation(db, payload: EvaluationCreate, actor_session_id, idempoten
                 case = binding['golden']['case']
                 item['golden_report'] = compare_case(case['kind'], case['expected'], item['candidate'],
                     {**source_input, 'case_id': case['case_id']})
-                if not receipt_matches(row, binding, item['candidate_receipt']):
+                if not receipt_matches(execution_context, binding, item['candidate_receipt']):
                     hard_blocks.append({'capture_id': capture_id, 'code': 'golden_candidate_receipt_mismatch'})
         results.append(item)
     if golden_bindings:
@@ -601,7 +635,8 @@ def create_evaluation(db, payload: EvaluationCreate, actor_session_id, idempoten
         report = aggregate_reports([item.get('golden_report') for item in results], expected_case_count=len(bindings))
         if report['state'] != 'passed':
             hard_blocks.append({'code': 'golden_assertions_failed' if report['state'] == 'failed' else 'golden_coverage_inconclusive'})
-    state = 'failed' if any(item['candidate_error'] for item in results) else 'completed'
+    state = 'failed' if any(item['candidate_error'] or item.get('control_capability_gap')
+                            for item in results) else 'completed'
     QueryService(db, None).lock_ingestion()
     db.add(ParserEvaluationCompletion(evaluation_id=row.id, state=state, results=results,
         hard_blocks=hard_blocks, reference_gaps=gaps,

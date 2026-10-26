@@ -57,6 +57,8 @@ async def stream_events(database, request, request_id, session_id, after):
             yield _frame('ai_event', row, after)
             if delivered >= MAX_STREAM_EVENTS:
                 break
+        if page['execution']['terminal'] and not page['has_more']:
+            break
         if time.monotonic() - heartbeat >= HEARTBEAT_SECONDS:
             yield _frame('heartbeat', {'cursor': after, 'server_time': timestamp(utcnow())})
             heartbeat = time.monotonic()
@@ -78,6 +80,8 @@ def register_ai_stream_routes(app):
                 existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, session_id)),
                                                             AIRequest.idempotency_key == key))
                 if existing:
+                    from .candidate_ai import reject_candidate_request
+                    reject_candidate_request(db, existing)
                     if existing.request_hash != fingerprint:
                         raise HTTPException(409, {'code': 'idempotency_payload_mismatch'})
                     if existing.request_contract.get('delivery_mode') != 'stream':

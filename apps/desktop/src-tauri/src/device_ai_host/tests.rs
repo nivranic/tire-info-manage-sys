@@ -10,10 +10,10 @@ use crate::security::LaunchConfig;
 use crate::session::{SessionStore, COOKIE_NAME};
 use std::sync::Mutex as StdMutex;
 
-const EXPECTED_PATH: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../../.artifacts/device-ai50/host-sdk-selftest/host-expected-fingerprints.json"
-);
+#[path = "../../tests/support/device_ai_corpus.rs"]
+mod fixture_corpus;
+
+const EXPECTED_PATH: &str = "host-sdk-selftest/host-expected-fingerprints.json";
 const TEST_COOKIE: &str = "acd95df4-f31d-4275-8b9e-098a90cbb223";
 
 // Shared mini inputs (lockstep with the TS selftest and
@@ -104,8 +104,7 @@ const QUESTION: &str = "P225 这条轮胎的历史参数如何解析？";
 const SOURCE_JSON: &str = r#"{"source_id":"src-1","observed_at":"2026-01-01T00:00:00Z","verified_at":null,"verification_id":"ver-1","load_index_9007199254740993":9007199254740993,"pressure":0.1000000000000000001,"negative_zero":-0}"#;
 
 fn expected_fingerprints() -> Value {
-    let raw = std::fs::read_to_string(EXPECTED_PATH)
-        .unwrap_or_else(|error| panic!("read expected fingerprints {EXPECTED_PATH}: {error}"));
+    let raw = String::from_utf8(fixture_corpus::read(EXPECTED_PATH)).expect("fingerprint fixture UTF-8");
     serde_json::from_str(&raw).expect("parse expected fingerprints")
 }
 
@@ -1479,6 +1478,59 @@ async fn client_prepare_replay_missing_preview_and_malformed_view() {
     }
 }
 
+#[test]
+fn preparation_reads_do_not_require_post_replay_metadata() {
+    let mut stored = prepare_view_fixture(KEY_CANONICAL);
+    stored.as_object_mut().unwrap().remove("replayed");
+    stored.as_object_mut().unwrap().remove("provider_preview");
+    assert_eq!(checked_preparation_view(stored.clone()).unwrap(), stored);
+    assert_eq!(
+        checked_prepare_view(stored.clone()).unwrap_err(),
+        DeviceAiHostErrorCode::ResponseInvalid
+    );
+    for flag in [Value::Null, json!("false"), json!(0), json!({})] {
+        let mut invalid = stored.clone();
+        invalid["replayed"] = flag;
+        assert_eq!(
+            checked_prepare_view(invalid).unwrap_err(),
+            DeviceAiHostErrorCode::ResponseInvalid
+        );
+    }
+    for flag in [true, false] {
+        let mut posted = stored.clone();
+        posted["replayed"] = json!(flag);
+        assert_eq!(
+            checked_prepare_view(posted).unwrap()["replayed"],
+            json!(flag)
+        );
+    }
+    for field in [
+        "id", "pack_id", "projection_sha256", "device_context_fingerprint",
+        "question_sha256", "selection_sha256", "expired", "expires_at",
+    ] {
+        let mut invalid = stored.clone();
+        invalid.as_object_mut().unwrap().remove(field);
+        assert_eq!(
+            checked_preparation_view(invalid).unwrap_err(),
+            DeviceAiHostErrorCode::ResponseInvalid,
+            "missing {field}"
+        );
+    }
+    for (field, invalid_value) in [
+        ("projection_sha256", json!("not-a-hash")),
+        ("expired", json!("false")),
+        ("expires_at", json!("not-a-time")),
+    ] {
+        let mut invalid = stored.clone();
+        invalid[field] = invalid_value;
+        assert_eq!(
+            checked_preparation_view(invalid).unwrap_err(),
+            DeviceAiHostErrorCode::ResponseInvalid,
+            "invalid {field}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn client_lookup_read_and_attempt_paths() {
     let server = Server::start(move |incoming| {
@@ -1490,11 +1542,17 @@ async fn client_lookup_read_and_attempt_paths() {
                 incoming.target,
                 format!("/v1/ai/device-evidence-packs/lookup?mode=history&idempotency_key={KEY_CANONICAL}")
             );
-            return json_reply(200, prepare_view_fixture(KEY_CANONICAL));
+            let mut view = prepare_view_fixture(KEY_CANONICAL);
+            view.as_object_mut().unwrap().remove("replayed");
+            view.as_object_mut().unwrap().remove("provider_preview");
+            return json_reply(200, view);
         }
         if incoming.target.starts_with("/v1/ai/device-evidence-packs/") {
             assert_eq!(incoming.target, "/v1/ai/device-evidence-packs/prep-1?mode=history");
-            return json_reply(200, prepare_view_fixture(KEY_CANONICAL));
+            let mut view = prepare_view_fixture(KEY_CANONICAL);
+            view.as_object_mut().unwrap().remove("replayed");
+            view.as_object_mut().unwrap().remove("provider_preview");
+            return json_reply(200, view);
         }
         assert_eq!(
             incoming.target,
@@ -1506,8 +1564,10 @@ async fn client_lookup_read_and_attempt_paths() {
     let client = DeviceAiHostClient::new(Arc::new(server.bridge()));
     let lookup = client.lookup_prepare(KEY_UPPER).await.unwrap();
     assert_eq!(lookup.value["id"], json!("prep-1"));
+    assert!(lookup.value.get("replayed").is_none());
     let read = client.read_prepare("prep-1").await.unwrap();
     assert_eq!(read.value["pack_id"], json!("pack-1"));
+    assert!(read.value.get("replayed").is_none());
     let attempt = client.lookup_attempt(KEY_UPPER).await.unwrap();
     assert_eq!(attempt.value["analysis"]["id"], json!("req-1"));
     // Ids that could smuggle path separators are refused before the network.
@@ -2101,16 +2161,11 @@ async fn ipc_resolve_unknown_four_branches_and_wire_kinds() {
 // pass is `accept` (a registered divergence recorded by the fixtures).
 // ---------------------------------------------------------------------------
 
-const DECODER_FIXTURES_PATH: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../../.artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json"
-);
+const DECODER_FIXTURES_PATH: &str = "specs/decoder-fixtures-a/fixtures.json";
 
 #[test]
 fn decoder_fixtures_replay_all_cases() {
-    let raw = std::fs::read_to_string(DECODER_FIXTURES_PATH).unwrap_or_else(|error| {
-        panic!("read decoder fixtures {DECODER_FIXTURES_PATH}: {error}")
-    });
+    let raw = String::from_utf8(fixture_corpus::read(DECODER_FIXTURES_PATH)).expect("decoder fixture UTF-8");
     let doc: serde_json::Value = serde_json::from_str(&raw)
         .unwrap_or_else(|error| panic!("parse decoder fixtures: {error}"));
     assert_eq!(

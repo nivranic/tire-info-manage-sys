@@ -1,4 +1,5 @@
 mod bridge;
+mod download_authority;
 pub mod device_ai_exact;
 pub mod device_ai_host;
 mod offline;
@@ -22,6 +23,8 @@ use tauri_plugin_opener::OpenerExt;
 use tokio::sync::Semaphore;
 
 struct NativeState {
+    downloads: Arc<download_authority::DownloadAuthority>,
+    download_document: Mutex<String>,
     bridge: NativeResult<Arc<Bridge>>,
     offline: NativeResult<Arc<offline::Store>>,
     sync: NativeResult<Arc<offline::sync::Coordinator>>,
@@ -34,6 +37,8 @@ struct NativeState {
 
 impl NativeState {
     fn from_environment(app_data: NativeResult<std::path::PathBuf>) -> Self {
+        let downloads = download_authority::DownloadAuthority::new();
+        let download_document = downloads.document().unwrap_or_default();
         let config = LaunchConfig::from_env();
         let api_base_url = config
             .as_ref()
@@ -47,7 +52,7 @@ impl NativeState {
         });
         let bridge = config.and_then(|config| {
             let store = OsSessionStore::open(&config)?;
-            Bridge::new(config, store).map(Arc::new)
+            Bridge::with_download_authority(config, store, downloads.clone()).map(Arc::new)
         });
         if let (Ok(bridge), Ok(store)) = (&bridge, &offline) {
             let _ = bridge.bind_fallback_store(store);
@@ -64,6 +69,8 @@ impl NativeState {
                 .map_err(|e| *e)
         });
         Self {
+            downloads,
+            download_document: Mutex::new(download_document),
             bridge,
             offline,
             sync,
@@ -84,7 +91,17 @@ impl NativeState {
     fn offline(&self) -> NativeResult<Arc<offline::Store>> {
         self.offline.as_ref().cloned().map_err(|error| *error)
     }
+    fn document(&self) -> NativeResult<String> {
+        self.download_document.lock().map(|token| token.clone()).map_err(|_| "DOWNLOAD_AUTHORITY_UNAVAILABLE")
+    }
+    fn document_started(&self) {
+        if let Ok(mut token) = self.download_document.lock() {
+            self.downloads.end_document(&token);
+            *token = self.downloads.document().unwrap_or_default();
+        } else { self.downloads.close(); }
+    }
 }
+impl Drop for NativeState { fn drop(&mut self) { self.downloads.close(); } }
 
 #[derive(Serialize)]
 struct DesktopStatus {
@@ -153,6 +170,8 @@ fn api_cancel(
 #[tauri::command(rename_all = "snake_case")]
 async fn reset_session(window: WebviewWindow, state: State<'_, NativeState>) -> NativeResult<()> {
     require_main(&window)?;
+    // Remains pending across owner DB work and all asynchronous lock waits.
+    let _download_transition = state.downloads.begin_transition()?;
     if state.offline_resetting.swap(true, Ordering::SeqCst) {
         return Err("SESSION_RESET_IN_PROGRESS");
     }
@@ -174,7 +193,8 @@ async fn reset_session(window: WebviewWindow, state: State<'_, NativeState>) -> 
     let _gate = state.offline_gate.lock().await;
     let store = state.offline()?;
     // A failed durable epoch update leaves the original session intact.
-    blocking(move || store.reset_owner()).await?;
+    let download_worker_transition = state.downloads.begin_transition()?;
+    blocking(move || { let _download_worker_transition = download_worker_transition; store.reset_owner() }).await?;
     if let Ok(sync) = &state.sync {
         sync.cancel(None);
     }
@@ -860,15 +880,31 @@ struct SaveResult {
     saved: bool,
 }
 
+#[derive(Serialize)]
+struct PreparedDownload { lease: String }
+#[tauri::command(rename_all = "snake_case")]
+fn prepare_download(window: WebviewWindow, state: State<'_, NativeState>) -> NativeResult<PreparedDownload> {
+    require_main(&window)?;
+    Ok(PreparedDownload { lease: state.downloads.prepare(&state.document()?)? })
+}
+#[tauri::command(rename_all = "snake_case")]
+fn release_download(window: WebviewWindow, state: State<'_, NativeState>, lease: String) -> NativeResult<()> {
+    require_main(&window)?;
+    state.downloads.release(&lease, &state.document()?);
+    Ok(())
+}
+
 #[tauri::command(rename_all = "snake_case")]
 async fn save_download(
     window: WebviewWindow,
     state: State<'_, NativeState>,
+    lease: String,
     filename: String,
     mime: String,
     body_base64: String,
 ) -> NativeResult<SaveResult> {
     require_main(&window)?;
+    let reservation = state.downloads.reserve(&lease, &state.document()?)?;
     let _permit = state
         .download
         .try_acquire()
@@ -899,10 +935,13 @@ async fn save_download(
     {
         return Err("INVALID_DOWNLOAD_TYPE");
     }
-    // Only this user-selected native path is accepted. No path is supplied by IPC.
-    tokio::fs::write(path, body)
-        .await
-        .map_err(|_| "DOWNLOAD_WRITE_FAILED")?;
+    // Commit in the byte-owning worker after picker/name validation. The independent gate is
+    // released before any open/truncate/write; later invalidation cannot promise rollback.
+    tokio::task::spawn_blocking(move || {
+        let body = zeroize::Zeroizing::new(body);
+        reservation.commit()?;
+        std::fs::write(path, &*body).map_err(|_| "DOWNLOAD_WRITE_FAILED")
+    }).await.map_err(|_| "DOWNLOAD_WRITE_FAILED")??;
     Ok(SaveResult { saved: true })
 }
 
@@ -931,6 +970,8 @@ pub fn run() {
             api_request,
             api_cancel,
             reset_session,
+            prepare_download,
+            release_download,
             save_download,
             open_external,
             offline_status,
@@ -978,7 +1019,7 @@ pub fn run() {
                     && std::env::var("TI_DESKTOP_QA_HIDDEN").as_deref() == Ok("1"));
             // QA may explicitly supply WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS in the
             // launch environment. The application never enables a debugging port itself.
-            tauri::WebviewWindowBuilder::new(
+            let main_window = tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
@@ -991,6 +1032,7 @@ pub fn run() {
             .on_page_load(|window, payload| {
                 if payload.event() == tauri::webview::PageLoadEvent::Started {
                     if let Some(state) = window.try_state::<NativeState>() {
+                        state.document_started();
                         if let Ok(store) = state.offline() {
                             store.invalidate_fallback_page();
                         }
@@ -999,6 +1041,10 @@ pub fn run() {
             })
             .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
             .build()?;
+            let downloads = app.state::<NativeState>().downloads.clone();
+            main_window.on_window_event(move |event| {
+                if matches!(event, tauri::WindowEvent::Destroyed) { downloads.close(); }
+            });
             Ok(())
         })
         .run(tauri::generate_context!())

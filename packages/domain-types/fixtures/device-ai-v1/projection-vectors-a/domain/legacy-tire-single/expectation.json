@@ -1,0 +1,18 @@
+{
+  "canonical_projection": {
+    "byte_count": 11377,
+    "path": "domain/legacy-tire-single/projection.canonical.json",
+    "sha256": "e4cb363251b706de8d30cdf7bef8ac043f514b90f2d2614435223cbe00abbddb"
+  },
+  "data_state": "local_snapshot",
+  "expected_error_code": null,
+  "member_count": 1,
+  "privacy_class": "private",
+  "source_refresh_performed": false,
+  "state": "accepted",
+  "token_dto_projection": {
+    "byte_count": 11422,
+    "path": "domain/legacy-tire-single/projection.tokens.json",
+    "sha256": "0b73f539091dbc1c9249fb728a25658fa74af4953f1c32e23f53e2a1dde76390"
+  }
+}

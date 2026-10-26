@@ -2205,7 +2205,8 @@ fn is_ai_stream_detail(value: &Value, request_id: Option<&str>) -> bool {
         && answer.get("notice").and_then(Value::as_str).is_some()
 }
 
-fn checked_prepare_view(value: Value) -> Result<Value, DeviceAiHostErrorCode> {
+// GET lookup/detail return the stored view, without a POST replay decision.
+fn checked_preparation_view(value: Value) -> Result<Value, DeviceAiHostErrorCode> {
     let invalid = || host_err(DeviceAiHostErrorCode::ResponseInvalid);
     let Some(object) = value.as_object() else {
         return Err(invalid());
@@ -2226,14 +2227,21 @@ fn checked_prepare_view(value: Value) -> Result<Value, DeviceAiHostErrorCode> {
     ]
     .iter()
     .all(|key| object.get(*key).and_then(Value::as_str).is_some_and(is_hash64));
-    let flags_ok = object.get("replayed").and_then(Value::as_bool).is_some()
-        && object.get("expired").and_then(Value::as_bool).is_some();
+    let flags_ok = object.get("expired").and_then(Value::as_bool).is_some();
     let expires_ok = is_ai_timestamp(object.get("expires_at").unwrap_or(&Value::Null));
     if id_ok && pack_id_ok && hash_ok && flags_ok && expires_ok {
         Ok(value)
     } else {
         Err(invalid())
     }
+}
+
+fn checked_prepare_view(value: Value) -> Result<Value, DeviceAiHostErrorCode> {
+    let value = checked_preparation_view(value)?;
+    if value.get("replayed").and_then(Value::as_bool).is_none() {
+        return Err(host_err(DeviceAiHostErrorCode::ResponseInvalid));
+    }
+    Ok(value)
 }
 
 fn checked_stream_detail(value: Value) -> Result<Value, DeviceAiHostErrorCode> {
@@ -2332,7 +2340,7 @@ impl DeviceAiHostClient {
             "/v1/ai/device-evidence-packs/lookup?mode=history&idempotency_key={idempotency_key}"
         );
         let success = self.dispatch("GET", path, None, None).await?;
-        let view = checked_prepare_view(success.value).map_err(DeviceAiClientError::Host)?;
+        let view = checked_preparation_view(success.value).map_err(DeviceAiClientError::Host)?;
         Ok(DeviceAiEndpointSuccess {
             status: success.status,
             value: view,
@@ -2357,7 +2365,7 @@ impl DeviceAiHostClient {
         }
         let path = format!("/v1/ai/device-evidence-packs/{prepare_id}?mode=history");
         let success = self.dispatch("GET", path, None, None).await?;
-        let view = checked_prepare_view(success.value).map_err(DeviceAiClientError::Host)?;
+        let view = checked_preparation_view(success.value).map_err(DeviceAiClientError::Host)?;
         Ok(DeviceAiEndpointSuccess {
             status: success.status,
             value: view,

@@ -77,7 +77,7 @@ def test_cli_reset_password_is_the_local_recovery_path(tmp_path):
     with TestClient(app) as client:
         assert register(client, username="root").status_code == 200
     result = subprocess.run([sys.executable, "-m", "tire_api.manage", "reset-password",
-                             "--username", "root", "--new-password", cli_password],
+                             "--username", "root", f"--new-password={cli_password}"],
                             capture_output=True, text=True, cwd=".", timeout=120,
                             env={**os.environ, "TIRE_DATABASE_URL": url})
     assert result.returncode == 0, result.stderr

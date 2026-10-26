@@ -396,13 +396,14 @@ def test_rejects_untrusted_selector_or_bad_envelope_before_spawn(monkeypatch):
 
 def test_domain_dependency_change_invalidates_frozen_digest(monkeypatch, tmp_path):
     original = runtime.current_parser('michelin-us')
+    mutated_root = tmp_path / 'mutated_source'
     for path in runtime._ROOT.rglob('*.py'):
-        target = tmp_path / path.relative_to(runtime._ROOT)
+        target = mutated_root / path.relative_to(runtime._ROOT)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
-    domain = tmp_path / 'domain.py'
+    domain = mutated_root / 'domain.py'
     domain.write_bytes(domain.read_bytes() + b'\n# synthetic dependency change\n')
-    monkeypatch.setattr(runtime, '_ROOT', tmp_path)
+    monkeypatch.setattr(runtime, '_ROOT', mutated_root)
     assert runtime.current_parser('michelin-us')['parser_digest'] != original['parser_digest']
     with pytest.raises(runtime.ParserRunError, match='parser_code_mismatch'):
         asyncio.run(runtime.parse_isolated('michelin-us', _page(), {}, original['parser_version'], original['parser_digest']))

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, load_only
 from .ai_analysis import grounded_answer, owned_pack
 from .auth import session_scope
 from .ai_recall_contract import is_recall_evidence, validate_recall_payload
+from .ai_test_contract import contains_test, test_boundary, validate_test_claim
 from .ai_models import AICompletion, AIRequest
 from .db import uid
 from .domain import StrictModel, digest, stable_json
@@ -24,6 +25,7 @@ from .research import DescriptionText
 from .service import QueryService, timestamp
 
 REPORT_SCHEMA = 'research-report@3'
+TEST_REPORT_SCHEMA = 'research-report@4'
 HISTORY_NOTICE = ('本报告保存的是所选证据包与可选分析的冻结历史副本，不代表当前参数、库存或适配结论。'
                   '模型推断不是来源事实；后续来源变化、撤销或修订不会改写已保存正文。')
 FORMATS = {'markdown': ('text/markdown', 'md'), 'html': ('text/html', 'html'), 'pdf': ('application/pdf', 'pdf')}
@@ -65,6 +67,11 @@ def latest_revision(db, report_id, expected=None):
 
 def owned_report(db, report_id, scope):
     row = db.get(ResearchReport, report_id)
+    if row is not None:
+        from .candidate_ai import reject_candidate_pack, reject_candidate_request
+        reject_candidate_pack(db, row.pack_id)
+        if row.analysis_id is not None:
+            reject_candidate_request(db, db.get(AIRequest, row.analysis_id))
     if row is None or row.actor_session_id not in scope:
         raise HTTPException(404, '未找到当前账户的报告')
     if digest(row.body) != row.body_hash:
@@ -72,8 +79,8 @@ def owned_report(db, report_id, scope):
     return row
 
 
-def canonical_facts(payload):
-    validate_recall_payload(payload)
+def canonical_facts(payload, *, frozen=False):
+    validate_recall_payload(payload, require_purpose=not frozen, frozen=frozen)
     evidence = deepcopy(payload.get('evidence'))
     if not isinstance(evidence, list) or not evidence or len({item['id'] for item in evidence}) != len(evidence):
         raise ValueError('invalid_report_evidence')
@@ -103,10 +110,15 @@ def canonical_facts(payload):
 
 
 def freeze_body(db, pack, analysis_id, session_id):
+    from .candidate_ai import reject_candidate_pack, reject_candidate_request
+    reject_candidate_pack(db, pack.id)
     if pack.payload.get('purpose') == 'rule_draft':
         raise HTTPException(422, '规则草稿不能保存为研究事实报告')
     try:
         evidence, facts = canonical_facts(pack.payload)
+        from .ai_evidence import require_vehicle_evidence
+        require_vehicle_evidence(db, {**pack.payload, 'evidence': evidence, 'facts': facts},
+                                 purpose='local_structured', pack_id=pack.id)
         from .ai_evidence import frozen_field_resolutions
         field_contract = {}
         if 'field_resolutions' in pack.payload:
@@ -123,6 +135,17 @@ def freeze_body(db, pack, analysis_id, session_id):
                         raise ValueError('invalid_report_recall_binding')
             field_contract['recall_policy'] = deepcopy(pack.payload['recall_policy'])
             field_contract['recall_boundary'] = deepcopy(pack.payload['recall_boundary'])
+        if contains_test(pack.payload):
+            from types import SimpleNamespace
+            field_contract['schema_version'] = TEST_REPORT_SCHEMA
+            field_contract['test_boundary'] = test_boundary(pack.payload)
+            by_fact = {item['id']: item for item in facts}
+            by_evidence = {item['id']: item for item in evidence}
+            # Validate every frozen field, even when the report has no analysis.
+            # Selecting facts must not launder malformed participant bindings.
+            for item in facts:
+                validate_test_claim(SimpleNamespace(type='fact', text='', fact_ids=[item['id']],
+                    evidence_ids=[item['evidence_id']]), by_fact, by_evidence)
     except (ValueError, TypeError, KeyError, AttributeError):
         raise HTTPException(409, '证据包引用结构无效，不能保存报告') from None
     ids = list({item['variant_id'] for item in evidence if item.get('variant_id')})
@@ -137,6 +160,7 @@ def freeze_body(db, pack, analysis_id, session_id):
     analysis = None
     if analysis_id:
         row = db.get(AIRequest, analysis_id)
+        reject_candidate_request(db, row)
         if row is None or row.actor_session_id not in session_scope(db, session_id):
             raise HTTPException(404, '未找到本账户的分析')
         completion = db.get(AICompletion, row.id)
@@ -200,7 +224,10 @@ def detail(db, report, revision=None):
 
 
 def document_for(report, revision):
-    return {'schema_version': REPORT_SCHEMA, 'report_id': report.id, 'title': revision.title, 'notes': revision.notes,
+    # Only new frozen bodies carry the test schema. Never upgrade an old report
+    # merely because its archived evidence happens to contain a TestEvent.
+    return {'schema_version': report.body.get('schema_version', REPORT_SCHEMA),
+            'report_id': report.id, 'title': revision.title, 'notes': revision.notes,
             'revision': revision.revision, 'created_at': timestamp(report.created_at), 'body': report.body}
 
 
@@ -252,12 +279,16 @@ def register_report_routes(app: FastAPI):
     @app.get('/v1/reports')
     def listing(request: Request, mode: Literal['history'] = Query(...), archived: bool = False,
                 offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+        from .candidate_ai_models import CandidateAIPreparation
         heads = select(ResearchReportRevision.report_id, func.max(ResearchReportRevision.revision).label('revision')).group_by(
             ResearchReportRevision.report_id).subquery()
         statement = select(ResearchReport, ResearchReportRevision).join(ResearchReportRevision,
             ResearchReportRevision.report_id == ResearchReport.id).join(heads,
             (heads.c.report_id == ResearchReport.id) & (heads.c.revision == ResearchReportRevision.revision)).where(
-                ResearchReport.actor_session_id.in_(session_scope(db, request.state.session_id)), ResearchReportRevision.archived == archived)
+                ResearchReport.actor_session_id.in_(session_scope(db, request.state.session_id)), ResearchReportRevision.archived == archived,
+                ~select(CandidateAIPreparation.id).where(CandidateAIPreparation.pack_id == ResearchReport.pack_id).exists(),
+                ~select(CandidateAIPreparation.id).join(AIRequest, AIRequest.pack_id == CandidateAIPreparation.pack_id)
+                    .where(AIRequest.id == ResearchReport.analysis_id).exists())
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = db.execute(statement.options(load_only(*[getattr(ResearchReport, column.name)
             for column in ResearchReport.__table__.columns if column.name != 'body']))
@@ -306,13 +337,16 @@ def register_report_routes(app: FastAPI):
 
     @app.post('/v1/reports/{report_id}/exports', status_code=201)
     def export(report_id: str, payload: ExportRequest, request: Request, db: Session = Depends(get_db)):
-        from .report_rendering import RENDERER_VERSION, ReportRenderError, render_report
+        from .report_rendering import ReportRenderError, render_report, renderer_version_for
         report = owned_report(db, report_id, session_scope(db, request.state.session_id))
         revision = report_revision(db, report_id, payload.revision)
         document = document_for(report, revision)
+        renderer_version = renderer_version_for(document)
         document_hash = digest(document)
+        from .ai_evidence import require_vehicle_evidence
+        require_vehicle_evidence(db, report.body, purpose='export', pack_id=report.pack_id, frozen=True)
         existing = db.scalar(select(ReportExport).where(ReportExport.report_id == report_id,
-            ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == RENDERER_VERSION))
+            ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == renderer_version))
         if existing:
             if existing.document_hash != document_hash:
                 raise HTTPException(409, '导出绑定的修订内容不一致')
@@ -327,10 +361,11 @@ def register_report_routes(app: FastAPI):
         except ObjectStoreError:
             raise HTTPException(503, '导出文件存储未完成，未创建导出记录') from None
         QueryService(db, None).lock_ingestion()
-        owned_report(db, report_id, session_scope(db, request.state.session_id))
+        fresh_report = owned_report(db, report_id, session_scope(db, request.state.session_id))
+        require_vehicle_evidence(db, fresh_report.body, purpose='export', pack_id=fresh_report.pack_id, frozen=True)
         # Concurrent identical exports reuse the first immutable object receipt.
         existing = db.scalar(select(ReportExport).where(ReportExport.report_id == report_id,
-            ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == RENDERER_VERSION))
+            ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == renderer_version))
         if existing:
             if existing.document_hash != document_hash:
                 raise HTTPException(409, '导出绑定的修订内容不一致')
@@ -338,7 +373,7 @@ def register_report_routes(app: FastAPI):
             db.commit()
             return result
         record = ReportExport(report_id=report_id, revision=payload.revision, format=payload.format,
-            renderer_version=RENDERER_VERSION, document_hash=document_hash, content_type=FORMATS[payload.format][0],
+            renderer_version=renderer_version, document_hash=document_hash, content_type=FORMATS[payload.format][0],
             sha256=sha256, byte_count=len(data))
         db.add(record)
         db.flush()
@@ -357,6 +392,8 @@ def register_report_routes(app: FastAPI):
         metadata_revision = report_revision(db, report_id, revision)
         if digest(document_for(report, metadata_revision)) != record.document_hash:
             raise HTTPException(409, '导出与冻结报告修订的绑定校验失败')
+        from .ai_evidence import require_vehicle_evidence
+        require_vehicle_evidence(db, report.body, purpose='export', pack_id=report.pack_id, frozen=True)
         try:
             data = checked(db.info['object_store'].get(record.sha256, record.byte_count), record.sha256, record.byte_count)
         except ObjectStoreError:

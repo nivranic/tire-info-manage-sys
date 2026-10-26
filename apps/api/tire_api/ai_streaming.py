@@ -47,12 +47,26 @@ class AIStreamSupervisor:
                 return result
             raise
 
+    async def _vehicle_dispatch(self, request_id, config, body, pack):
+        from .ai_execution import require_vehicle_dispatch
+        operation = asyncio.create_task(asyncio.to_thread(require_vehicle_dispatch,
+            self.database, request_id, config, body, pack))
+        try:
+            return await asyncio.shield(operation)
+        except asyncio.CancelledError as cancelled:
+            try:
+                await asyncio.shield(operation)
+            except Exception:
+                pass
+            raise cancelled
+
     async def _run(self, request_id, owner_token, config, body, pack):
         from .telemetry import observe, record_ai_usage
         receipt = {}
         answer = None
         state, error = 'outcome_unknown', 'ai_stream_interrupted'
         started = False
+        local_vehicle_denial = False
         with observe('ai.response', component='ai') as operation:
             try:
                 async with asyncio.timeout(PRODUCER_SECONDS):
@@ -60,6 +74,11 @@ class AIStreamSupervisor:
                     if not started:
                         operation.finish('not_started')
                         return
+                    try:
+                        await self._vehicle_dispatch(request_id, config, body, pack)
+                    except GatewayError:
+                        local_vehicle_denial = True
+                        raise
                     projector = StructuredDraftProjector(pack)
 
                     async def on_text(delta):
@@ -94,6 +113,8 @@ class AIStreamSupervisor:
             # started event; owner-fenced finalization safely handles that window.
             if not isinstance(receipt, dict):
                 receipt = {}
+            if local_vehicle_denial and state == 'failed':
+                receipt = {'usage': {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0}}
             usage = safe_usage(receipt.get('usage')) if state != 'outcome_unknown' else None
             try:
                 committed = await self._call('finish_execution', request_id, owner_token, finishing=True,

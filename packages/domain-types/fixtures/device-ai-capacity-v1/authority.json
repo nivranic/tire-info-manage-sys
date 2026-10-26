@@ -1,0 +1,18 @@
+{
+  "closure_derivation": "Explicit standard-library structural selection in generate_device_ai_capacity_fixtures.py; no product imports. A has A/B candidates, B only B; D/vehicle are unreachable. Five identity keys plus policy/fields/scope; observations sorted by member_key. See README.md.",
+  "fingerprint_spec_sections": [
+    "0",
+    "2",
+    "3",
+    "4"
+  ],
+  "fingerprint_spec_sha256": "d2b7524d0e86101885f08442d139ef0128481dba3992d396a46ef7af2e497345",
+  "fingerprint_spec_source": ".artifacts/device-ai50/specs/fingerprint-spec.md",
+  "formal_projection_derivation": "Replace exactly one archive.sha256 literal with each actual padded raw package SHA; preserve every other byte.",
+  "formal_projection_source": "domain/nonempty-tire-single/projection.canonical.json",
+  "formal_projection_source_sha256": "e6c42637f571dfb6695ec470a9c80d77d7ab42a879eeec1d7354ca0a2b5144e8",
+  "formal_source_root": "packages/domain-types/fixtures/device-ai-v1/projection-vectors-a",
+  "product_executed_to_generate_expected": false,
+  "schema": "device-ai-capacity-authority@1",
+  "synthetic_only": true
+}

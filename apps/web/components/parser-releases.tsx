@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { ParserBundle, ParserDeployment, ParserEvaluation, ParserEvaluationCreate, ParserPage,
-  ParserSignedAction, ParserTransition, RawCaptureEvidence, RawCaptureRecord, Source, GoldenSet, GoldenGate } from "@tire/domain-types";
+  ParserSignedAction, ParserTransition, RawCaptureRecord, Source, GoldenSet, GoldenGate } from "@tire/domain-types";
 import { DataTree, QualityMetrics, qualityLabels, qualityGroupLabels, queryScope, targetLabel } from "./reparse-review";
 import { useWorkbenchAuth } from "./auth";
+import { RawEvidenceV2View, useRawEvidenceV2 } from "./raw-evidence-v2";
+import { assertRawEvidenceInput } from "./raw-evidence-v2-context";
 
 const stamp = (value?: string) => value ? new Date(value).toLocaleString("zh-CN") : "未记录";
 const short = (value: string) => `${value.slice(0, 12)}…`;
@@ -124,7 +126,7 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
   const [goldenId, setGoldenId] = useState("");
   const [goldenSet, setGoldenSet] = useState<GoldenSet | null>(null);
   const [rawId, setRawId] = useState("");
-  const [raw, setRaw] = useState<RawCaptureEvidence | null>(null);
+  const [rawRead, setRawRead] = useState(0);
   const [evaluations, setEvaluations] = useState<ParserPage<ParserEvaluation> | null>(null);
   const [evaluationOffset, setEvaluationOffset] = useState(0);
   const [selectedId, setSelectedId] = useState("");
@@ -149,6 +151,20 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
   const [operator, setOperator] = useState("");
   const [reason, setReason] = useState("");
   const [changeConfirmed, setChangeConfirmed] = useState(false);
+  const reader = useRawEvidenceV2({ kind: "capture", id: rawId,
+    selectionKey: JSON.stringify([source, rawRead, goldenId, selectedId, evaluationMode, goldenSet?.fingerprint, evaluation?.id, evaluation?.completion?.fingerprint]),
+    validate(value) {
+      if (value.source_id !== source) throw new Error("原文来源与发布工作区不一致。");
+      const input = evaluation?.bindings?.find(item => item.input.capture_id === rawId)?.input;
+      if (input) assertRawEvidenceInput(value, input);
+      if (goldenSet?.capture_ids.includes(rawId)) {
+        const member = goldenSet.cases?.find(item => !!item && typeof item === "object" && "capture_id" in item && item.capture_id === rawId);
+        if (!member || typeof member !== "object" || !("input" in member)) throw new Error("冻结集合未提供此样本的完整原文绑定。");
+        assertRawEvidenceInput(value, member.input);
+      }
+      const sample = captures?.items.find(item => item.id === rawId) || samples.find(item => item.id === rawId);
+      if (sample && (value.target_kind !== sample.target_kind || value.byte_count !== sample.byte_count || value.raw_hash !== sample.raw_hash)) throw new Error("原文与所选样本范围或哈希不一致。");
+    } });
   const locked = busy || !!pending;
   const descriptor = bundle?.parsers.find(item => item.source_id === source);
   const currentEvaluation = !!evaluation && !!head && evaluation.deployment_revision === head.revision && !evaluation.deployment_stale;
@@ -169,7 +185,7 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
     pendingRef.current = value; setPending(value);
     if (value) attempts.set(value.source, value); else attempts.delete(source);
   }
-  function reload() { setActionError(""); setRefresh(value => value + 1); setDetailRefresh(value => value + 1); setChangeConfirmed(false); setEvaluateConfirmed(false); }
+  function reload() { reader.cancel(); setRawRead(value => value + 1); setActionError(""); setRefresh(value => value + 1); setDetailRefresh(value => value + 1); setChangeConfirmed(false); setEvaluateConfirmed(false); }
   function acceptEvaluation(value: ParserEvaluation, expectedId?: string) {
     if (value.source_id !== source || value.accepted_as_facts !== false || (expectedId && value.id !== expectedId)) throw new Error("评估返回范围不匹配，未展示。");
     setEvaluation(value); setReviewStale(false); setReviewConfirmed(false); setGapConfirmed(false);
@@ -235,20 +251,12 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
     // Requests are bound to the source/ID current when this effect is created.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, selectedId, detailRefresh]);
-  useEffect(() => {
-    setRaw(null); loadError("raw");
-    if (!rawId) return;
-    const controller = new AbortController();
-    void tireApi.captureEvidence(rawId, controller.signal).then(value => {
-      if (!controller.signal.aborted) { if (value.id !== rawId || value.source_id !== source) throw new Error("原文范围不匹配，未展示。"); setRaw(value); }
-    }).catch(error => { if (!controller.signal.aborted) loadError("raw", message(error)); });
-    return () => controller.abort();
-  }, [source, rawId]);
   useEffect(() => { setEvaluateConfirmed(false); setChangeConfirmed(false); }, [head?.revision, bundle?.id, samples, action, rollbackRevision, evaluation?.review_revision, evaluationMode, goldenSet?.fingerprint]);
 
   function chooseSource(value: string) {
+    reader.cancel();
     lastViewedSource = value;
-    setSource(value); setHead(null); setBundle(null); setSamples([]); setRawId(""); setRaw(null);
+    setSource(value); setHead(null); setBundle(null); setSamples([]); setRawId("");
     setGoldenId(""); setGoldenSet(null); setGoldenOffset(0); setEvaluationMode(sources.find(item => item.id === value)?.target_kind === "recall" ? "relative" : "golden");
     setCaptureOffset(0); setEvaluationOffset(0); setSelectedId(""); setEvaluation(null); setReviewStale(false); setDeploymentStale(false);
     setEvaluateConfirmed(false); setChangeConfirmed(false); setActionError(""); setNotice(""); setReason("");
@@ -320,8 +328,8 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
     void perform({ kind: "transition", source, key: crypto.randomUUID(), payload });
   }
 
-  return <dialog ref={dialog} className="fact-review-dialog reports-dialog parser-release-dialog" aria-labelledby="parser-release-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
-    <header className="fact-review-heading"><div><span className="eyebrow">LOCAL PARSER RELEASE</span><h2 id="parser-release-title">解析器发布与回滚</h2></div><button type="button" className="icon-button" aria-label="关闭解析器发布" onClick={onClose}>×</button></header>
+  return <dialog ref={dialog} className="fact-review-dialog reports-dialog parser-release-dialog" aria-labelledby="parser-release-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); reader.cancel(); onClose(); }}>
+    <header className="fact-review-heading"><div><span className="eyebrow">LOCAL PARSER RELEASE</span><h2 id="parser-release-title">解析器发布与回滚</h2></div><button type="button" className="icon-button" aria-label="关闭解析器发布" onClick={() => { reader.cancel(); onClose(); }}>×</button></header>
     <div className="reports-content parser-release-content"><div className="snapshot-banner"><strong>本机工作区 · 受控发布</strong><span>评估只重放历史原文；审批、切换不访问来源，不采纳历史候选，也不刷新在线核验时间。署名为本地自报。</span></div>
       <div className="parser-release-toolbar"><label><span>管理来源</span><select value={source} disabled={busy} onChange={event => chooseSource(event.target.value)}>{choices.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><button type="button" className="secondary-button" disabled={busy} onClick={reload}>重新读取部署与记录</button></div>
       {Object.entries(readErrors).filter(([, value]) => value).map(([key, value]) => <p className="inline-error" role="alert" key={key}>{value}</p>)}
@@ -337,17 +345,17 @@ function ReleaseDialog({ sources, onClose }: { sources: Source[]; onClose: () =>
         {bundles && !bundles.items.length ? <p>本页没有已登记包。初始化可固定首次活动包；其他候选须由服务端运维入口完成封存登记。</p> : bundles && !bundles.items.some(item => item.parsers.some(parser => parser.source_id === source)) ? <p>本页没有包含当前来源的代码包。可翻页查找；历史包不会自动增加新来源，初始化仅固定当前安装代码。</p> : null}
         <Pages label="代码包" offset={bundleOffset} total={bundles?.total || 0} disabled={locked || !bundles} onChange={setBundleOffset} />
         {bundle ? <div className="review-boundary"><p>所选候选包 <code>{bundle.id}</code> · {descriptor?.parser_version}</p><p>Parser 指纹 <code>{descriptor?.parser_digest}</code></p><DataTree label="所选包的登记与兼容环境" value={bundle} /></div> : null}
-        <label className="golden-field"><span>评估依据</span><select value={evaluationMode} disabled={locked} onChange={event => setEvaluationMode(event.target.value as "golden" | "relative")}><option value="golden" disabled={recallSource}>人工审核的完整冻结集</option><option value="relative">{recallSource ? "召回相对回归样本（既有发布流程）" : "相对回归样本（不能用于新发布）"}</option></select></label>
-        {evaluationMode === "golden" ? <><h4>同来源 Golden 冻结集 · 全部成员参与评估</h4><p>先在“Golden 真值与冻结集”填写并人工审核预期；此处绑定集合的精确修订与指纹，不能只选部分成员。</p><div className="parser-bundle-options">{goldenSets?.items.map(item => <button type="button" key={item.id} className={`report-list-item${goldenId === item.id ? " selected" : ""}`} aria-pressed={goldenId === item.id} disabled={locked || !item.eligible || item.state !== "frozen"} onClick={() => setGoldenId(item.id)}><strong>{item.title} · #{item.revision}</strong><span>{item.capture_ids.length} 份原文 · {item.eligible ? "当前可评估" : item.state === "revoked" ? "已撤回" : "依据已失效"}</span><small>{stamp(item.created_at)}</small></button>)}</div>{goldenSets?.total === 0 ? <p className="review-boundary">该来源暂无冻结集。缺少人工真值不能批准新发布；召回与测试事件尚不支持 Golden 集合。</p> : null}<Pages label="冻结集" offset={goldenOffset} total={goldenSets?.total || 0} disabled={locked || !goldenSets} onChange={setGoldenOffset} />
-          {goldenSet ? <div className="review-boundary"><p>{goldenSet.title} · 修订 #{goldenSet.revision}</p><p>冻结指纹 <code>{goldenSet.fingerprint}</code></p>{!goldenSet.eligible ? <p className="inline-error">集合当前不可评估：{goldenSet.blockers.join("、")}</p> : null}<DataTree label="所选集合的人工预期与审核证据" value={goldenSet.cases} />{goldenSet.capture_ids.map(id => <p key={id}>原文 <code>{id}</code> <button type="button" className="text-button" disabled={busy} onClick={() => setRawId(id)}>核对原文</button></p>)}</div> : goldenId ? <p role="status">正在读取冻结集合…</p> : null}
-        </> : <><h4>同来源原文 · 选择1–3份</h4><p className="review-boundary">{recallSource ? "召回保留既有严格回归审批流程；Golden 不适用，不表示人工真值或适用性已确认。" : "此模式只生成相对回归记录，不绑定人工真值，不能据此批准、激活、恢复或回滚部署。"}</p><div className="parser-capture-options">{captures?.items.map(item => <article key={item.id}><label className="review-checkbox"><input type="checkbox" checked={samples.some(sample => sample.id === item.id)} disabled={locked || (samples.length >= 3 && !samples.some(sample => sample.id === item.id))} onChange={event => setSamples(current => event.target.checked ? [...current, item] : current.filter(sample => sample.id !== item.id))} /><span>{targetLabel(item.target_kind, item.query)} · {stamp(item.observed_at)} · {item.byte_count.toLocaleString("zh-CN")} 字节<br />{item.query && queryScope(item.query) ? <>{queryScope(item.query)}<br /></> : null}<code>{short(item.id)}</code> · {item.query_state}</span></label><button type="button" className="text-button" disabled={busy} onClick={() => setRawId(item.id)}>核对这份原文</button></article>)}</div>
+        <label className="golden-field"><span>评估依据</span><select value={evaluationMode} disabled={locked} onChange={event => { reader.cancel(); setEvaluationMode(event.target.value as "golden" | "relative"); }}><option value="golden" disabled={recallSource}>人工审核的完整冻结集</option><option value="relative">{recallSource ? "召回相对回归样本（既有发布流程）" : "相对回归样本（不能用于新发布）"}</option></select></label>
+        {evaluationMode === "golden" ? <><h4>同来源 Golden 冻结集 · 全部成员参与评估</h4><p>先在“Golden 真值与冻结集”填写并人工审核预期；此处绑定集合的精确修订与指纹，不能只选部分成员。</p><div className="parser-bundle-options">{goldenSets?.items.map(item => <button type="button" key={item.id} className={`report-list-item${goldenId === item.id ? " selected" : ""}`} aria-pressed={goldenId === item.id} disabled={locked || !item.eligible || item.state !== "frozen"} onClick={() => { reader.cancel(); setGoldenId(item.id); }}><strong>{item.title} · #{item.revision}</strong><span>{item.capture_ids.length} 份原文 · {item.eligible ? "当前可评估" : item.state === "revoked" ? "已撤回" : "依据已失效"}</span><small>{stamp(item.created_at)}</small></button>)}</div>{goldenSets?.total === 0 ? <p className="review-boundary">该来源暂无冻结集。缺少人工真值不能批准新发布；召回与测试事件尚不支持 Golden 集合。</p> : null}<Pages label="冻结集" offset={goldenOffset} total={goldenSets?.total || 0} disabled={locked || !goldenSets} onChange={setGoldenOffset} />
+          {goldenSet ? <div className="review-boundary"><p>{goldenSet.title} · 修订 #{goldenSet.revision}</p><p>冻结指纹 <code>{goldenSet.fingerprint}</code></p>{!goldenSet.eligible ? <p className="inline-error">集合当前不可评估：{goldenSet.blockers.join("、")}</p> : null}<DataTree label="所选集合的人工预期与审核证据" value={goldenSet.cases} />{goldenSet.capture_ids.map(id => <p key={id}>原文 <code>{id}</code> <button type="button" className="text-button" disabled={busy} onClick={() => { reader.cancel(); setRawId(id); setRawRead(value => value + 1); }}>核对原文</button></p>)}</div> : goldenId ? <p role="status">正在读取冻结集合…</p> : null}
+        </> : <><h4>同来源原文 · 选择1–3份</h4><p className="review-boundary">{recallSource ? "召回保留既有严格回归审批流程；Golden 不适用，不表示人工真值或适用性已确认。" : "此模式只生成相对回归记录，不绑定人工真值，不能据此批准、激活、恢复或回滚部署。"}</p><div className="parser-capture-options">{captures?.items.map(item => <article key={item.id}><label className="review-checkbox"><input type="checkbox" checked={samples.some(sample => sample.id === item.id)} disabled={locked || (samples.length >= 3 && !samples.some(sample => sample.id === item.id))} onChange={event => setSamples(current => event.target.checked ? [...current, item] : current.filter(sample => sample.id !== item.id))} /><span>{targetLabel(item.target_kind, item.query)} · {stamp(item.observed_at)} · {item.byte_count.toLocaleString("zh-CN")} 字节<br />{item.query && queryScope(item.query) ? <>{queryScope(item.query)}<br /></> : null}<code>{short(item.id)}</code> · {item.query_state}</span></label><button type="button" className="text-button" disabled={busy} onClick={() => { reader.cancel(); setRawId(item.id); setRawRead(value => value + 1); }}>核对这份原文</button></article>)}</div>
         <Pages label="原文" offset={captureOffset} total={captures?.total || 0} disabled={locked || !captures} onChange={setCaptureOffset} />
         <p>已选择 {samples.length}/3 份</p>{samples.map(item => <p key={item.id}><code>{item.id}</code> · {stamp(item.observed_at)} <button type="button" className="text-button" disabled={locked} onClick={() => setSamples(current => current.filter(sample => sample.id !== item.id))}>移除样本</button></p>)}</>}
-        {rawId ? <section className="parser-raw-preview"><div className="panel-title"><h4>原文核对</h4><button type="button" className="text-button" onClick={() => setRawId("")}>收起原文</button></div>{raw ? <><p>{raw.source_url}</p><p>收件 <code>{raw.id}</code> · SHA-256 <code>{raw.raw_hash}</code></p><DataTree label="历史原文（分页文本，不执行内容）" value={raw.body} /></> : <p role="status">正在读取这份历史原文…</p>}</section> : null}
+        {rawId ? <section className="parser-raw-preview"><div className="panel-title"><h4>原文核对</h4><button type="button" className="text-button" onClick={() => { reader.cancel(); setRawId(""); }}>收起原文</button></div><RawEvidenceV2View reader={reader} /><p>此收件仍为 receipt-only；核对或下载不改变评估、人工真值或发布批准门。</p></section> : null}
         <p>本次评估 {evaluationCaptures.length} 份原文 · 依据部署修订 #{head?.revision ?? "未读取"}</p>
         <label className="review-checkbox"><input type="checkbox" checked={evaluateConfirmed} disabled={locked || !head?.revision || !descriptor || !readySamples} onChange={event => setEvaluateConfirmed(event.target.checked)} /><span>已核对具体包、{evaluationMode === "golden" ? "完整人工冻结集及指纹" : "相对回归原文"}和当前部署修订；仅生成评估，不访问来源或采纳事实。</span></label><button type="button" className="primary-button" disabled={locked || !head?.revision || !descriptor || !readySamples || !evaluateConfirmed} onClick={createEvaluation}>评估所选包与样本</button>
       </section>
-      <div className="reports-layout"><section className="reports-list" aria-label="解析器评估历史"><h3>3 · 评估与审批</h3>{evaluations?.items.map(item => <button type="button" className={`report-list-item${selectedId === item.id ? " selected" : ""}`} aria-pressed={selectedId === item.id} key={item.id} disabled={busy} onClick={() => { setSelectedId(item.id); setDetailRefresh(value => value + 1); }}><strong>{stateLabels[item.state]}</strong><small>候选 {short(item.target_bundle_id)} · 依据 #{item.deployment_revision}</small><small>{stamp(item.created_at)}</small><small>{item.latest_review ? item.latest_review.action === "approve" ? "已批准（活动状态见部署）" : "不批准 / 已撤回" : "尚未审批"}{item.deployment_stale ? " · 依据已过时" : ""}</small></button>)}{evaluations?.total === 0 ? <p>暂无评估记录。</p> : null}<Pages label="评估" offset={evaluationOffset} total={evaluations?.total || 0} disabled={busy || !evaluations} onChange={setEvaluationOffset} /></section>
+      <div className="reports-layout"><section className="reports-list" aria-label="解析器评估历史"><h3>3 · 评估与审批</h3>{evaluations?.items.map(item => <button type="button" className={`report-list-item${selectedId === item.id ? " selected" : ""}`} aria-pressed={selectedId === item.id} key={item.id} disabled={busy} onClick={() => { reader.cancel(); setSelectedId(item.id); setDetailRefresh(value => value + 1); }}><strong>{stateLabels[item.state]}</strong><small>候选 {short(item.target_bundle_id)} · 依据 #{item.deployment_revision}</small><small>{stamp(item.created_at)}</small><small>{item.latest_review ? item.latest_review.action === "approve" ? "已批准（活动状态见部署）" : "不批准 / 已撤回" : "尚未审批"}{item.deployment_stale ? " · 依据已过时" : ""}</small></button>)}{evaluations?.total === 0 ? <p>暂无评估记录。</p> : null}<Pages label="评估" offset={evaluationOffset} total={evaluations?.total || 0} disabled={busy || !evaluations} onChange={setEvaluationOffset} /></section>
         <section className="report-detail" aria-label="解析器评估详情"><h3 ref={focusTarget} tabIndex={-1}>{evaluation ? stateLabels[evaluation.state] : selectedId ? "正在读取评估…" : "选择一份评估核对"}</h3>{evaluation ? <><button type="button" className="text-button" disabled={busy} onClick={() => { setActionError(""); setDetailRefresh(value => value + 1); }}>重新读取评估与审批</button><EvaluationEvidence value={evaluation} />
           {!currentEvaluation ? <p className="inline-error">评估依据与当前部署不同，不能据此批准或激活。可保留历史记录或追加不批准决定。</p> : null}
           {reviewStale ? <p className="inline-error" role="alert">审批状态发生冲突或结果未确认。重新读取后再核对；当前表单已锁定。</p> : null}

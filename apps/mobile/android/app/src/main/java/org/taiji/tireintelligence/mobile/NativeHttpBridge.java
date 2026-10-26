@@ -29,6 +29,7 @@ import okhttp3.ResponseBody;
 
 /** The only native network authority. No WebView/global cookie manager is consulted. */
 public final class NativeHttpBridge {
+    final DownloadAuthority downloads;
     static final String COOKIE_NAME = "tire_local_session";
     final SessionState session;
     final RequestRegistry registry = new RequestRegistry(SystemClock::elapsedRealtime);
@@ -44,6 +45,10 @@ public final class NativeHttpBridge {
             .readTimeout(75, TimeUnit.SECONDS).writeTimeout(75, TimeUnit.SECONDS).protocols(java.util.Collections.singletonList(Protocol.HTTP_1_1)).build();
     public NativeHttpBridge(String baseUrl, SessionState.Store store) { this(baseUrl, store, new NativeQueryDenials()); }
     NativeHttpBridge(String baseUrl, SessionState.Store store, NativeQueryDenials queryDenials) {
+        this(baseUrl, store, queryDenials, new DownloadAuthority());
+    }
+    NativeHttpBridge(String baseUrl, SessionState.Store store, NativeQueryDenials queryDenials, DownloadAuthority downloads) {
+        this.downloads = downloads;
         this.baseUrl = baseUrl; session = new SessionState(store); this.queryDenials = queryDenials;
     }
     /** Shared UI/Worker authority, fixed for the whole history-only update run. */
@@ -117,7 +122,12 @@ public final class NativeHttpBridge {
         return requestBounded(request, registry.register(id), 1024 * 1024, fence);
     }
     public JSObject request(NativePolicy.Request request, RequestRegistry.Ticket ticket) throws NativeFailure {
-        return requestBounded(request, ticket, NativePolicy.MAX_RESPONSE_BYTES);
+        try (DownloadAuthority.Transition transition = admitIdentity(request)) {
+            return requestBounded(request, ticket, NativePolicy.MAX_RESPONSE_BYTES);
+        }
+    }
+    DownloadAuthority.Transition admitIdentity(NativePolicy.Request request) throws NativeFailure {
+        return DownloadAuthority.identityRequest(request.method, request.path) ? downloads.beginTransition() : null;
     }
     private JSObject requestBounded(NativePolicy.Request request, RequestRegistry.Ticket ticket, int maximumBytes) throws NativeFailure {
         return requestBounded(request, ticket, maximumBytes, null);
@@ -355,30 +365,38 @@ public final class NativeHttpBridge {
         if (seen) {
             synchronized (session) { synchronized (registry) {
                 boolean changed = !Objects.equals(session.cookie(), replacement);
+                DownloadAuthority.Transition transition = changed ? downloads.beginTransition() : null;
                 try { session.persist(replacement); }
-                finally { if (changed) fallbackPublicationRevision++; }
+                finally { if (changed) fallbackPublicationRevision++; if (transition != null) transition.close(); }
             } }
         }
     }
     public void recover() throws NativeFailure {
         if (session.error() == null) return;
+        try (DownloadAuthority.Transition transition = downloads.beginTransition()) {
         lifecycle.writeLock().lock();
         try { synchronized (session) { synchronized (registry) {
             try { session.recover(); } finally { fallbackPublicationRevision++; }
         } } } finally { lifecycle.writeLock().unlock(); }
+        }
     }
     public void reset() throws NativeFailure {
+        try (DownloadAuthority.Transition transition = downloads.beginTransition()) {
         registry.beginReset();
         finishReset();
+        }
     }
     /** A plugin reserves the generation synchronously before queued control work can wait. */
     void finishReset() throws NativeFailure {
+        try (DownloadAuthority.Transition transition = downloads.beginTransition()) {
         lifecycle.writeLock().lock();
         try { synchronized (session) { synchronized (registry) {
             try { session.reset(); } finally { fallbackPublicationRevision++; }
         } } } finally { lifecycle.writeLock().unlock(); registry.endReset(); }
+        }
     }
     public void close() {
+        downloads.close();
         synchronized (session) { synchronized (registry) { fallbackPublicationClosed = true; fallbackPublicationRevision++; registry.cancelAll(); } }
         client.dispatcher().executorService().shutdown(); client.connectionPool().evictAll();
     }

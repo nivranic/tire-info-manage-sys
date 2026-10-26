@@ -134,7 +134,6 @@ def main():
         body_bytes = base64.b64decode(request['body_base64'], validate=True)
         if not 0 < len(body_bytes) <= host.MAX_BODY_BYTES:
             return 78
-        body = body_bytes.decode('utf-8', errors='strict')
         query = request['query']
         allowed = host.query_fields(descriptor['target_kind'], query)
         if (not isinstance(query, dict) or set(query) - allowed
@@ -145,6 +144,10 @@ def main():
         if request['input_hash'] != host.input_hash(request, body_bytes):
             return 79
         source_id = request['source_id']
+        first_generation_pdf = (source_id == 'xiaomi-cn-vehicles'
+            and query == {'vehicle_id': 'xiaomi-su7-first-generation'})
+        if not first_generation_pdf:
+            body = body_bytes.decode('utf-8', errors='strict')
         if source_id.startswith('michelin-'):
             from tire_api.adapters.michelin import parse_michelin_html
             _check_imports(package_root)
@@ -163,9 +166,22 @@ def main():
             _check_imports(package_root)
             payload = parse_html(body, query)
         elif source_id == 'xiaomi-cn-vehicles':
-            from tire_api.adapters.xiaomi import parse_config
+            from tire_api.adapters.xiaomi import PARSER_VERSION, parse_config
             _check_imports(package_root)
-            payload = parse_config(body, query['vehicle_id'])
+            if first_generation_pdf:
+                if (descriptor['parser_version'] not in bundles.XIAOMI_PDF_PARSER_VERSIONS
+                        or PARSER_VERSION != descriptor['parser_version']):
+                    raise ValueError('parser_pdf_version_unsupported')
+                from tire_api.adapters.xiaomi_first_generation_pdf import ReviewedPDFError, parse_reviewed_pdf
+                _check_imports(package_root)
+                try:
+                    payload = parse_reviewed_pdf(body_bytes, query['vehicle_id'])
+                except ReviewedPDFError as error:
+                    if type(error.code) is str and error.code in host.PDF_ERROR_CODES:
+                        raise host.ParserRunError(error.code) from None
+                    raise ValueError('parser_pdf_error_not_allowed') from None
+            else:
+                payload = parse_config(body, query['vehicle_id'])
         elif source_id == 'nhtsa-us-recalls':
             from tire_api.adapters.nhtsa import parse_json
             _check_imports(package_root)
@@ -180,6 +196,10 @@ def main():
                     'source_id': source_id, 'parser_version': descriptor['parser_version'],
                     'parser_digest': descriptor['parser_digest'], 'limits_backend': limits_backend,
                     **{key: request[key] for key in ('bundle_id', 'input_hash', 'execution_digest', 'deployment_revision')}}
+    except host.ParserRunError as error:
+        code = error.code if type(error.code) is str and error.code in host.PDF_ERROR_CODES else 'parser_failed'
+        response = {'protocol': host.PROTOCOL, 'run_id': request.get('run_id') if isinstance(request, dict) else None,
+                    'ok': False, 'error': code}
     except bundles.BundleError as error:
         response = {'protocol': host.PROTOCOL, 'run_id': request.get('run_id') if isinstance(request, dict) else None,
                     'ok': False, 'error': error.code}

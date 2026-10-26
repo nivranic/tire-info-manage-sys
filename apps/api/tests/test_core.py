@@ -444,6 +444,12 @@ def test_legacy_schema_upgrade_preserves_evidence_facts_and_watchlist(tmp_path):
     # Reconstruct the prior verification schema in this test-only database.
     database = Database(url)
     with database.engine.begin() as connection:
+        # This fixture reconstructs a schema predating the catalog ledger;
+        # its new Verification foreign keys must not survive into that schema.
+        connection.exec_driver_sql('DROP TABLE tire_curation_applicability_events')
+        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '018_interest_manual_applicability'")
+        connection.exec_driver_sql('DROP TABLE tire_catalog_revisions')
+        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '017_interest_governance_catalog'")
         connection.exec_driver_sql("ALTER TABLE verifications RENAME TO old_verifications")
         connection.exec_driver_sql("CREATE TABLE verifications (id VARCHAR(64) PRIMARY KEY, snapshot_id VARCHAR(64) NOT NULL, query_id VARCHAR(64) NOT NULL, source_id VARCHAR(80) NOT NULL, query_key VARCHAR(64) NOT NULL, status VARCHAR(24) NOT NULL, verified_at DATETIME NOT NULL)")
         connection.exec_driver_sql("INSERT INTO verifications SELECT id,snapshot_id,query_id,source_id,query_key,status,verified_at FROM old_verifications")

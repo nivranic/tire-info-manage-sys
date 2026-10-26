@@ -3,8 +3,6 @@ package org.taiji.tireintelligence.mobile;
 import static org.junit.Assert.*;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,7 +15,7 @@ import org.junit.runners.Parameterized;
 
 /**
  * Replays the unified closed-decoder fixtures of
- * .artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json (decoder-spec
+ * packages/domain-types/fixtures/device-ai-v1/specs/decoder-fixtures-a/fixtures.json (decoder-spec
  * section 4.3-3 Root decision, M1-M10 matrix) through the Java Host decoder
  * layer named by each case's message:
  *
@@ -37,18 +35,13 @@ import org.junit.runners.Parameterized;
  * Host fence code). accept verdicts must carry null expectations and pass
  * clean (UUID canonicalization included).
  *
- * Fixture location: system property tire.test.decoderFixtures (absolute
- * path), else an upward search from the test working directory (the same
- * convention as DeviceAiJsonParserParityTest's E1 vector binding; Gradle's
- * ordinary Test working directory is the app project). Unlike the sealed E1
- * vectors the fixtures file is young (created in the same round this runner
- * lands), so its bytes are not pinned by SHA-256; the schema id
- * device-ai-decoder-fixtures@1, the counts block and the per-case expected
- * tokens bind instead.
+ * Fixture location: the tracked synthetic corpus found above the test working
+ * directory. Its pinned provenance, loaded byte count and SHA-256 bind the
+ * exact file before the schema, counts and per-case expected tokens are read.
  */
 @RunWith(Parameterized.class)
 public final class DeviceAiDecoderFixturesTest {
-    private static final String FIXTURES_REPOSITORY_PATH = ".artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json";
+    private static final String FIXTURES_REPOSITORY_PATH = "specs/decoder-fixtures-a/fixtures.json";
     private static final String FIXTURES_SCHEMA = "device-ai-decoder-fixtures@1";
     private static final String CLOSED_FIELDS_TOKEN = "closed_fields_error";
     private static final String ACCEPT_TOKEN = "accept";
@@ -75,10 +68,9 @@ public final class DeviceAiDecoderFixturesTest {
 
     private static void loadFixturesChecked() throws Exception {
         if (cases != null) return;
-        Path path = locate();
         byte[] raw;
-        try { raw = Files.readAllBytes(path); }
-        catch (Exception unreadable) { throw new IllegalStateException("decoder fixtures unreadable: " + path, unreadable); }
+        try { raw = DeviceAiFixtureCorpus.read(FIXTURES_REPOSITORY_PATH); }
+        catch (Exception unreadable) { throw new IllegalStateException("tracked decoder fixtures unreadable", unreadable); }
         JSONObject document = new JSONObject(new String(raw, StandardCharsets.UTF_8));
         assertEquals("decoder fixtures schema", FIXTURES_SCHEMA, document.getString("schema"));
         JSONArray list = document.getJSONArray("cases");
@@ -98,21 +90,8 @@ public final class DeviceAiDecoderFixturesTest {
         assertEquals("case total must match the file's own counts", counts.getInt("total"), list.length());
         assertEquals("accepted count", counts.getInt("accept"), accepted);
         assertEquals("rejected count", counts.getInt("reject"), rejected);
-        System.out.println("decoder fixtures bound: " + path + " (" + list.length() + " cases, "
+        System.out.println("Tracked decoder fixtures bound: " + FIXTURES_REPOSITORY_PATH + " (" + list.length() + " cases, "
             + accepted + " accept / " + rejected + " reject)");
-    }
-
-    private static Path locate() {
-        List<Path> candidates = new ArrayList<>();
-        String configured = System.getProperty("tire.test.decoderFixtures");
-        if (configured != null) candidates.add(Path.of(configured));
-        Path directory = Path.of("").toAbsolutePath();
-        for (int up = 0; up <= 8 && directory != null; up++) {
-            candidates.add(directory.resolve(FIXTURES_REPOSITORY_PATH).normalize());
-            directory = directory.getParent();
-        }
-        for (Path candidate : candidates) if (Files.isRegularFile(candidate)) return candidate;
-        throw new IllegalStateException("decoder fixture file not found above the working directory; pass -Dtire.test.decoderFixtures=<path>");
     }
 
     @Test public void replayCase() throws Exception {

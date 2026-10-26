@@ -1,0 +1,377 @@
+{
+  "context_cases": [
+    {
+      "expected": {
+        "byte_count": 2080,
+        "canonical_text": "{\"device_citations\":[],\"domain_boundaries\":[{\"boundary\":{\"applicability\":\"not_assessed\",\"mode\":\"announcement_facts_only\",\"notice\":\"\",\"policy\":\"recall-fact-selection@1\"},\"kind\":\"recall\"},{\"boundary\":{\"applicability\":\"not_assessed\",\"mode\":\"announcement_facts_only\",\"notice\":\"𐀀\",\"policy\":\"recall-fact-selection@1\"},\"kind\":\"recall\"}],\"numeric_encoding\":\"device-number-token@1\",\"package_id\":\"package-multimember\",\"package_schema\":\"offline-pack@2\",\"package_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"projection_mode\":\"complete_formal_observation\",\"projection_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"receipt_sources\":[{\"selection_reason\":\"requested\",\"selector\":{\"document_id\":null,\"kind\":\"recall\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"recall\",\"recall_revision_id\":\"recall-revision-a\",\"snapshot_id\":\"snapshot-a\",\"verification_id\":\"verification-a\"}},\"source\":{\"observed_at\":\"2026-10-18T00:00:00Z\",\"parser_identity\":null,\"parser_version\":\"fixture@1\",\"raw_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"source_id\":\"synthetic-recall\",\"source_url\":\"https://example.org/fixture\",\"verification_id\":\"verification-a\",\"verified_at\":\"2026-10-18T00:00:01Z\"}},{\"selection_reason\":\"requested\",\"selector\":{\"document_id\":null,\"kind\":\"recall\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"recall\",\"recall_revision_id\":\"recall-revision-b\",\"snapshot_id\":\"snapshot-b\",\"verification_id\":\"verification-b\"}},\"source\":{\"observed_at\":\"2026-10-18T00:00:00Z\",\"parser_identity\":null,\"parser_version\":\"fixture@1\",\"raw_hash\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"source_id\":\"synthetic-recall\",\"source_url\":\"https://example.org/fixture\",\"verification_id\":\"verification-b\",\"verified_at\":\"2026-10-18T00:00:01Z\"}}],\"schema\":\"device-ai-context@1\",\"selection_sha256\":\"0c9a5a19d22848229a759a7fa78e937de14f291055f5d2c0f050e0baea765011\"}",
+        "canonical_utf8_hex": "7b226465766963655f6369746174696f6e73223a5b5d2c22646f6d61696e5f626f756e646172696573223a5b7b22626f756e64617279223a7b226170706c69636162696c697479223a226e6f745f6173736573736564222c226d6f6465223a22616e6e6f756e63656d656e745f66616374735f6f6e6c79222c226e6f74696365223a22ee8080222c22706f6c696379223a22726563616c6c2d666163742d73656c656374696f6e4031227d2c226b696e64223a22726563616c6c227d2c7b22626f756e64617279223a7b226170706c69636162696c697479223a226e6f745f6173736573736564222c226d6f6465223a22616e6e6f756e63656d656e745f66616374735f6f6e6c79222c226e6f74696365223a22f0908080222c22706f6c696379223a22726563616c6c2d666163742d73656c656374696f6e4031227d2c226b696e64223a22726563616c6c227d5d2c226e756d657269635f656e636f64696e67223a226465766963652d6e756d6265722d746f6b656e4031222c227061636b6167655f6964223a227061636b6167652d6d756c74696d656d626572222c227061636b6167655f736368656d61223a226f66666c696e652d7061636b4032222c227061636b6167655f736861323536223a2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c2270726f6a656374696f6e5f6d6f6465223a22636f6d706c6574655f666f726d616c5f6f62736572766174696f6e222c2270726f6a656374696f6e5f736861323536223a2264646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464222c22726563656970745f736f7572636573223a5b7b2273656c656374696f6e5f726561736f6e223a22726571756573746564222c2273656c6563746f72223a7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a22726563616c6c222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a22726563616c6c222c22726563616c6c5f7265766973696f6e5f6964223a22726563616c6c2d7265766973696f6e2d61222c22736e617073686f745f6964223a22736e617073686f742d61222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d2c22736f75726365223a7b226f627365727665645f6174223a22323032362d31302d31385430303a30303a30305a222c227061727365725f6964656e74697479223a6e756c6c2c227061727365725f76657273696f6e223a22666978747572654031222c227261775f68617368223a2265656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565222c22736f757263655f6964223a2273796e7468657469632d726563616c6c222c22736f757263655f75726c223a2268747470733a2f2f6578616d706c652e6f72672f66697874757265222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61222c2276657269666965645f6174223a22323032362d31302d31385430303a30303a30315a227d7d2c7b2273656c656374696f6e5f726561736f6e223a22726571756573746564222c2273656c6563746f72223a7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a22726563616c6c222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a22726563616c6c222c22726563616c6c5f7265766973696f6e5f6964223a22726563616c6c2d7265766973696f6e2d62222c22736e617073686f745f6964223a22736e617073686f742d62222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d2c22736f75726365223a7b226f627365727665645f6174223a22323032362d31302d31385430303a30303a30305a222c227061727365725f6964656e74697479223a6e756c6c2c227061727365725f76657273696f6e223a22666978747572654031222c227261775f68617368223a2265656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565222c22736f757263655f6964223a2273796e7468657469632d726563616c6c222c22736f757263655f75726c223a2268747470733a2f2f6578616d706c652e6f72672f66697874757265222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62222c2276657269666965645f6174223a22323032362d31302d31385430303a30303a30315a227d7d5d2c22736368656d61223a226465766963652d61692d636f6e746578744031222c2273656c656374696f6e5f736861323536223a2230633961356131396432323834383232396137353961376661373865393337646531346632393130353566356432633066303530653062616561373635303131227d",
+        "sha256": "d4d264b4a7c7def262f5aa2eb1dae82729ec3911eb778305409a548da84804c7"
+      },
+      "id": "current-recall-boundary-nonbmp-order",
+      "input": {
+        "device_citations": [],
+        "domain_boundaries": [
+          {
+            "boundary": {
+              "applicability": "not_assessed",
+              "mode": "announcement_facts_only",
+              "notice": "𐀀",
+              "policy": "recall-fact-selection@1"
+            },
+            "kind": "recall"
+          },
+          {
+            "boundary": {
+              "applicability": "not_assessed",
+              "mode": "announcement_facts_only",
+              "notice": "",
+              "policy": "recall-fact-selection@1"
+            },
+            "kind": "recall"
+          }
+        ],
+        "package_id": "package-multimember",
+        "package_schema": "offline-pack@2",
+        "package_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "projection_mode": "complete_formal_observation",
+        "projection_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "receipt_sources": [
+          {
+            "selection_reason": "requested",
+            "selector": {
+              "document_id": null,
+              "kind": "recall",
+              "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+              "record_index": null,
+              "reference": {
+                "kind": "recall",
+                "recall_revision_id": "recall-revision-b",
+                "snapshot_id": "snapshot-b",
+                "verification_id": "verification-b"
+              }
+            },
+            "source": {
+              "observed_at": "2026-10-18T00:00:00Z",
+              "parser_identity": null,
+              "parser_version": "fixture@1",
+              "raw_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "source_id": "synthetic-recall",
+              "source_url": "https://example.org/fixture",
+              "verification_id": "verification-b",
+              "verified_at": "2026-10-18T00:00:01Z"
+            }
+          },
+          {
+            "selection_reason": "requested",
+            "selector": {
+              "document_id": null,
+              "kind": "recall",
+              "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+              "record_index": null,
+              "reference": {
+                "kind": "recall",
+                "recall_revision_id": "recall-revision-a",
+                "snapshot_id": "snapshot-a",
+                "verification_id": "verification-a"
+              }
+            },
+            "source": {
+              "observed_at": "2026-10-18T00:00:00Z",
+              "parser_identity": null,
+              "parser_version": "fixture@1",
+              "raw_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "source_id": "synthetic-recall",
+              "source_url": "https://example.org/fixture",
+              "verification_id": "verification-a",
+              "verified_at": "2026-10-18T00:00:01Z"
+            }
+          }
+        ],
+        "selection_sha256": "0c9a5a19d22848229a759a7fa78e937de14f291055f5d2c0f050e0baea765011"
+      }
+    }
+  ],
+  "invariants": {
+    "closure_permutation_keeps_preview": true,
+    "context_expected_notice_codepoints": [
+      "U+E000",
+      "U+10000"
+    ],
+    "selected_permutation_changes_preview": true
+  },
+  "preview_cases": [
+    {
+      "expected": {
+        "byte_count": 1804,
+        "canonical_text": "{\"intent\":{\"include_context_ids\":[],\"policy_version\":\"device-ai-projection@1\",\"purpose\":\"device_history_analysis\",\"question_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"},\"origin\":{\"expected_byte_count\":1024,\"expected_generation\":1,\"expected_owner_epoch\":1,\"expected_profile_id\":\"profile-fixture\",\"expected_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner_scope_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"package_id\":\"package-multimember\",\"package_schema\":\"offline-pack@2\",\"slot_id\":\"slot-fixture\"},\"projection_mode\":\"frozen_decision_closure\",\"projection_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"query_context\":null,\"resolved_closure\":[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}}],\"selected\":[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}}],\"state\":\"ready\"}",
+        "canonical_utf8_hex": "7b22696e74656e74223a7b22696e636c7564655f636f6e746578745f696473223a5b5d2c22706f6c6963795f76657273696f6e223a226465766963652d61692d70726f6a656374696f6e4031222c22707572706f7365223a226465766963655f686973746f72795f616e616c79736973222c227175657374696f6e5f736861323536223a2263636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363227d2c226f726967696e223a7b2265787065637465645f627974655f636f756e74223a313032342c2265787065637465645f67656e65726174696f6e223a312c2265787065637465645f6f776e65725f65706f6368223a312c2265787065637465645f70726f66696c655f6964223a2270726f66696c652d66697874757265222c2265787065637465645f736861323536223a2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c226f776e65725f73636f70655f6964223a2262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262222c227061636b6167655f6964223a227061636b6167652d6d756c74696d656d626572222c227061636b6167655f736368656d61223a226f66666c696e652d7061636b4032222c22736c6f745f6964223a22736c6f742d66697874757265227d2c2270726f6a656374696f6e5f6d6f6465223a2266726f7a656e5f6465636973696f6e5f636c6f73757265222c2270726f6a656374696f6e5f736861323536223a2264646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464222c2271756572795f636f6e74657874223a6e756c6c2c227265736f6c7665645f636c6f73757265223a5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d5d2c2273656c6563746564223a5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d5d2c227374617465223a227265616479227d",
+        "sha256": "a219f6c296e1e0fc3e6f2a034894dbb8baded063c77510ccae517bd5d21a372d"
+      },
+      "id": "closure-ascending",
+      "input": {
+        "include_context_ids": [],
+        "origin": {
+          "expected_byte_count": 1024,
+          "expected_generation": 1,
+          "expected_owner_epoch": 1,
+          "expected_profile_id": "profile-fixture",
+          "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner_scope_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "package_id": "package-multimember",
+          "package_schema": "offline-pack@2",
+          "slot_id": "slot-fixture"
+        },
+        "projection_mode": "frozen_decision_closure",
+        "projection_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_context": null,
+        "question_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resolved_closure": [
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-a",
+              "variant_id": "same-variant",
+              "verification_id": "verification-a"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-b",
+              "variant_id": "same-variant",
+              "verification_id": "verification-b"
+            }
+          }
+        ],
+        "selected": [
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-b",
+              "variant_id": "same-variant",
+              "verification_id": "verification-b"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-a",
+              "variant_id": "same-variant",
+              "verification_id": "verification-a"
+            }
+          }
+        ],
+        "state": "ready"
+      }
+    },
+    {
+      "expected": {
+        "byte_count": 1804,
+        "canonical_text": "{\"intent\":{\"include_context_ids\":[],\"policy_version\":\"device-ai-projection@1\",\"purpose\":\"device_history_analysis\",\"question_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"},\"origin\":{\"expected_byte_count\":1024,\"expected_generation\":1,\"expected_owner_epoch\":1,\"expected_profile_id\":\"profile-fixture\",\"expected_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner_scope_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"package_id\":\"package-multimember\",\"package_schema\":\"offline-pack@2\",\"slot_id\":\"slot-fixture\"},\"projection_mode\":\"frozen_decision_closure\",\"projection_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"query_context\":null,\"resolved_closure\":[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}}],\"selected\":[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}}],\"state\":\"ready\"}",
+        "canonical_utf8_hex": "7b22696e74656e74223a7b22696e636c7564655f636f6e746578745f696473223a5b5d2c22706f6c6963795f76657273696f6e223a226465766963652d61692d70726f6a656374696f6e4031222c22707572706f7365223a226465766963655f686973746f72795f616e616c79736973222c227175657374696f6e5f736861323536223a2263636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363227d2c226f726967696e223a7b2265787065637465645f627974655f636f756e74223a313032342c2265787065637465645f67656e65726174696f6e223a312c2265787065637465645f6f776e65725f65706f6368223a312c2265787065637465645f70726f66696c655f6964223a2270726f66696c652d66697874757265222c2265787065637465645f736861323536223a2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c226f776e65725f73636f70655f6964223a2262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262222c227061636b6167655f6964223a227061636b6167652d6d756c74696d656d626572222c227061636b6167655f736368656d61223a226f66666c696e652d7061636b4032222c22736c6f745f6964223a22736c6f742d66697874757265227d2c2270726f6a656374696f6e5f6d6f6465223a2266726f7a656e5f6465636973696f6e5f636c6f73757265222c2270726f6a656374696f6e5f736861323536223a2264646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464222c2271756572795f636f6e74657874223a6e756c6c2c227265736f6c7665645f636c6f73757265223a5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d5d2c2273656c6563746564223a5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d5d2c227374617465223a227265616479227d",
+        "sha256": "a219f6c296e1e0fc3e6f2a034894dbb8baded063c77510ccae517bd5d21a372d"
+      },
+      "id": "closure-descending",
+      "input": {
+        "include_context_ids": [],
+        "origin": {
+          "expected_byte_count": 1024,
+          "expected_generation": 1,
+          "expected_owner_epoch": 1,
+          "expected_profile_id": "profile-fixture",
+          "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner_scope_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "package_id": "package-multimember",
+          "package_schema": "offline-pack@2",
+          "slot_id": "slot-fixture"
+        },
+        "projection_mode": "frozen_decision_closure",
+        "projection_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_context": null,
+        "question_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resolved_closure": [
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-b",
+              "variant_id": "same-variant",
+              "verification_id": "verification-b"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-a",
+              "variant_id": "same-variant",
+              "verification_id": "verification-a"
+            }
+          }
+        ],
+        "selected": [
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-b",
+              "variant_id": "same-variant",
+              "verification_id": "verification-b"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-a",
+              "variant_id": "same-variant",
+              "verification_id": "verification-a"
+            }
+          }
+        ],
+        "state": "ready"
+      }
+    },
+    {
+      "expected": {
+        "byte_count": 1804,
+        "canonical_text": "{\"intent\":{\"include_context_ids\":[],\"policy_version\":\"device-ai-projection@1\",\"purpose\":\"device_history_analysis\",\"question_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"},\"origin\":{\"expected_byte_count\":1024,\"expected_generation\":1,\"expected_owner_epoch\":1,\"expected_profile_id\":\"profile-fixture\",\"expected_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner_scope_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"package_id\":\"package-multimember\",\"package_schema\":\"offline-pack@2\",\"slot_id\":\"slot-fixture\"},\"projection_mode\":\"frozen_decision_closure\",\"projection_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"query_context\":null,\"resolved_closure\":[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}}],\"selected\":[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}}],\"state\":\"ready\"}",
+        "canonical_utf8_hex": "7b22696e74656e74223a7b22696e636c7564655f636f6e746578745f696473223a5b5d2c22706f6c6963795f76657273696f6e223a226465766963652d61692d70726f6a656374696f6e4031222c22707572706f7365223a226465766963655f686973746f72795f616e616c79736973222c227175657374696f6e5f736861323536223a2263636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363636363227d2c226f726967696e223a7b2265787065637465645f627974655f636f756e74223a313032342c2265787065637465645f67656e65726174696f6e223a312c2265787065637465645f6f776e65725f65706f6368223a312c2265787065637465645f70726f66696c655f6964223a2270726f66696c652d66697874757265222c2265787065637465645f736861323536223a2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c226f776e65725f73636f70655f6964223a2262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262222c227061636b6167655f6964223a227061636b6167652d6d756c74696d656d626572222c227061636b6167655f736368656d61223a226f66666c696e652d7061636b4032222c22736c6f745f6964223a22736c6f742d66697874757265227d2c2270726f6a656374696f6e5f6d6f6465223a2266726f7a656e5f6465636973696f6e5f636c6f73757265222c2270726f6a656374696f6e5f736861323536223a2264646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464646464222c2271756572795f636f6e74657874223a6e756c6c2c227265736f6c7665645f636c6f73757265223a5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d5d2c2273656c6563746564223a5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d5d2c227374617465223a227265616479227d",
+        "sha256": "dde3b876e9d90cde00a37cb63b378a77f05dfd83cfa90614812be9e58b4178d8"
+      },
+      "id": "selected-order-change",
+      "input": {
+        "include_context_ids": [],
+        "origin": {
+          "expected_byte_count": 1024,
+          "expected_generation": 1,
+          "expected_owner_epoch": 1,
+          "expected_profile_id": "profile-fixture",
+          "expected_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner_scope_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "package_id": "package-multimember",
+          "package_schema": "offline-pack@2",
+          "slot_id": "slot-fixture"
+        },
+        "projection_mode": "frozen_decision_closure",
+        "projection_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "query_context": null,
+        "question_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resolved_closure": [
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-a",
+              "variant_id": "same-variant",
+              "verification_id": "verification-a"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-b",
+              "variant_id": "same-variant",
+              "verification_id": "verification-b"
+            }
+          }
+        ],
+        "selected": [
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-a",
+              "variant_id": "same-variant",
+              "verification_id": "verification-a"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "snapshot-b",
+              "variant_id": "same-variant",
+              "verification_id": "verification-b"
+            }
+          }
+        ],
+        "state": "ready"
+      }
+    }
+  ],
+  "schema": "device-ai-closure-fingerprints@1",
+  "selection_expected": {
+    "byte_count": 507,
+    "canonical_text": "[{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-a\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-a\"}},{\"document_id\":null,\"kind\":\"tire\",\"member_key\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"record_index\":null,\"reference\":{\"kind\":\"tire\",\"snapshot_id\":\"snapshot-b\",\"variant_id\":\"same-variant\",\"verification_id\":\"verification-b\"}}]",
+    "canonical_utf8_hex": "5b7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d61222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d61227d7d2c7b22646f63756d656e745f6964223a6e756c6c2c226b696e64223a2274697265222c226d656d6265725f6b6579223a2232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232323232222c227265636f72645f696e646578223a6e756c6c2c227265666572656e6365223a7b226b696e64223a2274697265222c22736e617073686f745f6964223a22736e617073686f742d62222c2276617269616e745f6964223a2273616d652d76617269616e74222c22766572696669636174696f6e5f6964223a22766572696669636174696f6e2d62227d7d5d",
+    "sha256": "7c4c07bd7f954ba4e5e8a1ab0d0509a857423d3f212f9ffef5a9c4827a124634"
+  },
+  "selection_input": [
+    {
+      "document_id": null,
+      "kind": "tire",
+      "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+      "record_index": null,
+      "reference": {
+        "kind": "tire",
+        "snapshot_id": "snapshot-b",
+        "variant_id": "same-variant",
+        "verification_id": "verification-b"
+      }
+    },
+    {
+      "document_id": null,
+      "kind": "tire",
+      "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+      "record_index": null,
+      "reference": {
+        "kind": "tire",
+        "snapshot_id": "snapshot-a",
+        "variant_id": "same-variant",
+        "verification_id": "verification-a"
+      }
+    }
+  ]
+}

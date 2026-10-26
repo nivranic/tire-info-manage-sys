@@ -6,9 +6,9 @@ import hashlib
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from pydantic import Field, StrictBool, field_validator, model_validator
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, desc, event, select, update
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, String, Text, desc, event, select, update
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from .adapters import xiaomi
@@ -20,6 +20,9 @@ from .service import QueryService, timestamp
 from .quality import QUALITY_REASON, SourceQualityQuarantined, metrics
 from .vehicle_quality import assess_vehicle_quality
 from .parser_provenance import check_result_identity, execution_outcome, verified_observation_recorder
+from .vehicle_binary_migration import ENCODING_CHECK, VEHICLE_STORAGE_CHECK
+from .vehicle_raw import (FIRST_GENERATION_ID, SOURCE_ID, VehicleRawIntegrityError, build_vehicle_parse_provenance,
+                          checked_vehicle_capture, checked_vehicle_parse_provenance)
 
 
 class AxleSpecification(StrictModel):
@@ -93,12 +96,18 @@ class VehicleTrim(Base):
 
 class VehicleSnapshot(Base):
     __tablename__ = "vehicle_snapshots"
+    __table_args__ = (
+        CheckConstraint(ENCODING_CHECK, name="ck_vehicle_snapshots_body_encoding"),
+        CheckConstraint(VEHICLE_STORAGE_CHECK, name="ck_vehicle_snapshots_body_storage"),
+    )
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     vehicle_id: Mapped[str] = mapped_column(ForeignKey("vehicle_models.id"), index=True)
     source_id: Mapped[str] = mapped_column(String(80))
     source_url: Mapped[str] = mapped_column(Text)
     raw_hash: Mapped[str] = mapped_column(String(64))
-    body: Mapped[str] = mapped_column(Text)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    body_encoding: Mapped[str] = mapped_column(String(16), default="utf-8", server_default="utf-8")
+    raw_capture_id: Mapped[str | None] = mapped_column(ForeignKey("raw_captures.id", ondelete="RESTRICT"), nullable=True, index=True)
     content_type: Mapped[str] = mapped_column(String(120))
     parser_version: Mapped[str] = mapped_column(String(100))
     parser_identity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -110,6 +119,10 @@ class VehicleSnapshot(Base):
 
 class VehicleQuarantine(Base):
     __tablename__ = "vehicle_quarantines"
+    __table_args__ = (
+        CheckConstraint(ENCODING_CHECK, name="ck_vehicle_quarantines_body_encoding"),
+        CheckConstraint(VEHICLE_STORAGE_CHECK, name="ck_vehicle_quarantines_body_storage"),
+    )
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     query_id: Mapped[str] = mapped_column(ForeignKey("query_runs.id"), unique=True)
     vehicle_id: Mapped[str] = mapped_column(ForeignKey("vehicle_models.id"), index=True)
@@ -117,7 +130,9 @@ class VehicleQuarantine(Base):
     previous_snapshot_id: Mapped[str] = mapped_column(ForeignKey("vehicle_snapshots.id"))
     source_url: Mapped[str] = mapped_column(Text)
     raw_hash: Mapped[str] = mapped_column(String(64))
-    body: Mapped[str] = mapped_column(Text)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    body_encoding: Mapped[str] = mapped_column(String(16), default="utf-8", server_default="utf-8")
+    raw_capture_id: Mapped[str | None] = mapped_column(ForeignKey("raw_captures.id", ondelete="RESTRICT"), nullable=True, index=True)
     content_type: Mapped[str] = mapped_column(String(120))
     parser_version: Mapped[str] = mapped_column(String(100))
     parser_identity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -270,9 +285,14 @@ class VehicleService:
         if result.get("status") == "ok":
             try:
                 payload = result["payload"]
-                if (validated_observation(result) is None or "\x00" in result["body"] or result.get("url") != xiaomi.API_URL
-                        or result.get("content_type") != "application/json"
-                        or not result.get("parser_version") or payload["vehicle"]["id"] != vehicle_id):
+                binary = result.get('body_encoding', 'utf-8') == 'binary'
+                observed = (validated_observation(result, source_id=run.source_id, query=run.query)
+                            if binary else validated_observation(result))
+                if (observed is None or not result.get("parser_version")
+                        or payload["vehicle"]["id"] != vehicle_id
+                        or (binary and selection is None)
+                        or (not binary and ("\x00" in result["body"] or result.get("url") != xiaomi.API_URL
+                                            or result.get("content_type") != "application/json"))):
                     raise ValueError("来源证据缺失或身份不符")
                 if not payload.get("fitments") or len(payload["fitments"]) > 100:
                     raise ValueError("适配列表无效")
@@ -294,6 +314,9 @@ class VehicleService:
                 except SourceAccessBlocked as error:
                     return self.block_source_access(vehicle_id, run, error)
                 except ParserDeploymentError as error:
+                    result = {"status": "unavailable", "reason": error.code}
+                except VehicleRawIntegrityError as error:
+                    self.db.rollback()
                     result = {"status": "unavailable", "reason": error.code}
                 except SourceQualityQuarantined:
                     result = {"status": "unavailable", "reason": QUALITY_REASON}
@@ -348,16 +371,43 @@ class VehicleService:
         verified_at = utcnow()
         vehicle = payload["vehicle"]
         previous = self.latest(vehicle["id"])
+        binary = result.get('body_encoding', 'utf-8') == 'binary'
+        if binary:
+            from .quarantine_review import checked_binary_baseline
+            if previous is not None:
+                checked_binary_baseline(self.db, previous, run)
+            elif self.db.scalar(select(VehicleSnapshot.id).where(
+                    VehicleSnapshot.vehicle_id == vehicle['id']).limit(1)) is not None:
+                # Losing the formal verification must not make an existing
+                # binary baseline look like a first-ever observation.
+                raise VehicleRawIntegrityError()
+        if previous is not None and (previous.body_encoding == 'binary'
+                or (previous.source_id == SOURCE_ID and previous.vehicle_id == FIRST_GENERATION_ID)):
+            checked_vehicle_parse_provenance(self.db, previous)
+        storage = {'body': result['body']}
+        if binary:
+            capture = checked_vehicle_capture(self.db, run, result)
+            provenance = build_vehicle_parse_provenance(self.db, run, result, payload,
+                                                       parser_selection=parser_selection)
+            payload = {**payload, 'parse_provenance': provenance}
+            raw_hash = capture.raw_hash
+            storage = {'body': None, 'body_encoding': 'binary', 'raw_capture_id': capture.id}
+        else:
+            raw_hash = hashlib.sha256(result["body"].encode("utf-8")).hexdigest()
         quality = assess_vehicle_quality(previous.payload if previous else None, payload)
-        raw_hash = hashlib.sha256(result["body"].encode("utf-8")).hexdigest()
         applied_review = None
         if quality["reason_codes"] and previous is not None:
-            from .quarantine_review import consume_approval
-            applied_review = consume_approval(self.db, run, 'vehicle', previous, result, payload, quality)
+            if binary:
+                from .quarantine_review import consume_binary_approval
+                applied_review = consume_binary_approval(self.db, run, previous, result, payload, quality,
+                                                        capture=capture)
+            else:
+                from .quarantine_review import consume_approval
+                applied_review = consume_approval(self.db, run, 'vehicle', previous, result, payload, quality)
         if quality["reason_codes"] and not applied_review:
             assert previous is not None
             quarantine = VehicleQuarantine(id=uid(), query_id=run.id, vehicle_id=vehicle["id"], source_id=run.source_id,
-                previous_snapshot_id=previous.id, source_url=result["url"], raw_hash=raw_hash, body=result["body"],
+                previous_snapshot_id=previous.id, source_url=result["url"], raw_hash=raw_hash, **storage,
                 content_type=result["content_type"], parser_version=result["parser_version"], observed_at=verified_at,
                 parser_identity=result.get('parser_identity'),
                 payload=payload, quality=quality)
@@ -390,7 +440,7 @@ class VehicleService:
                 or previous.parser_version != result["parser_version"]
                 or previous.parser_identity != result.get('parser_identity')):
             snapshot = VehicleSnapshot(id=uid(), vehicle_id=vehicle["id"], source_id=xiaomi.SOURCE_ID,
-                                       source_url=result["url"], body=result["body"], raw_hash=raw_hash,
+                                       source_url=result["url"], raw_hash=raw_hash, **storage,
                                        content_type=result["content_type"], parser_version=result["parser_version"],
                                        parser_identity=result.get('parser_identity'),
                                        payload=payload, fact_hash=fact_hash, fact_version=version, observed_at=verified_at)
@@ -404,6 +454,10 @@ class VehicleService:
         self.db.add(VehicleVerification(snapshot_id=snapshot.id, query_id=run.id,
                                         vehicle_id=vehicle["id"], verified_at=verified_at,
                                         parser_identity=result.get('parser_identity')))
+        self.db.flush()
+        if changed:
+            from .interest_events import publish
+            publish(self.db, 'vehicle', snapshot)
         return snapshot, verified_at
 
     def consume_consent(self, vehicle_id: str, request: VehicleLiveRequest, session_id: str, query_key: str, *, audience='internal') -> dict:
@@ -506,10 +560,27 @@ def register_vehicle_routes(app: FastAPI, adapter: Any = None) -> None:
                                 reason="explicit_history" if snapshot else "no_matching_vehicle_snapshot")
 
     @app.get("/v1/vehicle-evidence/{snapshot_id}")
-    def vehicle_evidence(snapshot_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    def vehicle_evidence(snapshot_id: str, request: Request,
+                         evidence_format: Literal['raw-evidence-v2'] | None = Query(None, alias='format'),
+                         mode: Literal['history'] | None = Query(None),
+                         db: Session = Depends(get_db)) -> dict:
+        if evidence_format is not None and mode != 'history':
+            raise HTTPException(422, {'code': 'raw_evidence_history_required'})
         snapshot = db.get(VehicleSnapshot, snapshot_id)
         if not snapshot:
             raise HTTPException(404, "未找到车型证据")
+        from .vehicle_raw import (VehicleOriginalUseNotAllowed, VehicleUseNotAllowed,
+                                  checked_vehicle_v2_metadata, vehicle_raw_requires_v2)
+        if evidence_format is None and vehicle_raw_requires_v2(db, snapshot):
+            raise HTTPException(409, {'code': 'binary_evidence_format_required'})
+        fields = {}
+        if evidence_format is not None:
+            try:
+                fields = checked_vehicle_v2_metadata(db, snapshot, structured=True)
+            except VehicleRawIntegrityError:
+                raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+            except (VehicleOriginalUseNotAllowed, VehicleUseNotAllowed) as error:
+                raise HTTPException(403, {'code': error.code}) from None
         verified_at = db.scalar(select(VehicleVerification.verified_at)
                                 .where(VehicleVerification.snapshot_id == snapshot_id)
                                 .order_by(desc(VehicleVerification.verified_at)).limit(1))
@@ -519,4 +590,29 @@ def register_vehicle_routes(app: FastAPI, adapter: Any = None) -> None:
         return {"id": snapshot.id, "vehicle_id": snapshot.vehicle_id, **vehicle_provenance(snapshot),
                 "quality_review": snapshot_review(db, snapshot.id, 'vehicle'),
                 "verified_at": timestamp(verified_at), "content_type": snapshot.content_type,
-                "body": snapshot.body, "data_state": "local_snapshot", "documents": snapshot.payload.get("documents", [])}
+                "body": snapshot.body, "data_state": "local_snapshot", "documents": snapshot.payload.get("documents", []),
+                **fields}
+
+    @app.get('/v1/vehicle-evidence/{snapshot_id}/content')
+    def vehicle_evidence_content(snapshot_id: str, request: Request, mode: Literal['history'] = Query(...),
+                                 evidence_format: Literal['raw-evidence-v2'] | None = Query(None, alias='format'),
+                                 db: Session = Depends(get_db)) -> Response:
+        snapshot = db.get(VehicleSnapshot, snapshot_id)
+        if snapshot is None:
+            raise HTTPException(404, '未找到车型证据')
+        from .vehicle_raw import (VehicleOriginalUseNotAllowed, checked_vehicle_original_bytes,
+                                  vehicle_raw_requires_v2)
+        if not vehicle_raw_requires_v2(db, snapshot):
+            raise HTTPException(409, {'code': 'raw_evidence_content_unavailable'})
+        try:
+            raw = checked_vehicle_original_bytes(db, snapshot)
+        except VehicleRawIntegrityError:
+            raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+        except VehicleOriginalUseNotAllowed as error:
+            raise HTTPException(403, {'code': error.code}) from None
+        QueryService(db, None).audit(request.state.session_id, 'vehicle_evidence_downloaded', snapshot_id=snapshot_id)
+        db.commit()
+        return Response(raw, media_type='application/pdf', headers={
+            'Content-Disposition': 'attachment; filename="vehicle-evidence.pdf"',
+            'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "sandbox; default-src 'none'", 'X-Evidence-SHA256': snapshot.raw_hash})

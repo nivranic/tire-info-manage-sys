@@ -1,25 +1,25 @@
 // Round50 P1-3 web host frontend contracts: projection-port parity against the
 // sealed authoritative vectors, journal persistence flow, policy fingerprint
 // mirror. Pure Node: no browser, no database, no network, no model calls.
+// Run: node scripts/device_ai_web_frontend_qa.mjs (or node --test ...).
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { loadTypeScript } from "../packages/native-client/tests/load-typescript.mjs";
+import { readCorpusBytes, readCorpusJson } from "../packages/api-client/tests/device-ai/corpus.mjs";
+import "../packages/api-client/tests/device-ai/json-esm-hook.mjs";
 
-const sdk = await loadTypeScript("../packages/api-client/src/device-ai-host.ts", import.meta.url);
-const port = await loadTypeScript("../packages/api-client/src/device-ai-projection.ts", import.meta.url);
-const webValues = await loadTypeScript("../apps/web/components/device-ai-values.ts", import.meta.url);
-const browserHost = await loadTypeScript("../apps/web/components/browser-device-ai.ts", import.meta.url);
+// Native ESM preserves the legal SDK barrel cycle; the old data-URL loader
+// waited on its own pending expansion after the Host became a package export.
+const sdk = await import("../packages/api-client/src/device-ai-host.ts");
+const port = await import("../packages/api-client/src/device-ai-projection.ts");
+const webValues = await import("../apps/web/components/device-ai-values.ts");
+const browserHost = await import("../apps/web/components/browser-device-ai.ts");
 
-const ROOT = resolve(new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
-const VECTORS = resolve(ROOT, ".artifacts/device-ai50/projection-vectors-a");
-const manifest = JSON.parse(readFileSync(resolve(VECTORS, "manifest.json"), "utf8"));
+const manifest = readCorpusJson("projection-vectors-a/manifest.json");
 
 function vectorPack(binding) {
   for (const name of ["legacy-pack.json", "nonempty-pack.json", "empty-pack.json"]) {
-    const bytes = readFileSync(resolve(VECTORS, "inputs", name));
+    const bytes = readCorpusBytes("projection-vectors-a/inputs/" + name);
     if (createHash("sha256").update(bytes).digest("hex") === binding.sha256) return new Uint8Array(bytes);
   }
   assert.fail("vector pack not found for binding");
@@ -29,9 +29,9 @@ test("projection port reproduces every sealed tire-single vector byte for byte",
   const cases = manifest.domain_vectors.filter(item => item.case.endsWith("tire-single") && item.expected_error_code === null);
   assert.ok(cases.length >= 3, `expected at least three tire-single vectors, got ${cases.length}`);
   for (const item of cases) {
-    const input = JSON.parse(readFileSync(resolve(VECTORS, item.input.path), "utf8"));
-    const expectation = JSON.parse(readFileSync(resolve(VECTORS, item.expectation.path), "utf8"));
-    const canonical = readFileSync(resolve(VECTORS, expectation.canonical_projection.path), "utf8");
+    const input = readCorpusJson("projection-vectors-a/" + item.input.path);
+    const expectation = readCorpusJson("projection-vectors-a/" + item.expectation.path);
+    const canonical = new TextDecoder().decode(readCorpusBytes("projection-vectors-a/" + expectation.canonical_projection.path));
     const result = await port.projectDeviceAiSingleObservation(vectorPack(input.binding), input.binding, input.selectors);
     assert.equal(result.sha256, expectation.canonical_projection.sha256, `${item.case} sha256`);
     assert.equal(result.canonicalText, canonical, `${item.case} canonical bytes`);
@@ -42,14 +42,14 @@ test("projection port reproduces every sealed tire-single vector byte for byte",
 
 test("projection port selection digest matches the SDK selection digest on the same selectors", async () => {
   const item = manifest.domain_vectors.find(entry => entry.case === "nonempty-tire-single");
-  const input = JSON.parse(readFileSync(resolve(VECTORS, item.input.path), "utf8"));
+  const input = readCorpusJson("projection-vectors-a/" + item.input.path);
   const result = await port.projectDeviceAiSingleObservation(vectorPack(input.binding), input.binding, input.selectors);
   assert.equal(result.selectionSha256, await sdk.selectionSha256(input.selectors));
 });
 
 test("projection port fails closed on receipt mismatch, mutated bytes and foreign selectors", async () => {
   const item = manifest.domain_vectors.find(entry => entry.case === "nonempty-tire-single");
-  const input = JSON.parse(readFileSync(resolve(VECTORS, item.input.path), "utf8"));
+  const input = readCorpusJson("projection-vectors-a/" + item.input.path);
   const bytes = vectorPack(input.binding);
   const foreign = structuredClone(input.selectors[0]);
   foreign.reference = { ...foreign.reference, snapshot_id: "00000000-0000-4000-8000-000000000000" };
@@ -73,8 +73,8 @@ test("four-domain prepare body assembly carries the sealed recomputed projection
      "empty-tire-closure"].includes(item.case) && item.expected_error_code === null);
   assert.ok(cases.length === 5, `expected the five accepted domain vectors, got ${cases.length}`);
   for (const item of cases) {
-    const input = JSON.parse(readFileSync(resolve(VECTORS, item.input.path), "utf8"));
-    const expectation = JSON.parse(readFileSync(resolve(VECTORS, item.expectation.path), "utf8"));
+    const input = readCorpusJson("projection-vectors-a/" + item.input.path);
+    const expectation = readCorpusJson("projection-vectors-a/" + item.expectation.path);
     const origin = {
       expected_profile_id: uuid, expected_owner_epoch: 1, slot_id: "slot-1", expected_generation: 2,
       package_id: input.binding.package_id, expected_sha256: input.binding.sha256,
@@ -103,7 +103,7 @@ test("four-domain prepare body assembly carries the sealed recomputed projection
   }
   // fail-closed: closure drift and out-of-mode approved closures never dispatch.
   const item = manifest.domain_vectors.find(entry => entry.case === "empty-tire-single");
-  const input = JSON.parse(readFileSync(resolve(VECTORS, item.input.path), "utf8"));
+  const input = readCorpusJson("projection-vectors-a/" + item.input.path);
   const origin = {
     expected_profile_id: uuid, expected_owner_epoch: 1, slot_id: "slot-1", expected_generation: 2,
     package_id: input.binding.package_id, expected_sha256: input.binding.sha256,
@@ -178,9 +178,9 @@ test("provider policy fingerprint mirror matches the Python server constants", a
   // Expected values produced by apps/api tire_api.ai_analysis.device_provider_policy_fingerprint
   // (uv run python, digest over provider/model/allow_private/allowed_privacy_classes/
   // prompt_version='tire-grounding@1'/grounding_schema=digest(OUTPUT_SCHEMA)).
-  assert.equal(await webValues.deviceProviderPolicyFingerprint({ model: "synthetic-device-ai-fixture", allowPrivate: true }),
+  assert.equal(await webValues.deviceProviderPolicyFingerprint({ provider: "openai_responses", model: "synthetic-device-ai-fixture", allowPrivate: true }),
     "5fc00af5b4beb91cf2a52478087827f753d905bb7b3fd0e3118a9a69898ba52e");
-  assert.equal(await webValues.deviceProviderPolicyFingerprint({ model: "synthetic-device-ai-fixture", allowPrivate: false }),
+  assert.equal(await webValues.deviceProviderPolicyFingerprint({ provider: "openai_responses", model: "synthetic-device-ai-fixture", allowPrivate: false }),
     "094c0874f41f64bab4eca9f28b07be371ae144cc3638d764d870e4b79ec4b3e3");
 });
 

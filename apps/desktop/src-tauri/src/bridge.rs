@@ -110,6 +110,7 @@ impl Drop for Registration<'_> {
 }
 
 pub struct Bridge {
+    pub downloads: Arc<crate::download_authority::DownloadAuthority>,
     pub config: LaunchConfig,
     pub session: Session,
     client: Client,
@@ -464,6 +465,12 @@ impl Bridge {
         Self::with_limits(config, store, REQUEST_TIMEOUT, MAX_RESPONSE_BYTES)
     }
 
+    pub fn with_download_authority(config: LaunchConfig, store: Arc<dyn SessionStore>, downloads: Arc<crate::download_authority::DownloadAuthority>) -> NativeResult<Self> {
+        let mut bridge = Self::new(config, store)?;
+        bridge.downloads = downloads;
+        Ok(bridge)
+    }
+
     fn with_limits(
         config: LaunchConfig,
         store: Arc<dyn SessionStore>,
@@ -481,6 +488,7 @@ impl Bridge {
             .build()
             .map_err(|_| "API_CLIENT_UNAVAILABLE")?;
         Ok(Self {
+            downloads: crate::download_authority::DownloadAuthority::new(),
             config,
             session: Session::new(store),
             client,
@@ -537,8 +545,13 @@ impl Bridge {
     }
 
     pub async fn request(&self, request: ApiRequest) -> NativeResult<ApiResponse> {
-        let registration = self.register(request_id(&request.id)?)?;
+        let id = request_id(&request.id)?;
         let request = validate_request(request)?;
+        // Admit identity work before queue/lifecycle/network waits, including rejected registration.
+        let _identity = if crate::download_authority::identity_request(request.method.as_str(), &request.path)? {
+            Some(self.downloads.begin_transition()?)
+        } else { None };
+        let registration = self.register(id)?;
         // Dropping the losing future cancels reqwest's actual connection/body read.
         // Cancellation never claims that a server-side mutation was rolled back.
         tokio::select! {
@@ -556,6 +569,7 @@ impl Bridge {
     }
 
     pub async fn reset_session(&self) -> NativeResult<()> {
+        let _identity = self.downloads.begin_transition()?;
         {
             let mut registry = self.registry.lock().map_err(|_| "API_CLIENT_UNAVAILABLE")?;
             if registry.resetting {
@@ -576,6 +590,7 @@ impl Bridge {
         if self.session.error().is_none() {
             return Ok(());
         }
+        let _identity = self.downloads.begin_transition()?;
         let _lifecycle = self.lifecycle.write().await;
         self.session.recover().await
     }
@@ -715,6 +730,7 @@ impl Bridge {
             replacement = Some(value);
         }
         if let Some(value) = replacement {
+            let _replacement = if session.cookie != value { Some(self.downloads.begin_transition()?) } else { None };
             if value.is_none() {
                 session.bootstrapped = false;
             }

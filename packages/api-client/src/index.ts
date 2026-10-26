@@ -1,14 +1,59 @@
+import { createRawEvidenceV2Api } from "./raw-evidence-v2";
+import { createQuarantineReviewV2Api } from "./quarantine-review-v2";
+export { QuarantineReviewContractError, QuarantineReviewContextError, assertBinaryQuarantineReviewStateV2 } from "./quarantine-review-v2";
+export { RawEvidenceContractError, RawEvidenceContextError, assertVehicleEvidenceV2, assertRawCaptureEvidenceV2, assertQuarantineEvidenceV2 } from "./raw-evidence-v2";
+export type { RawEvidenceContextFence, VerifiedRawEvidenceContent } from "./raw-evidence-v2";
 import type { ChangeItem, Evidence, Health, QuarantineEvidence, QuarantineRecord, QueryResult, Source, SourceHealthResult, SourceHealthTrends, AIUsageHistory, AuthState, AuthUser, AuthUserListItem, TireQuery, Variant, VehicleCandidate, VehicleFitmentResult, WatchItem } from "@tire/domain-types";
 import type { ExcludedVariant, FactReview, FactRevisionRequest, LifecycleRequest, LifecycleReview, RawCaptureEvidence, RawCaptureRecord } from "@tire/domain-types";
 import type { GarageDetail, GarageList, GarageProfile, GarageRecord } from "@tire/domain-types";
 import type { ComparisonView, DrivingPreferenceState, DrivingWeights, SaveComparisonRequest, SavedComparisonDetail, SavedComparisonRecord } from "@tire/domain-types";
 import type { AlertRuleCreate, AlertRuleDetail, AlertRuleRecord, AlertRuleSettings, LocalNotification } from "@tire/domain-types";
 import type { EvidenceDocument, EvidenceDocumentMetadata } from "@tire/domain-types";
+import type { InterestNotification, InterestNotificationList } from "@tire/domain-types";
 import { stringifyExactJson } from "./exact-json";
 import { fallbackUUID } from "./device-fallback-values";
+import { createCandidateAiApi } from "./candidate-ai";
+import { createAiPricePlanningApi } from "./ai-price-planning";
+import { createWebhooksApi } from "./webhooks";
+import { createApiKeysApi } from "./external-api";
+import { createApiKeyInventoryApi } from "./api-key-inventory";
+export { createExternalApiClient, ExternalApiError, ExternalApiContractError, assertApiKey, assertApiKeyOperation, assertExternalTireFactResult, assertExternalTireFactPage, apiKeyTime } from "./external-api";
+export { WebhookContractError, assertWebhookTargets, assertWebhook, assertWebhookDelivery, assertWebhookOperation } from "./webhooks";
+export { CandidateAiContractError, assertCandidateAiPreparation, assertCandidateAiRecommendation } from "./candidate-ai";
 export * from "./exact-json";
 export * from "./device-criteria";
 export * from "./device-fallback-values";
+export { DEVICE_AI_WIRE_CONTRACT } from "@tire/domain-types";
+export type {
+  DeviceAiTireReferenceWire, DeviceAiVehicleReferenceWire, DeviceAiRecallReferenceWire,
+  DeviceAiRecallSearchReferenceWire, DeviceAiTestEventReferenceWire, DeviceAiReferenceWire,
+  DeviceAiTireSelectorWire, DeviceAiVehicleSelectorWire, DeviceAiRecallSelectorWire,
+  DeviceAiRecallSearchSelectorWire, DeviceAiSelectorWire, DeviceAiPrepareSelectorWire,
+  DeviceAiPrepareProjectionMode, DeviceAiProjectionMode, DeviceAiOriginBindingWire,
+  DeviceAiPrepareBody, DeviceAiProviderConsentBody, DeviceAiSubmissionBody,
+  DeviceAiStreamSubmission, DeviceAiPreparationView, DeviceAiPrepareResultView,
+} from "@tire/domain-types";
+// Public Host operations and their inputs. Canonical AST/fingerprint plumbing
+// remains available only through its existing source module, outside this entry.
+export {
+  DeviceAiHostClient, DeviceAiHostError, DeviceAiJournal,
+  assertDeviceAiPrepareBody, buildDeviceAiPrepareBody, computeLocalPreview,
+  normalizeQuestion, questionSha256, resolveUnknownOutcome,
+  DEVICE_AI_SELECTION_NAMESPACE, DEVICE_AI_CONTEXT_NAMESPACE,
+  DEVICE_AI_LOCAL_PREVIEW_NAMESPACE, DEVICE_AI_JOURNAL_SCHEMA,
+  DEVICE_AI_JOURNAL_ENTRY_SCHEMA, DEVICE_AI_PROJECTION_POLICY_VERSION,
+  DEVICE_AI_MAX_PACKAGE_BYTES, DEVICE_AI_PREPARE_REQUEST_FIELDS,
+  DEVICE_AI_SUBMISSION_FIELDS, DEVICE_AI_PROVIDER_CONSENT_FIELDS,
+  DEVICE_AI_ANALYSIS_REQUEST_FIELDS, DEVICE_AI_PREPARE_PROJECTION_MODES,
+  DEVICE_AI_PREPARE_DOMAIN_MODES, DEVICE_AI_PREPARE_SELECTOR_FIELDS,
+  DEVICE_AI_PREPARE_REFERENCE_FIELDS,
+} from "./device-ai-host";
+export type {
+  DeviceAiHostErrorCode, DeviceAiPrepareBodyInput, DeviceAiPreviewRequest,
+  DeviceAiLocalPreviewSummary, DeviceAiUnknownOutcomeResolution,
+  DeviceAiJournalEvent, DeviceAiJournalEntry, DeviceAiJournalStore,
+  DeviceAiJournalOptions, DeviceAiJournalFenceCode, DeviceAiJournalVerification,
+} from "./device-ai-host";
 
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string, public readonly code?: string, public readonly runId?: string) { super(message); this.name = "ApiError"; }
@@ -46,6 +91,19 @@ let transport: ApiTransport = browserTransport;
 let transportAuthorityEpoch = 0;
 let observedSyncOwner: string | null = null;
 export const apiTransportAuthorityEpoch = () => transportAuthorityEpoch;
+const transportAuthorityObservers = new Set<(epoch: number) => void>();
+/** Synchronous revocation, including operations waiting for a native picker. */
+export function observeApiTransportAuthority(observer: (epoch: number) => void): () => void {
+  transportAuthorityObservers.add(observer);
+  return () => { transportAuthorityObservers.delete(observer); };
+}
+function advanceTransportAuthority() {
+  transportAuthorityEpoch++;
+  for (const observer of [...transportAuthorityObservers]) {
+    // Observers may revoke their own work, but cannot change transport semantics.
+    try { observer(transportAuthorityEpoch); } catch { /* Keep notifying other owners. */ }
+  }
+}
 
 type BrowserDenialCapture = (queryId: string, epoch: number) => Promise<() => Promise<void>>;
 const browserDenialObservers = new Set<BrowserDenialCapture>();
@@ -60,8 +118,8 @@ export function observeBrowserFallbackDenials(capture: BrowserDenialCapture): ()
 export function setApiTransport(next: ApiTransport): () => void {
   const previous = transport;
   transport = next;
-  transportAuthorityEpoch++;
-  return () => { if (transport === next) { transport = previous; transportAuthorityEpoch++; } };
+  advanceTransportAuthority();
+  return () => { if (transport === next) { transport = previous; advanceTransportAuthority(); } };
 }
 
 async function request<T>(path: string, init: RequestInit = {}, format: "json" | "blob" | "response" = "json"): Promise<T> {
@@ -109,7 +167,10 @@ async function request<T>(path: string, init: RequestInit = {}, format: "json" |
     if (!syncOwner || !/^[a-f0-9]{64}$/.test(syncOwner) || owner !== syncOwner || transportAuthorityEpoch !== syncEpoch)
       throw new ApiError(409, "持续更新的在线归属已变化，请重新预览授权。", "SESSION_CHANGED");
   }
-  if (response.status === 204) return undefined as T;
+  if (response.status === 204) {
+    await response.arrayBuffer();
+    return undefined as T;
+  }
   if (format === "response") return response as T;
   if (format === "blob") return await response.blob() as T;
   const value = await response.json();
@@ -315,7 +376,119 @@ export async function consumeAIStream(response: Response, requestId: string, rec
 
 function aiStreamPath(id: string) { return `/v1/ai/analysis-streams/${encodeURIComponent(id)}`; }
 
+export class SourceQualityInterestContractError extends Error {
+  readonly code = "source_quality_interest_contract_invalid";
+  constructor() { super("来源质量提醒的历史绑定不完整，未展示替代记录。"); this.name = "SourceQualityInterestContractError"; }
+}
+
+const qualityObject = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+const qualityId = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+const qualityHash = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+const qualityTime = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value));
+const qualityKeys = (value: unknown, keys: string[]): value is Record<string, unknown> => qualityObject(value)
+  && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+function qualityFail(): never { throw new SourceQualityInterestContractError(); }
+
+/** New quality JSON is closed at the HTTP boundary; existing nine domains keep their wire unchanged. */
+function checkedInterestNotification(value: InterestNotification, expectedId?: string): InterestNotification {
+  if (value?.event?.domain !== "tire_source_quality" && value?.match?.policy_version !== "source-quality-interest@1") return value;
+  if (!qualityKeys(value, ["id", "interest_id", "interest_revision", "interest_name", "delivered_at", "read_at", "event", "match"])
+    || !qualityId(value.id) || (expectedId !== undefined && value.id !== expectedId) || !qualityId(value.interest_id)
+    || !Number.isSafeInteger(value.interest_revision) || value.interest_revision < 1 || !qualityId(value.interest_name)
+    || !qualityTime(value.delivered_at) || (value.read_at !== null && !qualityTime(value.read_at))) qualityFail();
+  const event = value.event;
+  if (!qualityKeys(event, ["schema", "id", "domain", "action", "state", "revision", "observed_at", "subject_id", "label", "event_hash", "before", "after", "changed_paths", "evidence"])
+    || event.schema !== "interest-event@1" || event.domain !== "tire_source_quality" || event.action !== "quarantined"
+    || event.state !== "quarantined" || event.revision !== 1 || event.before !== null || !qualityId(event.id)
+    || !qualityId(event.subject_id) || !qualityId(event.label) || !qualityHash(event.event_hash) || !qualityTime(event.observed_at)
+    || !Array.isArray(event.changed_paths) || event.changed_paths.length !== 1 || event.changed_paths[0] !== "source_quality") qualityFail();
+  const after = event.after;
+  if (!qualityKeys(after, ["accepted", "state", "evidence_valid", "quarantine", "baseline", "baseline_members"])
+    || after.accepted !== false || after.state !== "quarantined" || after.evidence_valid !== true) qualityFail();
+  const q = after.quarantine, b = after.baseline;
+  if (!qualityKeys(q, ["id", "query_id", "source_id", "query_key", "query", "source_url", "raw_hash", "parser_version", "observed_at", "reason_codes", "metrics", "previous_snapshot_id"])
+    || ![q.id, q.query_id, q.source_id, q.source_url, q.parser_version, q.previous_snapshot_id].every(qualityId)
+    || !qualityHash(q.query_key) || !qualityHash(q.raw_hash) || !qualityTime(q.observed_at) || q.id !== event.subject_id
+    || Date.parse(q.observed_at) !== Date.parse(event.observed_at) || !qualityObject(q.query)
+    || Object.keys(q.query).some(key => key !== "model" && key !== "size") || Object.values(q.query).some(part => typeof part !== "string")
+    || !Array.isArray(q.reason_codes) || !q.reason_codes.length || !q.reason_codes.every(qualityId)) qualityFail();
+  const metricKeys = ["baseline_rows", "candidate_rows", "aligned_rows", "lost_rows", "row_loss_ratio", "known_fields", "lost_fields", "field_loss_ratio"];
+  if (!qualityKeys(q.metrics, metricKeys) || Object.values(q.metrics).some(part => typeof part !== "number" || !Number.isFinite(part) || part < 0)) qualityFail();
+  if (!qualityKeys(b, ["snapshot_id", "source_id", "query_key", "source_url", "raw_hash", "identity_contract_version", "parsed_variants_hash", "verification_id", "verification_status", "verified_at", "observed_at", "parser_version"])
+    || ![b.snapshot_id, b.source_id, b.source_url, b.identity_contract_version, b.verification_id, b.parser_version].every(qualityId)
+    || ![b.query_key, b.raw_hash, b.parsed_variants_hash].every(qualityHash) || !qualityTime(b.verified_at) || !qualityTime(b.observed_at)
+    || (b.verification_status !== "ok" && b.verification_status !== "not_modified") || b.snapshot_id !== q.previous_snapshot_id
+    || b.source_id !== q.source_id || b.query_key !== q.query_key || Date.parse(b.verified_at) > Date.parse(q.observed_at)) qualityFail();
+  if (!Array.isArray(after.baseline_members) || !after.baseline_members.length) qualityFail();
+  const members = new Set<string>();
+  for (const member of after.baseline_members) {
+    if (!qualityKeys(member, ["variant_id", "structured_locator", "member_hash", "identity", "facts", "fact_version_id", "fact_version", "facts_hash", "evidence_valid"])
+      || ![member.variant_id, member.structured_locator, member.fact_version_id].every(qualityId) || !qualityHash(member.member_hash)
+      || !qualityHash(member.facts_hash) || !qualityObject(member.identity) || !qualityObject(member.facts) || member.evidence_valid !== true
+      || typeof member.fact_version !== "number" || !Number.isSafeInteger(member.fact_version) || member.fact_version < 1) qualityFail();
+    const key = JSON.stringify([member.variant_id, member.structured_locator, member.member_hash]);
+    if (members.has(key)) qualityFail(); members.add(key);
+  }
+  const evidenceKeys = ["kind", "record_id", "entity_id", "revision", "snapshot_id", "previous_snapshot_id", "source_id", "source_url", "verification_ids", "fingerprint", "contract_version"];
+  if (!Array.isArray(event.evidence) || event.evidence.length !== 2) qualityFail();
+  const seen = new Set<string>();
+  for (const ref of event.evidence) {
+    if (!qualityKeys(ref, evidenceKeys) || seen.has(ref.kind) || ref.revision !== null || ref.source_id !== q.source_id) qualityFail();
+    seen.add(ref.kind);
+    if (ref.kind === "tire_source_quarantine") {
+      if (ref.record_id !== q.id || ref.entity_id !== q.id || ref.snapshot_id !== null || ref.previous_snapshot_id !== b.snapshot_id
+        || ref.source_url !== q.source_url || ref.fingerprint !== q.raw_hash || ref.contract_version !== "source-quality-interest@1"
+        || !Array.isArray(ref.verification_ids) || ref.verification_ids.length !== 0) qualityFail();
+    } else if (ref.kind === "tire_source_quality_baseline") {
+      if (ref.record_id !== b.snapshot_id || ref.entity_id !== b.snapshot_id || ref.snapshot_id !== b.snapshot_id || ref.previous_snapshot_id !== null
+        || ref.source_url !== b.source_url || ref.fingerprint !== b.raw_hash || ref.contract_version !== b.identity_contract_version
+        || !Array.isArray(ref.verification_ids) || ref.verification_ids.length !== 1 || ref.verification_ids[0] !== b.verification_id) qualityFail();
+    } else qualityFail();
+  }
+  const match = value.match;
+  if (!qualityKeys(match, ["state", "policy_version", "criteria", "matched_sides", "reasons", "matched_baseline_members"])
+    || match.state !== "matched" || match.policy_version !== "source-quality-interest@1"
+    || !Array.isArray(match.matched_sides) || match.matched_sides.length !== 1 || match.matched_sides[0] !== "after"
+    || !Array.isArray(match.reasons) || match.reasons.length !== 1 || match.reasons[0] !== "matches_baseline_member") qualityFail();
+  const criteria = match.criteria;
+  if (!qualityKeys(criteria, ["conditions", "metric_keys", "changed_fields", "source_quality_notifications"])
+    || criteria.source_quality_notifications !== true || !Array.isArray(criteria.metric_keys) || criteria.metric_keys.length !== 0
+    || !Array.isArray(criteria.changed_fields) || criteria.changed_fields.length !== 0 || !Array.isArray(criteria.conditions)
+    || criteria.conditions.length < 1 || criteria.conditions.length > 8) qualityFail();
+  for (const condition of criteria.conditions) {
+    if (!qualityKeys(condition, ["kind", "values"]) || !["brand", "model", "size", "oe", "technology"].includes(condition.kind)
+      || !Array.isArray(condition.values) || condition.values.length < 1 || condition.values.length > 20) qualityFail();
+    if (condition.kind === "model") {
+      if (!condition.values.every(part => qualityKeys(part, ["brand", "model"]) && qualityId(part.brand) && qualityId(part.model))) qualityFail();
+    } else if (!condition.values.every(qualityId)) qualityFail();
+  }
+  if (!Array.isArray(match.matched_baseline_members) || !match.matched_baseline_members.length) qualityFail();
+  const matched = new Set<string>();
+  for (const ref of match.matched_baseline_members) {
+    if (!qualityKeys(ref, ["variant_id", "structured_locator", "member_hash"])) qualityFail();
+    const key = JSON.stringify([ref.variant_id, ref.structured_locator, ref.member_hash]);
+    if (!members.has(key) || matched.has(key)) qualityFail(); matched.add(key);
+  }
+  return value;
+}
+
+function checkedInterestNotifications(value: InterestNotificationList): InterestNotificationList {
+  if (!Array.isArray(value?.items)) return value;
+  const quality = value.items.some(item => item?.event?.domain === "tire_source_quality" || item?.match?.policy_version === "source-quality-interest@1");
+  if (quality && (value.scope !== "actor" || value.data_state !== "local_snapshot" || !Number.isSafeInteger(value.total) || value.total < 0
+    || !Number.isSafeInteger(value.offset) || value.offset < 0 || !Number.isSafeInteger(value.limit) || value.limit < 1)) qualityFail();
+  for (const item of value.items) checkedInterestNotification(item);
+  return value;
+}
+
 export const tireApi = {
+  ...createRawEvidenceV2Api(request, apiTransportAuthorityEpoch),
+  ...createQuarantineReviewV2Api(request, apiTransportAuthorityEpoch),
+  ...createApiKeyInventoryApi(request),
+  ...createApiKeysApi(request),
+  ...createWebhooksApi(request),
+  ...createCandidateAiApi(request),
+  ...createAiPricePlanningApi(request),
   previewQueryFallbackPolicy: (payload: import("@tire/domain-types").WarehouseFallbackPolicyPreviewRequest, signal?: AbortSignal) => post<import("@tire/domain-types").WarehouseFallbackPolicyPreview>("/v1/query-fallback-policies:preview", payload, signal),
   applyQueryFallbackPolicy: (payload: import("@tire/domain-types").WarehouseFallbackPolicyApplyRequest, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").WarehouseFallbackPolicy>("/v1/query-fallback-policies:apply", { method: "POST", headers: { "Idempotency-Key": key }, body: stringifyExactJson(payload), signal }),
   queryFallbackPolicies: (offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").WarehouseFallbackPolicyList>(`/v1/query-fallback-policies?${new URLSearchParams({ limit: "16", offset: String(offset) })}`, { signal }),
@@ -387,11 +560,22 @@ export const tireApi = {
   goldenSet: (id: string, signal?: AbortSignal, revision?: number) => request<import("@tire/domain-types").GoldenSet>(`/v1/golden/sets/${encodeURIComponent(id)}?mode=history${revision === undefined ? "" : `&revision=${revision}`}`, { signal }),
   createGoldenSet: (payload: import("@tire/domain-types").GoldenSetCreate, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").GoldenSet>("/v1/golden/sets", { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
   reviseGoldenSet: (id: string, payload: import("@tire/domain-types").GoldenSetRevision, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").GoldenSet>(`/v1/golden/sets/${encodeURIComponent(id)}/revisions`, { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
+  testEventGoldenCases: (eventId?: string, signal?: AbortSignal, offset = 0) => request<import("@tire/domain-types").TestEventGoldenPage<import("@tire/domain-types").TestEventGoldenCaseSummary>>(`/v1/test-event-golden/cases?mode=history${eventId ? `&event_id=${encodeURIComponent(eventId)}` : ""}&offset=${offset}&limit=10`, { signal }),
+  testEventGoldenCase: (id: string, signal?: AbortSignal, revision?: number) => request<import("@tire/domain-types").TestEventGoldenCase>(`/v1/test-event-golden/cases/${encodeURIComponent(id)}?mode=history${revision === undefined ? "" : `&revision=${revision}`}`, { signal }),
+  testEventGoldenCreateCase: (payload: import("@tire/domain-types").TestEventGoldenContent, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventGoldenCase>("/v1/test-event-golden/cases", { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
+  testEventGoldenReviseCase: (id: string, payload: import("@tire/domain-types").TestEventGoldenContent, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventGoldenCase>(`/v1/test-event-golden/cases/${encodeURIComponent(id)}/revisions`, { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
+  testEventGoldenReviewCase: (id: string, payload: import("@tire/domain-types").TestEventGoldenReviewRequest, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventGoldenCase>(`/v1/test-event-golden/cases/${encodeURIComponent(id)}/reviews`, { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
+  testEventGoldenSets: (signal?: AbortSignal, offset = 0) => request<import("@tire/domain-types").TestEventGoldenPage<import("@tire/domain-types").TestEventGoldenSetSummary>>(`/v1/test-event-golden/sets?mode=history&offset=${offset}&limit=10`, { signal }),
+  testEventGoldenSet: (id: string, signal?: AbortSignal, revision?: number) => request<import("@tire/domain-types").TestEventGoldenSet>(`/v1/test-event-golden/sets/${encodeURIComponent(id)}?mode=history${revision === undefined ? "" : `&revision=${revision}`}`, { signal }),
+  testEventGoldenCreateSet: (payload: import("@tire/domain-types").TestEventGoldenSetWrite, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventGoldenSet>("/v1/test-event-golden/sets", { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
+  testEventGoldenReviseSet: (id: string, payload: import("@tire/domain-types").TestEventGoldenSetWrite, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventGoldenSet>(`/v1/test-event-golden/sets/${encodeURIComponent(id)}/revisions`, { method: "POST", headers: { "Idempotency-Key": key }, body: JSON.stringify(payload), signal }),
+  testEventGoldenEvaluateSet: (id: string, payload: import("@tire/domain-types").TestEventGoldenEvaluateRequest, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventGoldenEvaluation>(`/v1/test-event-golden/sets/${encodeURIComponent(id)}/evaluate?mode=history`, { method: "POST", body: JSON.stringify(payload), signal }),
   fitmentVehicleSnapshots: (vehicleId: string, offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentRelationPage<import("@tire/domain-types").FitmentVehicleSnapshot>>(`/v1/fitment-relations/vehicle-snapshots?mode=history&offset=${offset}&limit=20${vehicleId ? `&vehicle_id=${encodeURIComponent(vehicleId)}` : ""}`, { signal }),
   fitmentVehicleSnapshot: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentVehicleSnapshotDetail>(`/v1/fitment-relations/vehicle-snapshots/${encodeURIComponent(id)}?mode=history`, { signal }),
   fitmentTireEvidence: (variantId: string, offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentTireEvidencePage>(`/v1/fitment-relations/tire-evidence/${encodeURIComponent(variantId)}?mode=history&offset=${offset}&limit=20`, { signal }),
   fitmentRelations: (filters: { vehicle_id?: string; axle?: "front" | "rear"; state?: import("@tire/domain-types").FitmentRelationState }, offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentRelationPage<import("@tire/domain-types").FitmentRelation>>(`/v1/fitment-relations?mode=history&offset=${offset}&limit=20${Object.entries(filters).filter(([, value]) => value).map(([key, value]) => `&${key}=${encodeURIComponent(value!)}`).join("")}`, { signal }),
   fitmentRelation: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentRelationDetail>(`/v1/fitment-relations/${encodeURIComponent(id)}?mode=history`, { signal }),
+  fitmentRelationRevision: (id: string, revision: number, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentRelationRevision>(`/v1/fitment-relations/${encodeURIComponent(id)}/revisions/${revision}?mode=history`, { signal }),
   fitmentRelationPreview: (payload: import("@tire/domain-types").FitmentRelationPreviewRequest, signal?: AbortSignal) => post<import("@tire/domain-types").FitmentRelationPreview>("/v1/fitment-relations/preview", payload, signal),
   reviseFitmentRelation: (payload: import("@tire/domain-types").FitmentRelationDecision, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").FitmentRelationDecisionResult>("/v1/fitment-relations/revisions", { method: "POST", body: JSON.stringify(payload), headers: { "Idempotency-Key": key }, signal }),
   searchRecalls: (query: import("@tire/domain-types").RecallSearchQuery, signal?: AbortSignal, consentId?: string) => post<import("@tire/domain-types").RecallSearchResult>("/v1/recalls/search", { query, fallback_policy: "ask", ...(consentId ? { consent_id: consentId } : {}) }, signal),
@@ -468,6 +652,13 @@ export const tireApi = {
   documents: (signal?: AbortSignal, offset = 0) => request<{ items: EvidenceDocument[]; total: number; storage_backend: string }>(`/v1/documents?mode=history&offset=${offset}`, { signal }),
   uploadDocument: (metadata: EvidenceDocumentMetadata, file: File, signal?: AbortSignal) => request<EvidenceDocument>("/v1/documents", { method: "POST", body: file, signal, headers: { "Content-Type": "application/pdf", "X-Evidence-Metadata": btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(metadata)))) } }),
   documentContent: (id: string, signal?: AbortSignal) => request<Blob>(`/v1/documents/${encodeURIComponent(id)}/content?mode=history`, { signal }, "blob"),
+  sourceMaterialPolicies: (signal?: AbortSignal) => request<import("@tire/domain-types").SourceMaterialPolicies>("/v1/source-materials/policies", { signal }),
+  previewSourceMaterial: (payload: import("@tire/domain-types").SourceMaterialPreviewRequest, signal?: AbortSignal) => post<import("@tire/domain-types").SourceMaterialPreview>("/v1/source-materials/preview", payload, signal),
+  captureSourceMaterial: (payload: import("@tire/domain-types").SourceMaterialCaptureRequest, signal?: AbortSignal) => post<import("@tire/domain-types").SourceMaterialCaptureResult>("/v1/source-materials/captures", payload, signal),
+  sourceMaterialRequests: (offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").SourceMaterialRequests>(`/v1/source-materials/requests?mode=history&offset=${offset}`, { signal }),
+  sourceMaterialRequest: (key: string, signal?: AbortSignal) => request<import("@tire/domain-types").SourceMaterialRequestView>(`/v1/source-materials/requests/${encodeURIComponent(key)}?mode=history`, { signal }),
+  stopSourceMaterialRequest: (key: string, payload: import("@tire/domain-types").SourceMaterialStopRequest, signal?: AbortSignal) => post<import("@tire/domain-types").SourceMaterialStopResult>(`/v1/source-materials/requests/${encodeURIComponent(key)}/stop`, payload, signal),
+  sourceMaterialDocument: (documentId: string, signal?: AbortSignal) => request<import("@tire/domain-types").SourceMaterialRequestView>(`/v1/source-materials/documents/${encodeURIComponent(documentId)}?mode=history`, { signal }),
   alertRules: (archived: boolean, signal?: AbortSignal, offset = 0) => request<{ items: AlertRuleRecord[]; total: number }>(`/v1/alert-rules?archived=${archived}&offset=${offset}`, { signal }),
   alertRule: (id: string, signal?: AbortSignal) => request<AlertRuleDetail>(`/v1/alert-rules/${encodeURIComponent(id)}?mode=history`, { signal }),
   createAlertRule: (payload: AlertRuleCreate, signal?: AbortSignal) => post<AlertRuleRecord>("/v1/alert-rules", payload, signal),
@@ -475,6 +666,9 @@ export const tireApi = {
   alertRuleState: (id: string, revision: number, action: "archive" | "restore", signal?: AbortSignal) => post<AlertRuleRecord>(`/v1/alert-rules/${encodeURIComponent(id)}/state`, { expected_revision: revision, action }, signal),
   notifications: (unread: boolean, signal?: AbortSignal, offset = 0) => request<{ items: LocalNotification[]; total: number }>(`/v1/notifications?unread=${unread}&offset=${offset}`, { signal }),
   markNotification: (id: string, read: boolean, signal?: AbortSignal) => request<{ id: string; read_at: string | null }>(`/v1/notifications/${encodeURIComponent(id)}/read`, { method: "PUT", body: JSON.stringify({ read }), signal }),
+  sourcePageNotifications: (unread = false, signal?: AbortSignal, offset = 0, limit = 25) => request<import("@tire/domain-types").SourcePageNotifications>(`/v1/source-page-notifications?mode=history&unread=${unread}&offset=${offset}&limit=${limit}`, { signal }),
+  sourcePageNotification: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").SourcePageNotificationDetail>(`/v1/source-page-notifications/${encodeURIComponent(id)}?mode=history`, { signal }),
+  markSourcePageNotification: (id: string, read: boolean, signal?: AbortSignal) => request<import("@tire/domain-types").SourcePageNotificationRead>(`/v1/source-page-notifications/${encodeURIComponent(id)}/read`, { method: "PUT", body: JSON.stringify({ read }), signal }),
   saveComparison: (payload: SaveComparisonRequest, signal?: AbortSignal) => post<SavedComparisonRecord>("/v1/saved-comparisons", payload, signal),
   savedComparisons: (archived = false, signal?: AbortSignal, offset = 0) => request<{ items: SavedComparisonRecord[]; total: number; offset: number; limit: number }>(`/v1/saved-comparisons?archived=${archived}&offset=${offset}`, { signal }),
   savedComparison: (id: string, signal?: AbortSignal) => request<SavedComparisonDetail>(`/v1/saved-comparisons/${encodeURIComponent(id)}?mode=history`, { signal }),
@@ -503,10 +697,17 @@ export const tireApi = {
   quarantines: (sourceId: string, signal?: AbortSignal) => request<{ data_state: "local_snapshot"; items: QuarantineRecord[]; source_ids: string[] }>(`/v1/quarantines?limit=50${sourceId ? `&source_id=${encodeURIComponent(sourceId)}` : ""}`, { signal }),
   quarantineEvidence: (id: string, signal?: AbortSignal) => request<QuarantineEvidence>(`/v1/quarantines/${encodeURIComponent(id)}?mode=history`, { signal }),
   testEvents: (signal?: AbortSignal, offset = 0) => request<{ items: import("@tire/domain-types").TestEventRecord[]; total: number }>(`/v1/test-events?mode=history&offset=${offset}`, { signal }),
+  testSkuLinkMaterials: (offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").BridgeMaterialsPage>(`/v1/test-sku-links/materials?mode=history&offset=${offset}`, { signal }),
+  testSkuLinks: (eventId: string, offset = 0, signal?: AbortSignal) => request<import("@tire/domain-types").TestSkuLinkPage>(`/v1/test-sku-links?mode=history&event_id=${encodeURIComponent(eventId)}&offset=${offset}`, { signal }),
+  testSkuLink: (id: string, signal?: AbortSignal, revision?: number) => request<import("@tire/domain-types").TestSkuLinkDetail>(`/v1/test-sku-links/${encodeURIComponent(id)}?mode=history${revision === undefined ? "" : `&revision=${revision}`}`, { signal }),
+  previewTestSkuLink: (payload: import("@tire/domain-types").BridgePreviewRequest, signal?: AbortSignal) => post<import("@tire/domain-types").TestSkuLinkPreview>("/v1/test-sku-links/preview", payload, signal),
+  decideTestSkuLink: (payload: import("@tire/domain-types").BridgeDecision, key: string, signal?: AbortSignal) => request<import("@tire/domain-types").TestSkuLinkDecisionResult>("/v1/test-sku-links/decisions", { method: "POST", body: JSON.stringify(payload), headers: { "Idempotency-Key": key }, signal }),
   testEvent: (id: string, signal?: AbortSignal, revision?: number) => request<import("@tire/domain-types").TestEventDetail>(`/v1/test-events/${encodeURIComponent(id)}?mode=history${revision ? `&revision=${revision}` : ""}`, { signal }),
   saveTestEvent: (payload: import("@tire/domain-types").SaveTestEvent, id?: string, revision?: number, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventDetail>(`/v1/test-events${id ? `/${encodeURIComponent(id)}` : ""}`, { method: id ? "PUT" : "POST", body: JSON.stringify({ ...payload, ...(id ? { expected_revision: revision } : {}) }), signal }),
   testEventState: (id: string, payload: { action: "revoke" | "restore"; expected_revision: number; operator: string; reason: string }, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventDetail>(`/v1/test-events/${encodeURIComponent(id)}/state`, { method: "POST", body: JSON.stringify(payload), signal }),
   compareTestEvent: (id: string, payload: { expected_revision: number; participant_ids: string[]; metric_keys: string[] }, signal?: AbortSignal) => request<import("@tire/domain-types").TestEventComparison>(`/v1/test-events/${encodeURIComponent(id)}/compare?mode=history`, { method: "POST", body: JSON.stringify(payload), signal }),
+  interpretTestEventPreferences: (id: string, payload: import("@tire/domain-types").TestPreferenceInterpretationRequest, signal?: AbortSignal) => post<import("@tire/domain-types").TestPreferenceInterpretation>(`/v1/test-events/${encodeURIComponent(id)}/preference-interpretation?mode=history`, payload, signal),
+  interpretTestEventCandidates: (id: string, payload: import("@tire/domain-types").TestCandidateInterpretationRequest, signal?: AbortSignal) => post<import("@tire/domain-types").TestCandidateInterpretation>(`/v1/test-events/${encodeURIComponent(id)}/candidate-interpretation?mode=history`, payload, signal),
   quarantineReview: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").QuarantineReviewState>(`/v1/quarantines/${encodeURIComponent(id)}/review?mode=history`, { signal }),
   reviewQuarantine: (id: string, payload: import("@tire/domain-types").QuarantineReviewRequest, signal?: AbortSignal) => request<import("@tire/domain-types").QuarantineReviewState>(`/v1/quarantines/${encodeURIComponent(id)}/reviews`, { method: "POST", body: JSON.stringify(payload), signal }),
   captures: (pendingOnly: boolean, signal?: AbortSignal) => request<{ data_state: "local_snapshot"; items: RawCaptureRecord[] }>(`/v1/captures?mode=history&limit=50&pending_only=${pendingOnly}`, { signal }),
@@ -521,16 +722,29 @@ export const tireApi = {
   factReview: (variantId: string, sourceId: string, signal?: AbortSignal) => request<FactReview>(`/v1/tire-variants/${encodeURIComponent(variantId)}/fact-review?mode=history&source_id=${encodeURIComponent(sourceId)}`, { signal }),
   reviseFact: (variantId: string, payload: FactRevisionRequest, signal?: AbortSignal) => post<FactReview>(`/v1/tire-variants/${encodeURIComponent(variantId)}/fact-revisions`, payload, signal),
   watchlists: (signal?: AbortSignal) => request<{ items: WatchItem[] }>("/v1/watchlists", { signal }),
-  watch: (variantId: string) => post<WatchItem>("/v1/watchlists", { variant_id: variantId }),
-  unwatch: (id: string) => request<void>(`/v1/watchlists/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  watch: (variantId: string, signal?: AbortSignal) => post<WatchItem>("/v1/watchlists", { variant_id: variantId }, signal),
+  unwatch: (id: string, signal?: AbortSignal) => request<void>(`/v1/watchlists/${encodeURIComponent(id)}`, { method: "DELETE", signal }),
   changes: (signal?: AbortSignal) => request<{ items: ChangeItem[] }>("/v1/changes", { signal }),
+  previewPersonalFeed: (payload: import("@tire/domain-types").PersonalFeedRequest, signal?: AbortSignal) => post<import("@tire/domain-types").PersonalFeed>("/v1/personal-feed/preview?mode=history", payload, signal),
+  previewFitmentCandidates: (payload: import("@tire/domain-types").FitmentCandidatesRequest, signal?: AbortSignal) => post<import("@tire/domain-types").FitmentCandidates>("/v1/fitment-candidates/preview?mode=history", payload, signal),
+  interestCapabilities: (signal?: AbortSignal) => request<import("@tire/domain-types").InterestCapabilities>("/v1/interests/capabilities?mode=history", { signal }),
+  interestEvidence: (kind: import("@tire/domain-types").InterestOriginalEvidenceKind, recordId: string, signal?: AbortSignal) => request<import("@tire/domain-types").InterestOriginalEvidence>(`/v1/interest-evidence/${encodeURIComponent(kind)}/${encodeURIComponent(recordId)}?mode=history`, { signal }),
+  interests: (archived = false, signal?: AbortSignal, offset = 0, limit = 50) => request<import("@tire/domain-types").InterestList>(`/v1/interests?archived=${archived}&offset=${offset}&limit=${limit}`, { signal }),
+  interest: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").InterestDetail>(`/v1/interests/${encodeURIComponent(id)}?mode=history`, { signal }),
+  createInterest: (payload: import("@tire/domain-types").InterestSettings, signal?: AbortSignal) => post<import("@tire/domain-types").InterestRecord>("/v1/interests", payload, signal),
+  updateInterest: (id: string, revision: number, payload: import("@tire/domain-types").InterestSettings, signal?: AbortSignal) => request<import("@tire/domain-types").InterestRecord>(`/v1/interests/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ ...payload, expected_revision: revision }), signal }),
+  interestState: (id: string, revision: number, action: "archive" | "restore", signal?: AbortSignal) => post<import("@tire/domain-types").InterestRecord>(`/v1/interests/${encodeURIComponent(id)}/state`, { expected_revision: revision, action }, signal),
+  previewInterests: (payload: import("@tire/domain-types").InterestPreviewRequest, signal?: AbortSignal, offset = 0, limit = 50) => post<import("@tire/domain-types").InterestPreview>(`/v1/interests/preview?mode=history&offset=${offset}&limit=${limit}`, payload, signal),
+  interestNotifications: async (unread = false, signal?: AbortSignal, offset = 0, limit = 50) => checkedInterestNotifications(await request<InterestNotificationList>(`/v1/interest-notifications?mode=history&unread=${unread}&offset=${offset}&limit=${limit}`, { signal })),
+  interestNotification: async (id: string, signal?: AbortSignal) => checkedInterestNotification(await request<InterestNotification>(`/v1/interest-notifications/${encodeURIComponent(id)}?mode=history`, { signal }), id),
+  markInterestNotification: (id: string, read: boolean, signal?: AbortSignal) => request<{ id: string; read_at: string | null }>(`/v1/interest-notifications/${encodeURIComponent(id)}/read`, { method: "PUT", body: JSON.stringify({ read }), signal }),
   vehicles: (signal?: AbortSignal) => request<{ data_state: "source_catalog"; vehicles: VehicleCandidate[] }>("/v1/vehicles", { signal }),
   liveFitments: (vehicleId: string, signal?: AbortSignal, consentId?: string) => post<VehicleFitmentResult>(`/v1/vehicles/${encodeURIComponent(vehicleId)}/live-fitments`, { fallback_policy: "ask", ...(consentId ? { consent_id: consentId } : {}) }, signal),
   vehicleEvidence: (snapshotId: string, signal?: AbortSignal) => request<Evidence>(`/v1/vehicle-evidence/${encodeURIComponent(snapshotId)}`, { signal }),
 };
 
-// device-ai internal reuse points (wire not frozen; device-ai-host.ts consumes
-// these so the unfrozen Host SDK shares the sealed transport pipeline — session
+// Internal transport reuse points: device-ai-host.ts consumes these so the
+// public Host SDK shares the existing transport pipeline — session
 // cookies, Idempotency-Key handling, ApiError mapping — instead of growing a
-// second client). Not part of the frozen product surface.
+// second client. Their internal names are retained for source compatibility.
 export { request as deviceAiInternalRequest, checkedAIStreamDetail as deviceAiInternalStreamDetail };

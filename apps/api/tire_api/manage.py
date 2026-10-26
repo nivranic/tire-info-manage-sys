@@ -19,7 +19,7 @@ from sqlalchemy import select
 
 from .auth import hash_password, sweep_expired_sessions
 from .db import User, UserSession
-from .main import create_app
+from .service import QueryService
 
 
 def main():
@@ -30,18 +30,38 @@ def main():
     reset.add_argument("--new-password", default=None,
                        help="省略则读 TI_MANAGE_NEW_PASSWORD 环境变量")
     sub.add_parser("expire-sessions", help="解绑全部已过期的登录会话")
+    migration = sub.add_parser("migrate-vehicle-binary", help="显式私库023→024演练；不代表正常库发布许可")
+    migration.add_argument("--private-database", required=True, help="显式私有SQLite副本路径；不读取应用默认数据库")
+    migration.add_argument("--backup-file", required=True, help="全新SQLite备份文件；对象与Parser包须单独保全核验")
+    migration.add_argument("--offline-confirmed", action="store_true", required=True,
+                           help="确认私库所有写入方已停止；本入口不提供在线全资产一致备份")
     args = parser.parse_args()
 
+    if args.action == "migrate-vehicle-binary":
+        from .vehicle_binary_migration import VehicleBinaryMigrationError, private_rehearsal
+        try:
+            result = private_rehearsal(args.private_database, args.backup_file, offline_confirmed=args.offline_confirmed)
+        except VehicleBinaryMigrationError as error:
+            print(json.dumps({"ok": False, "code": error.code}))
+            raise SystemExit(1) from None
+        except Exception:
+            print(json.dumps({"ok": False, "code": "vehicle_binary_migration_failed"}))
+            raise SystemExit(1) from None
+        print(json.dumps({"ok": True, "scope": "private_schema_rehearsal", **result}))
+        return
+
+    from .main import create_app
     app = create_app()
     database = app.state.database
-    database.initialize()
     try:
+        database.initialize()
         with database.sessions() as db:
             if args.action == "expire-sessions":
                 unbound = sweep_expired_sessions(db)
                 db.commit()
                 print(json.dumps({"ok": True, "sessions_unbound": unbound}, ensure_ascii=False))
                 return
+            QueryService(db, None).lock_ingestion()
             user = db.scalar(select(User).where(User.username == args.username))
             if user is None:
                 print(json.dumps({"error": "user_not_found", "username": args.username}, ensure_ascii=False))
@@ -54,6 +74,8 @@ def main():
             sessions = db.scalars(select(UserSession).where(UserSession.user_id == user.id)).all()
             for session in sessions:
                 session.user_id = None
+            from .external_api import revoke_account_keys
+            revoke_account_keys(db, user.id)
             db.commit()
             print(json.dumps({"ok": True, "username": user.username, "sessions_unbound": len(sessions)},
                              ensure_ascii=False))

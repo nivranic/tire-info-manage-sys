@@ -155,6 +155,24 @@ pub fn validate_request(request: ApiRequest) -> NativeResult<ValidatedRequest> {
         "DELETE" => Method::DELETE,
         _ => return Err("INVALID_API_METHOD"),
     };
+    let route = request.path.split_once('?').map_or(request.path.as_str(), |(route, _)| route);
+    let inventory_read = method == Method::GET
+        && matches!(route, "/v1/api-keys/active" | "/v1/api-key-history");
+    // Match the original spelling, before any URL decoding or normalization.
+    let quarantine_review_write = method == Method::POST
+        && request.path.split_once('?').is_some_and(|(route, query)| {
+            query == "mode=history&format=raw-evidence-v2"
+                && route
+                    .strip_prefix("/v1/quarantines/")
+                    .and_then(|rest| rest.strip_suffix("/reviews"))
+                    .is_some_and(|id| {
+                        (1..=64).contains(&id.len())
+                            && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                    })
+        });
+    if request.headers.len() > 3 {
+        return Err("INVALID_API_HEADER");
+    }
     let mut seen = HashSet::new();
     let mut headers = HeaderMap::new();
     for (name, value) in request.headers {
@@ -165,6 +183,10 @@ pub fn validate_request(request: ApiRequest) -> NativeResult<ValidatedRequest> {
         match name.as_str() {
             "content-type" if matches!(value.as_str(), "application/json" | "application/pdf") => {}
             "idempotency-key" if request_id(&value).is_ok() => {}
+            "x-tire-expected-account"
+                if (inventory_read || quarantine_review_write)
+                    && (1..=64).contains(&value.len())
+                    && value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-') => {}
             "x-evidence-metadata" => {
                 let bytes = decode_bounded(&value, 12 * 1024, "INVALID_API_HEADER")
                     .map_err(|_| "INVALID_API_HEADER")?;

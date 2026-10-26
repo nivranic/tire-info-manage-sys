@@ -35,6 +35,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { AIStreamAcceptance, AIStreamDetail, OfflineReadResult, OfflineSearchResult, OfflineSlot } from "@tire/domain-types";
 import { WorkbenchPlatformContext, type WorkbenchPlatform } from "../../web/components/workbench-platform";
+import { useThemePreferences } from "../../web/components/theme-preferences";
 import { AIStreamProgress } from "../../web/components/ai-stream-progress";
 import {
   deviceAiDomainLabel, deviceAiDomainLabels, deviceAiEventLabels, deviceAiFailureLabels, deviceAiHostErrorMessage,
@@ -104,7 +105,7 @@ export function DesktopDeviceAiEntry({ platform, online, className = "text-butto
 }
 
 function DesktopDeviceAiDialog({ platform, onClose }: { platform: WorkbenchPlatform; onClose: () => void }) {
-  const [portalTheme] = useState(() => document.querySelector<HTMLElement>(".app-shell")?.dataset.theme || "light");
+  const { appearance } = useThemePreferences();
   const dialog = useRef<HTMLDialogElement>(null);
   const operation = useRef<AbortController | null>(null);
   const frozenSubmission = useRef<FrozenSubmission | null>(null);
@@ -464,7 +465,7 @@ function DesktopDeviceAiDialog({ platform, onClose }: { platform: WorkbenchPlatf
   const budgetBlocked = budget?.blocked === true || dailyBudget?.blocked === true;
   const activeStream = stream;
   // 平台上下文提供原生 kind=desktop：AIStreamProgress 据此走游标定时读取而非 SSE。
-  return createPortal(<WorkbenchPlatformContext.Provider value={platform}><div className="offline-portal" data-theme={portalTheme}><dialog ref={dialog} className="fact-review-dialog offline-dialog device-ai-dialog" aria-labelledby="desktop-device-ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
+  return createPortal(<WorkbenchPlatformContext.Provider value={platform}><div className="offline-portal" data-theme={appearance.palette}><dialog ref={dialog} className="fact-review-dialog offline-dialog device-ai-dialog" aria-labelledby="desktop-device-ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">DEVICE HISTORY → AI · 桌面</span><h2 id="desktop-device-ai-title">设备 AI 分析</h2><p>本机预览 · 一次决定 · 服务端复核 · IPC 流式轮询</p></div><button type="button" className="text-button" onClick={onClose}>关闭</button></header>
     <div className="offline-content">
       <p className="review-boundary">分析对象是本设备保存的离线历史观察（轮胎 / 车辆 / 召回公告 / 公告检索四域）。面板通过 Tauri IPC 与本机 API 通信：预览指纹在本机 WebView 内用投影复刻端口重算（预览字节与本机槽位 sha256 逐一钉死后才使用），只有你明确确认后才会创建服务端准备记录，第二次确认后才交给 AI Provider。</p>

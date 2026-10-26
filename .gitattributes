@@ -1,0 +1,8 @@
+# Keep raw source bytes stable for the sealed E1 provenance SHA-256 checks.
+/apps/api/tire_api/device_ai_projection.py text eol=lf
+/apps/api/tire_api/device_ai_value_encoder.py text eol=lf
+
+# Preserve the user-provided requirements snapshot byte for byte on checkout.
+/docs/requirements/2026-09-26-tire-intelligence-original.md -text
+
+/apps/api/tests/fixtures/vehicle_binary_023/* -text

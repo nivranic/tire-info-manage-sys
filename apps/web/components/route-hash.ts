@@ -3,10 +3,13 @@
  * 路由形如 `#/query`、`#/compare?ids=a,b`（≤4）、`#/query?size=245%2F40%20R20`。
  * 证据检查器、弹窗与查询草稿保持瞬态，不进入 URL（深链诚实边界）。
  */
-export type RouteView = "query" | "vehicles" | "garage" | "compare" | "watch" | "sources";
+export type RouteView = "home" | "query" | "vehicles" | "garage" | "compare" | "watch" | "sources";
 export type RouteState = { view: RouteView; compareIds?: string[]; size?: string };
+export const DEFAULT_ROUTE_VIEW: RouteView = "home";
+/** After transient evidence is closed, native back returns to the independent home. */
+export function nativeBackRoute(view: RouteView): RouteView | null { return view === DEFAULT_ROUTE_VIEW ? null : DEFAULT_ROUTE_VIEW; }
 
-const ROUTE_VIEWS: readonly RouteView[] = ["query", "vehicles", "garage", "compare", "watch", "sources"];
+const ROUTE_VIEWS: readonly RouteView[] = ["home", "query", "vehicles", "garage", "compare", "watch", "sources"];
 
 export function parseRouteHash(hash: string): RouteState | null {
   const raw = hash.replace(/^#/, "");

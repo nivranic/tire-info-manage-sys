@@ -1,0 +1,31 @@
+{
+  "approved_closure": null,
+  "binding": {
+    "byte_count": 82348,
+    "owner_scope_id": "e6b0aac1f7ab69c856dde1be3a0e84f4aa39ca15be472d53accc1f63b6eb9f4f",
+    "package_id": "81575f4f-48bb-4581-aafb-d2e5fc12c23c",
+    "schema": "offline-pack@2",
+    "sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574"
+  },
+  "core_sha256": "c8633ac0108b2b624e532afc157b91568d0381190f18aa70160931a5c7a2f774",
+  "host_parity_verified": false,
+  "max_projection_bytes": 44000,
+  "mode": "complete_formal_observation",
+  "public_wire_frozen": false,
+  "schema": "internal-device-ai-projection-vector-input@1",
+  "selectors": [
+    {
+      "document_id": "member:69fa1492c9876353b197e10aeac927a384d13060a55d34a7ba8799e525b941ce",
+      "kind": "recall",
+      "member_key": "69fa1492c9876353b197e10aeac927a384d13060a55d34a7ba8799e525b941ce",
+      "record_index": null,
+      "reference": {
+        "kind": "recall",
+        "recall_revision_id": null,
+        "snapshot_id": "16614242-6593-41f4-991d-c21854550c19",
+        "verification_id": "a210510a-485b-4929-9505-1e7c35bbeb54"
+      }
+    }
+  ],
+  "source_kind": "exact_producer49_download"
+}

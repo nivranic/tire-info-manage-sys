@@ -7,7 +7,7 @@ import { useWorkbenchAuth, authErrorText } from "./auth";
 import { useToast } from "./toast";
 import { Icon } from "./icons";
 
-const usernamePattern = "[A-Za-z0-9_-]{3,32}";
+const usernamePattern = "[A-Za-z0-9_\\-]{3,32}";
 
 /** 登录态「我的资料」区：任何已登录用户可自改用户名 / 显示名（POST /v1/auth/profile）。 */
 function ProfilePanel({ user, locked, onProfileChanged }: { user: AuthUser; locked: boolean; onProfileChanged: () => void }) {

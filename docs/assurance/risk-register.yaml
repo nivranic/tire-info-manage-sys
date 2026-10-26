@@ -1,9 +1,9 @@
-# COHS 风险登记 — r58（2026-10-04）
+# COHS 风险登记 — r82（2026-10-19）
 # 字段：id/asset/finding/impact/likelihood/priority/owner/compensating_control/reassess_trigger/status
 # 规则：无 owner 的风险不允许；无期限的例外不允许（COHS §53）。
 
-register_version: r58
-updated: 2026-10-04
+register_version: r82
+updated: 2026-10-19
 
 risks:
   - id: R-001
@@ -19,47 +19,47 @@ risks:
 
   - id: R-002
     asset: 来源采集（EPREL 及其余 P0/P1/P2）
-    finding: 真实来源外联采集未获用户授权（P2 明确未选）
+    finding: 用户已授权agent自主公开选源，R81明确目前没有EPREL Key并要求继续独立工作；正式API schema和本地更正/限制/删除生命周期未闭合，不猜wire。R81取得两份首代SU7官方历史PDF并独立视觉核5x3配置/轴位，只修正目录链接，二进制证据链和首代ready仍未实现。R74单篇Frontiers真实捕获按原范围保留；R81专业材料三候选均未建完整精确SKU/真人Golden，normal默认专业目录仍空；R82首代PDF可执行合同已独立读者审，二进制链路仍待实现，不因合同封存标ready
     impact: medium
     likelihood: n/a
     priority: deferred
-    owner: user
-    compensating_control: 外联白名单 + 无授权不发起；既有发现仅限已授权来源
-    reassess_trigger: 用户授权任一新来源
-    status: open
+    owner: engineering
+    compensating_control: R81原件仅本机核阅，不因robots404/公开下载推开放许可或Provider/再分发用途；灰色轴位说明按原图独立逐行核，不用遗漏文本/搜索摘要。首代维持requires_source_verification，两个既有目标测试通过；nullable文本加capture引用及全部原文消费者闭包见2026-10-19官方PDF计划。EPREL候选文档403/robots200HTML不放行；专业材料按各自许可访问，不绕KIT禁止archive，不猜Zenodo身份。R74单篇真实capture20检查及原件SHA保持历史绑定，专业provider_use/export仍false；R82合同明确nullable文本加capture、实际parse_provenance与历史/审批/下载/Native闭包，来源用途仍pending_review且provider_use/export=false，实施入口见官方PDF可执行合同
+    reassess_trigger: 首代PDF二进制捕获/迁移/Parser/下载/消费闭包，EPREL正式Key与官方schema可得或许可生命周期设计，以及新增精确SKU材料/真人Golden/正常进程配置或用途变化时；自主继续，不再重复索要URL或EPREL Key，不重造已交付捕获
+    status: partially-closed
 
   - id: R-003
     asset: Python 全量测试套件
-    finding: 真实 parser 子进程预算测试（8s墙钟/5s CPU，§8 禁止放宽）对机器间歇负载敏感——r52 三次运行共 21 个失败实例在隔离重跑中 100% 转绿（受害测试轮转换人），零确定性失败；负载源含常驻模拟器、Defender、海量测试临时文件 churn
+    finding: 真实 parser 子进程预算测试（8s墙钟/5s CPU，§8 禁止放宽）对机器间歇负载敏感——r52 三次运行共 21 个失败实例在隔离重跑中 100% 转绿（受害测试轮转换人），零确定性失败；负载源含常驻模拟器、Defender、海量测试临时文件 churn。以上为r52历史结论；R82第一次正式运行以GuardDenied中断且保留九旧红，工装路径解析/报告、历史迁移预期、DNS与CLI问题单独修订，不归为负载；七模块81项通过仅属阶段，正式148模块终态4058通过/5失败、另77子测试通过，660输入首尾一致；010/011/008/019迁移和Parser五项safe类型均Failure，原红保留，精确测试/pin修复后五模块89/89通过，严格660对比恰6变更/654不变；Parser具体code为事后保留目录观察加源码链，非原runner遥测，不归为负载或关闭全量风险，也不声称最新全148绿
     impact: low
     likelihood: medium（本机全量运行必遇若干）
     priority: low
     owner: engineering
-    compensating_control: 全量套件空闲机器串行执行+关模拟器；失败先文件级隔离重跑鉴别再判回归（r52 已验证该协议）；测试本身行为正确（预算耗尽即 fail-closed 是被测属性）
+    compensating_control: 全量套件空闲机器串行执行+关模拟器；失败先文件级隔离重跑鉴别再判回归（r52 已验证该协议）；测试本身行为正确（预算耗尽即 fail-closed 是被测属性）；R82不放宽8s墙钟/5s CPU预算，保留原中断及旧红，正式660输入首尾稳定；终态后仅按授权六文件精确整合，目标89项/输入660稳定/资源关闭与654未变均已有独立核对；不把目标绿或已知IPv6分类写成全套绿，不提前关闭风险
     reassess_trigger: 下次全量套件运行；长期可评估给预算测试加"负载防护标记"（pytest marker）而非放宽预算
     status: open-accepted
 
   - id: R-004
-    asset: device-ai wire 冻结
-    finding: 统一 closed-decoder fixtures（decoder-fixtures-a）——已于 2026-10-03 第三批实施落地（25 用例四端 runner 全绿，SHA 0e8998c9…5495 封存）；实施中发现并经 Root 裁决 D9 闭合嵌套键集分歧（ts/jv 运行时下沉，见 ADR-2026-053）。冻结前置至此全部闭合，仅剩冻结工程本身（draft b 迁移 domain-types + wire_frozen=true + 全量回归）
+    asset: device-ai v1 请求合同冻结
+    finding: 第63轮已将现行12键prepare、6键Provider consent、4键device_submission及selector/reference共享类型发布到domain-types，并从SDK公共入口导出；当前closed DTO与旧draft的差异按ADR-2026-063记录。TS公开消费、Python字段对拍及四端限定向量验证通过，完整API加Worker回归2705加77子测试通过exit0；826项运行中采样源码终态复核无变更，非启动前快照。代码尚未提交推送；opaque响应内部、共享value/citation后续义务及mixed/personal/test_event的后续版本不在本轮完成声明内
     impact: medium
     likelihood: n/a
     priority: medium
     owner: engineering
-    compensating_control: 四端各层最小负例 + 统一 fixtures 双保险；fixtures expected 变更须走新版本号（decoder-spec 4.3-9）
-    reassess_trigger: 冻结工程轮启动时
-    status: closed-for-freeze-precondition
+    compensating_control: 原runtime decoder与权利/同意gate保持；公共编译正负例与12/6/4字段跨语言对拍；第64轮三端GET基础视图与POST replay校验拆分、实际API响应经SDK消费及目标回归通过。旧全量只绑定第63轮源码；DEVICE_AI_WIRE_CONTRACT不声明完整V1或真实Provider接受
+    reassess_trigger: 任何请求合同或fixture预期变更必须按新版本复评；后续响应与mixed/personal/test_event另行版本设计
+    status: closed
 
   - id: R-005
     asset: E1 canonical 向量
-    finding: 8MiB 包字节界无向量覆盖（最大向量 ~0.5MB 明细 16.5KiB）；多成员闭包向量缺权威对拍（仅单 tire 成员 + 合成探针）
+    finding: R73已补真实8MiB原UTF-8边界、完整合成包及2成员实际依赖闭包权威向量，Java闭包排列与TS UTF-8排序分歧已有红转绿；3级链及6或7成员投影等更广覆盖未新补，native完整多成员闭包仍unsupported，6接受7拒绝只验证wire预算
     impact: low
     likelihood: low
     priority: low
     owner: engineering
-    compensating_control: 服务端 8MiB 硬门 + r52 起 Host 层同界收紧（D4）；闭包 route 层等值测试已补（E6）
-    reassess_trigger: fixtures 工程轮（可并入 R-004）
-    status: open
+    compensating_control: 新独立corpus22绑定，10原字节/4完整包/17闭包及指纹预像；Python45及旧133、TS45及旧192/34、Java JVM110、Rust6/旧E1 integration10及纯Host3分阶段通过，独立oracle及95项闭包规范审查通过；旧127输入及两E1核心不变，prepare12/consent6/submission4与各容量/权限门不变。补修后native loader每次read先核全部22绑定，Java新类8/Rust新target8分别通过；generator仅7份受管理输入在无.artifacts/产品源码的空checkout重生23文件，Python45/133重跑通过，当前源码由新freeze单独绑定，110/6等保留先前阶段身份，不冒称完整API/设备/Provider验收
+    reassess_trigger: 新增递归链/更多成员投影、改变容量或fixture预期、扩展native完整闭包或协议版本时
+    status: partially-closed
 
   - id: R-006
     asset: Windows 原生离线档案
@@ -73,15 +73,15 @@ risks:
     status: open
 
   - id: R-007
-    asset: packages/api-client 测试
-    finding: 仓库内自测（r52 迁入）以只读相对路径引用 .artifacts 密封向量库，CI 需携带 .artifacts 目录
+    asset: 设备AI合同测试的可移交输入
+    finding: 第63轮将127项原字节合成输入及逐文件provenance迁入packages/domain-types/fixtures/device-ai-v1，四端消费者读取tracked corpus并校验pin及实际SHA和长度；npm test增加禁止读取.artifacts的门，公共入口消费与四端目标回放通过。此结论限设备AI合同输入，不代表其他历史QA脚本或整个全量测试已消除所有.artifacts前置
     impact: low
-    likelihood: certain
+    likelihood: n/a
     priority: low
     owner: engineering
-    compensating_control: 向量库为只读引用不复制（保密封存证据）；本地与带 .artifacts 的 CI 均可运行
-    reassess_trigger: 建立正式 CI 时（向量库可随冻结轮一并产品化）
-    status: open-accepted
+    compensating_control: fixture Git text unset防换行；第64轮根属性另外固定两份E1 SHA绑定源码text eol=lf并以core.autocrlf=true的Git过滤字节验证及73项E1回归确认。原封存文件不改写，expected变更需新fixture版本；既有工具链和依赖仍是前置
+    reassess_trigger: 新增合同向量、变更expected或新增消费者时
+    status: closed
 
   - id: R-008
     asset: 静态安全扫描
@@ -108,12 +108,12 @@ risks:
 # R-010：编号已废弃（历史上并入 R-009 平台验收边界，无独立条目）
   - id: R-009
     asset: 整体发布 Gate（原规格 10 项）
-    finding: P0 来源 provenance 100%、Golden 0 错合并、六平台 E2E、WCAG2.2 AA 等 10 项 V1 Gate 仍多项未满足（明细见 HANDOFF §7）
+    finding: P0 来源 provenance 100%、Golden 0 错合并、六平台 E2E、WCAG2.2 AA 等 10 项 V1 Gate 仍多项未满足（明细见 docs/HANDOFF-2026-10-18.md 第9节）
     impact: high
     likelihood: n/a
     priority: roadmap
     owner: roadmap
-    compensating_control: 属长期路线而非本轮缺陷；HANDOFF §6 P2 清单为权威清单
+    compensating_control: 属长期路线而非本轮缺陷；当前队列与范围见 docs/HANDOFF-2026-10-18.md 第8节，原规格仍为完整需求依据；旧HANDOFF正文为历史快照
     reassess_trigger: 每轮推进后对照更新
     status: open-roadmap
 
@@ -124,7 +124,7 @@ risks:
     likelihood: low（当前无部署；服务 loopback 绑定，密钥/数据均不出本机）
     priority: high-at-deployment
     owner: user
-    compensating_control: 服务维持 loopback 绑定；ADR-2026-057 边界原文与代码注释双锚定（auth.py / db.py User docstring）；docs/DEPLOYMENT-KEY-POLICY.md 部署前置检查清单，部署轮必须逐项执行；与 R-011 联动复评
+    compensating_control: 服务维持 loopback 绑定；沿用ADR-2026-057会话聚合，同cookie重新绑定账户会带入原会话数据，第66轮真实注册重核再次观察并明确保留，独立cookie与迟到响应隔离不构成服务器级账户边界；部署前须重新设计资料归属与鉴权，执行docs/DEPLOYMENT-KEY-POLICY.md并与R-011联动复评
     reassess_trigger: 任何"部署到服务器"工作启动时
     status: open-guarded
 
@@ -152,12 +152,12 @@ risks:
 
   - id: R-015
     asset: 前端 Web 测试保障（apps/web）
-    finding: Web 业务 UI 回归保障极不对称——单测仅 route-hash 纯函数 5 用例，查询/授权门/监控/AI 流/报告等 UI 语义依赖约 20 个一次性人工浏览器 QA 脚本（scripts/*_frontend_qa.mjs），不自动重跑
+    finding: Web业务UI回归仍主要依赖分轮隔离浏览器QA，route-hash纯函数现6用例；查询/授权门/监控/AI流/报告/研究首页尚未建立自动全UI回归。R70修复390/320顶栏拥挤及已终态SSE仍等待窗口的问题，R77 C规格域切片已有实际私有HTTP和React限定验收；完整移动体验/WCAG仍未验收
     impact: medium
     likelihood: medium（下次 web 大改时回归发现成本高）
     priority: low
     owner: engineering
-    compensating_control: 分轮浏览器 E2E 验收 + route-hash 纯函数锚点 + 三端 tsc/build 门禁
+    compensating_control: 分轮真实隔离API/Chrome、route-hash与三端前端build门禁；R66至R68历史兴趣/治理/适用性证据保留。R69当前兴趣历史流和已审候选受影响195项、独立69项、私有API39条、1440/390各24条断言分别通过；canonical冻结详情不足的1根因/3反例已修。首尾绑定、游标失效、空页续读、精确原版本与迟到HTTP响应有限定验收，宽屏候选已前移并排；R75桌面24/390与320各12及独立前端静态12输入通过。R77最终浏览器目录.artifacts/r77-browser-final-70cadbc0f62044e1844bd8869cea881f/中desktop-01.json实际1447×904桌面15项，mobile-390-final.json与mobile-320-final.json实际390×844和320×740各10项，owner-final-02.json身份失效及迟到真实HTTP5项分别通过；stopped.json记录251输入稳定、受控Provider调用1、真实调用0、外网/子进程/正常DB禁止尝试0及私有服务停止，SDK59/typecheck/三端前端build另通过。阶段不累加为全量；C仅自有合成规格域受控验证，手机视口不是原生设备，未证明真实模型语义/完整性能C/完整移动体验或WCAG；同cookie既有聚合不是服务器账户边界，仍非全UI自动回归
     reassess_trigger: 下次 web 组件大改或新增交互域
     status: open-accepted
 
@@ -170,4 +170,37 @@ risks:
     owner: engineering
     compensating_control: 快照内容级去重 + 对象存储内容寻址 + 备份工具 scripts/backup_dev.py（第61轮补）
     reassess_trigger: dev.db 超过 100MB 或任何部署动议
+    status: open-roadmap
+
+  - id: R-017
+    asset: 测试身份桥与性能/AI推荐
+    finding: R71人工桥、R72捕获、R74真实未知材料、R75 B解释、R76独立专业评估器及R77 C仅规格域首批工程已交付；R76的7案仅6合成加1真实身份未知，真实精确SKU正例与外部人工审核均0，release_gate仍inconclusive、wrong_merge_count=null。完整专业性能C/推荐、真实Responses/模型语义及完整V1未完成，normal默认专业目录仍空
+    impact: high
+    likelihood: medium
+    priority: roadmap
+    owner: engineering
+    compensating_control: R76最终私库ASGI7案与39个记录HTTP观察、133输入稳定，独立25加10检查/旧Golden60项、相关124通过及3路径跳过、读取器宿主63通过均为各阶段证据；分层正向与distinct配对仅为合成，human仍inconclusive，自报HTTP/tier/双账户不认证真人。R77冻结合同及独立补充卡约束逐来源许可/实际接收方/新准备与单次同意、服务器理由闭包、专用历史/UUID GET恢复和通用旁路拒绝；Root最终275项及独立61项分别通过，历史claim/answer损坏漏洞已修，源码首尾稳定，SDK59/typecheck/三端前端build及限定浏览器证据见R-015。C规格投影经逐来源许可和单次同意独立受控验证可外发，R70/R71专业测试provider_use/export=false保持，不将规格许可扩给专业材料；正常API/DB/新原生设备未验，旧评估Gate不因此转绿
+    reassess_trigger: 补有合法原件和完整精确身份的真实专业样本及外部真人审核，不猜尺寸/研究编号；扩展C专业性能、来源用途/实际Provider接收方或模型策略时重新核许可和合同，真实Responses/语义质量和完整V1各Gate独立验收；用户已授权自主公开选源，不再等URL或重做已交付B/评估器/C规格域切片
+    status: open-roadmap
+
+  - id: R-018
+    asset: Webhook 对外通知与生产接收端
+    finding: R78本机Webhook闭环已交付；R79新增固定账户Key、独立Bearer鉴权、首批只读cursor及SDK，另见R-019。生产公网接收端、完整外部API、长期lag与真多进程故障未验，默认目标目录仍空，不称完整公开API生产可用
+    impact: medium
+    likelihood: medium
+    priority: roadmap
+    owner: engineering
+    compensating_control: 冻结合同9b835406及round-78报告；自有15、独立125、补充144、SDK77和三端前端build分组通过；实际React桌面1448x904及390/320各21、owner迟到5、受控400后人工重试至204共9项分别通过；真实receiver及Provider为0。生产hook不外发事实、私人条件或凭据；默认不发、目录fail closed、IP/内网及跳转拒绝、环境key、8秒/64KiB、不解压、队列容量与TTL/预算及账本对账、暂停修订ABA门；取消不能撤回HTTP，接收端按delivery ID去重。022只验私库，正常DB未迁移；服务已关闭，历史1286文件保全；既有本机会话聚合不构成服务器账户边界
+    reassess_trigger: 配置真实公网接收端/正常库022或正式外部API鉴权/PG/进程崩溃/TLS/重放与长期lag时分别验收；修改正文数据范围或目标策略/key时重新核同意；R-017专业材料与模型未完成项不因本轮关闭
+    status: open-roadmap
+
+  - id: R-019
+    asset: 外部只读 API 与凭据／游标
+    finding: R79本机固定账户Key及首批外部只读API已交付；R80修复最近100条遮住旧有效Key的问题，新增有效全集、固定账户提示头和全部历史游标分页及三端Native限定头接入；完整外部事实查询/CRUD/AI、生产公网IAM/RLS/PG/TLS/代理和分布式网关尚未交付
+    impact: high
+    likelihood: medium
+    priority: roadmap
+    owner: engineering
+    compensating_control: R80后端自有17/独立72/R79回归102，SDK新47/旧43，HTTP14检查8响应和SDK回放12分别通过；React1440x900/390x844/320x740为45/50/55项（含不同历史页数），类型及三端前端最终build通过；Native TS9/Java5/Rust10仅策略测试。单SQL joined投影、17条异常探测、owner头不作凭据、900秒不续期、anchor撤销/到期可续页；历史错误保留active，owner epoch/abort隔离迟到。API禁止外网/子进程/正常库尝试0，Provider/receiver0；正常库未启动023，无新迁移，测试Key已撤销，私有服务已停，未提交推送。R79证据保留历史绑定
+    reassess_trigger: 接入更多公共域/事实或原件导出、正常库023、生产公网部署/代理信任/外部流量、分布式限额与密钥托管时分别设计并验收；本轮不关闭R-017真实材料/模型及R-018公网投递边界
     status: open-roadmap

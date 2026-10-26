@@ -67,7 +67,43 @@ def _device_ai_ledger_postgresql_statements() -> tuple[DDL, ...]:
 DEVICE_AI_LEDGER_TRIGGERS_POSTGRESQL = _device_ai_ledger_postgresql_statements()
 
 
-def upgrade(connection: Connection) -> None:
+def _test_sku_link_sqlite_statements():
+    conflicts = {
+        'test_sku_links': 'id = NEW.id OR (event_id = NEW.event_id AND participant_key = NEW.participant_key)',
+        'test_sku_link_revisions': ('id = NEW.id OR (link_id = NEW.link_id AND revision = NEW.revision)'
+                                  ' OR (actor_user_id = NEW.actor_user_id AND idempotency_key = NEW.idempotency_key)')}
+    result = []
+    for table, predicate in conflicts.items():
+        for action in ('update', 'delete'):
+            result.append(f"CREATE TRIGGER IF NOT EXISTS {table}_no_{action} BEFORE {action.upper()} ON {table} BEGIN "
+                          "SELECT RAISE(FAIL, 'test_sku_link_immutable'); END")
+        result.append(f'CREATE TRIGGER IF NOT EXISTS {table}_no_replace BEFORE INSERT ON {table} '
+                      f'WHEN EXISTS(SELECT 1 FROM {table} WHERE {predicate}) BEGIN '
+                      "SELECT RAISE(FAIL, 'test_sku_link_immutable'); END")
+    return tuple(result)
+
+
+TEST_SKU_LINK_TRIGGERS_SQLITE = _test_sku_link_sqlite_statements()
+
+
+def _test_sku_link_postgresql_statements():
+    result = [DDL("CREATE FUNCTION tire_test_sku_link_immutable() RETURNS trigger LANGUAGE plpgsql AS $fn$ "
+                  "BEGIN RAISE EXCEPTION 'test_sku_link_immutable'; END $fn$")]
+    for table in ('test_sku_links', 'test_sku_link_revisions'):
+        for action in ('update', 'delete'):
+            result.append(DDL(f'CREATE TRIGGER {table}_no_{action} BEFORE {action.upper()} ON {table} '
+                              'FOR EACH ROW EXECUTE FUNCTION tire_test_sku_link_immutable()'))
+    return tuple(result)
+
+
+TEST_SKU_LINK_TRIGGERS_POSTGRESQL = _test_sku_link_postgresql_statements()
+
+
+def upgrade(connection: Connection, *, include_vehicle_binary: bool = True,
+            include_test_event_golden: bool = True, include_ai_pricing: bool = True,
+            include_source_page_monitoring: bool = True,
+            include_source_quality_interests: bool = True,
+            include_source_material_stops: bool = True) -> None:
     """Called inside Database.initialize's locked schema transaction."""
     connection.exec_driver_sql(
         "CREATE TABLE IF NOT EXISTS tire_schema_versions "
@@ -200,3 +236,151 @@ def upgrade(connection: Connection) -> None:
         connection.execute(text(
             "INSERT INTO tire_schema_versions (version) VALUES (:version)"
         ), {"version": "015_local_sessions_user_index"})
+    if '016_private_interests' not in applied:
+        # New private ledgers are created under initialize's schema transaction.
+        # Never seed events or notifications from old watchlists/history.
+        from .interest_models import Interest, InterestRevision, InterestEvent, InterestNotification
+        for model in (Interest, InterestRevision, InterestEvent, InterestNotification):
+            model.__table__.create(connection, checkfirst=True)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '016_private_interests'})
+    if '017_interest_governance_catalog' not in applied:
+        from .interest_catalog_models import TireCatalogRevision
+        TireCatalogRevision.__table__.create(connection, checkfirst=True)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '017_interest_governance_catalog'})
+    if '018_interest_manual_applicability' not in applied:
+        from .interest_applicability_models import TireCurationApplicabilityEvent
+        TireCurationApplicabilityEvent.__table__.create(connection, checkfirst=True)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '018_interest_manual_applicability'})
+    if '019_test_sku_links' not in applied:
+        from .test_sku_link_models import TestSkuLink, TestSkuLinkRevision
+        for model in (TestSkuLink, TestSkuLinkRevision):
+            model.__table__.create(connection, checkfirst=True)
+        if connection.dialect.name == 'sqlite':
+            for statement in TEST_SKU_LINK_TRIGGERS_SQLITE:
+                connection.exec_driver_sql(statement)
+        elif connection.dialect.name == 'postgresql':
+            for statement in TEST_SKU_LINK_TRIGGERS_POSTGRESQL:
+                connection.execute(statement)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '019_test_sku_links'})
+    if '020_source_materials' not in applied:
+        from .source_material_models import SourceMaterialRequest, SourceMaterialOutcome, sqlite_guards
+        for model in (SourceMaterialRequest, SourceMaterialOutcome):
+            model.__table__.create(connection, checkfirst=True)
+        if connection.dialect.name == 'sqlite':
+            for statement in sqlite_guards():
+                connection.exec_driver_sql(statement)
+        elif connection.dialect.name == 'postgresql':
+            connection.execute(DDL("CREATE FUNCTION tire_source_material_immutable() RETURNS trigger LANGUAGE plpgsql AS $fn$ "
+                "BEGIN RAISE EXCEPTION 'source_material_immutable'; END $fn$"))
+            for table in ('source_material_requests', 'source_material_outcomes'):
+                for action in ('update', 'delete'):
+                    connection.execute(DDL(f'CREATE TRIGGER {table}_no_{action} BEFORE {action.upper()} ON {table} '
+                        'FOR EACH ROW EXECUTE FUNCTION tire_source_material_immutable()'))
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '020_source_materials'})
+    if '021_candidate_ai_assistance' not in applied:
+        from .candidate_ai_models import MODELS, TABLES, sqlite_guards
+        for model in MODELS:
+            model.__table__.create(connection, checkfirst=True)
+        if connection.dialect.name == 'sqlite':
+            for statement in sqlite_guards():
+                connection.exec_driver_sql(statement)
+        elif connection.dialect.name == 'postgresql':
+            connection.execute(DDL("CREATE FUNCTION tire_candidate_ai_immutable() RETURNS trigger LANGUAGE plpgsql AS $fn$ "
+                "BEGIN RAISE EXCEPTION 'candidate_ai_history_immutable'; END $fn$"))
+            for table in TABLES:
+                for action in ('update', 'delete'):
+                    connection.execute(DDL(f'CREATE TRIGGER {table}_no_{action} BEFORE {action.upper()} ON {table} '
+                        'FOR EACH ROW EXECUTE FUNCTION tire_candidate_ai_immutable()'))
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '021_candidate_ai_assistance'})
+    if '022_webhook_delivery' not in applied:
+        from .webhook_models import MODELS, IMMUTABLE, sqlite_guards
+        for model in MODELS:
+            model.__table__.create(connection, checkfirst=True)
+        if connection.dialect.name == 'sqlite':
+            for statement in sqlite_guards():
+                connection.exec_driver_sql(statement)
+        elif connection.dialect.name == 'postgresql':
+            connection.execute(DDL("CREATE FUNCTION tire_webhook_immutable() RETURNS trigger LANGUAGE plpgsql AS $fn$ "
+                "BEGIN RAISE EXCEPTION 'webhook_history_immutable'; END $fn$"))
+            for model in IMMUTABLE:
+                for action in ('update', 'delete'):
+                    table = model.__tablename__
+                    connection.execute(DDL(f'CREATE TRIGGER {table}_no_{action} BEFORE {action.upper()} ON {table} '
+                        'FOR EACH ROW EXECUTE FUNCTION tire_webhook_immutable()'))
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '022_webhook_delivery'})
+    if '023_external_api_keys' not in applied:
+        from .external_api_models import MODELS, IMMUTABLE, sqlite_guards
+        for model in MODELS:
+            model.__table__.create(connection, checkfirst=True)
+        if connection.dialect.name == 'sqlite':
+            for statement in sqlite_guards():
+                connection.exec_driver_sql(statement)
+        elif connection.dialect.name == 'postgresql':
+            connection.execute(DDL("CREATE FUNCTION tire_external_key_immutable() RETURNS trigger LANGUAGE plpgsql AS $fn$ "
+                "BEGIN RAISE EXCEPTION 'external_key_history_immutable'; END $fn$"))
+            for model in IMMUTABLE:
+                for action in ('update', 'delete'):
+                    table = model.__tablename__
+                    connection.execute(DDL(f'CREATE TRIGGER {table}_no_{action} BEFORE {action.upper()} ON {table} '
+                        'FOR EACH ROW EXECUTE FUNCTION tire_external_key_immutable()'))
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '023_external_api_keys'})
+    if include_vehicle_binary:
+        # Destructive SQLite rebuilds never run during ordinary initialization.
+        # New/current physical shapes may retain an old ledger in milestone tests.
+        from .vehicle_binary_migration import VERSION, require_current
+        require_current(connection)
+        if VERSION not in applied:
+            connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                               {'version': VERSION})
+    if include_vehicle_binary and '025_external_fact_governance' not in applied:
+        from .external_fact_models import install_schema
+        install_schema(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '025_external_fact_governance'})
+    if include_vehicle_binary and '026_query_ownership' not in applied:
+        from .query_owner_models import install_schema
+        install_schema(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '026_query_ownership'})
+    if include_vehicle_binary and include_test_event_golden and '027_test_event_golden' not in applied:
+        from .test_event_golden_models import install_schema
+        install_schema(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '027_test_event_golden'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and '028_ai_price_versions' not in applied):
+        from .ai_pricing_models import install_schema
+        install_schema(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '028_ai_price_versions'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and include_source_page_monitoring and '029_source_page_monitoring' not in applied):
+        from .source_page_models import install_schema
+        install_schema(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '029_source_page_monitoring'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and include_source_page_monitoring and include_source_quality_interests
+            and '030_interest_source_quality' not in applied):
+        columns = {column['name'] for column in inspect(connection).get_columns('interest_revisions')}
+        if 'source_quality_notifications' not in columns:
+            connection.exec_driver_sql('ALTER TABLE interest_revisions ADD COLUMN '
+                                       'source_quality_notifications BOOLEAN NOT NULL DEFAULT false')
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '030_interest_source_quality'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and include_source_page_monitoring and include_source_quality_interests
+            and include_source_material_stops and '031_source_material_stops' not in applied):
+        from .source_material_models import SourceMaterialStop, install_stop_guards
+        SourceMaterialStop.__table__.create(connection, checkfirst=True)
+        install_stop_guards(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '031_source_material_stops'})

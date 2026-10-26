@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { AIStreamDetail, AIStreamEvent } from "@tire/domain-types";
 import { RecallAnalysisBoundary } from "./recall-evidence-meta";
+import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import { advanceAIEvent, AI_RECOVERY_KEY, aiStreamStateLabels, visibleAIDrafts, type AIEventPosition, type AIRecoveryPointer } from "./ai-stream-values";
 
@@ -128,9 +129,11 @@ export function AIStreamProgress({ initial, recovery, onDetail, onFact, errorLab
   const draft = visibleAIDrafts(detail, invalidated);
   const terminal = detail.execution.terminal;
   const recallPack = !!detail.analysis.pack?.evidence.some(evidence => evidence.evidence_type === "recall");
+  const testPack = !!detail.analysis.pack && containsTestEvidence(detail.analysis.pack.evidence);
   return <section className="ai-stream-progress" aria-label="AI 分析实时进度">
     <div className="ai-stream-heading"><h3>{aiStreamStateLabels[detail.execution.state]}</h3><button type="button" className="secondary-button" onClick={() => setRefresh(value => value + 1)}>重新读取进度</button></div>
     <RecallAnalysisBoundary boundary={detail.analysis.pack?.recall_boundary} pending={recallPack} />
+    <TestAnalysisScope boundary={detail.analysis.pack?.test_boundary} pending={testPack} />
     <p className="ai-stream-question">本次问题：{detail.analysis.question}</p>
     <p className="ai-stream-connection" role="status" aria-live="polite">{connectionLabels[connection]} · 最后读取 {new Date(detail.server_time).toLocaleTimeString("zh-CN")}</p>
     <p className="review-boundary">只读取同一调用的已保存进度。断线、刷新或关闭窗口不会重复调用模型，也不能保证已取消供应商处理或免于计费。</p>
@@ -141,11 +144,11 @@ export function AIStreamProgress({ initial, recovery, onDetail, onFact, errorLab
     {!terminal ? <section className="ai-stream-drafts" aria-label="未完成校验的分析草稿">
       <h4>生成中草稿 · 整份结果尚未完成引用校验</h4>
       <p className="review-warning">以下仅为完整片段的临时投影，仍可能被最终校验拒绝。不能作为正式分析或保存为含分析的报告。</p>
-      {draft.claims.filter(({ claim }) => !recallPack || claim.type === "fact").map(({ index, claim }) => <article className={`ai-claim ${claim.type}`} key={index}>
+      {draft.claims.filter(({ claim }) => (!recallPack && !detail.analysis.pack?.test_boundary) || claim.type === "fact").map(({ index, claim }) => <article className={`ai-claim ${claim.type}`} key={index}>
         <strong>{claim.type === "fact" ? "证据字段草稿" : "模型推断草稿 · 需人工核对"}</strong><p>{claim.text}</p>
         <div className="compare-toolbar">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} onClick={() => onFact(id)}>核对 {id}</button>)}</div>
       </article>)}
-      {!recallPack && draft.uncertainty !== null ? <article className="ai-claim inference"><strong>生成中的不确定性说明 · 尚未正式采纳</strong><p>{draft.uncertainty}</p></article> : null}
+      {!recallPack && !detail.analysis.pack?.test_boundary && draft.uncertainty !== null ? <article className="ai-claim inference"><strong>生成中的不确定性说明 · 尚未正式采纳</strong><p>{draft.uncertainty}</p></article> : null}
       {!draft.claims.length && draft.uncertainty === null ? <p>{invalidated ? "连接或校验状态待核对，已隐藏临时草稿。" : "尚未收到可展示的完整片段。"}</p> : null}
     </section> : null}
   </section>;

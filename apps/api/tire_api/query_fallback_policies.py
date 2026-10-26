@@ -450,6 +450,9 @@ def claim_policy_use(db, registry, run, query_kind, audience, *, failure_reason=
     cause = run.reason if failure_reason is None else failure_reason
     if (mode != 'allow' or cause not in ELIGIBLE_FAILURES
             or db.scalar(select(FallbackConsent.id).where(FallbackConsent.query_id == run.id)) is not None):
+        # No authorized historical read follows. Release our write lock before
+        # the async route waits for its synchronous Session dependency to exit.
+        db.commit()
         return None
     scope_metadata(db, registry, policy.payload['scope'])
     now = utcnow()

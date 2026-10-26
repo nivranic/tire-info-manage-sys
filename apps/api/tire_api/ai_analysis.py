@@ -15,6 +15,7 @@ from .auth import session_scope
 from .ai_gateway import (GatewayError, analysis_contract, configured_adapter, configured_model, model_status,
                          request_body)
 from .ai_recall_contract import (recall_boundary, validate_recall_claim, validate_recall_payload)
+from .ai_test_contract import contains_test, test_boundary, validate_test_claim, validate_test_uncertainty
 from .ai_models import AICompletion, AIEvidencePack, AIRequest
 from .device_ai import DeviceSubmission, question_digest
 from .device_ai_models import DeviceAIPreparation
@@ -110,7 +111,16 @@ class ModelAnswer(StrictModel):
 
 
 def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
-    model = ModelAnswer.model_validate(json.loads(text))
+    from sqlalchemy.orm import object_session
+    if isinstance(pack, AIEvidencePack):
+        attached = object_session(pack)
+        if attached is not None:
+            from .candidate_ai import reject_candidate_pack
+            reject_candidate_pack(attached, pack.id)
+    if pack.payload.get('purpose') == 'candidate_spec_assistance@1':
+        raise ValueError('candidate_ai_dedicated_route_required')
+    raw = json.loads(text)
+    model = ModelAnswer.model_validate(raw)
     # D17 分流（P1-4a 落地）：device 包的 evidence/facts 形状与仓库 recall 合同不同源
     #（非 tire 域身份键收进 reference 子对象，顶层无 kind/recall_revision_id 别名键），
     # 且 origin 标记只在 device payload 出现（仓库 payload 从不携带），按 origin 跳过
@@ -121,18 +131,31 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
         recall = validate_recall_payload(pack.payload)
     if recall and model.uncertainty:
         raise ValueError('recall_freeform_not_allowed')
+    test = contains_test(pack.payload)
+    # StrictModel trims strings for the legacy contract. The test selection
+    # schema requires the model's original text to be exactly empty instead.
+    validate_test_uncertainty(raw['uncertainty'], pack.payload)
     facts = {item['id']: item for item in pack.payload['facts']}
     evidence = {item['id']: item for item in pack.payload['evidence']}
-    if not recall and not model.claims and not model.uncertainty:
+    if not recall and not test and not model.claims and not model.uncertainty:
         raise ValueError('empty_answer')
     claims = []
-    for claim in model.claims:
+    for claim, raw_claim in zip(model.claims, raw['claims']):
         if (len(set(claim.fact_ids)) != len(claim.fact_ids) or not set(claim.fact_ids) <= facts.keys()
                 or len(set(claim.evidence_ids)) != len(claim.evidence_ids)
                 or set(claim.evidence_ids) != {facts[key]['evidence_id'] for key in claim.fact_ids}):
             raise ValueError('unbound_citation')
         if recall:
             validate_recall_claim(claim, facts, evidence)
+        if test:
+            # Preserve the older explicit cross-event failure before the new
+            # whole-package restriction; no free text passes either gate.
+            events = {evidence[key]['event_id'] for key in claim.evidence_ids if evidence[key].get('event_id')}
+            if claim.type == 'inference' and len(events) > 1:
+                raise ValueError('cross_event_inference_not_allowed')
+            if raw_claim['text'] != '':
+                raise ValueError('test_freeform_not_allowed')
+            validate_test_claim(claim, facts, evidence)
         if claim.type == 'fact':
             if claim.text:
                 raise ValueError('freeform_fact_not_allowed')
@@ -152,10 +175,15 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
     if recall:
         result['recall_boundary'] = recall_boundary(pack.payload)
         result['notice'] = result['recall_boundary']['notice']
+    if test:
+        result['test_boundary'] = test_boundary(pack.payload)
+        result['notice'] = ((result['notice'] + '\n') if recall else '') + result['test_boundary']['notice']
     return result
 
 
 def owned_pack(db, pack_id, scope):
+    from .candidate_ai import reject_candidate_pack
+    reject_candidate_pack(db, pack_id)
     pack = db.get(AIEvidencePack, pack_id)
     if pack is None or pack.actor_session_id not in scope:
         raise HTTPException(404, '未找到当前账户的 AI 证据包')
@@ -286,11 +314,13 @@ def _prepare_device_analysis(db, payload, pack, preparation, *, stream=False):
            for v in annotate_variants(db, [{'id': value} for value in sorted(embedded_variants)])):
         raise HTTPException(409, {'code': 'device_ai_variant_revoked',
             'message': '所选版本状态已撤销，请重新预览并生成新的准备记录'})
+    from .ai_evidence import require_vehicle_evidence
+    require_vehicle_evidence(db, pack.payload, purpose='provider', pack_id=pack.id)
     try:
         # D18 方案B（Root 2026-10-03 批准）：Provider 请求体按 proposal-a.json:214 最小化
         # 组装，不再全量直发 pack.payload——device_context/manifest/member_reasons 等
         # 本机与审计细节结构性禁发；幂等不受影响（request_hash 只对 DTO 摘要，
-        # request_contract.body_hash 是只写审计字段，无任何相等性消费方）。
+        # 非车型分支维持原审计用途；R91 车型派发前另核 request_contract.body_hash）。
         body, reserve = request_body(config, payload.question,
                                      _device_request_evidence({**pack.payload, 'data_state': pack.data_state}),
                                      stream=stream)
@@ -350,6 +380,8 @@ def prepare_analysis(db, payload, session_id, *, stream=False):
                 event = latest(db, evidence['event_id'], evidence['revision'])
                 if event.state == 'revoked':
                     raise HTTPException(409, '测试事件已撤销，请重新核对')
+        from .ai_evidence import require_vehicle_evidence
+        require_vehicle_evidence(db, pack.payload, purpose='provider', pack_id=pack.id)
         body, reserve = request_body(config, payload.question, {**pack.payload, 'data_state': pack.data_state}, stream=stream)
     except GatewayError as error:
         raise HTTPException(503, str(error)) from None
@@ -397,6 +429,8 @@ def register_ai_routes(app: FastAPI):
         existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)),
                                                     AIRequest.idempotency_key == key))
         if existing:
+            from .candidate_ai import reject_candidate_request
+            reject_candidate_request(db, existing)
             if existing.request_hash != request_hash or existing.request_contract.get('purpose') == 'rule_draft':
                 raise HTTPException(409, '同一幂等键不能用于不同问题或证据包')
             value = run_state(db, existing)
@@ -413,17 +447,21 @@ def register_ai_routes(app: FastAPI):
     @app.get('/v1/ai/analyses/{request_id}')
     def get_analysis(request_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
         row = db.get(AIRequest, request_id)
+        from .candidate_ai import reject_candidate_request
+        reject_candidate_request(db, row)
         if row is None or row.actor_session_id not in session_scope(db, request.state.session_id) or row.request_contract.get('purpose') == 'rule_draft':
             raise HTTPException(404, '未找到本账户的 AI 调用记录')
         return {**run_state(db, row), 'pack': pack_view(owned_pack(db, row.pack_id, session_scope(db, request.state.session_id)))}
 
     @app.get('/v1/ai/analyses')
     def history(request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
+        from .candidate_ai_models import CandidateAIPreparation
         rows = db.execute(select(AIRequest, AICompletion)
             .outerjoin(AICompletion, AICompletion.request_id == AIRequest.id)
             .options(load_only(AICompletion.request_id, AICompletion.state, AICompletion.error_code,
                                AICompletion.usage, AICompletion.created_at))
             .where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)))
+            .where(~select(CandidateAIPreparation.id).where(CandidateAIPreparation.pack_id == AIRequest.pack_id).exists())
             .where(or_(AIRequest.request_contract['purpose'].as_string().is_(None),
                        AIRequest.request_contract['purpose'].as_string() != 'rule_draft'))
             .order_by(desc(AIRequest.created_at), desc(AIRequest.id)).limit(20)).all()

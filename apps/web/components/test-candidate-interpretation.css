@@ -1,0 +1,64 @@
+.test-candidate-panel { min-width: 0; margin-top: 10px; padding: 22px; border: 1px solid var(--border); border-top: 3px solid var(--accent); background: var(--surface); }
+.test-candidate-panel * { min-width: 0; box-sizing: border-box; }
+.test-candidate-heading { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+.test-candidate-heading h3 { margin: 8px 0 0; font-size: 19px; letter-spacing: -.025em; line-height: 1.5; }
+.test-candidate-panel p, .test-candidate-panel blockquote { font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.test-candidate-panel p { color: var(--muted); }
+.test-candidate-panel h4 { margin: 0 0 12px; font-size: 16px; line-height: 1.6; }
+.test-candidate-panel h5 { margin: 0 0 8px; font-size: 13px; line-height: 1.7; }
+.test-candidate-panel select { width: 100%; max-width: 100%; min-height: 44px; padding: 9px 28px 9px 10px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; }
+.test-candidate-panel button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+.test-candidate-panel summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.test-candidate-panel pre { max-width: 100%; max-height: 420px; padding: 12px; overflow: auto; border: 1px solid var(--border); background: var(--bg); font-size: 11px; line-height: 1.7; }
+.test-candidate-step { margin: 22px 0; padding: 16px; border: 1px solid var(--border); }
+.test-candidate-step legend { padding: 0 8px; color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.test-candidate-field { display: grid; gap: 8px; color: var(--muted); font-size: 12px; }
+.test-candidate-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; }
+.test-candidate-actions > span { color: var(--muted); font-size: 11px; line-height: 1.8; }
+.test-candidate-event { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.test-candidate-event > strong { font-size: 13px; overflow-wrap: anywhere; }
+.test-candidate-choices { display: grid; gap: 12px; margin: 16px 0; }
+.test-candidate-choice { padding: 16px; border: 1px solid var(--border); background: var(--surface-soft, var(--surface)); }
+.test-candidate-checkbox { display: flex; align-items: flex-start; gap: 10px; min-height: 30px; font-size: 13px; line-height: 1.8; }
+.test-candidate-checkbox input { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 3px; accent-color: var(--accent); }
+.test-candidate-checkbox strong { overflow-wrap: anywhere; }
+.test-candidate-empty { padding: 12px; border-left: 2px solid var(--border); }
+.test-candidate-mapping { display: grid; grid-template-columns: minmax(0, 1fr) minmax(125px, .85fr); align-items: center; gap: 14px; padding: 16px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.test-candidate-mapping small { display: block; margin-top: 5px; color: var(--muted); line-height: 1.8; overflow-wrap: anywhere; }
+.test-candidate-weights { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+.test-candidate-weights span { padding: 3px 6px; border: 1px solid var(--border); }
+.test-candidate-submit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.test-candidate-submit > p { flex-basis: 100%; margin-top: 0; }
+.test-candidate-result { margin-top: 24px; }
+.test-candidate-result > section { padding: 22px 0; border-top: 1px solid var(--border); }
+.test-candidate-hash { overflow-wrap: anywhere; font-size: 10px !important; line-height: 1.9; }
+.test-candidate-evidence { border-top: 1px solid var(--border); }
+.test-candidate-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin: 18px 0; }
+.test-candidate-meta dt { color: var(--muted); font-size: 11px; line-height: 1.7; }
+.test-candidate-meta dd { margin: 5px 0 0; font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.test-candidate-checks { display: grid; gap: 10px; margin: 14px 0; }
+.test-candidate-checks > div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; padding: 12px; border: 1px solid var(--border); font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+.test-candidate-checks strong { grid-column: 1 / -1; }
+.test-candidate-material, .test-candidate-relation, .test-candidate-assertion, .test-candidate-metric-result { padding: 16px 0; border-top: 1px solid var(--border); }
+.test-candidate-material { margin: 14px 0; padding: 16px; border: 1px solid var(--border); border-left: 2px solid var(--accent); }
+.test-candidate-panel blockquote { margin: 8px 0; padding: 8px 12px; border-left: 2px solid var(--border); color: var(--ink); }
+.test-candidate-coverage { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.test-candidate-coverage > div { padding: 15px; border: 1px solid var(--border); }
+.test-candidate-coverage span { display: block; color: var(--muted); font-size: 11px; line-height: 1.8; }
+.test-candidate-coverage strong { display: block; margin-top: 7px; font-size: 24px; font-weight: 500; }
+.test-candidate-source-metric { padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--border); }
+.test-candidate-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); }
+.test-candidate-table-wrap table { width: 100%; min-width: 570px; border-collapse: collapse; text-align: left; font-size: 12px; line-height: 1.8; }
+.test-candidate-table-wrap th, .test-candidate-table-wrap td { max-width: 240px; padding: 12px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+.test-candidate-table-wrap th { font-weight: 500; }
+.test-candidate-table-wrap thead th { color: var(--muted); font-size: 11px; }
+.test-candidate-excluded { border-left: 2px solid var(--warning, #996b28); padding-left: 14px !important; }
+.test-candidate-excluded article { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .test-candidate-panel { padding: 14px; }
+  .test-candidate-step { padding: 12px; }
+  .test-candidate-mapping, .test-candidate-meta, .test-candidate-coverage { grid-template-columns: minmax(0, 1fr); }
+  .test-candidate-choice, .test-candidate-material { padding: 12px; }
+  .test-candidate-submit > .primary-button { width: 100%; justify-content: center; }
+  .test-candidate-checks > div { grid-template-columns: minmax(0, 1fr); }
+}

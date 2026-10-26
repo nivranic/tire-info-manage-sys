@@ -1,0 +1,31 @@
+.webhook-panel { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); min-width: 0; }
+.webhook-heading, .webhook-actions, .webhook-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.webhook-heading h3 { margin: 8px 0 12px; font-size: 19px; line-height: 1.5; }
+.webhook-panel h4 { margin: 0 0 14px; font-size: 15px; line-height: 1.8; }
+.webhook-panel h5 { margin: 18px 0 10px; font-size: 13px; }
+.webhook-panel p, .webhook-panel li { color: var(--muted); font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.webhook-panel code, .webhook-mono { font-family: var(--font-mono, monospace); font-size: 11px; overflow-wrap: anywhere; word-break: break-word; }
+.webhook-panel pre { white-space: pre-wrap; margin: 12px 0; max-width: 100%; }
+.webhook-panel summary { cursor: pointer; font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.webhook-catalog, .webhook-recovery-warning { margin: 18px 0; padding: 16px; border: 1px dashed var(--border); font-size: 12px; }
+.webhook-detail, .webhook-editor, .webhook-receipt { padding: 20px; margin: 20px 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); background: var(--surface); min-width: 0; }
+.webhook-row, .webhook-enable, .webhook-deliveries, .webhook-delivery, .webhook-recovery { padding: 16px 0; margin-top: 14px; border-top: 1px solid var(--border); min-width: 0; }
+.webhook-row > div { flex: 1 1 250px; min-width: 0; }
+.webhook-row strong { font-size: 13px; margin-right: 10px; overflow-wrap: anywhere; }
+.webhook-row .tag { white-space: normal; }
+.webhook-actions { justify-content: flex-start; margin: 12px 0; font-size: 12px; color: var(--muted); }
+.webhook-field { display: grid; gap: 8px; margin: 16px 0; min-width: 0; font-size: 12px; color: var(--muted); }
+.webhook-panel input:not([type=checkbox]), .webhook-panel select { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--ink); font: inherit; box-sizing: border-box; }
+.webhook-panel fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.webhook-panel .webhook-channels { border-block: 1px solid var(--border); margin: 20px 0; padding: 12px 0; }
+.webhook-channels legend { font-size: 12px; color: var(--ink); line-height: 1.9; padding: 0 0 10px; }
+.webhook-check { display: flex; align-items: start; gap: 10px; margin: 15px 0; font-size: 12px; line-height: 1.9; color: var(--ink); min-width: 0; }
+.webhook-check input { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 3px; accent-color: var(--accent); }
+.webhook-check span { min-width: 0; overflow-wrap: anywhere; }
+.webhook-check small { display: block; color: var(--muted); margin-top: 3px; font-size: 12px; }
+.webhook-panel button { max-width: 100%; white-space: normal; }
+@media (max-width: 460px) {
+  .webhook-detail, .webhook-editor, .webhook-receipt { padding: 15px; }
+  .webhook-panel button { min-height: 44px; }
+  .webhook-catalog, .webhook-recovery-warning { padding: 12px; }
+}

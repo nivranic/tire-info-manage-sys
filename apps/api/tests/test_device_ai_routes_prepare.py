@@ -11,10 +11,13 @@ from datetime import datetime, timedelta
 import hashlib
 import json
 from pathlib import Path
+import shutil
+import subprocess
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import pytest
+from device_ai_fixture_corpus import read_producer_sample
 from sqlalchemy import func, select
 
 from tire_api.ai_models import AIEvidencePack
@@ -28,7 +31,6 @@ from tire_api.offline_models import OfflinePack, OfflinePackPlan
 from test_core import FixtureRegistry
 
 ROOT = Path(__file__).resolve().parents[3]
-SAMPLES = ROOT / '.artifacts/query-fallback49/producer-v2-samples-a'
 QUESTION = 'P225 这条轮胎的历史参数如何解读？'
 FORBIDDEN_KEYS = {'field_policy', 'field_resolutions', 'field_resolution_format',
                   'field_resolution_materials', 'query_id', 'consent_id', 'recall_policy',
@@ -104,8 +106,8 @@ class RouteEnv:
         self.client, self.app, self.session_id = client, app, session_id
 
     def seed(self, *, mutate=None, name='nonempty'):
-        original = (SAMPLES / f'{name}-pack.json').read_bytes()
-        descriptor = json.loads((SAMPLES / f'{name}-descriptor.json').read_bytes())
+        original = read_producer_sample(f'{name}-pack.json')
+        descriptor = json.loads(read_producer_sample(f'{name}-descriptor.json'))
         envelope = json.loads(original)
         envelope['owner_scope_id'] = digest({'namespace': 'offline-owner-scope@1', 'session': self.session_id})
         if mutate is not None:
@@ -336,7 +338,7 @@ def test_restricted_member_selection_is_rejected_closed(env):
 
 
 def test_projection_over_44k_is_rejected_without_truncation(env):
-    probe = json.loads((SAMPLES / 'nonempty-pack.json').read_bytes())
+    probe = json.loads(read_producer_sample('nonempty-pack.json'))
     copies = copies_reaching(probe, tire_selector(probe), 44_001)
     seeded = env.seed(mutate=lambda envelope: inflate_fields(envelope, copies))
     response = env.post(env.body(seeded))
@@ -431,6 +433,84 @@ def test_lookup_literal_route_precedes_parameter_route_and_recovers(env):
     assert env.client.get(f"/v1/ai/device-evidence-packs/{uuid4()}", params={'mode': 'history'}).status_code == 404
 
 
+def test_preparation_response_views_are_consumable_through_public_sdk(env):
+    """Actual route output must remain consumable by the public SDK, including GET.
+
+    The local routes create/read one synthetic preparation. Node receives those
+    exact response bodies over stdin and injects them into the public transport;
+    it never starts a server, reads credentials or contacts a Provider.
+    """
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('Public SDK response parity requires the monorepo Node runtime')
+    payload = env.body(env.seed(), approved_closure=None)
+    key = str(uuid4())
+    fresh = env.post(payload, key)
+    assert fresh.status_code == 201, fresh.text
+    created = fresh.json()
+    replay = env.post(payload, key)
+    assert replay.status_code == 200, replay.text
+    lookup = env.client.get('/v1/ai/device-evidence-packs/lookup', params={
+        'mode': 'history', 'idempotency_key': key})
+    detail = env.client.get(f"/v1/ai/device-evidence-packs/{created['id']}", params={'mode': 'history'})
+    assert lookup.status_code == detail.status_code == 200
+    assert created['replayed'] is False and replay.json()['replayed'] is True
+    assert 'replayed' not in lookup.json() and 'replayed' not in detail.json()
+    assert 'provider_preview' not in lookup.json() and 'provider_preview' not in detail.json()
+    script = """
+import assert from 'node:assert/strict';
+import { DeviceAiHostClient, setApiTransport } from '@tire/api-client';
+let input = '';
+for await (const chunk of process.stdin) input += chunk;
+const wire = JSON.parse(input);
+const calls = [];
+let posts = 0;
+const restore = setApiTransport(async (path, init) => {
+  calls.push({path, method: init.method ?? 'GET'});
+  let value, status = 200;
+  if (init.method === 'POST') {
+    assert.equal(path, '/v1/ai/device-evidence-packs');
+    assert.deepEqual(JSON.parse(init.body), wire.payload);
+    value = posts++ === 0 ? wire.fresh : wire.replay;
+    status = posts === 1 ? 201 : 200;
+  } else if (path.startsWith('/v1/ai/device-evidence-packs/lookup?')) {
+    value = wire.lookup;
+  } else {
+    assert.equal(path, `/v1/ai/device-evidence-packs/${wire.fresh.id}?mode=history`);
+    value = wire.detail;
+  }
+  return new Response(JSON.stringify(value), {status, headers: {'content-type': 'application/json'}});
+});
+try {
+  const client = new DeviceAiHostClient();
+  const fresh = await client.prepare(wire.payload, wire.key);
+  const replay = await client.prepare(wire.payload, wire.key);
+  const lookup = await client.lookupPrepare(wire.key);
+  const detail = await client.readPrepare(wire.fresh.id);
+  assert.equal(fresh.replayed, false);
+  assert.equal(replay.replayed, true);
+  assert.deepEqual(lookup, wire.lookup);
+  assert.deepEqual(detail, wire.detail);
+  assert.equal(Object.hasOwn(lookup, 'replayed'), false);
+  assert.equal(Object.hasOwn(detail, 'replayed'), false);
+  assert.equal(calls.length, 4);
+  assert.deepEqual(calls.map(call => call.method), ['POST', 'POST', 'GET', 'GET']);
+  console.log(JSON.stringify({route_shapes_consumed: 4, replayed_synthesized: false}));
+} finally { restore(); }
+"""
+    result = subprocess.run([
+        node, '--experimental-transform-types',
+        '--import', './packages/api-client/tests/device-ai/no-artifacts-hook.mjs',
+        '--import', './packages/api-client/tests/device-ai/json-esm-hook.mjs',
+        '--input-type=module', '-e', script,
+    ], cwd=ROOT, input=json.dumps({
+        'key': key, 'payload': payload, 'fresh': created, 'replay': replay.json(),
+        'lookup': lookup.json(), 'detail': detail.json(),
+    }), capture_output=True, text=True, encoding='utf-8', timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout) == {'route_shapes_consumed': 4, 'replayed_synthesized': False}
+
+
 def test_detail_is_owned_and_foreign_session_gets_404(env):
     value = created_and_viewed(env, env.seed())
     env.client.cookies.clear()
@@ -472,7 +552,7 @@ def test_outbound_budget_vector_minimal_assembly_far_below_48k_gate_without_trun
     方案B后 device_context/manifest/成员理由结构性不外发，计量只覆盖白名单组装
     （回执+身份+引用标签+question占位），预检与 submit 共用同一组装函数（D12 反漂移）。
     """
-    probe = json.loads((SAMPLES / 'nonempty-pack.json').read_bytes())
+    probe = json.loads(read_producer_sample('nonempty-pack.json'))
     selector = tire_selector(probe)
     copies = copies_reaching(probe, selector, 40_000)
     seeded = env.seed(mutate=lambda envelope: inflate_fields(envelope, copies))

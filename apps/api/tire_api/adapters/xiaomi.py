@@ -27,10 +27,14 @@ SOURCE_ID = "xiaomi-cn-vehicles"
 SOURCE_PAGE = "https://www.xiaomiev.com/xiaomi/car-config"
 HOST = "website-api.xiaomiev.com"
 API_URL = f"https://{HOST}/mtop/guidemarketing/product/pc/paramComparison"
-PARSER_VERSION = "xiaomi-param-comparison@1.0.1"
+PARSER_VERSION = "xiaomi-param-comparison@1.1.0"
 supports_parser_deployments = True
 CURRENT_ID = "xiaomi-su7-current"
 FIRST_GENERATION_ID = "xiaomi-su7-first-generation"
+FIRST_GENERATION_SOURCE_PAGE = (
+    "https://s1.xiaomiev.com/activity-outer-assets/0328/env/"
+    "SU7%E5%8F%82%E6%95%B0%E9%85%8D%E7%BD%AE%E8%A1%A8.pdf"
+)
 CURRENT_SOURCE_ID = 500023067
 _last_fetch = -float("inf")
 _busy = False
@@ -48,8 +52,8 @@ def candidates() -> list[dict]:
          "description": "官方当前参数配置表；明确区分版本、轮毂选项和前后轴。年款未由该表独立声明。"},
         {"id": FIRST_GENERATION_ID, "manufacturer": "小米汽车", "model": "SU7", "generation": "首代",
          "model_year": None, "region": "CN", "status": "requires_source_verification", "source_id": SOURCE_ID,
-         "source_page": SOURCE_PAGE,
-         "description": "首代官方配置来源尚待恢复核验，不借用新一代配置或美国轮胎 SKU。"},
+         "source_page": FIRST_GENERATION_SOURCE_PAGE,
+         "description": "首代历史官方参数 PDF 已定位；自动采集与 PDF 证据链待接入，不代表当前在售或首代全生命周期配置。"},
     ]
 
 

@@ -91,6 +91,7 @@ export interface NativeDownload {
   blob: Blob;
   filename: string;
   signal?: AbortSignal;
+  assertCurrent?: () => void;
 }
 
 export type NativeSave = (download: NativeDownload) => Promise<{ saved: boolean }>;
@@ -126,6 +127,9 @@ const messages: Record<string, string> = {
   DOWNLOAD_DIALOG_BUSY: "正在选择另一个文件的保存位置，请先完成当前保存。",
   DOWNLOAD_DIALOG_FAILED: "未能打开系统文件选择器，请重试。",
   DOWNLOAD_TOO_LARGE: "文件超出本机保存大小限制。",
+  DOWNLOAD_CONTEXT_CHANGED: "保存上下文已改变，请重新读取原件。",
+  DOWNLOAD_AUTHORITY_UNAVAILABLE: "本机保存授权不可用，请重新打开应用。",
+  DOWNLOAD_CANCELLED: "本次文件保存已取消；已获准的系统写入可能已经开始。",
   REQUEST_CANCELLED: "请求已取消；服务器写入结果须重新读取确认。",
   API_TIMEOUT: "本机 API 响应超时。写入结果可能已保存，请先重新读取记录。",
   API_UNAVAILABLE: "无法连接本机 API，请确认服务已启动后重试。",
@@ -222,14 +226,38 @@ export function createNativeTransport(invoke: NativeInvoke): ApiTransport {
       try {
         throwIfAborted(signal);
         if (!path.startsWith("/") || path.startsWith("//")) throw new NativeError("invalid_request");
+        const method = (init.method || "GET").toUpperCase();
+        const route = path.split("?", 1)[0];
+        const inventoryRead = method === "GET" && (route === "/v1/api-keys/active" || route === "/v1/api-key-history");
+        // Keep the raw route/query spelling: URL normalization must not grant header scope.
+        const reviewId = route.startsWith("/v1/quarantines/") && route.endsWith("/reviews")
+          ? route.slice("/v1/quarantines/".length, -"/reviews".length) : "";
+        const quarantineReviewWrite = method === "POST" && reviewId.length >= 1 && reviewId.length <= 64
+          && !/[^A-Za-z0-9_-]/.test(reviewId)
+          && path.slice(route.length) === "?mode=history&format=raw-evidence-v2";
+        const validateAccountHint = (value: string) => {
+          if (!(inventoryRead || quarantineReviewWrite) || typeof value !== "string" || value.length < 1 || value.length > 64 || /[^A-Za-z0-9_-]/.test(value)) throw new NativeError("invalid_request");
+        };
+        // Headers trims whitespace, so validate raw object/tuple hints first.
+        const rawHeaders = init.headers instanceof Headers ? [...init.headers.entries()]
+          : Array.isArray(init.headers) ? init.headers : Object.entries(init.headers ?? {});
+        let accountHintSeen = false;
+        for (const [name, value] of rawHeaders) {
+          if (name.toLowerCase() !== "x-tire-expected-account") continue;
+          if (accountHintSeen) throw new NativeError("invalid_request");
+          accountHintSeen = true;
+          validateAccountHint(value);
+        }
         const headers: Record<string, string> = {};
         new Headers(init.headers).forEach((value, key) => {
-          if (!allowedHeaders.has(key)) throw new NativeError("invalid_request");
+          if (key === "x-tire-expected-account") validateAccountHint(value);
+          else if (!allowedHeaders.has(key)) throw new NativeError("invalid_request");
           headers[key] = value;
         });
+        if (Object.keys(headers).length > 3) throw new NativeError("invalid_request");
         const bytes = init.body === undefined || init.body === null ? undefined : await bodyBytes(init.body);
         throwIfAborted(signal);
-        const request = { id, path, method: (init.method || "GET").toUpperCase(), headers, ...(bytes ? { body_base64: bytesToBase64(bytes) } : {}) };
+        const request = { id, path, method, headers, ...(bytes ? { body_base64: bytesToBase64(bytes) } : {}) };
         throwIfAborted(signal);
         dispatched = true;
         const result = await invoke<NativeResponse>("api_request", { request });
@@ -253,18 +281,38 @@ export function createNativeTransport(invoke: NativeInvoke): ApiTransport {
 }
 
 export function createNativeSave(invoke: NativeInvoke): NativeSave {
-  return async ({ blob, filename, signal }) => {
-    throwIfAborted(signal);
-    const body = new Uint8Array(await blob.arrayBuffer());
-    throwIfAborted(signal);
+  return async ({ blob, filename, signal, assertCurrent }) => {
+    const check = () => { throwIfAborted(signal); assertCurrent?.(); };
+    let lease: string | undefined;
+    const release = () => {
+      try { if (lease) void invoke("release_download", { lease }).catch(() => { /* Cleanup cannot replace the operation result. */ }); }
+      catch { /* An unavailable bridge cannot replace cancellation/write results. */ }
+    };
+    // The listener remains installed throughout a pending native system picker.
+    signal?.addEventListener("abort", release, { once: true });
     try {
-      const result = await invoke<{ saved: boolean }>("save_download", { filename, mime: blob.type, body_base64: bytesToBase64(body) });
-      throwIfAborted(signal);
+      check();
+      const prepared = await invoke<{ lease: string }>("prepare_download");
+      if (!prepared || typeof prepared.lease !== "string" || !/^[A-Za-z0-9_-]{32,128}$/.test(prepared.lease)) throw new NativeError("DOWNLOAD_AUTHORITY_UNAVAILABLE");
+      lease = prepared.lease;
+      // Also releases a prepare response that arrived after the abort listener ran.
+      if (signal?.aborted) release();
+      check();
+      const body = new Uint8Array(await blob.arrayBuffer());
+      check();
+      const encoded = bytesToBase64(body);
+      const mime = blob.type;
+      check();
+      const result = await invoke<{ saved: boolean }>("save_download", { lease, filename, mime, body_base64: encoded });
+      check();
       if (!result || typeof result.saved !== "boolean") throw new NativeError("save_failed");
       return { saved: result.saved };
     } catch (cause) {
-      if (signal?.aborted) throw aborted();
+      check();
       throw cause instanceof NativeError ? cause : new NativeError("save_failed");
+    } finally {
+      signal?.removeEventListener("abort", release);
+      release();
     }
   };
 }

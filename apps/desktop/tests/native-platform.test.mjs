@@ -166,22 +166,23 @@ test("empty 204 response is compatible with SDK JSON methods", async () => {
 
 test("save passes original binary to a native dialog; cancellation never reports success or opens HTML", async () => {
   const calls = [];
-  const platform = createNativePlatform(async (command, args) => { calls.push({ command, args }); return { saved: false }; });
+  const lease = "a".repeat(64);
+  const platform = createNativePlatform(async (command, args) => { calls.push({ command, args }); return command === "prepare_download" ? { lease } : { saved: false }; });
   const blob = new Blob(["<html>fixture</html>"], { type: "text/html" });
   assert.deepEqual(await platform.saveDownload({ blob, filename: "report.html" }), { saved: false });
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].command, "save_download");
-  assert.deepEqual(calls[0].args, { filename: "report.html", mime: "text/html", body_base64: Buffer.from(await blob.arrayBuffer()).toString("base64") });
+  assert.deepEqual(calls.map(call => call.command), ["prepare_download", "save_download", "release_download"]);
+  assert.deepEqual(calls[1].args, { lease, filename: "report.html", mime: "text/html", body_base64: Buffer.from(await blob.arrayBuffer()).toString("base64") });
 });
 
 test("cancelled save preparation never opens the dialog; native write errors stay sanitized", async () => {
   const controller = new AbortController();
   const blob = new Blob(["fixture"]);
   blob.arrayBuffer = async () => { controller.abort(); return new Uint8Array([1]).buffer; };
-  let calls = 0;
-  const platform = createNativePlatform(async () => { calls += 1; throw "private-location"; });
+  const calls = [];
+  const platform = createNativePlatform(async command => { calls.push(command); if (command === "prepare_download") return { lease: "a".repeat(64) }; if (command === "release_download") return; throw "private-location"; });
   await assert.rejects(platform.saveDownload({ blob, filename: "fixture.pdf", signal: controller.signal }), { name: "AbortError" });
-  assert.equal(calls, 0);
+  assert.equal(calls.includes("save_download"), false);
+  assert.equal(calls.includes("release_download"), true);
   await assert.rejects(platform.saveDownload({ blob: new Blob(["fixture"]), filename: "fixture.pdf" }), error => error instanceof DesktopError && error.code === "save_failed" && !error.message.includes("private-location"));
 });
 

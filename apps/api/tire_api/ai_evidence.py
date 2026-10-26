@@ -1,6 +1,7 @@
 """Exact structured evidence selection before any model call or document retrieval."""
 from copy import deepcopy
 from datetime import datetime, timedelta
+import json
 from typing import Literal
 
 from fastapi import HTTPException
@@ -69,6 +70,227 @@ class PreparePack(StrictModel):
         if len(set(self.variant_ids)) != len(self.variant_ids) or any(not v or len(v) > 64 for v in self.variant_ids):
             raise ValueError('精确版本标识无效')
         return self
+
+
+def _vehicle_binding_failed():
+    raise HTTPException(409, {'code': 'vehicle_evidence_binding_failed'})
+
+
+def _vehicle_marker(item):
+    from .vehicle_raw import FIRST_GENERATION_ID, SOURCE_ID
+    if not isinstance(item, dict):
+        return False
+    reference = item.get('reference')
+    source = item.get('source')
+    return (item.get('kind') in {'vehicle', 'oem_fitment'}
+        or isinstance(reference, dict) and reference.get('kind') == 'vehicle'
+        or item.get('source_id') == SOURCE_ID or item.get('vehicle_id') == FIRST_GENERATION_ID
+        or isinstance(source, dict) and source.get('source_id') == SOURCE_ID)
+
+
+def vehicle_payload_marker(payload):
+    """Recognize existing vehicle references, including inconsistent field aliases."""
+    if not isinstance(payload, dict):
+        return False
+    evidence, facts = payload.get('evidence'), payload.get('facts')
+    return (isinstance(evidence, list) and any(_vehicle_marker(item) for item in evidence)
+        or isinstance(facts, list) and any(isinstance(fact, dict) and (str(fact.get('field_code', '')).startswith('oem_fitment.')
+            or fact.get('domain') == 'vehicle') for fact in facts))
+
+
+def vehicle_consumer_capsule(db, snapshot_id, verification_id=None):
+    from .vehicle_raw import VehicleRawIntegrityError, checked_vehicle_consumer_capsule
+    try:
+        return checked_vehicle_consumer_capsule(db, snapshot_id, verification_id=verification_id)
+    except VehicleRawIntegrityError:
+        raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+
+
+def require_vehicle_capsule_use(capsule, purpose):
+    from .vehicle_raw import VehicleUseNotAllowed, require_vehicle_consumer_use
+    try:
+        require_vehicle_consumer_use(capsule, purpose)
+    except VehicleUseNotAllowed as error:
+        raise HTTPException(403, {'code': error.code}) from None
+
+
+def _ordinary_vehicle_binding(item, facts, capsule):
+    payload = capsule['payload']
+    label = payload['vehicle']['model'] + ' · ' + payload['vehicle']['generation']
+    if (set(item) != {'id', 'kind', 'label', 'data_state', 'verified_at', *capsule['provenance']}
+            or item.get('kind') != 'oem_fitment' or item.get('label') != label
+            or 'reference' in item or any(item.get(key) != value for key, value in capsule['provenance'].items())):
+        _vehicle_binding_failed()
+    expected = {'车型': payload['vehicle'], '配置版本': payload['trims'], '轮毂与轴位': payload['fitments']}
+    related = [fact for fact in facts if fact.get('evidence_id') == item['id']]
+    if len(related) != len(expected) or {fact.get('field') for fact in related} != set(expected):
+        _vehicle_binding_failed()
+    for index, (field, value) in enumerate(expected.items(), 1):
+        fact = next(fact for fact in related if fact['field'] == field)
+        if (fact.get('field_code') != 'oem_fitment.field_' + str(index)
+                or stable_json(fact.get('value')) != stable_json(value)
+                or fact.get('text') != label + '：' + field + ' = ' + stable_json(value)):
+            _vehicle_binding_failed()
+
+
+def _device_vehicle_projection(db, payload, preparation, *, frozen=False):
+    from .db import EvidenceObject
+    from .object_store import checked
+    context = payload.get('device_context')
+    if (preparation is None or (not frozen and (not isinstance(context, dict)
+            or context.get('projection_sha256') != preparation.projection_hash
+            or context.get('selection_sha256') != preparation.selection_hash
+            or context.get('device_context_fingerprint') != preparation.device_context_fingerprint))):
+        _vehicle_binding_failed()
+    try:
+        record = db.get(EvidenceObject, preparation.projection_hash, populate_existing=True)
+        if record is None or record.byte_count != preparation.projection_byte_count:
+            _vehicle_binding_failed()
+        raw = checked(db.info['object_store'].get(preparation.projection_hash, preparation.projection_byte_count),
+                      preparation.projection_hash, preparation.projection_byte_count)
+        projection = json.loads(raw)
+        if not isinstance(projection.get('observations'), list):
+            _vehicle_binding_failed()
+        return projection['observations']
+    except HTTPException:
+        raise
+    except Exception:
+        _vehicle_binding_failed()
+
+
+def _device_vehicle_binding(item, facts, capsule, observations):
+    reference = item.get('reference')
+    if (set(item) != {'id', 'member_key', 'observed_at', 'verified_at', 'reference'}
+            or not isinstance(reference, dict) or set(reference) != {'kind', 'snapshot_id', 'verification_id'}
+            or reference != {'kind': 'vehicle', 'snapshot_id': capsule['snapshot_id'],
+                             'verification_id': capsule['verification_id']}):
+        _vehicle_binding_failed()
+    matches = [entry for entry in observations if isinstance(entry, dict)
+        and isinstance(entry.get('selector'), dict) and entry['selector'].get('reference') == reference
+        and entry['selector'].get('member_key') == item.get('member_key')]
+    if len(matches) != 1:
+        _vehicle_binding_failed()
+    source = {key: capsule[key] for key in ('source_id', 'raw_hash', 'parser_version', 'parser_identity',
+                                          'observed_at', 'verified_at', 'verification_id')}
+    source['source_url'] = capsule['provenance']['source_url']
+    selected = matches[0]
+    if (selected.get('source') != source or item.get('observed_at') != source['observed_at']
+            or item.get('verified_at') != source['verified_at']):
+        _vehicle_binding_failed()
+    material = selected.get('material')
+    if (not isinstance(material, dict) or material.get('fact_hash') != capsule['fact_hash']
+            or any(stable_json(material.get(key)) != stable_json(capsule['payload'].get(key))
+                   for key in ('vehicle', 'trims', 'fitments', 'footnotes'))):
+        _vehicle_binding_failed()
+    # Current Device preparation deliberately has no fact expansion. Do not let
+    # new text impersonate a vehicle fact outside that frozen preparation.
+    if any(fact.get('evidence_id') == item['id'] for fact in facts):
+        _vehicle_binding_failed()
+
+
+
+def _vehicle_preparation_refs(contract, *, marked=False):
+    if contract is None:
+        return []
+    if not isinstance(contract, dict):
+        if marked:
+            _vehicle_binding_failed()
+        return []
+    domains = contract.get('domain_references', {})
+    if not isinstance(domains, dict):
+        if marked:
+            _vehicle_binding_failed()
+        return []
+    refs = domains.get('vehicle', [])
+    if (not isinstance(refs, list)
+            or any(not isinstance(ref, dict) or ref.get('kind') != 'vehicle' for ref in refs)):
+        _vehicle_binding_failed()
+    return refs
+
+
+def vehicle_evidence_capsules(db, payload, *, pack_id=None, frozen=False):
+    """Read current binary qualifications without changing a frozen pack/report."""
+    from .db import EvidenceObject
+    from .device_ai_models import DeviceAIPreparation
+    marker = vehicle_payload_marker(payload)
+    device = isinstance(payload, dict) and (payload.get('origin') == 'device_history'
+                                          or isinstance(payload.get('device_context'), dict))
+    if not marker and not device and not pack_id:
+        return []
+    with db.no_autoflush:
+        # Classify durable Device references with a column read: no identity-map
+        # refresh or new dirty-object constraint is imposed on unrelated packs.
+        contract = (db.scalar(select(DeviceAIPreparation.contract).where(
+            DeviceAIPreparation.ai_pack_id == pack_id)) if pack_id else None)
+        expected_refs = _vehicle_preparation_refs(contract, marked=marker)
+        if not marker and not expected_refs:
+            return []
+        pending = db.new | db.dirty | db.deleted
+        if any(isinstance(row, EvidenceObject) for row in pending):
+            raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'})
+        if any(isinstance(row, (AIEvidencePack, DeviceAIPreparation)) for row in pending):
+            _vehicle_binding_failed()
+        preparation = (db.scalar(select(DeviceAIPreparation).where(DeviceAIPreparation.ai_pack_id == pack_id)
+            .execution_options(populate_existing=True)) if pack_id and (device or marker or expected_refs) else None)
+        device = device or preparation is not None
+        if preparation is not None:
+            expected_refs = _vehicle_preparation_refs(preparation.contract, marked=True)
+        evidence, facts = payload.get('evidence'), payload.get('facts')
+        if (not isinstance(evidence, list) or not isinstance(facts, list)
+                or any(not isinstance(item, dict) or not item.get('id') for item in evidence)
+                or len({item['id'] for item in evidence}) != len(evidence)
+                or any(not isinstance(fact, dict) for fact in facts)):
+            _vehicle_binding_failed()
+        selected = {item['id']: item for item in evidence if _vehicle_marker(item)}
+        for fact in facts:
+            if str(fact.get('field_code', '')).startswith('oem_fitment.') or fact.get('domain') == 'vehicle':
+                item = next((item for item in evidence if item['id'] == fact.get('evidence_id')), None)
+                if item is None:
+                    _vehicle_binding_failed()
+                selected[item['id']] = item
+        if expected_refs and ({stable_json(item.get('reference')) for item in selected.values()}
+                              != {stable_json(ref) for ref in expected_refs}):
+            _vehicle_binding_failed()
+        capsules, observations = [], None
+        for item in selected.values():
+            reference = item.get('reference')
+            snapshot_id = reference.get('snapshot_id') if isinstance(reference, dict) else item.get('snapshot_id')
+            verification_id = reference.get('verification_id') if isinstance(reference, dict) else None
+            if not isinstance(snapshot_id, str) or not snapshot_id or isinstance(reference, dict) and not verification_id:
+                _vehicle_binding_failed()
+            capsule = vehicle_consumer_capsule(db, snapshot_id, verification_id)
+            binary = capsule is not None
+            if not binary:
+                # None means this stored row is text, not that an arbitrary
+                # frozen binary reference may be relabelled as a text row.
+                from .vehicles import VehicleSnapshot, vehicle_provenance
+                snapshot = db.get(VehicleSnapshot, snapshot_id)
+                if snapshot is None:
+                    _vehicle_binding_failed()
+                capsule = {'snapshot_id': snapshot.id, 'payload': snapshot.payload,
+                    'fact_hash': snapshot.fact_hash, 'provenance': vehicle_provenance(snapshot),
+                    'source_id': snapshot.source_id, 'raw_hash': snapshot.raw_hash,
+                    'parser_version': snapshot.parser_version, 'parser_identity': snapshot.parser_identity,
+                    'observed_at': timestamp(snapshot.observed_at),
+                    'verified_at': item.get('verified_at'), 'verification_id': verification_id}
+            if device:
+                if preparation is None:
+                    _vehicle_binding_failed()
+                if observations is None:
+                    observations = _device_vehicle_projection(db, payload, preparation, frozen=frozen)
+                _device_vehicle_binding(item, facts, capsule, observations)
+            else:
+                _ordinary_vehicle_binding(item, facts, capsule)
+            if binary:
+                capsules.append(capsule)
+        return capsules
+
+
+def require_vehicle_evidence(db, payload, *, purpose, pack_id=None, frozen=False):
+    capsules = vehicle_evidence_capsules(db, payload, pack_id=pack_id, frozen=frozen)
+    for capsule in capsules:
+        require_vehicle_capsule_use(capsule, purpose)
+    return capsules
 
 
 class PackBuilder:
@@ -264,6 +486,10 @@ def pack_view(row: AIEvidencePack) -> dict:
         # marker; warehouse packs are never retroactively labelled and keep
         # their exact legacy DTO shape.
         view['origin'] = 'device_history'
+    from .ai_test_contract import test_boundary
+    boundary = test_boundary(row.payload)
+    if boundary:
+        view['test_boundary'] = boundary
     return view
 
 
@@ -377,7 +603,9 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
                 snapshot = db.get(VehicleSnapshot, ref.snapshot_id)
                 if snapshot is None:
                     raise HTTPException(404, '未找到正式车型证据')
-                data = snapshot.payload
+                capsule = vehicle_consumer_capsule(db, snapshot.id)
+                require_vehicle_capsule_use(capsule, 'local_structured')
+                data = capsule['payload'] if capsule is not None else snapshot.payload
                 builder.add(kind='oem_fitment', label=data['vehicle']['model'] + ' · ' + data['vehicle']['generation'],
                     provenance={**vehicle_provenance(snapshot), 'data_state': state, 'verified_at': None},
                     values={'车型': data['vehicle'], '配置版本': data['trims'], '轮毂与轴位': data['fitments']})

@@ -75,6 +75,13 @@ public final class NativePolicy {
     public static Request request(String id, String path, String method, Map<String,String> headers, String body, MetadataValidator validator) throws NativeFailure {
         requestId(id); path(path);
         if (!"GET".equals(method) && !"POST".equals(method) && !"PUT".equals(method) && !"DELETE".equals(method)) throw new NativeFailure("INVALID_API_METHOD");
+        int queryStart = path.indexOf('?');
+        String route = queryStart < 0 ? path : path.substring(0, queryStart);
+        boolean inventoryRead = "GET".equals(method) && (route.equals("/v1/api-keys/active") || route.equals("/v1/api-key-history"));
+        // Use the original route/query spelling, never a decoded or normalized alias.
+        boolean quarantineReviewWrite = "POST".equals(method) && queryStart >= 0
+                && route.matches("/v1/quarantines/[A-Za-z0-9_-]{1,64}/reviews")
+                && path.substring(queryStart + 1).equals("mode=history&format=raw-evidence-v2");
         Map<String,String> clean = new LinkedHashMap<>();
         if (headers.size() > 3) throw new NativeFailure("INVALID_API_HEADER");
         for (Map.Entry<String,String> entry : headers.entrySet()) {
@@ -83,6 +90,8 @@ public final class NativePolicy {
             switch (name) {
                 case "content-type": if (!value.equals("application/json") && !value.equals("application/pdf")) throw new NativeFailure("INVALID_API_HEADER"); break;
                 case "idempotency-key": try { requestId(value); } catch (NativeFailure ignored) { throw new NativeFailure("INVALID_API_HEADER"); } break;
+                case "x-tire-expected-account":
+                    if (!(inventoryRead || quarantineReviewWrite) || !value.matches("[A-Za-z0-9_-]{1,64}")) throw new NativeFailure("INVALID_API_HEADER"); break;
                 case "x-evidence-metadata":
                     try { if (!validator.valid(decode(value, 12 * 1024, "INVALID_API_HEADER"))) throw new NativeFailure("INVALID_API_HEADER"); }
                     catch (NativeFailure ignored) { throw new NativeFailure("INVALID_API_HEADER"); } break;

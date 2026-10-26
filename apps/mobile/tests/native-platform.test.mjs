@@ -13,6 +13,8 @@ test("Capacitor adapter maps exact command names and keeps binary payloads snake
   const calls = [];
   const plugin = {
     apiRequest: async args => { calls.push(["apiRequest", args]); return response(Uint8Array.from([0, 128, 255]), "application/pdf"); },
+    prepareDownload: async args => { calls.push(["prepareDownload", args]); return { lease: "a".repeat(64) }; },
+    releaseDownload: async args => { calls.push(["releaseDownload", args]); },
     saveDownload: async args => { calls.push(["saveDownload", args]); return { saved: false }; },
     openExternal: async args => { calls.push(["openExternal", args]); },
   };
@@ -26,10 +28,13 @@ test("Capacitor adapter maps exact command names and keeps binary payloads snake
   const platform = createMobilePlatform(invoke);
   assert.equal(platform.kind, "mobile");
   assert.deepEqual(await platform.saveDownload({ blob: file, filename: "原文.pdf" }), { saved: false });
-  assert.equal(calls[1][0], "saveDownload");
-  assert.equal(calls[1][1].mime, "application/pdf");
+  assert.deepEqual(calls[1], ["prepareDownload", {}]);
+  assert.equal(calls[2][0], "saveDownload");
+  assert.equal(calls[2][1].mime, "application/pdf");
+  assert.equal(calls[2][1].lease, "a".repeat(64));
+  assert.deepEqual(calls[3], ["releaseDownload", { lease: "a".repeat(64) }]);
   await shared.openNativeExternal(invoke, "https://example.test/evidence");
-  assert.deepEqual(calls[2], ["openExternal", { url: "https://example.test/evidence" }]);
+  assert.deepEqual(calls[4], ["openExternal", { url: "https://example.test/evidence" }]);
 });
 
 test("Capacitor Error codes retain safe native errors without leaking native messages", async () => {
@@ -38,6 +43,23 @@ test("Capacitor Error codes retain safe native errors without leaking native mes
   await assert.rejects(transport("/health", {}), error => error instanceof shared.NativeError && error.code === "SESSION_STORE_WRITE_FAILED" && !error.message.includes("private-file"));
   assert.equal(mobileError(new Error("RELEASE_API_NOT_CONFIGURED")).code, "RELEASE_API_NOT_CONFIGURED");
   assert.equal(mobileError({ message: "session-cookie=secret", code: "UNKNOWN_SECRET" }).code, "request_failed");
+  for (const code of ["DOWNLOAD_CONTEXT_CHANGED", "DOWNLOAD_AUTHORITY_UNAVAILABLE", "DOWNLOAD_CANCELLED"]) {
+    assert.equal(mobileError({ code, message: "private-cookie-lease-path" }).code, code);
+    assert.equal(mobileError({ code }).message.includes("private"), false);
+  }
+});
+
+test("mobile picker abort dispatches exact releaseDownload before the picker replies", async () => {
+  let finish; const picker = new Promise(resolve => { finish = resolve; }); const calls = [], controller = new AbortController();
+  const platform = createMobilePlatform(createMobileInvoke({
+    prepareDownload: async () => ({ lease: "a".repeat(64) }),
+    saveDownload: async args => { calls.push(["save", args]); return picker; },
+    releaseDownload: async args => { calls.push(["release", args]); },
+  }));
+  const pending = platform.saveDownload({ blob: new Blob(["bytes"]), filename: "evidence.pdf", signal: controller.signal });
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(calls.at(-1)[0], "save");
+  controller.abort(); assert.deepEqual(calls.at(-1), ["release", { lease: "a".repeat(64) }]);
+  finish({ saved: true }); await assert.rejects(pending, { name: "AbortError" });
 });
 
 test("mobile abort uses apiCancel with the matching id and ignores late replies", async () => {

@@ -1,7 +1,8 @@
 //! E1 canonical-vector replay for the Rust device-ai exact pipeline.
 //!
 //! Reads the authoritative vectors from
-//! `.artifacts/device-ai50/specs/e1-canonical-vectors-a.json` at runtime and
+//! `packages/domain-types/fixtures/device-ai-v1/specs/e1-canonical-vectors-a.json`
+//! at runtime, verifies its pinned provenance and actual bytes, and
 //! locks 68/68 parity (47 accept + 21 reject) with the sealed Python
 //! reference: accepted vectors must reproduce canonical bytes, both sha256
 //! forms and the encoded DeviceAIValue shape byte-for-byte (the 250000-node
@@ -16,14 +17,14 @@
 #[path = "../src/device_ai_exact.rs"]
 mod device_ai_exact;
 
+#[path = "support/device_ai_corpus.rs"]
+mod fixture_corpus;
+
 use device_ai_exact::{
     canonical_device_ai_json, device_ai_digest, encode_device_ai_value, parse_device_ai_package,
 };
 
-const VECTORS_PATH: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../../.artifacts/device-ai50/specs/e1-canonical-vectors-a.json"
-);
+const VECTORS_PATH: &str = "specs/e1-canonical-vectors-a.json";
 
 fn hex_digit(byte: u8) -> u8 {
     match byte {
@@ -69,8 +70,7 @@ struct AcceptedOutcome {
 
 #[test]
 fn device_ai_e1_parity_replays_all_68_vectors() {
-    let raw = std::fs::read_to_string(VECTORS_PATH)
-        .unwrap_or_else(|e| panic!("read E1 vector file {}: {e}", VECTORS_PATH));
+    let raw = String::from_utf8(fixture_corpus::read(VECTORS_PATH)).expect("E1 vector UTF-8");
     let doc: serde_json::Value =
         serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse E1 vector file: {e}"));
     let vectors = doc["vectors"].as_array().expect("vectors array");

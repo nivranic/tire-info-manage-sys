@@ -101,6 +101,138 @@ def test_scheduled_worker_persists_outcomes_and_never_uses_fallback(monkeypatch,
             assert db.scalar(select(func.count()).select_from(MonitorRun)) == 2
 
 
+def test_page_only_rules_drive_existing_worker_one_job_online_and_durable_receipts(monkeypatch, tmp_path):
+    """Synthetic due/clock controls; no real four-hour wait or real upstream."""
+    from tire_api.db import ChangeEvent, MonitorJob, MonitorRun
+    from tire_api.monitor_task_models import MonitorTaskAttempt, MonitorTaskEvent
+    from tire_api.source_page_models import SourcePageChange, SourcePageNotification
+    from tire_api import monitoring
+    fixture = FixtureSource()
+    fixture.sources = lambda: [{'id': 'fixture', 'status': 'ready', 'supported_models': ['Synthetic Tire']}]
+    fixture.body = 'synthetic-worker-page-A'
+    fixture.calls = []
+    original_fetch = fixture.fetch
+    async def fetch(source_id, query, cached=None, *, on_observation=None):
+        fixture.calls.append((source_id, dict(query)))
+        result = await original_fetch(source_id, query, cached, on_observation=on_observation)
+        result['body'] = fixture.body
+        return result
+    fixture.fetch = fetch
+    app = create_app('sqlite:///' + (tmp_path / 'page-worker.sqlite').as_posix(), fixture)
+    monkeypatch.setattr(monitor, 'registry', fixture)
+    with TestClient(app) as client:
+        for enabled in (True, False):
+            response = client.post('/v1/alert-rules', json={'name': f'Synthetic page rule {enabled}',
+                'source_id': 'fixture', 'query': {'model': 'Synthetic Tire'}, 'enabled': enabled,
+                'kinds': ['page_changed'], 'variant_id': None, 'fields': [], 'conditions': {}})
+            assert response.status_code == 201, response.text
+        database = app.state.database
+        first = asyncio.run(monitor.run_scheduled_cycle(database, max_jobs=1))
+        assert first['jobs'] == 1 and first['results'][0]['state'] == 'live' and first['results'][0]['finalized']
+        assert client.get('/v1/source-page-notifications?mode=history').json()['total'] == 0
+        assert asyncio.run(monitor.run_scheduled_cycle(database, max_jobs=1))['jobs'] == 0
+        assert len(fixture.calls) == 1
+        with database.sessions() as db:
+            assert db.scalar(select(func.count()).select_from(MonitorJob)) == 1
+            job = db.scalar(select(MonitorJob))
+            job.next_due_at = utcnow() - timedelta(days=1)
+            db.commit()
+        actual_now = monitoring.utcnow
+        monkeypatch.setattr(monitoring, 'utcnow', lambda: actual_now() + timedelta(seconds=3))
+        fixture.body = 'synthetic-worker-page-B'
+        second = asyncio.run(monitor.run_scheduled_cycle(database, max_jobs=1))
+        assert second['jobs'] == 1 and second['results'][0]['state'] == 'live' and second['results'][0]['finalized']
+        assert len(fixture.calls) == 2
+        assert client.get('/v1/source-page-notifications?mode=history').json()['total'] == 1
+        with database.sessions() as db:
+            assert db.scalar(select(func.count()).select_from(SourcePageChange)) == 1
+            assert db.scalar(select(func.count()).select_from(SourcePageNotification)) == 1
+            assert db.scalar(select(func.count()).select_from(FactVersion)) == 1
+            assert db.scalar(select(func.count()).select_from(ChangeEvent)) == 1
+            runs = db.scalars(select(QueryRun).where(QueryRun.session_id == 'scheduled-monitor-worker')).all()
+            assert len(runs) == 2 and all(run.fallback_policy == 'never' and run.state == 'live' for run in runs)
+            assert db.scalar(select(func.count()).select_from(MonitorRun)) == 2
+            attempts = db.scalars(select(MonitorTaskAttempt).where(MonitorTaskAttempt.kind == 'tire')).all()
+            assert len(attempts) == 2 and all(type(row.source_access_generation) is int for row in attempts)
+            for attempt in attempts:
+                phases = db.scalars(select(MonitorTaskEvent).where(MonitorTaskEvent.attempt_id == attempt.id)
+                    .order_by(MonitorTaskEvent.sequence)).all()
+                assert [row.phase for row in phases] == ['claimed', 'running', 'finished']
+                assert phases[-1].state == 'succeeded' and phases[-1].query_id in {row.id for row in runs}
+                assert phases[-1].run_id is not None
+            job = db.scalar(select(MonitorJob))
+            assert job.lease_token is None and job.lease_until is None
+
+
+def test_quality_interest_uses_existing_scheduled_worker_without_creating_its_own_job(monkeypatch, tmp_path):
+    """Actual worker entrypoint with synthetic due/clock controls and no network."""
+    from tire_api import monitoring
+    from tire_api.db import MonitorJob, MonitorRun, SourceQuarantine, Verification
+    from tire_api.interest_models import InterestEvent
+    from tire_api.monitor_task_models import MonitorTaskAttempt, MonitorTaskEvent
+    fixture = FixtureSource()
+    fixture.sources = lambda: [{'id': 'fixture', 'status': 'ready', 'supported_models': ['Synthetic Tire']}]
+    fixture.reject = False
+    fixture.calls = []
+    original_fetch = fixture.fetch
+    async def fetch(source_id, query, cached=None, *, on_observation=None):
+        fixture.calls.append((source_id, dict(query)))
+        result = await original_fetch(source_id, query, cached, on_observation=on_observation)
+        if fixture.reject:
+            result['variants'] = []
+            result['body'] = 'synthetic-worker-quality-isolation'
+        return result
+    fixture.fetch = fetch
+    app = create_app('sqlite:///' + (tmp_path / 'quality-interest-worker.sqlite').as_posix(), fixture)
+    monkeypatch.setattr(monitor, 'registry', fixture)
+    with TestClient(app) as client:
+        database = app.state.database
+        response = client.post('/v1/interests', json={'name': 'Synthetic worker quality subscription',
+            'enabled': True, 'conditions': [{'kind': 'brand', 'values': ['Fixture']}],
+            'metric_keys': [], 'changed_fields': [], 'source_quality_notifications': True})
+        assert response.status_code == 201, response.text
+        with database.sessions() as db:
+            assert db.scalar(select(func.count()).select_from(MonitorJob)) == 0
+        response = client.post('/v1/alert-rules', json={'name': 'Existing polling rule', 'source_id': 'fixture',
+            'query': {'model': 'Synthetic Tire'}, 'enabled': True, 'kinds': ['variant_observed']})
+        assert response.status_code == 201, response.text
+        first = asyncio.run(monitor.run_scheduled_cycle(database, max_jobs=1))
+        assert first['jobs'] == 1 and first['results'][0]['state'] == 'live'
+        assert asyncio.run(monitor.run_scheduled_cycle(database, max_jobs=1))['jobs'] == 0
+        with database.sessions() as db:
+            assert db.scalar(select(func.count()).select_from(MonitorJob)) == 1
+            job = db.scalar(select(MonitorJob))
+            job.next_due_at = utcnow() - timedelta(days=1)
+            db.commit()
+        actual_now = monitoring.utcnow
+        monkeypatch.setattr(monitoring, 'utcnow', lambda: actual_now() + timedelta(seconds=3))
+        fixture.reject = True
+        second = asyncio.run(monitor.run_scheduled_cycle(database, max_jobs=1))
+        assert second['jobs'] == 1 and second['results'][0]['state'] == 'source_unavailable'
+        assert second['results'][0]['finalized'] and len(fixture.calls) == 2
+        rows = client.get('/v1/interest-notifications?mode=history').json()['items']
+        quality = [row for row in rows if row['event']['domain'] == 'tire_source_quality']
+        assert len(quality) == 1 and quality[0]['event']['after']['accepted'] is False
+        with database.sessions() as db:
+            assert db.scalar(select(func.count()).select_from(SourceQuarantine)) == 1
+            assert db.scalar(select(func.count()).select_from(Verification)) == 1
+            assert db.scalar(select(func.count()).select_from(FactVersion)) == 1
+            assert db.scalar(select(func.count()).select_from(InterestEvent).where(
+                InterestEvent.domain == 'tire_source_quality')) == 1
+            assert db.scalar(select(func.count()).select_from(MonitorRun)) == 2
+            runs = db.scalars(select(QueryRun).where(QueryRun.session_id == 'scheduled-monitor-worker')).all()
+            assert len(runs) == 2 and all(row.fallback_policy == 'never' for row in runs)
+            assert {row.state for row in runs} == {'live', 'source_unavailable'}
+            attempts = db.scalars(select(MonitorTaskAttempt).where(MonitorTaskAttempt.kind == 'tire')).all()
+            assert len(attempts) == 2
+            for attempt in attempts:
+                phases = db.scalars(select(MonitorTaskEvent).where(MonitorTaskEvent.attempt_id == attempt.id)
+                    .order_by(MonitorTaskEvent.sequence)).all()
+                assert [row.phase for row in phases] == ['claimed', 'running', 'finished']
+            job = db.scalar(select(MonitorJob))
+            assert job.lease_token is None and job.lease_until is None
+
+
 def test_recall_worker_runs_independent_fenced_queue_and_never_falls_back(monkeypatch, tmp_path):
     from tire_api.recall_models import RecallEvent, RecallMonitorJob, RecallMonitorRun
     from tire_api import recall_monitoring

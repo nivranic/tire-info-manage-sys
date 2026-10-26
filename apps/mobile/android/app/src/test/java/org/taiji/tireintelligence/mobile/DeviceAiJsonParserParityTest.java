@@ -3,8 +3,6 @@ package org.taiji.tireintelligence.mobile;
 import static org.junit.Assert.*;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -19,7 +17,7 @@ import org.junit.runners.Parameterized;
 
 /**
  * Replays the authoritative cross-host vectors in
- * .artifacts/device-ai50/specs/e1-canonical-vectors-a.json (68 entries, Python
+ * packages/domain-types/fixtures/device-ai-v1/specs/e1-canonical-vectors-a.json (68 entries, Python
  * reference generated_and_self_checked) against the Java device-ai strict parser
  * DeviceAiJsonParser: accepted vectors must reproduce canonical bytes/text,
  * sha256, sha256_namespaced and encoded_canonical_text byte for byte (the
@@ -27,15 +25,13 @@ import org.junit.runners.Parameterized;
  * rejected vectors must fail closed with the exact listed error code. The
  * cross_vector_invariants and counts sections bind as well.
  *
- * Fixture location: system property tire.test.e1vectors (absolute path), else an
- * upward search from the test working directory (Gradle's ordinary Test working
- * directory is the app project, like OfflineRulesReferenceTest's relative asset
- * binding). The file bytes are pinned by SHA-256, so the run reads the
- * authoritative artifact itself and no copy is embedded.
+ * Fixture location: the tracked synthetic corpus found above the test working
+ * directory. Its provenance and loaded bytes are checked before the historical
+ * per-file SHA-256; no artifact path or system-property override is used.
  */
 @RunWith(Parameterized.class)
 public final class DeviceAiJsonParserParityTest {
-    private static final String VECTORS_REPOSITORY_PATH = ".artifacts/device-ai50/specs/e1-canonical-vectors-a.json";
+    private static final String VECTORS_REPOSITORY_PATH = "specs/e1-canonical-vectors-a.json";
     private static final String VECTORS_SHA256 = "9e5efce6c9d9a2faa016da8b2ed851d13a0620194d97d96dccd09e851272fe3b";
 
     private static JSONObject document;
@@ -60,11 +56,10 @@ public final class DeviceAiJsonParserParityTest {
 
     private static void loadVectorsChecked() throws Exception {
         if (vectors != null) return;
-        Path path = locate();
         byte[] raw;
-        try { raw = Files.readAllBytes(path); }
-        catch (Exception unreadable) { throw new IllegalStateException("E1 vectors unreadable: " + path, unreadable); }
-        assertEquals("E1 vectors sha256 drift: " + path, VECTORS_SHA256, sha256Hex(raw));
+        try { raw = DeviceAiFixtureCorpus.read(VECTORS_REPOSITORY_PATH); }
+        catch (Exception unreadable) { throw new IllegalStateException("tracked E1 vectors unreadable", unreadable); }
+        assertEquals("E1 vectors sha256 drift", VECTORS_SHA256, sha256Hex(raw));
         document = new JSONObject(new String(raw, StandardCharsets.UTF_8));
         JSONArray list = document.getJSONArray("vectors");
         vectors = new LinkedHashMap<>();
@@ -84,7 +79,7 @@ public final class DeviceAiJsonParserParityTest {
         bindInvariant(cross, "canonical_must_match");
         bindInvariant(cross, "encoded_must_differ");
         bindInvariant(cross, "sha256_must_differ");
-        System.out.println("E1 vectors bound: " + path + " (sha256 " + VECTORS_SHA256 + ", " + list.length() + " vectors)");
+        System.out.println("Tracked E1 vectors bound: " + VECTORS_REPOSITORY_PATH + " (sha256 " + VECTORS_SHA256 + ", " + list.length() + " vectors)");
     }
 
     private static void bindInvariant(JSONObject cross, String name) throws Exception {
@@ -96,19 +91,6 @@ public final class DeviceAiJsonParserParityTest {
             pairs.add(List.of(pair.getString(0), pair.getString(1)));
         }
         invariants.put(name, pairs);
-    }
-
-    private static Path locate() {
-        List<Path> candidates = new ArrayList<>();
-        String configured = System.getProperty("tire.test.e1vectors");
-        if (configured != null) candidates.add(Path.of(configured));
-        Path directory = Path.of("").toAbsolutePath();
-        for (int up = 0; up <= 8 && directory != null; up++) {
-            candidates.add(directory.resolve(VECTORS_REPOSITORY_PATH).normalize());
-            directory = directory.getParent();
-        }
-        for (Path candidate : candidates) if (Files.isRegularFile(candidate)) return candidate;
-        throw new IllegalStateException("E1 vector file not found above the working directory; pass -Dtire.test.e1vectors=<path>");
     }
 
     private static byte[] sha256(byte[] data) throws Exception {

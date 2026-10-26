@@ -131,18 +131,18 @@ class QueryService:
                 "scope": consent.scope, "expires_at": timestamp(consent.expires_at)}
 
     async def execute(self, source_id: str, request: LiveQueryRequest, session_id: str, *,
-                      audience: str = 'internal') -> dict[str, Any]:
+                      audience: str = 'internal', owner_actor=None) -> dict[str, Any]:
         from .telemetry import observe
         source = source_id if source_id in {
             'michelin-us', 'michelin-cn', 'michelin-uk', 'michelin-fr', 'michelin-de',
             'toyo-us', 'hankook-us', 'pirelli-us'} else 'unknown'
         with observe('source.query', component='crawler', source=source) as operation:
-            result = await self._execute(source_id, request, session_id, audience=audience)
+            result = await self._execute(source_id, request, session_id, audience=audience, owner_actor=owner_actor)
             operation.finish(result['data_state'])
             return result
 
     async def _execute(self, source_id: str, request: LiveQueryRequest, session_id: str, *,
-                       audience: str = 'internal') -> dict[str, Any]:
+                       audience: str = 'internal', owner_actor=None) -> dict[str, Any]:
         self.require_source(source_id)
         query = request.query.canonical()
         query_key = digest(query)
@@ -152,9 +152,14 @@ class QueryService:
         run = QueryRun(id=uid(), session_id=session_id, source_id=source_id,
                        query_key=query_key, query=query, fallback_policy=request.fallback_policy,
                        selection_filters=canonical_filters(request.filters))
-        self.db.add(run)
-        self.audit(session_id, "online_query_started", run.id, source_id=source_id)
-        self.db.commit()
+        if owner_actor is None:
+            # Anonymous/background/PG calls retain their existing internal path.
+            self.db.add(run)
+            self.audit(session_id, "online_query_started", run.id, source_id=source_id)
+            self.db.commit()
+        else:
+            from .query_ownership import create_query_with_owner
+            create_query_with_owner(self.db, run, owner_actor, lock_ingestion=self.lock_ingestion)
         try:
             self.pin_source_access(run)
         except SourceAccessBlocked as error:
@@ -329,6 +334,10 @@ class QueryService:
                        variants: list[VariantInput], verification_status: str = "ok", *,
                        parser_selection: dict | None = None) -> tuple[Snapshot, Any, list[dict[str, Any]]]:
         self.lock_ingestion()
+        previous_verification = self.db.scalar(select(Verification).where(
+            Verification.source_id == run.source_id, Verification.query_key == run.query_key,
+            Verification.status.in_(['ok', 'not_modified']))
+            .order_by(desc(Verification.verified_at), desc(Verification.id)).limit(1))
         self.assert_source_access(run)
         if self.ingestion_guard is not None:
             self.ingestion_guard(self.db)
@@ -336,12 +345,13 @@ class QueryService:
             from .parser_releases import assert_selection_current
             assert_selection_current(self.db, parser_selection)
             check_result_identity(parser_selection, result)
+        # Quarantine is terminal for this QueryRun. Only a fresh online run
+        # may consume a later approval or produce a new isolation/notice.
+        if self.db.scalar(select(SourceQuarantine.id).where(SourceQuarantine.query_id == run.id)) is not None:
+            raise SourceQualityQuarantined()
         raw_hash = hashlib.sha256(result["body"].encode("utf-8")).hexdigest()
         verified_at = utcnow()
-        snapshot = self.db.scalar(select(Snapshot).join(Verification, Verification.snapshot_id == Snapshot.id)
-                                  .where(Verification.source_id == run.source_id,
-                                         Verification.query_key == run.query_key)
-                                  .order_by(desc(Verification.verified_at)).limit(1))
+        snapshot = self.db.get(Snapshot, previous_verification.snapshot_id) if previous_verification else None
         candidates = [variant.model_dump() for variant in variants]
         quality = assess_quality(snapshot.parsed_variants if snapshot else None, candidates)
         applied_review = None
@@ -359,8 +369,11 @@ class QueryService:
             self.db.add(quarantine)
             self.audit(run.session_id, "source_quality_quarantined", run.id, quarantine_id=quarantine.id,
                        previous_snapshot_id=snapshot.id, reason_codes=quality["reason_codes"], metrics=metrics(quality))
+            from .interest_source_quality import publish_quality_quarantine
+            publish_quality_quarantine(self.db, quarantine, previous_verification)
             # No accepted snapshot, variant, fact, change or verification has been
-            # written. The caller commits only this rejection plus query/audit state.
+            # written. The caller commits this isolation, its local quality
+            # evidence/notifications, and query/audit state in the same transaction.
             raise SourceQualityQuarantined()
         if snapshot and (snapshot.identity_contract_version != schema_version() or applied_review or snapshot.raw_hash != raw_hash or snapshot.parser_version != result["parser_version"]
                          or snapshot.parser_identity != result.get('parser_identity')
@@ -379,6 +392,7 @@ class QueryService:
         # Reconcile even on a verified 304, preserving the original raw timestamp.
         assert snapshot is not None
         pending_facts: list[FactVersion | ChangeEvent] = []
+        fact_transitions = []
         parsed: list[dict[str, Any]] = []
         seen: set[str] = set()
         identity_context = {}
@@ -400,10 +414,12 @@ class QueryService:
             version = previous.version if previous else 0
             if previous is None or previous.facts_hash != facts_hash:
                 version += 1
-                pending_facts.append(FactVersion(variant_id=stored.id, source_id=run.source_id,
+                new_fact = FactVersion(variant_id=stored.id, source_id=run.source_id,
                                                  snapshot_id=snapshot.id, facts=facts,
                                                  facts_hash=facts_hash, version=version,
-                                                 observed_at=verified_at))
+                                                 observed_at=verified_at)
+                pending_facts.append(new_fact)
+                fact_transitions.append((previous, new_fact))
                 changes = {key: {"before": previous.facts.get(key) if previous else None,
                                  "after": facts.get(key),
                                  "before_present": key in previous.facts if previous else False,
@@ -427,11 +443,23 @@ class QueryService:
         self.db.flush()
         from .monitoring import record_alerts
         record_alerts(self.db, [item for item in pending_facts if isinstance(item, ChangeEvent)])
-        self.db.add(Verification(snapshot_id=snapshot.id, query_id=run.id,
+        verification = Verification(snapshot_id=snapshot.id, query_id=run.id,
                                  source_id=run.source_id, query_key=run.query_key,
                                  status=verification_status, verified_at=verified_at,
                                  parser_identity=result.get('parser_identity'),
-                                 etag=result.get("etag"), last_modified=result.get("last_modified")))
+                                 etag=result.get("etag"), last_modified=result.get("last_modified"))
+        self.db.add(verification)
+        self.db.flush()
+        from .source_page_monitoring import append_page_change
+        append_page_change(self.db, verification, previous_verification)
+        from .interest_events import publish
+        for change in pending_facts:
+            if isinstance(change, ChangeEvent):
+                publish(self.db, 'tire', change)
+        from .interest_governance import append_catalog
+        append_catalog(self.db, verification, previous_verification)
+        from .interest_applicability import append_applicability
+        append_applicability(self.db, fact_transitions, verification)
         return snapshot, verified_at, parsed
 
     def lock_ingestion(self) -> None:

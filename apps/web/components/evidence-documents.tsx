@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
 import type { EvidenceDocument, EvidenceDocumentMetadata } from "@tire/domain-types";
 import { useWorkbenchPlatform } from "./workbench-platform";
+import SourceMaterials, { SourceMaterialDocumentReceipt } from "./source-materials";
 
 const empty = (): EvidenceDocumentMetadata => ({ title: "", source_url: "", operator: "", rights_basis: "" });
 const errorText = (value: unknown) => value instanceof Error ? value.message : "文档操作未完成，请重试。";
@@ -69,6 +70,7 @@ export default function EvidenceDocuments({ sessionReady }: { sessionReady: bool
   return <section className="quarantine-panel evidence-documents" aria-labelledby="evidence-documents-title">
     <div className="panel-title"><span id="evidence-documents-title">原始 PDF 文档</span><button className="text-button" type="button" disabled={busy || loading} onClick={() => setRevision(value => value + 1)}>刷新文档</button></div>
     <p className="quality-intro">仅保存你已获授权留存的原始文件。文档属于本地工作区，原始字节固定保留；上传不会解析 PDF，也不会自动建立轮胎或车型事实。</p>
+    <SourceMaterials sessionReady={sessionReady} onCaptured={() => setRevision(value => value + 1)} />
     {error ? <p className="inline-error" role="alert">{error}</p> : null}{notice ? <p className="review-saved" role="status">{notice}</p> : null}
     <details className="document-upload"><summary>留存一份 PDF 原文</summary><form className="review-form" onSubmit={event => { event.preventDefault(); void upload(); }}>
       <label><span>PDF 文件（最大 8 MiB）</span><input ref={input} type="file" accept="application/pdf,.pdf" required disabled={busy} onChange={event => { const selected = event.target.files?.[0] || null; setFile(selected); setError(""); if (selected) setMetadata(previous => ({ ...previous, title: previous.title || selected.name.slice(0, 160) })); }} /></label>
@@ -78,6 +80,13 @@ export default function EvidenceDocuments({ sessionReady }: { sessionReady: bool
       <label><span>保存授权依据</span><textarea required maxLength={500} value={metadata.rights_basis} disabled={busy} placeholder="说明文件的保存授权或许可依据" onChange={event => setMetadata(previous => ({ ...previous, rights_basis: event.target.value }))} /></label>
       <button type="submit" className="primary-button" disabled={!sessionReady || busy || !file}>{busy ? "正在处理…" : "保存原始文档"}</button>
     </form></details>
-    {loading ? <p role="status" className="quality-empty">正在读取文档记录…</p> : records.length ? <><p className="quarantine-list-count">已显示 {records.length} / {total} 份</p>{records.map(row => <article className="quarantine-item" key={row.id}><div className="quality-item-heading"><h3>{row.title}</h3><span className="tag quiet">原文收件 · 未核验</span></div><p className="document-description">{new Date(row.created_at).toLocaleString("zh-CN")} · {row.byte_count.toLocaleString()} 字节 · 署名 {row.operator}</p><p className="hash-value">SHA-256 {row.raw_hash}</p><details className="quality-technical"><summary>来源与留存说明</summary><p className="document-description">来源：{row.source_url || "未提供链接"}</p><p className="document-description">声明的保存依据：{row.rights_basis}</p></details><button type="button" className="text-button" disabled={busy} onClick={() => void download(row)}>校验并下载原文</button></article>)}{records.length < total ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void more()}>加载更多文档</button> : null}</> : <p className="quality-empty">尚未留存 PDF 原文。</p>}
+    {loading ? <p role="status" className="quality-empty">正在读取文档记录…</p> : records.length ? <><p className="quarantine-list-count">已显示 {records.length} / {total} 份</p>{records.map(row => <article className="quarantine-item" key={row.id}>
+      <div className="quality-item-heading"><h3>{row.title}</h3><span className="tag quiet">原文收件 · 未核验</span></div>
+      <p className="document-description">{new Date(row.created_at).toLocaleString("zh-CN")} · {row.byte_count.toLocaleString()} 字节 · 署名 {row.operator}</p>
+      <p className="hash-value">SHA-256 {row.raw_hash}</p>
+      <details className="quality-technical"><summary>来源与留存说明</summary><p className="document-description">来源：{row.source_url || "未提供链接"}</p><p className="document-description">声明的保存依据：{row.rights_basis}</p></details>
+      <button type="button" className="text-button" disabled={busy} onClick={() => void download(row)}>校验并下载原文</button>
+      <SourceMaterialDocumentReceipt documentId={row.id} />
+    </article>)}{records.length < total ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void more()}>加载更多文档</button> : null}</> : <p className="quality-empty">尚未留存 PDF 原文。</p>}
   </section>;
 }

@@ -1,6 +1,6 @@
 """E5 统一 closed-decoder fixtures 回放（Python 服务端参考端，decoder-spec 4.3-3）。
 
-回放 .artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json 的逐条向量：
+回放 tracked corpus 中 specs/decoder-fixtures-a/fixtures.json 的逐条向量：
 
 - 文件自洽（schema/counts/by_matrix/唯一 id/expected 键集）先于回放；
 - expected.py='validation_error'：pydantic ValidationError（服务端 fail-closed 422 路径）；
@@ -19,10 +19,10 @@ import pytest
 from pydantic import ValidationError
 
 from tire_api.device_ai import DeviceAIPrepareRequest, ProviderConsent
+from device_ai_fixture_corpus import CORPUS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-FIXTURE_FILE = REPO_ROOT / '.artifacts/device-ai50/specs/decoder-fixtures-a/fixtures.json'
-PAYLOAD = json.loads(FIXTURE_FILE.read_text(encoding='utf-8'))
+PAYLOAD = CORPUS.read_json('specs/decoder-fixtures-a/fixtures.json')
 CASES = PAYLOAD['cases']
 CANONICAL_UUID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z')
 MODELS = {'prepare_body': DeviceAIPrepareRequest, 'provider_consent': ProviderConsent}

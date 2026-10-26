@@ -1,0 +1,18 @@
+{
+  "canonical_projection": {
+    "byte_count": 32059,
+    "path": "domain/empty-tire-closure/projection.canonical.json",
+    "sha256": "455f405b59e3845cf351122e1f4eca0496fcd3d119dd0fba96b970d33a0a7434"
+  },
+  "data_state": "local_snapshot",
+  "expected_error_code": null,
+  "member_count": 1,
+  "privacy_class": "private",
+  "source_refresh_performed": false,
+  "state": "accepted",
+  "token_dto_projection": {
+    "byte_count": 32149,
+    "path": "domain/empty-tire-closure/projection.tokens.json",
+    "sha256": "3846d6ccbfac0b64311e38de27bf6e49e1d26875530f20ea17573e092f4217fa"
+  }
+}

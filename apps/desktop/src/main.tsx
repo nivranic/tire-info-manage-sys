@@ -1,9 +1,11 @@
-import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
+import { StrictMode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setApiTransport, tireApi } from "@tire/api-client";
 import Workbench from "../../web/components/workbench";
 import { OfflineLibraryEntry } from "../../web/components/offline-library";
+import ThemePreferenceControl from "../../web/components/theme-preference-control";
+import { ThemeProvider } from "../../web/components/theme-preferences";
 import { DesktopDeviceAiEntry } from "./device-ai-panel";
 import { createNativePlatform, createNativeTransport, DesktopError, externalLink, openNativeExternal, type DesktopStatus } from "./native-platform";
 import "../../web/app/globals.css";
@@ -38,8 +40,50 @@ function DesktopApp() {
   const [resetRequested, setResetRequested] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const sessionEpoch = useRef(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const header = headerRef.current;
+    if (!root || !header) return;
+    const property = "--desktop-header-height";
+    const previousHeight = root.style.getPropertyValue(property);
+    const previousPriority = root.style.getPropertyPriority(property);
+    let writtenHeight = "";
+    const measureHeader = () => {
+      const height = header.getBoundingClientRect().height;
+      if (!Number.isFinite(height) || height <= 0) return;
+      const nextHeight = `${height}px`;
+      if (nextHeight === writtenHeight) return;
+      root.style.setProperty(property, nextHeight);
+      writtenHeight = nextHeight;
+    };
+    // The host header can wrap; preserve document scrolling below its actual height.
+    measureHeader();
+    let observer: ResizeObserver | null = null;
+    try {
+      if (typeof ResizeObserver === "function") {
+        observer = new ResizeObserver(measureHeader);
+        observer.observe(header, { box: "border-box" });
+      }
+    } catch {
+      observer?.disconnect();
+      observer = null;
+    }
+    if (!observer) window.addEventListener("resize", measureHeader);
+    return () => {
+      observer?.disconnect();
+      if (!observer) window.removeEventListener("resize", measureHeader);
+      if (root.style.getPropertyValue(property) === writtenHeight && root.style.getPropertyPriority(property) === "") {
+        if (previousHeight) root.style.setProperty(property, previousHeight, previousPriority);
+        else root.style.removeProperty(property);
+      }
+    };
+  }, []);
 
   const failSession = useCallback((cause: DesktopError) => {
+    window.dispatchEvent(new Event("tire-session-unavailable"));
     setError(cause.message);
     setPhase("failed");
   }, []);
@@ -68,6 +112,7 @@ function DesktopApp() {
         if (!current()) return;
         if (!validStatus(connected)) throw new DesktopError(connected.error || "SESSION_STORE_UNAVAILABLE");
         setStatus(connected); setPhase("ready");
+      window.dispatchEvent(new Event("tire-session-revalidate"));
       } catch (cause) {
         if (current()) { setError(cause instanceof DesktopError ? cause.message : new DesktopError(cause).message); setPhase("failed"); }
       }
@@ -93,13 +138,15 @@ function DesktopApp() {
   }, []);
 
   function reconnect(reset = false) {
+    window.dispatchEvent(new Event("tire-session-unavailable"));
     setConfirmReset(false); setPhase("connecting"); setResetRequested(reset); setAttempt(value => value + 1);
   }
 
-  return <div className="desktop-root">
-    <header className="desktop-bar" aria-label="桌面连接与安全会话">
+  return <div ref={rootRef} className="desktop-root">
+    <header ref={headerRef} className="desktop-bar" aria-label="桌面连接与安全会话">
       <strong>胎迹 <span>桌面工作台</span></strong>
       <span className={`desktop-connection ${phase}`} role="status">{phase === "ready" ? "本机 API 已连接 · 系统安全会话" : phase === "connecting" ? "正在连接本机 API…" : "本机连接未就绪"}</span>
+      <ThemePreferenceControl />
       <OfflineLibraryEntry platform={nativePlatform} onlineEnabled={phase === "ready"} /><DesktopDeviceAiEntry platform={nativePlatform} online={phase === "ready"} /><details className="desktop-settings"><summary>连接与会话</summary><div>
         <p>API：{status?.api_base_url || "等待安全连接检查"}</p>
         <p>会话仅存储在操作系统凭据库，独立于 Web 浏览器；本机 API 服务须另外启动。</p>
@@ -118,4 +165,4 @@ function DesktopApp() {
   </div>;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><DesktopApp /></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><ThemeProvider><DesktopApp /></ThemeProvider></StrictMode>);

@@ -102,6 +102,41 @@ public final class DownloadJobTest {
         discarded.cancel(); check(queuedExecutor.shutdownNow().size() == 1, "shutdown discards an actually queued save"); unblock.countDown();
         check(discarded.isFinished() && erased(queuedBytes) && queuedOpened.get() == 0, "discarded task is cleaned without opening a destination");
         check(queued.results.get() == 1 && queued.finishes.get() == 1, "discarded task settles once");
+
+        // Actual production job calls the actual authority after target-name validation and before open.
+        for (String cause : new String[] { "release", "identity", "document", "reset" }) {
+            DownloadAuthority authority = new DownloadAuthority(); String document = authority.document(), lease = authority.prepare(document);
+            DownloadAuthority.Reservation reservation = authority.reserve(lease, document);
+            AtomicInteger rejectedOpens = new AtomicInteger(); Completion revoked = new Completion(); ByteArrayOutputStream rejectedTarget = new ByteArrayOutputStream();
+            DownloadJob guarded = new DownloadJob("application/pdf", original.clone(), revoked, reservation::commit);
+            guarded.run(new DownloadJob.Destination() {
+                @Override public String displayName() throws Exception {
+                    if (cause.equals("release")) authority.release(lease, document);
+                    else if (cause.equals("document")) authority.endDocument(document);
+                    else { try (DownloadAuthority.Transition transition = authority.beginTransition()) { } }
+                    return "evidence.pdf";
+                }
+                @Override public OutputStream open() { rejectedOpens.incrementAndGet(); return rejectedTarget; }
+                @Override public void cancel() { }
+            });
+            reservation.close();
+            check(rejectedOpens.get() == 0 && rejectedTarget.size() == 0, cause + " before commit has application open/write = 0");
+            check(revoked.results.get() == 1 && "DOWNLOAD_CONTEXT_CHANGED".equals(revoked.error.get()), cause + " never reports saved");
+        }
+        DownloadAuthority committedAuthority = new DownloadAuthority(); String committedDocument = committedAuthority.document(), committedLease = committedAuthority.prepare(committedDocument);
+        DownloadAuthority.Reservation committing = committedAuthority.reserve(committedLease, committedDocument);
+        ByteArrayOutputStream authorizedTarget = new ByteArrayOutputStream(); Completion authorized = new Completion(); AtomicInteger authorizedOpens = new AtomicInteger();
+        new DownloadJob("application/pdf", original.clone(), authorized, committing::commit).run(new DownloadJob.Destination() {
+            @Override public String displayName() { return "evidence.pdf"; }
+            @Override public OutputStream open() throws Exception {
+                // Cancellation/revocation after commit but before the real OS open cannot promise rollback.
+                committedAuthority.invalidate(); committedAuthority.release(committedLease, committedDocument);
+                authorizedOpens.incrementAndGet(); return authorizedTarget;
+            }
+            @Override public void cancel() { }
+        }); committing.close();
+        check(authorizedOpens.get() == 1 && Arrays.equals(original, authorizedTarget.toByteArray()), "postcommit invalidation does not undo an authorized open/write");
+        check(authorized.results.get() == 1 && authorized.error.get() == null, "authorized worker records completed bytes");
         System.out.println("Download job checks passed: " + checks);
     }
 }

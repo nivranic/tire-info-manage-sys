@@ -41,6 +41,8 @@ fn main() {
             "api_cancel",
             "reset_session",
             "save_download",
+            "prepare_download",
+            "release_download",
             "open_external",
             "offline_status",
             "offline_list",

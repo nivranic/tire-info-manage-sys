@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Query, Request
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
-from sqlalchemy import Text, cast, desc, func, select
+from sqlalchemy import Text, and_, cast, desc, func, or_, select
 
 from .auth import make_admin_guard
 from .db import FactVersion, Snapshot, TireVariant, VariantLifecycleEvent, Verification, uid
@@ -16,6 +16,8 @@ from .identity_models import IdentityRevision
 from .identity_contract import contract_metadata
 from .service import QueryService, business_facts, provenance, timestamp
 from .vehicles import VehicleSnapshot, VehicleVerification, vehicle_provenance
+from .vehicle_raw import (FIRST_GENERATION_ID, SOURCE_ID, VehicleRawIntegrityError, VehicleUseNotAllowed,
+                         checked_vehicle_consumer_capsule, require_vehicle_consumer_use)
 
 NOTICE = '本地共享工作区的人工候选/复核关系；不代表官方原配认证，不改写车型要求、轮胎事实、车库或关注。'
 OFFICIAL_OE = {'state': 'not_established', 'missing_evidence': [
@@ -98,14 +100,35 @@ class RelationDecision(RelationPreviewRequest):
         return value
 
 
+def _checked_relation_vehicle(db, row):
+    try:
+        capsule = checked_vehicle_consumer_capsule(db, row.id)
+        require_vehicle_consumer_use(capsule, 'local_structured')
+        return capsule
+    except VehicleRawIntegrityError as error:
+        fail(error.code, '车型原件或正式核验链完整性检查失败，不能作为关系证据', 503)
+    except VehicleUseNotAllowed as error:
+        fail(error.code, '车型来源的结构化事实本地用途尚未获准', error.status_code)
+
+
+def _binary_vehicle_clause():
+    return or_(VehicleSnapshot.body_encoding == 'binary', and_(
+        VehicleSnapshot.source_id == SOURCE_ID, VehicleSnapshot.vehicle_id == FIRST_GENERATION_ID))
+
+
 def accepted_vehicle(db, snapshot_id):
-    row = db.get(VehicleSnapshot, snapshot_id)
-    accepted = row and db.scalar(select(VehicleVerification.id).where(
-        VehicleVerification.snapshot_id == row.id, VehicleVerification.vehicle_id == row.vehicle_id).limit(1))
-    if not accepted:
-        fail('vehicle_snapshot_not_accepted', '必须选择正式已采纳的车型快照', 422)
-    verify_raw(row)
-    return row
+    with db.no_autoflush:
+        row = db.get(VehicleSnapshot, snapshot_id)
+        if row is None:
+            fail('vehicle_snapshot_not_accepted', '必须选择正式已采纳的车型快照', 422)
+        capsule = _checked_relation_vehicle(db, row)
+        if capsule is None:
+            accepted = db.scalar(select(VehicleVerification.id).where(
+                VehicleVerification.snapshot_id == row.id, VehicleVerification.vehicle_id == row.vehicle_id).limit(1))
+            if not accepted:
+                fail('vehicle_snapshot_not_accepted', '必须选择正式已采纳的车型快照', 422)
+            verify_raw(row)
+        return row
 
 
 def accepted_tire(db, snapshot_id):
@@ -119,10 +142,15 @@ def accepted_tire(db, snapshot_id):
 
 
 def latest_vehicle(db, vehicle_id):
-    return db.scalar(select(VehicleSnapshot).join(VehicleVerification,
-        VehicleVerification.snapshot_id == VehicleSnapshot.id).where(
-        VehicleVerification.vehicle_id == vehicle_id, VehicleSnapshot.vehicle_id == vehicle_id)
-        .order_by(desc(VehicleVerification.verified_at), desc(VehicleVerification.id)).limit(1))
+    with db.no_autoflush:
+        row = db.scalar(select(VehicleSnapshot).join(VehicleVerification,
+            VehicleVerification.snapshot_id == VehicleSnapshot.id).where(
+            VehicleSnapshot.vehicle_id == vehicle_id,
+            or_(VehicleVerification.vehicle_id == vehicle_id, _binary_vehicle_clause()))
+            .order_by(desc(VehicleVerification.verified_at), desc(VehicleVerification.id)).limit(1))
+        if row is not None:
+            _checked_relation_vehicle(db, row)
+        return row
 
 
 def vehicle_parts(snapshot, selected):
@@ -449,12 +477,15 @@ def append_revision(db, payload, session_id, idempotency_key):
     shared.audit(session_id, 'fitment_relation_revision_appended', relation_id=relation.id, event_id=row.id,
                  revision=row.revision, action_kind=row.action, before=before, after=after)
     db.flush()
+    from .interest_events import publish
+    publish(db, 'fitment', row)
     result = {'relation': detail(db, relation.id), 'event': serialize_event(row), 'idempotent_replay': False}
     db.commit()
     return result
 
 
-def snapshot_summary(row):
+def snapshot_summary(db, row):
+    _checked_relation_vehicle(db, row)
     return {'id': row.id, 'vehicle_id': row.vehicle_id, 'vehicle': row.payload['vehicle'],
             'fact_version': row.fact_version, 'fact_hash': row.fact_hash, 'provenance': vehicle_provenance(row),
             'fitment_count': len(row.payload.get('fitments', []))}
@@ -472,17 +503,19 @@ def register_fitment_relation_routes(app):
                           offset: int = Query(0, ge=0, le=100000), limit: int = Query(20, ge=1, le=100), db=Depends(get_db)):
         statement = select(VehicleSnapshot).where(select(VehicleVerification.id).where(
             VehicleVerification.snapshot_id == VehicleSnapshot.id,
-            VehicleVerification.vehicle_id == VehicleSnapshot.vehicle_id).exists())
+            or_(VehicleVerification.vehicle_id == VehicleSnapshot.vehicle_id, _binary_vehicle_clause())).exists())
         if vehicle_id:
             statement = statement.where(VehicleSnapshot.vehicle_id == vehicle_id)
-        total = db.scalar(select(func.count()).select_from(statement.subquery()))
-        rows = db.scalars(statement.order_by(desc(VehicleSnapshot.observed_at), VehicleSnapshot.id).offset(offset).limit(limit))
-        return {**BASE, 'items': [snapshot_summary(row) for row in rows], 'total': total, 'offset': offset, 'limit': limit}
+        with db.no_autoflush:
+            total = db.scalar(select(func.count()).select_from(statement.subquery()))
+            rows = db.scalars(statement.order_by(desc(VehicleSnapshot.observed_at), VehicleSnapshot.id).offset(offset).limit(limit))
+            items = [snapshot_summary(db, row) for row in rows]
+        return {**BASE, 'items': items, 'total': total, 'offset': offset, 'limit': limit}
 
     @app.get('/v1/fitment-relations/vehicle-snapshots/{snapshot_id}')
     def vehicle_snapshot(snapshot_id: str, mode: Literal['history'] = Query(...), db=Depends(get_db)):
         row = accepted_vehicle(db, snapshot_id)
-        return {**BASE, **snapshot_summary(row), 'trims': row.payload['trims'], 'fitments': row.payload['fitments'],
+        return {**BASE, **snapshot_summary(db, row), 'trims': row.payload['trims'], 'fitments': row.payload['fitments'],
                 'coverage': row.payload.get('coverage')}
 
     @app.get('/v1/fitment-relations/tire-evidence/{variant_id}')
@@ -550,3 +583,11 @@ def register_fitment_relation_routes(app):
         result = detail(db, relation_id)
         db.commit()
         return result
+
+    @app.get('/v1/fitment-relations/{relation_id}/revisions/{revision}')
+    def exact_revision(relation_id: str, revision: int, mode: Literal['history'] = Query(...), db=Depends(get_db)):
+        row = db.scalar(select(FitmentRelationRevision).where(FitmentRelationRevision.relation_id == relation_id,
+                                                             FitmentRelationRevision.revision == revision))
+        if row is None:
+            fail('fitment_relation_revision_missing', '未找到该关系修订', 404)
+        return serialize_event(row)

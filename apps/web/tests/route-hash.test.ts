@@ -1,10 +1,10 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
-import { parseRouteHash, serializeRouteHash } from "../components/route-hash.ts";
+import { DEFAULT_ROUTE_VIEW, nativeBackRoute, parseRouteHash, serializeRouteHash } from "../components/route-hash.ts";
 
 test("parses bare view hashes", () => {
-  for (const view of ["query", "vehicles", "garage", "compare", "watch", "sources"] as const) {
+  for (const view of ["home", "query", "vehicles", "garage", "compare", "watch", "sources"] as const) {
     assert.deepEqual(parseRouteHash("#/" + view), { view });
   }
 });
@@ -32,6 +32,7 @@ test("rejects non-route hashes", () => {
 });
 
 test("serializes and round-trips canonical states", () => {
+  assert.equal(serializeRouteHash({ view: "home" }), "#/home");
   assert.equal(serializeRouteHash({ view: "query" }), "#/query");
   assert.equal(serializeRouteHash({ view: "compare", compareIds: ["a", "b"] }), "#/compare?ids=a%2Cb");
   assert.equal(serializeRouteHash({ view: "query", size: "245/40 R20" }), "#/query?size=245%2F40+R20");
@@ -39,4 +40,13 @@ test("serializes and round-trips canonical states", () => {
     const state = parseRouteHash(hash)!;
     assert.deepEqual(parseRouteHash(serializeRouteHash(state)), state, hash);
   }
+});
+
+test("home is the default and native back target while query deep links remain direct", () => {
+  assert.equal(DEFAULT_ROUTE_VIEW, "home");
+  assert.equal(nativeBackRoute("home"), null);
+  for (const view of ["query", "vehicles", "garage", "compare", "watch", "sources"] as const) assert.equal(nativeBackRoute(view), "home");
+  assert.deepEqual(parseRouteHash("#/query"), { view: "query" });
+  assert.deepEqual(parseRouteHash("#/home?ids=private&size=225"), { view: "home" });
+  assert.equal(parseRouteHash("#"), null);
 });

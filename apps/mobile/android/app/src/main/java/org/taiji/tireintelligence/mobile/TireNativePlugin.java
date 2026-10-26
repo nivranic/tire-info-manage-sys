@@ -47,12 +47,16 @@ public final class TireNativePlugin extends Plugin {
     private AtomicBoolean offlineResetting;
     private OfflineRuntime runtime;
     private final Set<RequestRegistry.Ticket> ownedRequests = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<RequestWork> requestWork = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final AtomicLong offlineLifecycle = new AtomicLong();
     private String offlineInitializationError;
     private NativeHttpBridge http;
     private String initializationError;
     private DownloadJob downloadJob;
     private String downloadCallbackId;
+    private String downloadLease;
+    private DownloadAuthority.Reservation downloadReservation;
+    private volatile String downloadDocument;
     private volatile boolean destroyed;
     private String pendingBack;
     private long backDeadline;
@@ -62,6 +66,8 @@ public final class TireNativePlugin extends Plugin {
         offlineResetting = runtime.resetting;
         http = runtime.http;
         initializationError = runtime.httpError;
+        try { downloadDocument = runtime.downloads.document(); }
+        catch (NativeFailure failure) { downloadDocument = null; }
         offlineTasks.execute(() -> {
             try { requireOffline(); runtime.reconcile(); } catch (NativeFailure failure) { offlineInitializationError = failure.code; }
             catch(Exception ignored) { /* Storage remains usable when OS scheduling is unavailable. */ }
@@ -82,7 +88,15 @@ public final class TireNativePlugin extends Plugin {
         return runtime.store();
     }
     /** Every main-frame document invalidates queued work and prior-page one-shot grants. */
-    void documentStarted() { offlineLifecycle.incrementAndGet(); if (runtime != null) runtime.documentEnded(); }
+    synchronized void documentStarted() {
+        offlineLifecycle.incrementAndGet(); if (runtime != null) runtime.documentEnded();
+        if (runtime != null) {
+            runtime.downloads.endDocument(downloadDocument);
+            try { downloadDocument = runtime.downloads.document(); }
+            catch (NativeFailure failure) { downloadDocument = null; }
+        }
+        if (downloadJob != null) downloadJob.cancel();
+    }
     private interface OfflineAction { JSONObject run(OfflinePackStore store) throws Exception; }
     private void offline(PluginCall call, OfflineAction action) {
         try {
@@ -287,24 +301,50 @@ public final class TireNativePlugin extends Plugin {
         catch (RejectedExecutionException ignored) { if (discarded != null) discarded.run(); call.reject("API_CLIENT_UNAVAILABLE", "API_CLIENT_UNAVAILABLE"); }
     }
     @PluginMethod public void status(PluginCall call) {
-        try { guard(); fields(call.getData()); }
+        final DownloadAuthority.Transition transition;
+        try { guard(); fields(call.getData()); transition = http != null && http.session.error() != null ? http.downloads.beginTransition() : null; }
         catch (NativeFailure error) { reject(call, error); return; }
         control(call, () -> {
+            try {
             String error = initializationError;
             if (http != null) { try { http.recover(); } catch (NativeFailure failure) { error = failure.code; } if (error == null) error = http.session.error(); }
             JSObject result = new JSObject(); result.put("api_base_url", baseUrl()); result.put("session_persistent", error == null); result.put("session_store", "android_keystore");
             result.put("version", BuildConfig.VERSION_NAME); result.put("platform", "android"); result.put("mode", BuildConfig.DEBUG ? "debug-local" : "release-unconfigured");
             if (error != null) result.put("error", error); call.resolve(result);
-        }, null);
+            } finally { if (transition != null) transition.close(); }
+        }, () -> { if (transition != null) transition.close(); });
+    }
+    /** Owns queued identity tickets too; discarded tasks never leave a permanent pending ticket. */
+    private final class RequestWork implements Runnable {
+        private final NativeHttpBridge bridge; private final NativePolicy.Request request;
+        private final RequestRegistry.Ticket ticket; private final DownloadAuthority.Transition identity;
+        private final PluginCall call; private final AtomicBoolean claimed = new AtomicBoolean();
+        RequestWork(NativeHttpBridge bridge, NativePolicy.Request request, RequestRegistry.Ticket ticket, DownloadAuthority.Transition identity, PluginCall call) {
+            this.bridge = bridge; this.request = request; this.ticket = ticket; this.identity = identity; this.call = call;
+        }
+        private void finish() {
+            if (identity != null) identity.close(); ownedRequests.remove(ticket); requestWork.remove(this); Arrays.fill(request.body, (byte) 0);
+        }
+        void discard() {
+            if (!claimed.compareAndSet(false, true)) return;
+            bridge.registry.complete(ticket); finish(); call.reject("REQUEST_CANCELLED", "REQUEST_CANCELLED");
+        }
+        @Override public void run() {
+            if (!claimed.compareAndSet(false, true)) return;
+            try { if (destroyed) throw new NativeFailure("REQUEST_CANCELLED"); call.resolve(bridge.request(request, ticket)); }
+            catch (NativeFailure error) { reject(call, error); }
+            catch (RuntimeException ignored) { call.reject("API_REQUEST_FAILED", "API_REQUEST_FAILED"); }
+            finally { bridge.registry.complete(ticket); finish(); }
+        }
     }
     @PluginMethod public void apiRequest(PluginCall call) {
         RequestRegistry.Ticket registered = null;
+        DownloadAuthority.Transition identity = null;
+        NativePolicy.Request validated = null;
         try {
             guard(); fields(call.getData(), "request"); NativeHttpBridge bridge = requireHttp();
             JSONObject value = call.getData().optJSONObject("request"); if (value == null) throw new NativeFailure("INVALID_NATIVE_ARGUMENT");
             fields(value, "id", "path", "method", "headers", "body_base64");
-            registered = bridge.registry.register(string(value, "id"));
-            ownedRequests.add(registered);
             Map<String,String> headers = new LinkedHashMap<>();
             if (value.has("headers")) {
                 JSONObject supplied = value.optJSONObject("headers"); if (supplied == null) throw new NativeFailure("INVALID_API_HEADER");
@@ -312,20 +352,33 @@ public final class TireNativePlugin extends Plugin {
             }
             String body = value.isNull("body_base64") ? null : string(value, "body_base64");
             NativePolicy.Request request = NativePolicy.request(string(value, "id"), string(value, "path"), string(value, "method"), headers, body, TireNativePlugin::metadata);
+            validated = request;
+            identity = bridge.admitIdentity(request);
+            registered = bridge.registry.register(string(value, "id"));
+            ownedRequests.add(registered);
             RequestRegistry.Ticket ticket = registered;
             // Do not retain another full copy in PluginCall while the bounded native request runs.
             call.getData().remove("request");
-            try { requests.execute(() -> { try { call.resolve(bridge.request(request, ticket)); } catch (NativeFailure error) { reject(call, error); } catch (RuntimeException ignored) { bridge.registry.complete(ticket); call.reject("API_REQUEST_FAILED", "API_REQUEST_FAILED"); } finally { ownedRequests.remove(ticket); Arrays.fill(request.body, (byte) 0); } }); }
-            catch (RejectedExecutionException ignored) { Arrays.fill(request.body, (byte) 0); throw new NativeFailure("API_CLIENT_UNAVAILABLE"); }
-        } catch (NativeFailure error) { if (registered != null && http != null) { ownedRequests.remove(registered); http.registry.complete(registered); } reject(call, error); }
+            RequestWork work = new RequestWork(bridge, request, ticket, identity, call);
+            requestWork.add(work);
+            try { requests.execute(work); }
+            catch (RejectedExecutionException ignored) { work.discard(); }
+        } catch (NativeFailure error) {
+            if (identity != null) identity.close();
+            if (validated != null) Arrays.fill(validated.body, (byte) 0);
+            if (registered != null && http != null) { ownedRequests.remove(registered); http.registry.complete(registered); } reject(call, error);
+        }
     }
     @PluginMethod public void apiCancel(PluginCall call) {
         try { guard(); fields(call.getData(), "id"); requireHttp().registry.cancel(string(call.getData(), "id")); call.resolve(); }
         catch (NativeFailure error) { reject(call, error); }
     }
     @PluginMethod public void resetSession(PluginCall call) {
+        DownloadAuthority.Transition transition = null;
         try {
             guard(); fields(call.getData());
+            transition = runtime.downloads.beginTransition();
+            final DownloadAuthority.Transition resetTransition = transition;
             if (!offlineResetting.compareAndSet(false, true)) throw new NativeFailure("SESSION_RESET_IN_PROGRESS");
             NativeHttpBridge bridge = http;
             // Publish durable owner/policy revocation before cancelling network work.
@@ -345,17 +398,36 @@ public final class TireNativePlugin extends Plugin {
                 } catch (Exception ignored) {
                     if (bridge != null) bridge.registry.endReset();
                     call.reject("OFFLINE_STORAGE_FAILED", "OFFLINE_STORAGE_FAILED");
-                } finally { offlineResetting.set(false); }
+                } finally { offlineResetting.set(false); resetTransition.close(); }
             }); } catch (RejectedExecutionException ignored) {
                 if (bridge != null) bridge.registry.endReset();
+                resetTransition.close();
                 offlineResetting.set(false); throw new NativeFailure("OFFLINE_BUSY");
             }
         }
+        catch (NativeFailure error) { if (transition != null) transition.close(); reject(call, error); }
+    }
+    @PluginMethod public void prepareDownload(PluginCall call) {
+        try { guard(); fields(call.getData()); call.resolve(new JSObject().put("lease", runtime.downloads.prepare(downloadDocument))); }
         catch (NativeFailure error) { reject(call, error); }
     }
-    @PluginMethod public void saveDownload(PluginCall call) {
+    @PluginMethod public void releaseDownload(PluginCall call) {
         try {
-            guard(); fields(call.getData(), "filename", "mime", "body_base64");
+            guard(); fields(call.getData(), "lease"); String lease = string(call.getData(), "lease");
+            runtime.downloads.release(lease, downloadDocument);
+            DownloadJob job; DownloadAuthority.Reservation reservation;
+            synchronized (this) { job = lease.equals(downloadLease) ? downloadJob : null; reservation = job == null ? null : downloadReservation; }
+            if (job != null && reservation != null && reservation.revokeBeforeCommit()) job.cancel();
+            call.resolve();
+        } catch (NativeFailure error) { reject(call, error); }
+    }
+    @PluginMethod public void saveDownload(PluginCall call) {
+        DownloadAuthority.Reservation reserved = null;
+        try {
+            guard(); fields(call.getData(), "lease", "filename", "mime", "body_base64");
+            String lease = string(call.getData(), "lease");
+            reserved = runtime.downloads.reserve(lease, downloadDocument);
+            final DownloadAuthority.Reservation reservation = reserved;
             String name = string(call.getData(), "filename"), mime = NativePolicy.download(name, string(call.getData(), "mime"));
             if (!downloadBusy.compareAndSet(false, true)) throw new NativeFailure("DOWNLOAD_DIALOG_BUSY");
             byte[] bytes;
@@ -367,11 +439,11 @@ public final class TireNativePlugin extends Plugin {
                     else if (error.equals("DOWNLOAD_DIALOG_CANCELLED")) call.resolve(new JSObject().put("saved", false));
                     else call.reject(error, error);
                 }
-                @Override public void finished(DownloadJob current) { finishDownload(current); }
-            });
+                @Override public void finished(DownloadJob current) { reservation.close(); finishDownload(current); }
+            }, reservation::commit);
             synchronized (this) {
                 if (destroyed) { job.abort("API_CLIENT_UNAVAILABLE"); downloadBusy.set(false); return; }
-                downloadJob = job; downloadCallbackId = call.getCallbackId();
+                downloadJob = job; downloadCallbackId = call.getCallbackId(); downloadLease = lease; downloadReservation = reservation;
             }
             call.getData().remove("body_base64");
             getActivity().runOnUiThread(() -> {
@@ -380,7 +452,7 @@ public final class TireNativePlugin extends Plugin {
                 try { startActivityForResult(call, intent, "downloadSelected"); }
                 catch (Exception ignored) { job.abort("DOWNLOAD_DIALOG_FAILED"); }
             });
-        } catch (NativeFailure error) { reject(call, error); }
+        } catch (NativeFailure error) { if (reserved != null) reserved.close(); reject(call, error); }
     }
     @ActivityCallback private void downloadSelected(PluginCall call, ActivityResult result) {
         final DownloadJob job;
@@ -409,7 +481,7 @@ public final class TireNativePlugin extends Plugin {
         catch (RejectedExecutionException ignored) { job.abort("DOWNLOAD_WRITE_FAILED"); }
     }
     private synchronized void finishDownload(DownloadJob job) {
-        if (downloadJob == job) { downloadJob = null; downloadCallbackId = null; downloadBusy.set(false); }
+        if (downloadJob == job) { downloadJob = null; downloadCallbackId = null; downloadLease = null; downloadReservation = null; downloadBusy.set(false); }
     }
     @PluginMethod public void openExternal(PluginCall call) {
         try { guard(); fields(call.getData(), "url"); Uri uri = Uri.parse(NativePolicy.externalUrl(string(call.getData(), "url")).toASCIIString());
@@ -440,6 +512,7 @@ public final class TireNativePlugin extends Plugin {
         destroyed = true;
         offlineLifecycle.incrementAndGet();
         if (runtime != null) runtime.documentEnded();
+        if (runtime != null) runtime.downloads.endDocument(downloadDocument);
         DownloadJob job; synchronized (this) { job = downloadJob; }
         if (job != null) job.cancel();
         downloads.shutdownNow();
@@ -448,6 +521,7 @@ public final class TireNativePlugin extends Plugin {
             if (http != null) http.registry.complete(ticket);
         }
         ownedRequests.clear(); requests.shutdownNow();
+        for (RequestWork work : requestWork) work.discard();
         // Already queued controls settle promptly without running their action after teardown.
         controls.shutdown();
         // Queued document calls settle through guard. Application-owned Store/HTTP

@@ -141,7 +141,10 @@ def preference_state(db: Session, scope: list[str]) -> dict:
     rows = db.scalars(select(DrivingPreferenceRevision).where(DrivingPreferenceRevision.actor_session_id.in_(scope))
                       .order_by(desc(DrivingPreferenceRevision.revision)).limit(21)).all()
     row = rows[0] if rows else None
-    return {"scope": "actor", "revision": row.revision if row else 0, "weights": row.weights if row else None,
+    revision = row.revision if row else 0
+    weights = row.weights if row else None
+    return {"scope": "actor", "revision": revision, "weights": weights,
+            "fingerprint": digest({"schema": "driving-preference-state@1", "revision": revision, "weights": weights}),
             "updated_at": timestamp(row.created_at) if row else None, "history_truncated": len(rows) > 20,
             "history": [{"revision": item.revision, "weights": item.weights, "created_at": timestamp(item.created_at)} for item in rows[:20]],
             "notice": "个人偏好不改写官方参数或客观测试排序；偏好仅本人可见（登录按账户聚合，匿名按会话隔离）；当前未启用推荐评分。"}

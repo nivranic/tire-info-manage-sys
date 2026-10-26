@@ -7,11 +7,13 @@ from pydantic import Field, StrictInt, field_validator, model_validator
 from sqlalchemy import DateTime, ForeignKey, JSON, String, UniqueConstraint, desc, event, func, select
 from sqlalchemy.orm import Mapped, Session, load_only, mapped_column
 
+from .auth import session_scope
 from .db import Base, uid, utcnow
 from .documents import DocumentMetadata
 from .domain import StrictModel, digest, parse_size, stable_json
-from .research import DescriptionText
+from .research import DescriptionText, preference_state
 from .service import QueryService, timestamp
+from .test_preference_interpretation import PreferenceInterpretationRequest, interpret_test_preferences
 
 
 class Participant(StrictModel):
@@ -192,8 +194,31 @@ def append(db, event_id, payload, action, state, operator, reason, session_id, r
     db.flush()
     QueryService(db, None).audit(session_id, 'test_event_revision_recorded', event_id=event_id,
                                revision_id=row.id, revision=revision, operation=action)
+    from .interest_events import publish
+    publish(db, 'test_event', row)
     db.commit()
     return detail(db, row)
+
+
+def compare_revision(row, participant_ids, metric_keys):
+    """Read-only projection of one exact revision; preserve source values and ranks."""
+    event_id = row.event_id
+    if row.state == 'revoked':
+        raise HTTPException(409, '已撤销事件不参与成绩比较，原记录仍可按历史查看')
+    people = {f'{event_id}:{p["key"]}': p for p in row.payload['participants']}
+    metrics = {m['key']: m for m in row.payload['metrics']}
+    if (len(set(participant_ids)) != len(participant_ids) or not set(participant_ids) <= people.keys()
+            or len(set(metric_keys)) != len(metric_keys) or not set(metric_keys) <= metrics.keys()):
+        raise HTTPException(422, '只能比较同一事件内不同参测胎及本场指标；不能混入其他场次')
+    selected = {people[k]['key'] for k in participant_ids}
+    measurements = [m for m in row.payload['measurements']
+                    if m['participant_key'] in selected and m['metric_key'] in metric_keys]
+    return {**metadata(row), 'data_state': 'local_snapshot', 'comparison_scope': 'same_event_only',
+            'event': {k: v for k, v in row.payload.items() if k not in {'participants', 'metrics', 'measurements'}},
+            'participants': [{**people[k], 'id': k} for k in participant_ids],
+            'metrics': [metrics[k] for k in metric_keys], 'measurements': measurements,
+            'ranking': 'source_reported_only',
+            'notice': '人工录入的历史测试记录，未经在线核验；不同事件不可直接排名，缺少成绩不等于零。'}
 
 
 def register_test_event_routes(app: FastAPI):
@@ -257,22 +282,28 @@ def register_test_event_routes(app: FastAPI):
     @app.post('/v1/test-events/{event_id}/compare')
     def compare(event_id: str, payload: EventComparison, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
         row = latest(db, event_id, payload.expected_revision)
+        return compare_revision(row, payload.participant_ids, payload.metric_keys)
+
+    @app.post('/v1/test-events/{event_id}/preference-interpretation')
+    def preference_interpretation(event_id: str, payload: PreferenceInterpretationRequest, request: Request,
+                                 mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
+        try:
+            row = latest(db, event_id)
+        except HTTPException as error:
+            if error.status_code == 404:
+                raise HTTPException(404, {'code': 'test_event_not_found', 'message': '未找到测试事件。'}) from None
+            raise
         if row.state == 'revoked':
-            raise HTTPException(409, '已撤销事件不参与成绩比较，原记录仍可按历史查看')
-        people = {f'{event_id}:{p["key"]}': p for p in row.payload['participants']}
-        metrics = {m['key']: m for m in row.payload['metrics']}
-        if (len(set(payload.participant_ids)) != len(payload.participant_ids)
-                or not set(payload.participant_ids) <= people.keys()
-                or len(set(payload.metric_keys)) != len(payload.metric_keys)
-                or not set(payload.metric_keys) <= metrics.keys()):
-            raise HTTPException(422, '只能比较同一事件内不同参测胎及本场指标；不能混入其他场次')
-        selected = {people[k]['key'] for k in payload.participant_ids}
-        measurements = [m for m in row.payload['measurements']
-                        if m['participant_key'] in selected and m['metric_key'] in payload.metric_keys]
-        # Preserve original decimals and source ranks. No rank recomputation on a subset,
-        # cross-event unit conversion, inferred overall score, or fact overwrite.
-        return {**metadata(row), 'data_state': 'local_snapshot', 'comparison_scope': 'same_event_only',
-                'event': {k: v for k, v in row.payload.items() if k not in {'participants', 'metrics', 'measurements'}},
-                'participants': [{**people[k], 'id': k} for k in payload.participant_ids],
-                'metrics': [metrics[k] for k in payload.metric_keys], 'measurements': measurements,
-                'ranking': 'source_reported_only', 'notice': '人工录入的历史测试记录，未经在线核验；不同事件不可直接排名，缺少成绩不等于零。'}
+            raise HTTPException(409, {'code': 'test_event_revoked', 'message': '测试事件已撤销，不能产生新的个人解读。'})
+        if (row.revision != payload.expected_event_revision
+                or row.fingerprint != payload.expected_event_fingerprint):
+            raise HTTPException(409, {'code': 'test_event_changed', 'message': '测试事件已更新，请重新载入后解读。'})
+        preference = preference_state(db, session_scope(db, request.state.session_id))
+        if preference['weights'] is None:
+            raise HTTPException(409, {'code': 'driving_preference_missing', 'message': '尚未设置或已清除驾驶偏好，请先设置本人偏好。'})
+        if (preference['revision'] != payload.expected_preference_revision
+                or preference['fingerprint'] != payload.expected_preference_fingerprint):
+            raise HTTPException(409, {'code': 'driving_preference_changed', 'message': '本人驾驶偏好已更新，请重新载入后解读。'})
+        # These append-only records are the calculation snapshot. Do not call the
+        # event GET handler: its history-read audit commits a write transaction.
+        return interpret_test_preferences({**metadata(row), 'event': row.payload}, preference, payload)

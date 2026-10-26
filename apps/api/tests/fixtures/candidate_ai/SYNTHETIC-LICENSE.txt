@@ -1,0 +1,14 @@
+SYNTHETIC R77 CANDIDATE SPECIFICATION ENGINEERING FIXTURE LICENSE
+
+Rights holder: the project synthetic fixture authors.
+The synthetic vehicle, tire identity and manually reviewed fitment relation
+records authored in candidate_ai_support.py are project-created test material.
+Permission is granted to process their explicitly selected specification
+fields with a controlled model adapter for candidate_spec_assistance@1
+engineering tests, including the configured recipient asserted by each test.
+
+This statement covers no real manufacturer, publisher, professional test,
+TestEvent, R71 bridge, R74 source, copied publication or third-party material.
+It does not establish real-world performance, human Golden qualification,
+installation safety, official OE, provider connectivity or source ownership.
+It is not a blanket grant for production sources or other purposes.

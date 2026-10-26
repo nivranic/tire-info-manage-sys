@@ -3,8 +3,6 @@ package org.taiji.tireintelligence.mobile;
 import static org.junit.Assert.*;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +43,7 @@ import org.junit.Test;
  */
 public final class DeviceAiHostTest {
     private static final String FINGERPRINTS_REPOSITORY_PATH =
-        ".artifacts/device-ai50/host-sdk-selftest/host-expected-fingerprints.json";
+        "host-sdk-selftest/host-expected-fingerprints.json";
     private static final String FINGERPRINTS_SHA256 =
         "8f8cf08b39cf978fc326ebfb7d94c14ad4b1bfec1519da4395aa2e60b7aa0160";
 
@@ -63,31 +61,17 @@ public final class DeviceAiHostTest {
 
     private static synchronized JSONObject expected() {
         if (document != null) return document;
-        Path path = locate();
         byte[] raw;
-        try { raw = Files.readAllBytes(path); }
-        catch (Exception unreadable) { throw new IllegalStateException("fingerprint vectors unreadable: " + path, unreadable); }
+        try { raw = DeviceAiFixtureCorpus.read(FINGERPRINTS_REPOSITORY_PATH); }
+        catch (Exception unreadable) { throw new IllegalStateException("tracked fingerprint vectors unreadable", unreadable); }
         String actual;
         try { actual = sha256Hex(raw); }
         catch (Exception failure) { throw new IllegalStateException("digest failed", failure); }
-        assertEquals("expected fingerprints sha256 drift: " + path, FINGERPRINTS_SHA256, actual);
+        assertEquals("expected fingerprints sha256 drift", FINGERPRINTS_SHA256, actual);
         document = parseJson(raw);
         assertEquals("device-ai-host-expected-fingerprints@1", document.optString("schema"));
-        System.out.println("host fingerprints bound: " + path + " (sha256 " + FINGERPRINTS_SHA256 + ")");
+        System.out.println("Tracked host fingerprints bound: " + FINGERPRINTS_REPOSITORY_PATH + " (sha256 " + FINGERPRINTS_SHA256 + ")");
         return document;
-    }
-
-    private static Path locate() {
-        List<Path> candidates = new ArrayList<>();
-        String configured = System.getProperty("tire.test.hostFingerprints");
-        if (configured != null) candidates.add(Path.of(configured));
-        Path directory = Path.of("").toAbsolutePath();
-        for (int up = 0; up <= 8 && directory != null; up++) {
-            candidates.add(directory.resolve(FINGERPRINTS_REPOSITORY_PATH).normalize());
-            directory = directory.getParent();
-        }
-        for (Path candidate : candidates) if (Files.isRegularFile(candidate)) return candidate;
-        throw new IllegalStateException("fingerprint vector file not found above the working directory; pass -Dtire.test.hostFingerprints=<path>");
     }
 
     private static String sha256Hex(byte[] data) throws Exception {
@@ -274,7 +258,11 @@ public final class DeviceAiHostTest {
             "question_sha256", prepareBody.optString("question_sha256"), "selection_sha256", "02".repeat(32),
             "projection_sha256", "99".repeat(32), "projection_byte_count", 1000L,
             "device_context_fingerprint", "03".repeat(32), "request_hash", "04".repeat(32),
-            "contract", json(), "pack", json(), "replayed", false,
+            "contract", json(), "pack", json());
+    }
+
+    private static JSONObject prepareResponseFixture(JSONObject prepareBody) {
+        return with(with(prepareViewFixture(prepareBody), "replayed", false),
             "provider_preview", json("model", json("provider", "openai_responses")));
     }
 
@@ -902,7 +890,7 @@ public final class DeviceAiHostTest {
         FakeTransport transport = new FakeTransport();
         DeviceAiHost.DeviceAiHostClient client = new DeviceAiHost.DeviceAiHostClient(transport);
         JSONObject prepareBody = prepareBodyFixture();
-        JSONObject view = prepareViewFixture(prepareBody);
+        JSONObject view = prepareResponseFixture(prepareBody);
 
         transport.responder = call -> jsonResponse(201, view);
         JSONObject result = client.prepare(prepareBody, "9999AAAA-BBBB-4CCC-8DDD-5555EEE66666");
@@ -968,7 +956,7 @@ public final class DeviceAiHostTest {
     public void clientPrepareDispatchesFourDomainBodiesInFrozenKeyOrder() throws Exception {
         FakeTransport transport = new FakeTransport();
         DeviceAiHost.DeviceAiHostClient client = new DeviceAiHost.DeviceAiHostClient(transport);
-        transport.responder = call -> jsonResponse(201, prepareViewFixture(prepareBodyFixture()));
+        transport.responder = call -> jsonResponse(201, prepareResponseFixture(prepareBodyFixture()));
 
         // vehicle domain under its locked mode: wire key order stays the frozen list.
         JSONObject vehicleBody = prepareBodyWith("complete_observation", selectors(vehicleSelector()), null);
@@ -1006,17 +994,38 @@ public final class DeviceAiHostTest {
     }
 
     @Test
+    public void clientPrepareRequiresBooleanReplayFlag() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        DeviceAiHost.DeviceAiHostClient client = new DeviceAiHost.DeviceAiHostClient(transport);
+        JSONObject prepareBody = prepareBodyFixture();
+        transport.responder = call -> jsonResponse(201, prepareViewFixture(prepareBody));
+        assertThrows("POST must include replayed", IllegalStateException.class,
+            () -> client.prepare(prepareBody, KEY_CANONICAL));
+        for (Object flag : new Object[] {JSONObject.NULL, "false", 0L, json()}) {
+            transport.responder = call -> jsonResponse(200, with(prepareViewFixture(prepareBody), "replayed", flag));
+            assertThrows("POST replayed must be a boolean", IllegalStateException.class,
+                () -> client.prepare(prepareBody, KEY_CANONICAL));
+        }
+    }
+
+    @Test
     public void clientLookupAndReadPaths() throws Exception {
         FakeTransport transport = new FakeTransport();
         DeviceAiHost.DeviceAiHostClient client = new DeviceAiHost.DeviceAiHostClient(transport);
         transport.responder = call -> jsonResponse(200, prepareViewFixture(prepareBodyFixture()));
 
-        client.lookupPrepare("9999AAAA-BBBB-4CCC-8DDD-5555EEE66666");
+        JSONObject lookup = client.lookupPrepare("9999AAAA-BBBB-4CCC-8DDD-5555EEE66666");
+        assertFalse("GET lookup must not synthesize replayed", lookup.has("replayed"));
         assertEquals("GET", transport.last().method);
         assertEquals("/v1/ai/device-evidence-packs/lookup?mode=history&idempotency_key=" + KEY_CANONICAL, transport.last().path);
 
-        client.readPrepare("prep-1");
+        JSONObject read = client.readPrepare("prep-1");
+        assertFalse("GET read must not synthesize replayed", read.has("replayed"));
         assertEquals("/v1/ai/device-evidence-packs/prep-1?mode=history", transport.last().path);
+
+        transport.responder = call -> jsonResponse(200, with(prepareViewFixture(prepareBodyFixture()), "expired", true));
+        assertTrue("expired GET records remain readable", client.lookupPrepare(KEY_CANONICAL).getBoolean("expired"));
+        assertTrue("expired GET records remain readable", client.readPrepare("prep-1").getBoolean("expired"));
 
         transport.responder = call -> jsonResponse(404, json("detail", "未找到本会话的设备 AI 准备记录"));
         try {
@@ -1024,6 +1033,32 @@ public final class DeviceAiHostTest {
             fail("404 must throw");
         } catch (DeviceAiHost.DeviceAiHostException error) {
             assertEquals(Integer.valueOf(404), error.httpStatus);
+        }
+    }
+
+    @Test
+    public void clientLookupAndReadRejectMalformedBindingAndExpiry() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        DeviceAiHost.DeviceAiHostClient client = new DeviceAiHost.DeviceAiHostClient(transport);
+        JSONObject view = prepareViewFixture(prepareBodyFixture());
+        List<JSONObject> invalidViews = new ArrayList<>();
+        for (String field : List.of("id", "pack_id", "projection_sha256", "device_context_fingerprint",
+                "question_sha256", "selection_sha256", "expired", "expires_at")) {
+            JSONObject missing = DeviceAiHost.copyOf(view);
+            missing.remove(field);
+            invalidViews.add(missing);
+        }
+        for (String hash : List.of("projection_sha256", "device_context_fingerprint", "question_sha256", "selection_sha256"))
+            invalidViews.add(with(view, hash, "not-a-sha256"));
+        invalidViews.add(with(view, "expired", "false"));
+        invalidViews.add(with(view, "expires_at", "not-a-date"));
+        invalidViews.add(with(view, "expires_at", "2026-10-02T12:30:00"));
+        for (JSONObject invalid : invalidViews) {
+            transport.responder = call -> jsonResponse(200, invalid);
+            assertThrows("GET lookup must validate binding and expiry", IllegalStateException.class,
+                () -> client.lookupPrepare(KEY_CANONICAL));
+            assertThrows("GET read must validate binding and expiry", IllegalStateException.class,
+                () -> client.readPrepare("prep-1"));
         }
     }
 

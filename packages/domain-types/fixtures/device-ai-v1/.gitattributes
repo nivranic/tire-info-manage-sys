@@ -1,0 +1,2 @@
+# Preserve sealed hashes through git add/clone on every core.autocrlf setting.
+** -text

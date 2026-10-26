@@ -76,6 +76,39 @@ def bundle_entries(db, bundle_id):
     return entries, manifest
 
 
+def binary_vehicle_capture(db, capture):
+    from .vehicle_raw import FIRST_GENERATION_ID, SOURCE_ID
+    run = db.get(QueryRun, capture.query_id)
+    return (capture.body_encoding == 'binary' or (capture.source_id == SOURCE_ID
+            and run is not None and run.query == {'vehicle_id': FIRST_GENERATION_ID}))
+
+
+def checked_history_capture_bytes(db, capture, *, frozen_input=None):
+    capture_id = (frozen_input or {}).get('capture_id')
+    if capture_id is None:
+        if capture is None:
+            raise HTTPException(503, {'code': 'capture_integrity_failed'})
+        capture_id = capture.id
+    capture = db.get(RawCapture, capture_id, populate_existing=True)
+    if capture is None:
+        raise HTTPException(503, {'code': 'capture_integrity_failed'})
+    db.get(QueryRun, capture.query_id, populate_existing=True)
+    if (frozen_input or {}).get('body_encoding') == 'binary' or binary_vehicle_capture(db, capture):
+        from .vehicle_raw import checked_vehicle_history_capture_bytes
+        capture = db.get(RawCapture, capture.id, populate_existing=True)
+        from .vehicle_raw import VehicleRawIntegrityError
+        try:
+            raw, storage = checked_vehicle_history_capture_bytes(db, capture)
+        except VehicleRawIntegrityError:
+            raise HTTPException(503, {'code': 'capture_integrity_failed'}) from None
+        if frozen_input is not None:
+            current = capture_input(db, capture, {capture.source_id: {'target_kind': capture.target_kind}})
+            if current != frozen_input:
+                raise HTTPException(503, {'code': 'capture_integrity_failed'})
+        return raw, storage
+    return checked_capture_bytes(db, capture)
+
+
 def latest_baseline(db, source_id, target_kind, query_key, query):
     if target_kind == 'recall':
         from .recall_reparse import latest_recall_baseline
@@ -89,7 +122,8 @@ def latest_baseline(db, source_id, target_kind, query_key, query):
             .join(QueryRun, QueryRun.id == VehicleVerification.query_id)
             .where(QueryRun.source_id == source_id, QueryRun.query_key == query_key,
                    VehicleVerification.vehicle_id == query['vehicle_id'])
-            .order_by(desc(VehicleVerification.verified_at), desc(VehicleVerification.id)).limit(1)).first()
+            .order_by(desc(VehicleVerification.verified_at), desc(VehicleVerification.id)).limit(1)
+            .execution_options(populate_existing=True)).first()
     else:
         item = db.execute(select(Snapshot, Verification)
             .join(Verification, Verification.snapshot_id == Snapshot.id)
@@ -98,6 +132,15 @@ def latest_baseline(db, source_id, target_kind, query_key, query):
     if item is None:
         return None
     snapshot, verification = item
+    if target_kind == 'vehicle':
+        from .vehicle_raw import FIRST_GENERATION_ID, SOURCE_ID, checked_vehicle_history_baseline
+        if snapshot.body_encoding == 'binary' or (snapshot.source_id == SOURCE_ID
+                and snapshot.vehicle_id == FIRST_GENERATION_ID):
+            from .vehicle_raw import VehicleRawIntegrityError
+            try:
+                checked_vehicle_history_baseline(db, snapshot, verification)
+            except VehicleRawIntegrityError:
+                raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
     return {'snapshot_id': snapshot.id, 'verification_id': verification.id,
             'verified_at': utc(verification.verified_at).isoformat(),
             'observed_at': utc(snapshot.observed_at).isoformat(), 'raw_hash': snapshot.raw_hash,
@@ -122,7 +165,13 @@ def capture_input(db, capture, entries):
             from .recall_reparse import validate_recall_input
             validate_recall_input(capture.source_id, run.query, capture.source_url, capture.content_type)
         elif capture.target_kind == 'vehicle':
-            if (set(run.query) != {'vehicle_id'} or run.query['vehicle_id'] != xiaomi.CURRENT_ID
+            if binary_vehicle_capture(db, capture):
+                from .vehicle_raw import FIRST_GENERATION_ID, PDF_URL, SOURCE_ID
+                if (capture.body_encoding != 'binary' or capture.source_id != SOURCE_ID
+                        or run.query != {'vehicle_id': FIRST_GENERATION_ID}
+                        or capture.source_url != PDF_URL or capture.content_type != 'application/pdf'):
+                    raise ValueError('binary vehicle input')
+            elif (set(run.query) != {'vehicle_id'} or run.query['vehicle_id'] != xiaomi.CURRENT_ID
                     or capture.source_url != xiaomi.API_URL or capture.content_type != 'application/json'):
                 raise ValueError('vehicle input')
         else:
@@ -133,7 +182,7 @@ def capture_input(db, capture, entries):
                 raise ValueError('source query url')
     except (ValueError, TypeError, KeyError, SourceAccessError):
         raise HTTPException(422, {'code': 'capture_source_metadata_mismatch'}) from None
-    return {'capture_id': capture.id, 'query_id': run.id, 'source_id': capture.source_id,
+    value = {'capture_id': capture.id, 'query_id': run.id, 'source_id': capture.source_id,
             'target_kind': capture.target_kind, 'query': deepcopy(run.query), 'query_key': capture.query_key,
             'source_url': capture.source_url, 'content_type': capture.content_type,
             'raw_hash': capture.raw_hash, 'byte_count': capture.byte_count,
@@ -141,9 +190,13 @@ def capture_input(db, capture, entries):
             'storage_kind': 'object_store' if db.get(CaptureObject, capture.id) else 'database_legacy',
             'original_parser_version': capture.parser_version,
             'original_parser_identity': deepcopy(capture.parser_identity)}
+    if capture.body_encoding == 'binary':
+        value.update(body_encoding='binary', original_mapping_status='not_attested')
+    return value
 
 
-def validate_candidate(payload, source_input, raw):
+def validate_candidate(payload, source_input, raw, *, db=None, bundle_manifest=None,
+                       receipt=None, deployment_revision=None):
     if source_input.get('target_kind') not in {'tire', 'vehicle', 'recall'}:
         raise ValueError('unsupported_reparse_source')
     def validate_text(value):
@@ -179,7 +232,15 @@ def validate_candidate(payload, source_input, raw):
     if any(row['trim_id'] not in trim_ids for row in fits):
         raise ValueError('unknown trim')
     validate_vehicle_structure(payload, fits)
-    return {**payload, 'fitments': fits}
+    candidate = {**payload, 'fitments': fits}
+    if source_input.get('body_encoding') == 'binary':
+        from .vehicle_raw import build_vehicle_history_parse_provenance
+        candidate['parse_provenance'] = build_vehicle_history_parse_provenance(db,
+            source_input=source_input, raw=raw, payload=payload, bundle_manifest=bundle_manifest,
+            receipt=receipt, deployment_revision=deployment_revision)
+        if len(stable_json(candidate).encode('utf-8')) > MAX_CANDIDATE_BYTES:
+            raise ValueError('candidate too large')
+    return candidate
 
 
 def tire_identity(row):
@@ -338,7 +399,8 @@ def register_reparse_routes(app: FastAPI):
                            'max_output_bytes': runtime['output_bytes'], 'max_stderr_bytes': runtime['stderr_bytes'],
                            'timeout_seconds': runtime['wall_seconds'], 'cpu_seconds': runtime['cpu_seconds'],
                            'max_memory_bytes': runtime['memory_bytes'], 'max_concurrency': runtime['max_concurrent'],
-                           'unknown_after_seconds': 120}, 'notice': NOTICE}
+                           'unknown_after_seconds': 120}, 'notice': NOTICE,
+                'binary_reparse': {'bundle_id_required': True, 'body_encoding': 'binary'}}
 
     @app.get('/v1/reparse/runs')
     def runs(mode: Literal['history'] = Query(...), capture_id: str | None = Query(None, max_length=64),
@@ -389,6 +451,8 @@ def register_reparse_routes(app: FastAPI):
         if capture is None:
             raise HTTPException(404, {'code': 'capture_not_found'})
         source_input = capture_input(db, capture, entries)
+        if source_input.get('body_encoding') == 'binary' and not payload.bundle_id:
+            raise HTTPException(422, {'code': 'binary_reparse_bundle_required'})
         current = entries[capture.source_id]
         if payload.parser_version != current['parser_version'] or payload.parser_digest != current['parser_digest']:
             raise HTTPException(409, {'code': 'parser_deployment_changed'})
@@ -408,15 +472,20 @@ def register_reparse_routes(app: FastAPI):
         error_code, candidate, quality, difference, receipt, http_failure = None, None, None, None, {}, None
         runtime_error_type = ()
         try:
-            raw, _storage = checked_capture_bytes(db, capture)
+            raw, _storage = checked_history_capture_bytes(db, capture,
+                frozen_input=source_input if source_input.get('body_encoding') == 'binary' else None)
             db.commit()  # No database lock or read transaction spans parser execution.
             from .parser_runtime import parse_isolated, ParserRunError
             runtime_error_type = ParserRunError
-            parsed = asyncio.run(parse_isolated(capture.source_id, raw, source_input['query'],
+            parsed = asyncio.run(parse_isolated(
+                source_input['source_id'] if source_input.get('body_encoding') == 'binary' else capture.source_id,
+                raw, source_input['query'],
                                                 parser['version'], parser['digest'],
                                                 **({'bundle_manifest': bundle_manifest} if bundle_manifest else {})))
             receipt = parsed['receipt']
-            candidate = validate_candidate(parsed['payload'], source_input, raw)
+            candidate = validate_candidate(parsed['payload'], source_input, raw, **(
+                {'db': db, 'bundle_manifest': bundle_manifest, 'receipt': receipt}
+                if source_input.get('body_encoding') == 'binary' else {}))
             quality, difference = compare_candidate(baseline, candidate, source_input['target_kind'])
         except HTTPException:
             error_code, http_failure = 'capture_integrity_failed', 503

@@ -2,9 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { TestEventComparison, TestEventDetail, TestEventRecord } from "@tire/domain-types";
+import type { TestEventComparison, TestEventDetail, TestEventRecord, TestMeasurementReference } from "@tire/domain-types";
 import TestEventEditor from "./test-event-editor";
 import AIAnalysisDialog from "./ai-analysis";
+import TestPreferenceInterpretation from "./test-preference-interpretation";
+import TestSkuLinks from "./test-sku-links";
+import TestEventGolden from "./test-event-golden";
 
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : "测试记录操作未完成。";
 const relations = { independent: "独立测试（录入声明）", manufacturer_commissioned: "厂商委托测试（录入声明）", unknown: "测试关系未确认" };
@@ -18,19 +21,50 @@ function EventDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [goldenOpen, setGoldenOpen] = useState(false);
+  const [preferenceOpen, setPreferenceOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [comparison, setComparison] = useState<TestEventComparison | null>(null);
   const [operator, setOperator] = useState("");
   const [reason, setReason] = useState("");
+  const [pendingReference, setPendingReference] = useState<TestMeasurementReference | null>(null);
+  const [referenceNotice, setReferenceNotice] = useState("");
+  const rawEvidence = useRef<HTMLDetailsElement | null>(null);
+  const measurementNodes = useRef(new Map<string, HTMLElement>());
   const operation = useRef<AbortController | null>(null);
   useEffect(() => () => operation.current?.abort(), []);
   useEffect(() => {
     const controller = new AbortController(); setRow(null); setError(""); setComparison(null); setEditing(false);
     void tireApi.testEvent(id, controller.signal, historyRevision).then(result => {
       if (!controller.signal.aborted) { setRow(result); setSelected(result.participants.slice(0, 6).map(p => p.id)); }
-    }).catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+    }).catch(cause => { if (!controller.signal.aborted) { setError(errorText(cause)); setPendingReference(null); } });
     return () => controller.abort();
   }, [id, revision, historyRevision]);
+  useEffect(() => {
+    if (!row || !pendingReference) return;
+    const reference = pendingReference;
+    const target = row.id === reference.event_id && row.revision === reference.revision
+      ? measurementNodes.current.get(JSON.stringify([reference.participant_id, reference.metric_key])) : undefined;
+    if (target && rawEvidence.current) {
+      rawEvidence.current.open = true;
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      const metric = row.event.metrics.find(item => item.key === reference.metric_key);
+      const participant = row.participants.find(item => item.id === reference.participant_id);
+      setReferenceNotice(`已定位修订 #${reference.revision}：${participant?.brand || ""} ${participant?.model || ""} · ${metric?.label || reference.metric_key} 的原始成绩与短证据。`);
+    } else {
+      setReferenceNotice("未找到与该引用的事件、修订、参测对象和指标一致的原始成绩，未定位其他记录。");
+    }
+    setPendingReference(null);
+  }, [row, pendingReference]);
+  function openHistory(value: number, reference?: TestMeasurementReference) {
+    operation.current?.abort(); setBusy(false); setRow(null); setComparison(null); setPreferenceOpen(false);
+    setPendingReference(reference || null); setReferenceNotice(""); setHistoryRevision(value); setRevision(previous => previous + 1);
+  }
+  function reloadLatest() {
+    operation.current?.abort(); setBusy(false); setRow(null); setComparison(null);
+    setPendingReference(null); setReferenceNotice(""); setHistoryRevision(undefined); setRevision(value => value + 1);
+  }
   async function compare() {
     if (!row || busy || !selected.length) return;
     const controller = new AbortController(); operation.current = controller; setBusy(true); setError(""); setComparison(null);
@@ -45,21 +79,31 @@ function EventDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
     catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
-  function changed(value: TestEventDetail) { setRow(value); setEditing(false); setComparison(null); setSelected(value.participants.slice(0, 6).map(p => p.id)); onChanged(); }
+  function changed(value: TestEventDetail) { setRow(value); setEditing(false); setComparison(null); setPendingReference(null); setReferenceNotice(""); setSelected(value.participants.slice(0, 6).map(p => p.id)); onChanged(); }
   return <section className="test-event-detail" aria-label="测试事件详情">
-    <div className="panel-title"><h3>场次详情</h3><button type="button" className="text-button" disabled={busy} onClick={() => { setHistoryRevision(undefined); setRevision(v => v + 1); }}>重新载入最新版</button></div>
+    <div className="panel-title"><h3>场次详情</h3><button type="button" className="text-button" disabled={busy} onClick={reloadLatest}>重新载入最新版</button></div>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}
+    {referenceNotice ? <p className="review-boundary" role="status">{referenceNotice}</p> : null}
     {!row ? !error ? <p role="status">正在读取测试记录…</p> : null : editing ? <TestEventEditor initial={row} onSaved={changed} onClose={() => setEditing(false)} /> : <>
-      <h4>{row.title}</h4>{!historyRevision && row.state !== "revoked" ? <button type="button" className="secondary-button" disabled={busy} onClick={() => setAiOpen(true)}>AI 解释本场测试证据</button> : null}{aiOpen ? <AIAnalysisDialog target={{ references: [{ kind: "test_event", event_id: row.id, event_revision: row.revision }], label: row.title + " · 人工记录，仅限本场" }} onClose={() => setAiOpen(false)} /> : null}<div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 人工录入，未在线核验 · {row.state === "revoked" ? "已撤销" : "未撤销"}</strong><span>修订 #{row.revision} · {stamp(row.recorded_at)}；录入时间不是来源验证时间。</span></div>
+      <h4>{row.title}</h4>{!historyRevision && row.state !== "revoked" ? <button type="button" className="secondary-button" disabled={busy} onClick={() => setAiOpen(true)}>AI 摘录本场事实</button> : null}{aiOpen ? <AIAnalysisDialog target={{ references: [{ kind: "test_event", event_id: row.id, event_revision: row.revision }], label: row.title + " · 人工记录，仅限本场", defaultQuestion: "分别摘录本场参测对象的原始成绩与条件，保留来源名次。" }} onClose={() => setAiOpen(false)} /> : null}<div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 人工录入，未在线核验 · {row.state === "revoked" ? "已撤销" : "未撤销"}</strong><span>修订 #{row.revision} · {stamp(row.recorded_at)}；录入时间不是来源验证时间。</span></div>
       <dl className="quality-detail-meta"><div><dt>机构 / 关系</dt><dd>{row.organization} · {relations[row.relationship]}</dd></div><div><dt>发布日期 / 尺寸</dt><dd>{row.publication_date || "未知"} · {row.tested_size}</dd></div><div><dt>车辆 / 路面</dt><dd>{row.event.vehicle || "未披露"} / {row.event.surface || "未披露"}</dd></div><div><dt>条件与适用范围</dt><dd>{row.event.conditions}</dd></div><div><dt>录入范围</dt><dd>{row.coverage === "full_event" ? "本场全部参测胎" : "选录部分结果"} · 已录 {row.participant_count} / 来源总数 {row.event.reported_participants ?? "未知"}</dd></div><div><dt>原始来源</dt><dd><a href={row.event.source_url} target="_blank" rel="noopener noreferrer">{row.event.source_url}</a></dd></div><div><dt>留存依据</dt><dd>{row.event.rights_basis}</dd></div></dl>
+      <TestSkuLinks event={row} readOnly={historyRevision !== undefined} />
+      <div className="test-event-actions"><button type="button" className="secondary-button" onClick={() => setGoldenOpen(value => !value)}>{goldenOpen ? "收起测试真值与复核" : "管理测试真值与复核"}</button></div>
+      {goldenOpen ? <TestEventGolden key={`${row.revision_id}:${row.state}`} event={row} readOnly={historyRevision !== undefined} /> : null}
       {historyRevision ? <p className="review-boundary">正在查看历史修订；恢复最新版后才可比较或管理。</p> : <>
         <p className="quality-intro">选择本场参测胎进行对照。来源名次保持原值，选录子集不重新排名；未披露的成绩显示缺失，不补零。不关联未确认的精确 SKU，也不修改厂商参数。</p>
         <div className="test-participant-selection">{row.participants.map(person => <label className="review-checkbox" key={person.id}><input type="checkbox" disabled={busy || row.state === "revoked"} checked={selected.includes(person.id)} onChange={() => { setComparison(null); setSelected(previous => previous.includes(person.id) ? previous.filter(value => value !== person.id) : [...previous, person.id]); }} /><span>{person.brand} {person.model}{person.source_designation ? ` · ${person.source_designation}` : ""}</span></label>)}</div>
-        <div className="test-event-actions"><button type="button" className="primary-button" disabled={busy || !selected.length || row.state === "revoked"} onClick={() => void compare()}>只比较本场成绩</button><button type="button" className="secondary-button" disabled={busy || row.state === "revoked"} onClick={() => setEditing(true)}>修订这场记录</button></div>
+        <div className="test-event-actions"><button type="button" className="primary-button" disabled={busy || !selected.length || row.state === "revoked"} onClick={() => void compare()}>只比较本场成绩</button><button type="button" className="secondary-button" disabled={busy || row.state === "revoked" || selected.length < 2} onClick={() => setPreferenceOpen(true)}>按我的偏好解读本场</button><button type="button" className="secondary-button" disabled={busy || row.state === "revoked"} onClick={() => setEditing(true)}>修订这场记录</button></div>
+        {preferenceOpen && row.state === "active" ? <TestPreferenceInterpretation event={row} participantIds={selected} onClose={() => setPreferenceOpen(false)} onReload={reloadLatest} onHistory={openHistory} /> : null}
       </>}
       {comparison ? <div className="test-event-comparison"><p className="review-boundary">{comparison.notice}</p>{comparison.metrics.map(metric => <section key={metric.key}><h4>{metric.label} · {metric.unit}</h4><p>{metric.protocol} · 数值方向：{{ lower: "原文说明较低较好", higher: "原文说明较高较好", unspecified: "未说明" }[metric.direction]}</p><div className="comparison-table-wrap" tabIndex={0} aria-label={`${metric.label}同场成绩，可横向滚动`}><table className="comparison-table"><thead><tr><th>参测胎</th><th>原始数值</th><th>来源名次</th><th>短证据</th></tr></thead><tbody>{comparison.participants.map(person => { const value = comparison.measurements.find(m => m.participant_key === person.key && m.metric_key === metric.key); return <tr key={person.id}><th scope="row">{person.brand} {person.model}</th><td>{value ? `${value.raw_value} ${metric.unit}` : "未录入成绩"}</td><td>{value?.source_rank ?? "未记录"}</td><td>{value ? <details><summary>核对摘录</summary><p>{value.evidence_span}</p><p>定位：{value.evidence_locator}</p></details> : "—"}</td></tr>; })}</tbody></table></div></section>)}</div> : null}
-      <details className="quality-technical"><summary>本修订的全部原始数值与短证据</summary>{row.event.measurements.map(value => <article key={`${value.metric_key}:${value.participant_key}`}><p>{row.event.participants.find(p => p.key === value.participant_key)?.model} · {row.event.metrics.find(m => m.key === value.metric_key)?.label}：{value.raw_value} {row.event.metrics.find(m => m.key === value.metric_key)?.unit} · 来源名次 {value.source_rank ?? "未记录"}</p><p>{value.evidence_span}</p><p>定位：{value.evidence_locator}</p></article>)}</details>
-      <details className="quality-technical"><summary>修订历史（{row.history.length}{row.history_truncated ? "+" : ""} 条）</summary>{row.history.map(item => <article key={item.id}><p>#{item.revision} · {{ create: "创建", revise: "修订", revoke: "撤销", restore: "恢复" }[item.action] || item.action} · {item.operator} · {stamp(item.recorded_at)}</p><p>{item.reason}</p><button type="button" className="text-button" disabled={busy} onClick={() => setHistoryRevision(item.revision)}>查看修订 #{item.revision}</button></article>)}</details>
+      <details className="quality-technical" ref={rawEvidence}><summary>本修订的全部原始数值与短证据</summary>{row.event.measurements.map(value => {
+        const participant = row.participants.find(person => person.key === value.participant_key);
+        const metric = row.event.metrics.find(item => item.key === value.metric_key);
+        const key = JSON.stringify([participant?.id, value.metric_key]);
+        return <article key={key} tabIndex={-1} aria-label={`${participant?.model || value.participant_key} · ${metric?.label || value.metric_key}的原始成绩证据`} ref={node => { if (node) measurementNodes.current.set(key, node); else measurementNodes.current.delete(key); }}><p>{participant?.model} · {metric?.label}：{value.raw_value} {metric?.unit} · 来源名次 {value.source_rank ?? "未记录"}</p><p>{value.evidence_span}</p><p>定位：{value.evidence_locator}</p></article>;
+      })}</details>
+      <details className="quality-technical"><summary>修订历史（{row.history.length}{row.history_truncated ? "+" : ""} 条）</summary>{row.history.map(item => <article key={item.id}><p>#{item.revision} · {{ create: "创建", revise: "修订", revoke: "撤销", restore: "恢复" }[item.action] || item.action} · {item.operator} · {stamp(item.recorded_at)}</p><p>{item.reason}</p><button type="button" className="text-button" disabled={busy} onClick={() => openHistory(item.revision)}>查看修订 #{item.revision}</button></article>)}</details>
       {!historyRevision ? <details className="quality-technical"><summary>{row.state === "revoked" ? "恢复这场记录" : "撤销这场记录"}</summary><form className="review-form" onSubmit={event => { event.preventDefault(); void changeState(); }}><label><span>管理署名</span><input required maxLength={80} value={operator} disabled={busy} onChange={e => setOperator(e.target.value)} /></label><label><span>管理原因</span><textarea required minLength={5} maxLength={2000} value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /></label><button type="submit" className="secondary-button" disabled={busy}>{row.state === "revoked" ? "恢复记录" : "撤销并排除比较"}</button></form></details> : null}
     </>}
   </section>;

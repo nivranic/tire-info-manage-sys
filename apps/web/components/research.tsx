@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { DrivingPreferenceState, DrivingWeightKey, DrivingWeights, Evidence, SaveComparisonRequest, SavedComparisonDetail, SavedComparisonRecord, SourceFieldConflict, Variant } from "@tire/domain-types";
 import { Icon } from "./icons";
 import { identityLabel } from "./identity-review";
+import { useWorkbenchAuth } from "./auth";
 
 const errorText = (value: unknown) => value instanceof Error ? value.message : "操作未完成，请重试。";
 const stamp = (value: string) => new Date(value).toLocaleString("zh-CN");
@@ -155,7 +156,19 @@ export function SavedComparisonsPanel({ sessionReady, refreshVersion, renderComp
   </section>;
 }
 
-export function DrivingPreferences({ sessionReady }: { sessionReady: boolean }) {
+type DrivingPreferencesProps = { sessionReady: boolean; onChanged?: (value: DrivingPreferenceState | null) => void; onError?: (message: string) => void };
+
+export function DrivingPreferences(props: DrivingPreferencesProps) {
+  const auth = useWorkbenchAuth();
+  if (!props.sessionReady || !auth.ready) return <section className="quarantine-panel driving-preferences"><p role="status">正在等待确认当前账户归属，个人偏好暂不显示。</p><button type="button" className="text-button" disabled={!props.sessionReady} onClick={() => void auth.refresh()}>重新确认账户</button></section>;
+  return <DrivingPreferencesEditor key={auth.ownerEpoch} {...props} ownerEpoch={auth.ownerEpoch} />;
+}
+
+function DrivingPreferencesEditor({ sessionReady, ownerEpoch, onChanged, onError }: DrivingPreferencesProps & { ownerEpoch: number }) {
+  const auth = useWorkbenchAuth();
+  const titleId = useId();
+  const notify = useRef(onChanged); notify.current = onChanged;
+  const notifyError = useRef(onError); notifyError.current = onError;
   const [data, setData] = useState<DrivingPreferenceState | null>(null);
   const [values, setValues] = useState<Record<DrivingWeightKey, string>>(() => Object.fromEntries(weightFields.map(([key]) => [key, ""])) as Record<DrivingWeightKey, string>);
   const [error, setError] = useState("");
@@ -167,28 +180,30 @@ export function DrivingPreferences({ sessionReady }: { sessionReady: boolean }) 
   useEffect(() => () => request.current?.abort(), []);
   function accept(value: DrivingPreferenceState) {
     setData(value); setValues(Object.fromEntries(weightFields.map(([key]) => [key, value.weights ? String(value.weights[key]) : ""])) as Record<DrivingWeightKey, string>); setStale(false);
+    notify.current?.(value);
   }
   useEffect(() => {
     if (!sessionReady) return;
-    const controller = new AbortController(); request.current = controller; setData(null); setError(""); setNotice("");
-    void tireApi.drivingPreferences(controller.signal).then(value => { if (!controller.signal.aborted) accept(value); })
-      .catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+    const controller = new AbortController(); request.current = controller; setData(null); setError(""); setNotice(""); setBusy(false); notify.current?.(null);
+    void tireApi.drivingPreferences(controller.signal).then(value => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) accept(value); })
+      .catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { const message = errorText(cause); setError(message); notifyError.current?.(message); } });
     return () => controller.abort();
-  }, [sessionReady, attempt]);
+  }, [sessionReady, attempt, ownerEpoch, auth.isCurrentOwner]);
   const total = weightFields.reduce((sum, [key]) => sum + (Number(values[key]) || 0), 0);
   const valid = total === 100 && weightFields.every(([key]) => values[key].trim() !== "" && Number.isInteger(Number(values[key])) && Number(values[key]) >= 0 && Number(values[key]) <= 100);
   async function save(clear = false) {
-    if (!data || busy || stale || (!clear && !valid)) return;
-    const controller = new AbortController(); request.current = controller; setBusy(true); setError(""); setNotice("");
+    if (!data || busy || stale || !auth.isCurrentOwner(ownerEpoch) || (!clear && !valid)) return;
+    request.current?.abort();
+    const controller = new AbortController(); request.current = controller; setBusy(true); setError(""); setNotice(""); notify.current?.(null);
     try {
       const value = clear ? await tireApi.clearDrivingPreferences(data.revision, controller.signal)
         : await tireApi.saveDrivingPreferences(data.revision, Object.fromEntries(weightFields.map(([key]) => [key, Number(values[key])])) as DrivingWeights, controller.signal);
-      if (!controller.signal.aborted) { accept(value); setNotice(clear ? "已清除当前偏好，修改历史仍保留。" : "偏好已保存，官方参数与测试排序保持原样。"); }
-    } catch (cause) { if (!controller.signal.aborted) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
-    finally { if (!controller.signal.aborted) setBusy(false); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { accept(value); setNotice(clear ? "已清除当前偏好，修改历史仍保留。" : "偏好已保存，官方参数与测试排序保持原样。"); }
+    } catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { const message = errorText(cause); setError(message); notifyError.current?.(message); if (cause instanceof ApiError && cause.status === 409) { setStale(true); } } }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
-  return <section className="quarantine-panel driving-preferences" aria-labelledby="driving-preferences-title">
-    <div className="panel-title"><span id="driving-preferences-title">驾驶偏好</span><button className="text-button" disabled={!sessionReady || busy} onClick={() => setAttempt(value => value + 1)}>重新载入偏好</button></div>
+  return <section className="quarantine-panel driving-preferences" aria-labelledby={titleId}>
+    <div className="panel-title"><span id={titleId}>驾驶偏好</span><button type="button" className="text-button" disabled={!sessionReady || busy} onClick={() => setAttempt(value => value + 1)}>重新载入偏好</button></div>
     <p className="quality-intro">记录你的取舍，七项合计 100。权重独立于官方参数和测试排序；当前保存偏好，尚未启用推荐评分。偏好仅本人可见：登录账户内多端共享，匿名按会话隔离。</p>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}{notice ? <p className="review-saved" role="status">{notice}</p> : null}
     {!data ? !error ? <p className="quality-empty" role="status">正在读取偏好…</p> : null : <form className="review-form preferences-form" onSubmit={event => { event.preventDefault(); void save(); }}>

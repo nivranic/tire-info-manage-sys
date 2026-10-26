@@ -1,0 +1,18 @@
+{
+  "canonical_projection": {
+    "byte_count": 14148,
+    "path": "domain/empty-formal-recall-nonempty/projection.canonical.json",
+    "sha256": "43dc3ebcb2052135ef3c75925241b48a805b2f0a76b9246f7f901295d23d0590"
+  },
+  "data_state": "local_snapshot",
+  "expected_error_code": null,
+  "member_count": 1,
+  "privacy_class": "private",
+  "source_refresh_performed": false,
+  "state": "accepted",
+  "token_dto_projection": {
+    "byte_count": 14643,
+    "path": "domain/empty-formal-recall-nonempty/projection.tokens.json",
+    "sha256": "2bdf12a421df3fcc7f5324d69b8d4a9aa719d5450afcea2bab192cdcabcefa80"
+  }
+}

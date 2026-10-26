@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 
 import pytest
+from device_ai_fixture_corpus import CORPUS, CORPUS_ROOT
 
 from tire_api import device_ai_value_encoder as encoder
 from tire_api.device_ai_projection import (
@@ -31,20 +32,20 @@ from tire_api.device_ai_projection import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VECTOR_FILE = REPO_ROOT / ".artifacts/device-ai50/specs/e1-canonical-vectors-a.json"
+VECTOR_FILE = CORPUS_ROOT / "specs/e1-canonical-vectors-a.json"
 GENERATOR = REPO_ROOT / "apps/api/tests/generate_e1_vectors.py"
 PINNED_SOURCES = {
     "device_ai_projection.py": REPO_ROOT / "apps/api/tire_api/device_ai_projection.py",
     "device_ai_value_encoder.py": REPO_ROOT / "apps/api/tire_api/device_ai_value_encoder.py",
 }
 
-PAYLOAD = json.loads(VECTOR_FILE.read_text(encoding="utf-8"))
+PAYLOAD = CORPUS.read_json("specs/e1-canonical-vectors-a.json")
 VECTORS = {item["id"]: item for item in PAYLOAD["vectors"]}
 ACCEPTED = [item for item in PAYLOAD["vectors"] if item["state"] == "accepted"]
 REJECTED = [item for item in PAYLOAD["vectors"] if item["state"] == "rejected"]
 REGENERATE_HINT = (
-    f"vector file {VECTOR_FILE} is stale or tampered; regenerate it with "
-    f"`{GENERATOR}` (python -B -X utf8, cwd apps/api) and re-review the diff")
+    f"vector file {VECTOR_FILE} is stale or tampered; review the reference diff "
+    f"and regenerate separately with `{GENERATOR}` before updating the tracked corpus and provenance")
 
 
 def expand(inp: dict) -> bytes:

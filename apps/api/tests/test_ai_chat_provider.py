@@ -111,11 +111,20 @@ def test_resolver_loopback_exception_matches_config_layer_promise(monkeypatch):
     """G5-2（第61轮圆桌）：配置层允许的 loopback base URL 在传输层同样放行（AI 适配器例外）；
     来源抓取默认形态仍拒绝环回解析。"""
     from tire_api.adapters.transport import PublicResolver, SourceAccessError
+    import socket
 
     async def scenario():
+        dns_calls = []
+
+        async def loopback_records(host, port, **_options):
+            dns_calls.append((host, port))
+            return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, '', ('127.0.0.1', port))]
+
+        monkeypatch.setattr(asyncio.get_running_loop(), 'getaddrinfo', loopback_records)
         allowed = PublicResolver(frozenset({'localhost'}), allow_loopback=True)
         records = await allowed.resolve('localhost', 11434)
         assert records[0]['host'] == 'localhost'
+        assert dns_calls == []
         blocked = PublicResolver(frozenset({'localhost'}))
         try:
             await blocked.resolve('localhost', 11434)
@@ -130,6 +139,7 @@ def test_resolver_loopback_exception_matches_config_layer_promise(monkeypatch):
             assert str(error) == 'host_not_allowed'
         else:
             raise AssertionError('白名单外主机必须拒绝')
+        assert dns_calls == [('localhost', 11434)]
 
     asyncio.run(scenario())
 

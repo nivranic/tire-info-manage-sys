@@ -3,7 +3,7 @@
 Real tire_api app on an isolated temporary SQLite DB + filesystem object store
 (TI_* env isolation, audit hook forbids subprocess/external network/normal
 databases). Seeds one actor-owned OfflinePack built from the sealed producer
-sample (.artifacts/device-ai50/projection-vectors-a/inputs/nonempty-pack.json,
+sample (tracked device-ai-v1/projection-vectors-a/inputs/nonempty-pack.json,
 owner_scope_id replaced byte-for-byte with the session-derived digest). The
 synthetic provider streams an uncertainty-only grounded answer (device packs
 render no fact text in this wave); OpenAI is never contacted.
@@ -34,8 +34,9 @@ from fastapi.responses import JSONResponse
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from golden_acceptance import save  # noqa: E402
+sys.path.insert(0, str(ROOT / 'apps/api/tests'))
+from device_ai_fixture_corpus import read_producer_sample  # noqa: E402
 
-SAMPLES = ROOT / '.artifacts/device-ai50/projection-vectors-a/inputs'
 MODES = {'complete', 'held', 'provider_error', 'refusal'}
 
 
@@ -112,8 +113,8 @@ def serve(port, output):
         def seeded_pack(owner_session: str):
             """Session-owned copy of the sealed producer sample (byte-level
             owner_scope replacement keeps every number lexeme identical)."""
-            original = (SAMPLES / 'nonempty-pack.json').read_bytes()
-            descriptor = json.loads((SAMPLES / 'nonempty-descriptor.json').read_text(encoding='utf-8'))
+            original = read_producer_sample('nonempty-pack.json')
+            descriptor = json.loads(read_producer_sample('nonempty-descriptor.json'))
             scope = hashlib.sha256(json.dumps({'namespace': 'offline-owner-scope@1', 'session': owner_session},
                                               separators=(',', ':')).encode('utf-8')).hexdigest()
             sample_scope = descriptor['owner_scope_id'].encode('ascii')

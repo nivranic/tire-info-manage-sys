@@ -11,6 +11,7 @@ import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope, recallAnal
 import { recallCurrentRequest, uniqueAIReferences } from "./recall-evidence-values";
 import { AI_RECOVERY_KEY, aiStreamErrorMessage, aiStreamErrorMessages, canExportAIAnalysis, parseAIRecovery, type AIRecoveryPointer } from "./ai-stream-values";
 import AiBudgetMeter, { aiProviderLabel } from "./ai-budget";
+import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 
 export type AITarget = ({ variant: Variant; sourceId?: string } | { references: AIAnalysisReference[]; label: string }
   | { recall: { campaign_number: string; reference: RecallAnalysisReference }; label: string }) & { defaultQuestion?: string };
@@ -197,12 +198,13 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   const frozen = !!attempt || !!run;
   const recallTarget = !!target && ("recall" in target || ("references" in target && target.references.some(reference => reference.kind === "recall")));
   const recallPack = !!pack?.evidence.some(evidence => evidence.evidence_type === "recall");
+  const testPack = !!pack && containsTestEvidence(pack.evidence);
   const canSend = !evidenceStale && status?.model.state === "configured" && pack && status.model.allowed_privacy_classes?.includes(pack.privacy_class);
 
   return <><dialog ref={dialog} className="fact-review-dialog ai-dialog" aria-labelledby="ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">EVIDENCE → ANALYSIS</span><h2 id="ai-title">基于证据的 AI 分析</h2></div><button type="button" className="icon-button" aria-label="关闭 AI 分析" onClick={onClose}>×</button></header>
     <div className="ai-content">
-      <p className="review-boundary">{recallTarget || recallPack ? recallAnalysisNotice : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 AI Provider 的处理或免于计费。</p>
+      <p className="review-boundary">{recallTarget || recallPack ? recallAnalysisNotice : testPack || target && "references" in target && target.references.some(reference => reference.kind === "test_event") ? "含测试证据时仅摘录已录事实，按场次和参测对象分别引用。个人取舍可使用同场偏好解读；精确 SKU 性能关联和推荐尚未建立。" : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 AI Provider 的处理或免于计费。</p>
       <section className="ai-status" aria-label="模型状态"><strong>{aiProviderLabel(status?.model.provider)}</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p><AiBudgetMeter status={status} /></section>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       {recovery && !stream && !attempt ? <section className="ai-recovery" aria-label="上次分析提交核对"><h3>核对本标签页上次提交</h3><p>刷新或重新打开不会重新调用模型。先读取原请求记录；如果无法确认，原调用仍可能处理或计费。</p><div className="compare-toolbar"><button type="button" className="secondary-button" disabled={busy} onClick={() => void perform(async signal => { const value = await tireApi.lookupAIStream(recovery.key, signal); if (!signal.aborted) showStream(value, recovery.key); })}>只读核对上次提交</button><button type="button" className="text-button" disabled={busy} onClick={reset}>返回证据准备</button></div></section> : null}
@@ -216,6 +218,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
       {fallback?.data_state === "consent_required" ? <section className="consent-box" aria-label="AI 历史证据授权"><h3>在线核验失败</h3><p>是否仅为本次分析读取该查询的历史快照？同意后仍标记为 LOCAL SNAPSHOT。</p><div className="compare-toolbar"><button className="secondary-button" disabled={busy} onClick={() => void consent("allow")}>仅本次使用历史快照</button><button className="text-button" disabled={busy} onClick={() => void consent("deny")}>拒绝使用历史数据</button></div></section> : null}
       {pack ? <>
         <RecallAnalysisBoundary boundary={pack.recall_boundary} pending={recallPack} />
+        <TestAnalysisScope boundary={pack.test_boundary} pending={testPack} />
         <section className="snapshot-banner"><strong>{pack.source_state === "snapshot" ? "LOCAL SNAPSHOT · 历史证据" : "已在线核验的所选证据"}</strong><span>准备时间 {stamp(pack.created_at)} · 提交有效期至 {stamp(pack.expires_at)} · {pack.privacy_class === "public" ? "公开来源证据" : "非公开工作区证据"}</span></section>
         <details className="ai-evidence" open><summary>查看 {pack.evidence.length} 条来源与 {pack.facts.length} 个字段</summary>{pack.evidence.map(e => <section key={e.id} id={`ai-source-${e.id}`}><h4>{e.id} · {e.label}</h4>{e.kind === "tire" || e.identity_contract ? <IdentityContractEvidence contract={e.identity_contract} historical /> : null}<p>观察 {stamp(e.observed_at)} · 验证 {stamp(e.verified_at)}{e.revision ? ` · 修订 #${e.revision}` : ""}</p><p>{sourceLink(e.source_url) ? <a href={sourceLink(e.source_url)} target="_blank" rel="noopener noreferrer">打开原始来源</a> : "来源链接不可打开"} · {e.parser_version || "人工录入 / 车型证据"}</p>
           <RecallEvidenceMeta evidence={e} />
@@ -238,7 +241,8 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
       {stream ? <AIStreamProgress key={`${stream.analysis.id}:${streamEpoch}`} initial={stream} recovery={recovery} onDetail={updateStream} onFact={revealFact} errorLabel={errorLabel} /> : null}
       {run && (!stream || run.state === "completed") ? <section className="ai-result" aria-label="AI 分析结果"><h3>{states[run.state]}</h3><p>{run.question}</p><small>{run.model} · {stamp(run.created_at)} · {run.usage ? `${run.usage.total_tokens} tokens` : `用量未确认，保留 ${run.reserved_tokens} tokens 预留`}</small>
         {run.error_code ? <p role="alert">{errors[run.error_code] || run.error_code}</p> : null}
-        {canExportAIAnalysis(run) ? <><RecallAnalysisBoundary boundary={run.answer.recall_boundary || pack?.recall_boundary} pending={recallPack} />{run.answer.claims.filter(claim => !recallPack || claim.type === "fact").map((claim, index) => <article className={`ai-claim ${claim.type}`} key={index}><strong>{claim.type === "fact" ? "证据原始字段" : "模型推断 · 需人工核对"}</strong><p>{claim.text}</p><div className="compare-toolbar">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} onClick={() => revealFact(id)}>核对 {id}</button>)}</div></article>)}{!recallPack && run.answer.uncertainty ? <div className="ai-claim inference"><strong>模型报告的不确定性 · 需核对</strong><p>{run.answer.uncertainty}</p></div> : null}<p className="review-boundary">{run.answer.notice}</p></> : null}
+        {run.answer ? <TestAnalysisScope boundary={run.answer.test_boundary} historical={testPack && !run.answer.test_boundary} /> : null}
+        {canExportAIAnalysis(run) ? <><RecallAnalysisBoundary boundary={run.answer.recall_boundary || pack?.recall_boundary} pending={recallPack} />{run.answer.claims.filter(claim => (!recallPack && !run.answer.test_boundary) || claim.type === "fact").map((claim, index) => <article className={`ai-claim ${claim.type}`} key={index}><strong>{claim.type === "fact" ? "证据原始字段" : "模型推断 · 需人工核对"}</strong><p>{claim.text}</p><div className="compare-toolbar">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} onClick={() => revealFact(id)}>核对 {id}</button>)}</div></article>)}{!recallPack && !run.answer.test_boundary && run.answer.uncertainty ? <div className="ai-claim inference"><strong>模型报告的不确定性 · 需核对</strong><p>{run.answer.uncertainty}</p></div> : null}<p className="review-boundary">{run.answer.notice}</p></> : null}
         {run.state === "pending" || run.state === "outcome_unknown" ? <><p>未确认完成的调用不会自动重试。请核对调用记录及供应商用量；结果未知不代表未计费。</p><button className="secondary-button" disabled={busy} onClick={() => void openRun(run.id)}>刷新这条调用记录</button></> : target ? <button className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}
       </section> : null}
       {stream && run && ["failed", "outcome_unknown"].includes(run.state) && target ? <button type="button" className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}

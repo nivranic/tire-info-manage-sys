@@ -1,4 +1,8 @@
-"""Synthetic pre-009 schema preservation; no normal DB or backup is read."""
+"""Current-shape fixture with a pre-009 ledger; target and full-chain preservation.
+
+This synthetic fixture is not an exact historical database backup. Later table
+after_create hooks are checked explicitly instead of being mistaken for 009 DDL.
+"""
 from datetime import timedelta
 
 import pytest
@@ -12,6 +16,8 @@ from tire_api.ai_stream_models import AIStreamExecution, AIStreamEvent
 from tire_api.db import Base, Database, UserSession, uid, utcnow
 from tire_api.knowledge_models import initialize_search
 from tire_api.main import create_app
+from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
+    assert_trigger_contract, initialize_observing_version, snapshot_connection)
 
 NEW_TABLES = {'ai_stream_executions', 'ai_stream_events'}
 OLD_VERSIONS = PRE_009_VERSIONS  # 单一权威清单见 version_registry.py
@@ -19,11 +25,7 @@ OLD_VERSIONS = PRE_009_VERSIONS  # 单一权威清单见 version_registry.py
 
 def snapshot(database):
     with database.engine.connect() as connection:
-        schema = connection.exec_driver_sql('SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name').all()
-        tables = set(inspect(connection).get_table_names())
-        rows = {name: sorted(repr(tuple(row)) for row in connection.exec_driver_sql(
-            'SELECT * FROM "' + name.replace('"', '""') + '"')) for name in tables}
-        return {'schema': [tuple(row) for row in schema], 'tables': tables, 'rows': rows}
+        return snapshot_connection(connection)
 
 
 @pytest.fixture
@@ -61,13 +63,17 @@ def predecessor(tmp_path, monkeypatch):
 def test_only_two_new_tables_and_one_version_preserve_every_old_schema_and_row(predecessor):
     database = predecessor
     before = snapshot(database)
-    database.initialize()
+    assert_trigger_contract(before, device=False, candidate=False)
+    stage = initialize_observing_version(database, '009_ai_streaming')
+    assert_target_delta(before, stage, NEW_TABLES)
+    assert_trigger_contract(stage, device=False, candidate=False)
+    first = snapshot(database)
     database.initialize()
     after = snapshot(database)
+    assert after == first
     assert after['tables'] - before['tables'] == NEW_TABLES
     assert before['tables'] - after['tables'] == set()
-    # 013 adds device-ledger triggers; their DDL is asserted in test_device_ai_migration013.py.
-    assert [row for row in after['schema'] if row[2] in before['tables'] and row[0] != 'trigger'] == before['schema']
+    assert_full_chain_preserved(before, after)
     for table in before['tables'] - {'tire_schema_versions'}:
         assert before['rows'][table] == after['rows'][table], table
     assert set(before['rows']['tire_schema_versions']) < set(after['rows']['tire_schema_versions'])

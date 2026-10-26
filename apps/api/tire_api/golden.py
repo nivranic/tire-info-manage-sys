@@ -9,11 +9,10 @@ from pydantic import Field, StrictBool, StrictInt, field_validator, model_valida
 from sqlalchemy import desc, func, select
 
 from .auth import make_admin_guard
-from .captures import checked_capture_bytes
 from .db import RawCapture, uid, utc
 from .domain import StrictModel, digest, stable_json
 from .golden_models import GoldenCase, GoldenCaseRevision, GoldenCaseReview, GoldenSetRevision
-from .reparse import capture_input
+from .reparse import capture_input, checked_history_capture_bytes
 from .service import QueryService
 
 SCOPE = {'scope': 'local_workspace', 'data_state': 'local_snapshot', 'accepted_as_facts': False,
@@ -189,7 +188,7 @@ def _capture(db, capture_id, source_id, kind, *, verify_bytes=True):
     try:
         value = capture_input(db, capture, catalog)
         if verify_bytes:
-            checked_capture_bytes(db, capture)
+            checked_history_capture_bytes(db, capture)
     except Exception:
         raise GoldenError('golden_capture_integrity_failed', 503) from None
     return value

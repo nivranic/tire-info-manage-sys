@@ -17,6 +17,7 @@ from urllib.parse import quote, urlsplit
 from .object_store import MAX_OBJECT_BYTES
 
 RENDERER_VERSION = 'frozen-research-export@4'
+TEST_RENDERER_VERSION = 'frozen-research-export@5'
 FORMATS = ('markdown', 'html', 'pdf')
 _FONT_NAME = 'TireEvidenceSC-Regular'
 _FONT_FILE = Path(__file__).resolve().parent / 'assets' / 'fonts' / 'TireEvidenceSC-Regular.ttf'
@@ -29,6 +30,11 @@ _STYLE = '''body{font-family:system-ui,"Noto Sans SC","Microsoft YaHei",sans-ser
 
 class ReportRenderError(ValueError):
     """Stable error codes only; never return local paths or library diagnostics."""
+
+
+def renderer_version_for(document):
+    """Legacy documents keep their renderer bytes; test @4 has its own version."""
+    return TEST_RENDERER_VERSION if document.get('schema_version') == 'research-report@4' else RENDERER_VERSION
 
 
 @dataclass(frozen=True)
@@ -67,7 +73,7 @@ def _identifier(value):
 
 def _validate(document):
     if not isinstance(document, dict) or document.get('schema_version') not in {
-            'research-report@1', 'research-report@2', 'research-report@3'}:
+            'research-report@1', 'research-report@2', 'research-report@3', 'research-report@4'}:
         raise ReportRenderError('invalid_document')
     for key in ('report_id', 'title', 'created_at'):
         _text(document.get(key), empty=False)
@@ -102,10 +108,29 @@ def _validate(document):
         facts_by_id[key] = item
     if not isinstance(body.get('conflicts'), list):
         raise ReportRenderError('invalid_document')
+    test_report = document['schema_version'] == 'research-report@4'
+    if (body.get('schema_version') == 'research-report@4' or 'test_boundary' in body) and not test_report:
+        raise ReportRenderError('invalid_report_test_contract')
+    if test_report:
+        try:
+            from types import SimpleNamespace
+            from .ai_test_contract import contains_test, test_boundary, validate_test_claim
+            from .reports import canonical_facts
+            if (body.get('schema_version') != 'research-report@4' or not contains_test(body)
+                    or body.get('test_boundary') != test_boundary(body)):
+                raise ValueError('invalid_report_test_boundary')
+            _, canonical = canonical_facts(body, frozen=True)
+            if canonical != facts:
+                raise ValueError('noncanonical_report_test_fact')
+            for fact in facts:
+                validate_test_claim(SimpleNamespace(type='fact', text='', fact_ids=[fact['id']],
+                    evidence_ids=[fact['evidence_id']]), facts_by_id, evidence_by_id)
+        except (ValueError, TypeError, KeyError, AttributeError):
+            raise ReportRenderError('invalid_report_test_contract') from None
     try:
         from .ai_recall_contract import validate_recall_payload
         recall = validate_recall_payload(body, require_purpose=False, frozen=True)
-        if recall and document['schema_version'] != 'research-report@3':
+        if recall and document['schema_version'] not in {'research-report@3', 'research-report@4'}:
             raise ValueError('invalid_recall_schema')
     except (ValueError, TypeError, KeyError, AttributeError):
         raise ReportRenderError('invalid_report_recall_contract') from None
@@ -150,9 +175,23 @@ def _validate(document):
                     validate_recall_claim(raw, facts_by_id, evidence_by_id)
                 except (ValueError, TypeError, KeyError, AttributeError):
                     raise ReportRenderError('invalid_report_recall_analysis') from None
+            if test_report:
+                try:
+                    from types import SimpleNamespace
+                    from .ai_test_contract import validate_test_claim
+                    raw = SimpleNamespace(**{**claim, 'text': '' if claim['type'] == 'fact' else claim['text']})
+                    validate_test_claim(raw, facts_by_id, evidence_by_id)
+                except (ValueError, TypeError, KeyError, AttributeError):
+                    raise ReportRenderError('invalid_report_test_analysis') from None
         _text(analysis.get('uncertainty', ''))
         if recall and analysis.get('uncertainty') != '':
             raise ReportRenderError('invalid_report_recall_analysis')
+        if test_report:
+            try:
+                from .ai_test_contract import validate_test_uncertainty
+                validate_test_uncertainty(analysis.get('uncertainty', ''), body)
+            except (ValueError, TypeError, KeyError, AttributeError):
+                raise ReportRenderError('invalid_report_test_analysis') from None
     _text(body.get('notice', ''))
     if len(_json(document).encode('utf-8')) > MAX_OBJECT_BYTES:
         raise ReportRenderError('report_export_too_large')
@@ -258,7 +297,7 @@ def _blocks(document, body):
     blocks = [Block('title', document['title']), Block('meta', f'报告 {document["report_id"]} · 修订 {document["revision"]}'),
         Block('meta', f'冻结报告创建时间：{document["created_at"]}'),
         Block('paragraph', 'LOCAL SNAPSHOT · 本报告是已选证据的冻结历史记录，不表示导出时的在线参数、在售状态或安全适配认证。'),
-        Block('meta', '隐私范围：' + privacy), Block('meta', '导出契约：' + RENDERER_VERSION)]
+        Block('meta', '隐私范围：' + privacy), Block('meta', '导出契约：' + renderer_version_for(document))]
     if document.get('notes'):
         blocks += [Block('heading', '研究说明'), Block('paragraph', document['notes'])]
     blocks += [Block('heading', '冻结证据范围')]
@@ -269,6 +308,10 @@ def _blocks(document, body):
         blocks += [Block('heading', '召回公告范围与实物适用性'),
                    Block('paragraph', body['recall_boundary']['notice']),
                    Block('meta', '适用性：not_assessed · 仅公告事实选择 · ' + body['recall_boundary']['policy'])]
+    if document['schema_version'] == 'research-report@4':
+        blocks += [Block('heading', '测试事实摘录与精确身份边界'),
+                   Block('paragraph', body['test_boundary']['notice'])]
+        blocks += _metadata(body['test_boundary'], excluded={'notice'})
     blocks += [Block('heading', '结构化事实与引用', group='fact-' + body['facts'][0]['id'])]
     for fact in body['facts']:
         group = 'fact-' + fact['id']
@@ -288,7 +331,9 @@ def _blocks(document, body):
         blocks.append(Block('paragraph', '本报告未附带 AI 分析。保存和导出报告不会自动调用模型。'))
     else:
         blocks += _metadata(analysis, excluded={'claims', 'uncertainty'})
-        blocks.append(Block('paragraph', '以下事实文字来自已引用字段；模型推断单独标识，仍需人工核对。引用存在不等于推断正确。'))
+        blocks.append(Block('paragraph', '以下内容仅摘录已引用字段，不进行自由推断或精确SKU性能推荐。'
+            if document['schema_version'] == 'research-report@4' else
+            '以下事实文字来自已引用字段；模型推断单独标识，仍需人工核对。引用存在不等于推断正确。'))
         for index, claim in enumerate(analysis['claims'], start=1):
             blocks += [Block('subheading', f'{index}. ' + ('引用事实' if claim['type'] == 'fact' else '模型推断 · 需核对')),
                 Block('paragraph', claim['text']),
@@ -296,6 +341,8 @@ def _blocks(document, body):
                 Block('citations', '来源引用', links=tuple((key, '#evidence-' + key) for key in claim['evidence_ids']))]
         if body.get('recall_boundary'):
             blocks += [Block('subheading', '适用性未评估'), Block('paragraph', body['recall_boundary']['notice'])]
+        elif document['schema_version'] == 'research-report@4':
+            blocks += [Block('subheading', '固定测试边界'), Block('paragraph', body['test_boundary']['notice'])]
         else:
             blocks += [Block('subheading', '不确定性'), Block('paragraph', analysis.get('uncertainty') or '未提供额外不确定性说明；不代表没有不确定性。')]
     blocks.append(Block('heading', '证据目录'))
@@ -415,7 +462,7 @@ def _pdf(document, blocks):
         canvas = Canvas(output, pagesize=A4, invariant=1, pageCompression=1, pdfVersion=(1, 4))
         canvas.setTitle(document['title'])
         canvas.setAuthor('Tire Intelligence')
-        canvas.setCreator(RENDERER_VERSION)
+        canvas.setCreator(renderer_version_for(document))
         page_width, page_height = A4
         left, right, top, bottom = 43.0, 43.0, 48.0, 46.0
         width, y, page = page_width - left - right, page_height - top, 1

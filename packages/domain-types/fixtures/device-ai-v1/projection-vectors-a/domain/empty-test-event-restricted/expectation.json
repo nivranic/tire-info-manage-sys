@@ -1,0 +1,6 @@
+{
+  "canonical_projection": null,
+  "expected_error_code": "device_ai_selected_restricted",
+  "state": "rejected",
+  "token_dto_projection": null
+}

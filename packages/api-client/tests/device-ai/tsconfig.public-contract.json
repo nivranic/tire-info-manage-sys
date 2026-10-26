@@ -1,0 +1,9 @@
+{
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "incremental": false,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["public-contract.types.ts", "public-contract.mts"]
+}

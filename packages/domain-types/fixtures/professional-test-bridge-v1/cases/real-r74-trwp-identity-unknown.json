@@ -1,0 +1,80 @@
+{
+  "schema": "professional-golden-case@1",
+  "case_id": "real-r74-trwp-identity-unknown",
+  "tier": "real_source_unknown_or_inadmissible",
+  "materials": [
+    {
+      "material_label": "r74-paper",
+      "origin": "real_source",
+      "title": "Shades of grey—tire characteristics and road surface influence tire and road wear particle (TRWP) abundance and physicochemical properties",
+      "publisher": "Frontiers in Environmental Science",
+      "publication_date": "2023-11-07",
+      "doi": "10.3389/fenvs.2023.1258922",
+      "source_reference_url": "https://www.frontiersin.org/journals/environmental-science/articles/10.3389/fenvs.2023.1258922/full",
+      "download_url": "https://www.frontiersin.org/journals/environmental-science/articles/10.3389/fenvs.2023.1258922/pdf",
+      "original": {
+        "path": ".artifacts/r74-live-c726bf6f944a4e6fb094e7ec79188e23/review-original.pdf",
+        "byte_count": 3302848,
+        "sha256": "33471a0b0d0a8c2f172b61b034a8300c65e3ff2372c79782562048133606f635"
+      },
+      "capture_receipt": {
+        "path": ".artifacts/r74-live-c726bf6f944a4e6fb094e7ec79188e23/capture-response.json",
+        "byte_count": 5395,
+        "sha256": "f783be6bb8a1dd10631e4e297df8104f238297db39c8e73eaa3f0cf5761547da"
+      },
+      "agent_review_record": {
+        "path": ".artifacts/r74-pdf-review-8ef032fe57a44573b3c1f5e7cb771ad5/findings.json",
+        "byte_count": 6583,
+        "sha256": "3387534e41103f9b2d4e34b92631f2e9661243a1ceacb3f8fe0bc08eca0692c8"
+      },
+      "rights": {
+        "rights_holder": "Wilkinson, Jarlskog, de Lima, Gustafsson, Mattsson, Andersson Skold and Hassellov (2023)",
+        "basis": "Article printed CC BY licence and linked CC BY 4.0; preserve authors, journal, DOI and Figure 1 credit; no endorsement",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "attribution": "Tim Wilkinson; Ida Järlskog; Juliana Aristéia de Lima; Mats Gustafsson; Karin Mattsson; Yvonne Andersson Sköld; Martin Hassellöv. Frontiers in Environmental Science 11:1258922 (2023-11-07). DOI 10.3389/fenvs.2023.1258922. Figure 1 credits Mats Gustafsson/VTI and Mattsson et al. (2023); image not copied.",
+        "store_original": true,
+        "workspace_reopen": true,
+        "quote_identifiers": true,
+        "provider_use": false,
+        "export": false
+      }
+    }
+  ],
+  "input": {
+    "mode": "source_review_only",
+    "event": null,
+    "skus": [],
+    "bridge_attempts": [],
+    "candidate": null,
+    "source_review": {
+      "material_label": "r74-paper",
+      "findings": [
+        "exact_sku_not_established",
+        "tested_size_not_established",
+        "study_codes_not_manufacturer_codes",
+        "particle_classification_not_whole_tire_performance",
+        "source_review_only_no_product_event",
+        "agent_review_not_human_golden"
+      ],
+      "exact_sku_truth": "unknown",
+      "review_origin": "existing_agent_document_review"
+    }
+  },
+  "expected": {
+    "bridges": [],
+    "distinct_pairs": [],
+    "candidate": null,
+    "source_review_findings": [
+      "exact_sku_not_established",
+      "tested_size_not_established",
+      "study_codes_not_manufacturer_codes",
+      "particle_classification_not_whole_tire_performance",
+      "source_review_only_no_product_event",
+      "agent_review_not_human_golden"
+    ]
+  },
+  "review": {
+    "state": "pending_external_review",
+    "record": null
+  }
+}

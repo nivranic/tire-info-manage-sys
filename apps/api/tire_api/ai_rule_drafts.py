@@ -46,6 +46,8 @@ def key_value(value):
 
 def owned_draft(db, run_id, scope):
     row = db.get(AIRequest, run_id)
+    from .candidate_ai import reject_candidate_request
+    reject_candidate_request(db, row)
     if row is None or row.actor_session_id not in scope or row.request_contract.get('purpose') != 'rule_draft':
         raise HTTPException(404, '未找到当前账户的规则草稿')
     return row
@@ -101,6 +103,8 @@ def register_rule_draft_routes(app: FastAPI):
         QueryService(db, None).lock_ingestion()
         existing = db.scalar(select(AIRequest).where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)), AIRequest.idempotency_key == key))
         if existing:
+            from .candidate_ai import reject_candidate_request
+            reject_candidate_request(db, existing)
             if existing.request_hash != request_hash or existing.request_contract.get('purpose') != 'rule_draft':
                 raise HTTPException(409, '同一幂等键不能用于不同任务或草稿')
             value = draft_view(db, existing)
@@ -128,9 +132,11 @@ def register_rule_draft_routes(app: FastAPI):
     @app.get('/v1/ai/rule-drafts')
     def listing(request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):
         from .auth import session_scope
+        from .candidate_ai_models import CandidateAIPreparation
         rows = db.execute(select(AIRequest, AICompletion).outerjoin(AICompletion, AICompletion.request_id == AIRequest.id)
             .options(load_only(AICompletion.request_id, AICompletion.state, AICompletion.error_code, AICompletion.usage, AICompletion.created_at))
             .where(AIRequest.actor_session_id.in_(session_scope(db, request.state.session_id)), AIRequest.request_contract['purpose'].as_string() == 'rule_draft')
+            .where(~select(CandidateAIPreparation.id).where(CandidateAIPreparation.pack_id == AIRequest.pack_id).exists())
             .order_by(desc(AIRequest.created_at), desc(AIRequest.id)).limit(20)).all()
         return {'scope': 'browser_session', 'items': [draft_view(db, row, completion, prefetched=True, include_draft=False) for row, completion in rows]}
 
@@ -170,6 +176,8 @@ def register_rule_draft_routes(app: FastAPI):
             raise HTTPException(422, '审核规则的来源与型号必须属于准备时明确选择的目录')
         if set(payload.rule.fields) - {item['key'] for item in pack.payload['capabilities']['fields']}:
             raise HTTPException(422, '规则包含本次支持能力之外的字段')
+        if not set(payload.rule.kinds) <= set(pack.payload['capabilities']['kinds']):
+            raise HTTPException(422, '规则包含本次支持能力之外的提醒类型')
         validate_rule_target(db, app.state.registry, payload.rule)
         result = create_rule(db, app.state.registry, payload.rule, request.state.session_id)
         application_id = uid()

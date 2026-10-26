@@ -1,0 +1,982 @@
+{
+  "boundaries": {
+    "credentials_keystore_operations": 0,
+    "environment_changes": 0,
+    "host_implementations_executed": false,
+    "network_provider_model_calls": 0,
+    "normal_or_producer_database_access": 0,
+    "product_source_changes": 0,
+    "provider_acceptance": false,
+    "public_wire_frozen": false,
+    "source_adapter_parser_calls": 0,
+    "three_host_parity_verified": false
+  },
+  "counts": {
+    "domain": 20,
+    "domain_accepted": 17,
+    "domain_rejected": 3,
+    "parser": 16,
+    "parser_accepted": 5,
+    "parser_rejected": 11
+  },
+  "coverage_limits": [
+    "These actual samples each contain one tire observation; original tire-closure vectors do not prove expansion across multiple observations.",
+    "Restricted test-event is a rejection vector, not an accepted AI analysis.",
+    "Parser literals are synthetic grammar vectors, not original measurements.",
+    "Host once consent, owned API rights, public wire, Provider, ledger, SSE and reopen CAS remain separate integration work."
+  ],
+  "domain_vectors": [
+    {
+      "canonical_projection": {
+        "byte_count": 11377,
+        "path": "domain/legacy-tire-single/projection.canonical.json",
+        "sha256": "e4cb363251b706de8d30cdf7bef8ac043f514b90f2d2614435223cbe00abbddb"
+      },
+      "case": "legacy-tire-single",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 588,
+        "path": "domain/legacy-tire-single/expectation.json",
+        "sha256": "59c76af35b8dca8c200d0c6fd9dd0f7f0f8be6777a7a229fe8461220a6fa59f0"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1169,
+        "path": "domain/legacy-tire-single/input.json",
+        "sha256": "d14453115c3bc89d3e73acfe1b4424b1fd330d9002952e97ed1d7931acd09cdb"
+      },
+      "member_count": 1,
+      "package_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
+      "privacy_class": "private",
+      "source": "offline-pack@1",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 11422,
+        "path": "domain/legacy-tire-single/projection.tokens.json",
+        "sha256": "0b73f539091dbc1c9249fb728a25658fa74af4953f1c32e23f53e2a1dde76390"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 32059,
+        "path": "domain/legacy-tire-closure/projection.canonical.json",
+        "sha256": "1544885ef27dace261623164e6f25311d99335e9acdd4fc682857605ee709856"
+      },
+      "case": "legacy-tire-closure",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 590,
+        "path": "domain/legacy-tire-closure/expectation.json",
+        "sha256": "4c558b2c435e2baf9297a9ca7a678b702da45cb4a733c5b75f60d45dfee76384"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1174,
+        "path": "domain/legacy-tire-closure/input.json",
+        "sha256": "b9359a38ef29668769f306b3b082159fb5d7e15229ec19f560d9180829f5f320"
+      },
+      "member_count": 1,
+      "package_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
+      "privacy_class": "private",
+      "source": "offline-pack@1",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 32149,
+        "path": "domain/legacy-tire-closure/projection.tokens.json",
+        "sha256": "e113c62f228064cc5e408af815367b415a64394f7740c40b414dc243582e2e11"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 2197,
+        "path": "domain/legacy-vehicle-complete/projection.canonical.json",
+        "sha256": "29b8014d3201a7b04aa622fac364a499360850b146459f9877c30c3124720b5e"
+      },
+      "case": "legacy-vehicle-complete",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 596,
+        "path": "domain/legacy-vehicle-complete/expectation.json",
+        "sha256": "8b2bfc35565beafc2b76f8018ebe8dad7a3cd74dfd5d776e88129fd44e14990f"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1115,
+        "path": "domain/legacy-vehicle-complete/input.json",
+        "sha256": "15666d5befd484753a81633ede54ce4193a5aef3dba0cc92167825026ee4170d"
+      },
+      "member_count": 1,
+      "package_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
+      "privacy_class": "private",
+      "source": "offline-pack@1",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 2422,
+        "path": "domain/legacy-vehicle-complete/projection.tokens.json",
+        "sha256": "489b8c0aa55f131e109867666f329617951ff97cb53e7b6640ecce05df561c62"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 14148,
+        "path": "domain/legacy-formal-recall-nonempty/projection.canonical.json",
+        "sha256": "1900fa00a9931e62055fdb4192252e862fada82b8b0f4ebcc0a8ca5ab536ad2a"
+      },
+      "case": "legacy-formal-recall-nonempty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 610,
+        "path": "domain/legacy-formal-recall-nonempty/expectation.json",
+        "sha256": "e3df3796bec8ffa4c40ccbd97090f1e5197eec444d95cb6d3f1874dceec6f09b"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1196,
+        "path": "domain/legacy-formal-recall-nonempty/input.json",
+        "sha256": "0def036d4648ef71f721656904a90960bbed591cbe223a17bcbd9a1cd4fa2939"
+      },
+      "member_count": 1,
+      "package_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
+      "privacy_class": "private",
+      "source": "offline-pack@1",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 14643,
+        "path": "domain/legacy-formal-recall-nonempty/projection.tokens.json",
+        "sha256": "baa4c386288d16d931ddda5383e656d49266ea8826870cca9511397663b125cb"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 3960,
+        "path": "domain/legacy-formal-recall-empty/projection.canonical.json",
+        "sha256": "3419afe2b01a3ab67bf1651f2f69121dea9b7cc978b2336f3af2de1ce5e6e845"
+      },
+      "case": "legacy-formal-recall-empty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 602,
+        "path": "domain/legacy-formal-recall-empty/expectation.json",
+        "sha256": "94df72425123e65434e6026b5fb13ba5baa1443140dfd6c3c19ee56c88001f2a"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1156,
+        "path": "domain/legacy-formal-recall-empty/input.json",
+        "sha256": "b6e1b962ae24745d175dee7860c8dcd8b0ef82d7ce11358acb676d7b98f8932f"
+      },
+      "member_count": 1,
+      "package_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
+      "privacy_class": "private",
+      "source": "offline-pack@1",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 4050,
+        "path": "domain/legacy-formal-recall-empty/projection.tokens.json",
+        "sha256": "79085e8b1d6726fe0c6d385e7d0fe55e5a48f473d424e09957f3e39f4e74218c"
+      }
+    },
+    {
+      "canonical_projection": null,
+      "case": "legacy-test-event-restricted",
+      "expectation": {
+        "byte_count": 148,
+        "path": "domain/legacy-test-event-restricted/expectation.json",
+        "sha256": "ef5b07bc2e34b3a01b54e81797b053ee13dcf5c7bdfb9c6ffa0d82be15473478"
+      },
+      "expected_error_code": "device_ai_selected_restricted",
+      "input": {
+        "byte_count": 1088,
+        "path": "domain/legacy-test-event-restricted/input.json",
+        "sha256": "97dfc2518ef166459ecaa5d79ff868340b3c1c53bc0105dc00dd8ef27cb39c75"
+      },
+      "package_sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
+      "source": "offline-pack@1",
+      "state": "rejected",
+      "token_dto_projection": null
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 11377,
+        "path": "domain/nonempty-tire-single/projection.canonical.json",
+        "sha256": "e6c42637f571dfb6695ec470a9c80d77d7ab42a879eeec1d7354ca0a2b5144e8"
+      },
+      "case": "nonempty-tire-single",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 592,
+        "path": "domain/nonempty-tire-single/expectation.json",
+        "sha256": "03c6168532294c3491264333ce9c7dc6d629e77de7a29667fcc9f6dfb6550b92"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1169,
+        "path": "domain/nonempty-tire-single/input.json",
+        "sha256": "d2f1f1ad761c6f100ada487c2abb83e4996c57f3751305df1320766e4763faf4"
+      },
+      "member_count": 1,
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 11422,
+        "path": "domain/nonempty-tire-single/projection.tokens.json",
+        "sha256": "f8d827c19f2f95e2dbe1d2e88d05a081f43cf78134cb705ce9b3dd29b8545222"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 32059,
+        "path": "domain/nonempty-tire-closure/projection.canonical.json",
+        "sha256": "8a33de2cdfbadf9619578178af3573e484454d462bdb64c65bedee015e899f5b"
+      },
+      "case": "nonempty-tire-closure",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 594,
+        "path": "domain/nonempty-tire-closure/expectation.json",
+        "sha256": "c15a230acaf65208bd17f43e120369f19c5a0f24e001fd2058cc01e6f9acb98f"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1174,
+        "path": "domain/nonempty-tire-closure/input.json",
+        "sha256": "b6f3152c2043d160bef977b95e77e1bb3cc61140805216dc657df4089c1d8dc8"
+      },
+      "member_count": 1,
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 32149,
+        "path": "domain/nonempty-tire-closure/projection.tokens.json",
+        "sha256": "45aceea61085bae34b1e93edb76120ecc65c898fcc3ffe6bd3fc7432ba68837c"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 2197,
+        "path": "domain/nonempty-vehicle-complete/projection.canonical.json",
+        "sha256": "0658b84146cb63adf9142c62137fcfd5c51cd0bf6c54035655046f370fecc6f5"
+      },
+      "case": "nonempty-vehicle-complete",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 600,
+        "path": "domain/nonempty-vehicle-complete/expectation.json",
+        "sha256": "f5591ab17f0c430ebeeabda8195062707825dd4696df184f4cda4ef79ea272cb"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1115,
+        "path": "domain/nonempty-vehicle-complete/input.json",
+        "sha256": "e45f80c8afe3d3c09491d5f743a8405916af4fb8ff1bfd8bf44de566c2582dcd"
+      },
+      "member_count": 1,
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 2422,
+        "path": "domain/nonempty-vehicle-complete/projection.tokens.json",
+        "sha256": "1b16945589adb0ed712866db1aa67ba7e896795ab659817532f33283af574549"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 14148,
+        "path": "domain/nonempty-formal-recall-nonempty/projection.canonical.json",
+        "sha256": "a57fd6a239656eb88bcb2cdefc071206798fd10ef98ffbe2e3ca12707e187f33"
+      },
+      "case": "nonempty-formal-recall-nonempty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 614,
+        "path": "domain/nonempty-formal-recall-nonempty/expectation.json",
+        "sha256": "8c0696cfdcaa898c94f4c19abfc75aec13c328e320029f3972716c14d33c6fd6"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1196,
+        "path": "domain/nonempty-formal-recall-nonempty/input.json",
+        "sha256": "9e75698fbc807169d48a2e16357ac2487409817b1e8a106fa1dca761f071db13"
+      },
+      "member_count": 1,
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 14643,
+        "path": "domain/nonempty-formal-recall-nonempty/projection.tokens.json",
+        "sha256": "b3b5e521d421fab3d8a291b36b8a29af294a6030aa9083dc4b2729258d399107"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 3960,
+        "path": "domain/nonempty-formal-recall-empty/projection.canonical.json",
+        "sha256": "8eaa6cb629443e308a6541a9fb83017e2a1a424a4ff56468cf8cc8d7fa0981cc"
+      },
+      "case": "nonempty-formal-recall-empty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 606,
+        "path": "domain/nonempty-formal-recall-empty/expectation.json",
+        "sha256": "ef6d9180565af38008b89bedd4ac2f4bc7ffe2af34fd9957ec2ab15f16c69bfb"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1156,
+        "path": "domain/nonempty-formal-recall-empty/input.json",
+        "sha256": "1409edc5a28055d4fd1ec882899f23fb700c09dff37a80fae949a509a7836bd6"
+      },
+      "member_count": 1,
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 4050,
+        "path": "domain/nonempty-formal-recall-empty/projection.tokens.json",
+        "sha256": "e79f68475dfde89703e9257423cb1244db7c9a4cf97e74eb8c6526d49825d480"
+      }
+    },
+    {
+      "canonical_projection": null,
+      "case": "nonempty-test-event-restricted",
+      "expectation": {
+        "byte_count": 148,
+        "path": "domain/nonempty-test-event-restricted/expectation.json",
+        "sha256": "ef5b07bc2e34b3a01b54e81797b053ee13dcf5c7bdfb9c6ffa0d82be15473478"
+      },
+      "expected_error_code": "device_ai_selected_restricted",
+      "input": {
+        "byte_count": 1088,
+        "path": "domain/nonempty-test-event-restricted/input.json",
+        "sha256": "592c472f1cda80d93d12114751e9706ac6de4a71f8b62b9d51f7045a846c4967"
+      },
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "source": "offline-pack@2",
+      "state": "rejected",
+      "token_dto_projection": null
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 3005,
+        "path": "domain/nonempty-recall-search-nonempty/projection.canonical.json",
+        "sha256": "8cbf7d16a37b71ec4ca3dd16aff850e7bfe4cc76253aa35b4000aae7da70b480"
+      },
+      "case": "nonempty-recall-search-nonempty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 612,
+        "path": "domain/nonempty-recall-search-nonempty/expectation.json",
+        "sha256": "6f02aa77ca1a80ac7fc346d6f83ab1b810dd1e49278d8411d5c45e63771c15cc"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1135,
+        "path": "domain/nonempty-recall-search-nonempty/input.json",
+        "sha256": "688d7d4799670012da35a5d3d724712fb8f2fd3fe158fdd71c61b11aee95d824"
+      },
+      "member_count": 1,
+      "package_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 3365,
+        "path": "domain/nonempty-recall-search-nonempty/projection.tokens.json",
+        "sha256": "97e53f3d6605b7f971fd51f4ca19694149c18141293abf877f9c17fcadac09b1"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 11377,
+        "path": "domain/empty-tire-single/projection.canonical.json",
+        "sha256": "88e0b87ddb75f62c0797d9a21b0650a2c68c3062971218a693aaf8243ec81708"
+      },
+      "case": "empty-tire-single",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 586,
+        "path": "domain/empty-tire-single/expectation.json",
+        "sha256": "2e9610f60e02b692f4bac472621e00262340c87a80a5ba82e1642dc897b2ff40"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1169,
+        "path": "domain/empty-tire-single/input.json",
+        "sha256": "7d70edd841905f1577110a2e11ec90dd31367bdf8cb0823f8575b09bfe157210"
+      },
+      "member_count": 1,
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 11422,
+        "path": "domain/empty-tire-single/projection.tokens.json",
+        "sha256": "85b62ef1edca71a7e0c803e9ea9344cf4d89714e6ce7bc060604f98d7dad5574"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 32059,
+        "path": "domain/empty-tire-closure/projection.canonical.json",
+        "sha256": "455f405b59e3845cf351122e1f4eca0496fcd3d119dd0fba96b970d33a0a7434"
+      },
+      "case": "empty-tire-closure",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 588,
+        "path": "domain/empty-tire-closure/expectation.json",
+        "sha256": "14f8797c492acc6253d4fa9b3757a70426cb6210f04634d556601346154fdaaa"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1174,
+        "path": "domain/empty-tire-closure/input.json",
+        "sha256": "a52bd1ec42c718e7b1debe592a5559c92f1b8c2dc0bea55bb9396133ab48b1c9"
+      },
+      "member_count": 1,
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 32149,
+        "path": "domain/empty-tire-closure/projection.tokens.json",
+        "sha256": "3846d6ccbfac0b64311e38de27bf6e49e1d26875530f20ea17573e092f4217fa"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 2197,
+        "path": "domain/empty-vehicle-complete/projection.canonical.json",
+        "sha256": "d88874aeffbe13238bac2c866727da10cda622cd75c46fc4ead60b3ec6b95c9e"
+      },
+      "case": "empty-vehicle-complete",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 594,
+        "path": "domain/empty-vehicle-complete/expectation.json",
+        "sha256": "35dcb67b1dceb65e5c1905da105d08585aae20bf560f5473026afc487c380fa2"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1115,
+        "path": "domain/empty-vehicle-complete/input.json",
+        "sha256": "cc70637cd2758f732ef23dbbb654c10e71eb24deaa1c0d7fa9f9738510be3898"
+      },
+      "member_count": 1,
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 2422,
+        "path": "domain/empty-vehicle-complete/projection.tokens.json",
+        "sha256": "b7d13422742506b47e5b79b73441a338541f9797fca537d320cb58950301303b"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 14148,
+        "path": "domain/empty-formal-recall-nonempty/projection.canonical.json",
+        "sha256": "43dc3ebcb2052135ef3c75925241b48a805b2f0a76b9246f7f901295d23d0590"
+      },
+      "case": "empty-formal-recall-nonempty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 608,
+        "path": "domain/empty-formal-recall-nonempty/expectation.json",
+        "sha256": "9a0a5aacec0d5a467bee94174fd350075b0b768e5568a84b5f9bcc8a65984325"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1196,
+        "path": "domain/empty-formal-recall-nonempty/input.json",
+        "sha256": "a1428d1f670a2c72a8be845616907ca1315f65f2ede80703df1d493b906af33a"
+      },
+      "member_count": 1,
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 14643,
+        "path": "domain/empty-formal-recall-nonempty/projection.tokens.json",
+        "sha256": "2bdf12a421df3fcc7f5324d69b8d4a9aa719d5450afcea2bab192cdcabcefa80"
+      }
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 3960,
+        "path": "domain/empty-formal-recall-empty/projection.canonical.json",
+        "sha256": "76262abe4e2959707ff7497a5db5ee4d61023f9380e21ea88617fff02f423c45"
+      },
+      "case": "empty-formal-recall-empty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 600,
+        "path": "domain/empty-formal-recall-empty/expectation.json",
+        "sha256": "11d5a86d5e987aa78ac7ffd938b5c11b904965d781fb94157aeef0408675c492"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1156,
+        "path": "domain/empty-formal-recall-empty/input.json",
+        "sha256": "81db6724b0d5febce4822bdf4303cc914ff0fd07fc0b12a1e087b094211be2e7"
+      },
+      "member_count": 1,
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 4050,
+        "path": "domain/empty-formal-recall-empty/projection.tokens.json",
+        "sha256": "4545360c383a85cb2b2527030098ee51b21ea6e29bcfc6c06ae121292ff2a183"
+      }
+    },
+    {
+      "canonical_projection": null,
+      "case": "empty-test-event-restricted",
+      "expectation": {
+        "byte_count": 148,
+        "path": "domain/empty-test-event-restricted/expectation.json",
+        "sha256": "ef5b07bc2e34b3a01b54e81797b053ee13dcf5c7bdfb9c6ffa0d82be15473478"
+      },
+      "expected_error_code": "device_ai_selected_restricted",
+      "input": {
+        "byte_count": 1088,
+        "path": "domain/empty-test-event-restricted/input.json",
+        "sha256": "8198d1383c734d9cd85dd335b5f8a670e788bb2ce60a8ecef3ae61db301d3837"
+      },
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "source": "offline-pack@2",
+      "state": "rejected",
+      "token_dto_projection": null
+    },
+    {
+      "canonical_projection": {
+        "byte_count": 2494,
+        "path": "domain/empty-recall-search-empty/projection.canonical.json",
+        "sha256": "383738b80df598d41cdfe03934d9db05ebb00cbd0166b9225beea9c6b246ff87"
+      },
+      "case": "empty-recall-search-empty",
+      "data_state": "local_snapshot",
+      "expectation": {
+        "byte_count": 600,
+        "path": "domain/empty-recall-search-empty/expectation.json",
+        "sha256": "2f08ea6b50adadc737572428938a8fcd9215138f6816643e7bb0ef1cbb4f5c4d"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1129,
+        "path": "domain/empty-recall-search-empty/input.json",
+        "sha256": "e56b050ba5f0d74adf35c834c758d3231f2c30d380114c11bb52d203dd580fac"
+      },
+      "member_count": 1,
+      "package_sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574",
+      "privacy_class": "private",
+      "source": "offline-pack@2",
+      "source_refresh_performed": false,
+      "state": "accepted",
+      "token_dto_projection": {
+        "byte_count": 2719,
+        "path": "domain/empty-recall-search-empty/projection.tokens.json",
+        "sha256": "2034ddeecf1562f6315a7ae1b0f516621db7980b5c297e382fbdc208eaf594c8"
+      }
+    }
+  ],
+  "generator_sha256": "240e6b6396d45b46796dc480cf40804e6c44b56ecd524355a1cd516cd34cc8f0",
+  "inputs": [
+    {
+      "byte_count": 3343,
+      "path": "inputs/manifest.json",
+      "sha256": "4be587f5ec8d43dbf096fc5715bfd16e5d107ca37b53d720edd78ea9e9ac0c5f"
+    },
+    {
+      "byte_count": 78418,
+      "path": "inputs/legacy-pack.json",
+      "sha256": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00"
+    },
+    {
+      "byte_count": 820,
+      "path": "inputs/legacy-descriptor.json",
+      "sha256": "58beed945e65dc23967742849a8b3fb78d5bc0809a67c13ec86562dc8c077edf"
+    },
+    {
+      "byte_count": 82981,
+      "path": "inputs/nonempty-pack.json",
+      "sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862"
+    },
+    {
+      "byte_count": 820,
+      "path": "inputs/nonempty-descriptor.json",
+      "sha256": "9a647693195d96daa5a73237f108973dea4b43dce2b35eb94096ea404972629d"
+    },
+    {
+      "byte_count": 82348,
+      "path": "inputs/empty-pack.json",
+      "sha256": "644a5b288c0c35f728da086d9e15a02fb0547b98489a0700ad245e4d22024574"
+    },
+    {
+      "byte_count": 820,
+      "path": "inputs/empty-descriptor.json",
+      "sha256": "b73693be275ca1f51ed491f2970052d7123551d547779415b904f9ff01095783"
+    }
+  ],
+  "numeric_semantics": "Integer tokens are arbitrary precision. JSON float tokens must remain finite binary64 under original package semantics. Lexemes do not imply extra measurement precision or exact-decimal arithmetic.",
+  "parser_vectors": [
+    {
+      "canonical_ast": {
+        "byte_count": 320,
+        "path": "parser/integer-310-digits/canonical.json",
+        "sha256": "d9c1104010e03236f7dd0e4e3d81bccf7f9231f45f06e3e27bc7a58a4fcff771"
+      },
+      "case": "integer-310-digits",
+      "expectation": {
+        "byte_count": 1076,
+        "path": "parser/integer-310-digits/expectation.json",
+        "sha256": "d4a515030af77c091e776ffc8ea4ee2b90bc964f39a37e9208d98ef7aa95c0b8"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 320,
+        "path": "parser/integer-310-digits/input.bin",
+        "sha256": "d9c1104010e03236f7dd0e4e3d81bccf7f9231f45f06e3e27bc7a58a4fcff771"
+      },
+      "state": "accepted",
+      "token_dto_ast": {
+        "byte_count": 365,
+        "path": "parser/integer-310-digits/tokens.json",
+        "sha256": "04945307a4846a2f127d6d017e0924363b5e75c65c5c93dcb60d71b13c63f235"
+      }
+    },
+    {
+      "canonical_ast": {
+        "byte_count": 1010,
+        "path": "parser/integer-1000-digits/canonical.json",
+        "sha256": "5b08db4c1704f8435374384d7a7e2ed61364f15590f328330d7f3671b380a933"
+      },
+      "case": "integer-1000-digits",
+      "expectation": {
+        "byte_count": 1082,
+        "path": "parser/integer-1000-digits/expectation.json",
+        "sha256": "d071985f7aa2c6e7f441eba8c43a0d912c881274ec65b176728e69d38543d9f9"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 1010,
+        "path": "parser/integer-1000-digits/input.bin",
+        "sha256": "5b08db4c1704f8435374384d7a7e2ed61364f15590f328330d7f3671b380a933"
+      },
+      "state": "accepted",
+      "token_dto_ast": {
+        "byte_count": 1055,
+        "path": "parser/integer-1000-digits/tokens.json",
+        "sha256": "6fea25c4d5b2bdfde87ae8ae6ed51f160f8e8e9dd4047eff5b08df83ab2b49a0"
+      }
+    },
+    {
+      "canonical_ast": {
+        "byte_count": 53,
+        "path": "parser/finite-float-spellings/canonical.json",
+        "sha256": "038b8a737122e84e40d133622b05ee6bba5c6fef23865f7568e019d1f76248cf"
+      },
+      "case": "finite-float-spellings",
+      "expectation": {
+        "byte_count": 1086,
+        "path": "parser/finite-float-spellings/expectation.json",
+        "sha256": "95cbe9e0d2f0a552e5e8558caf268bbf62de0e68b89b48df7235bd6bc2f784ad"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 53,
+        "path": "parser/finite-float-spellings/input.bin",
+        "sha256": "038b8a737122e84e40d133622b05ee6bba5c6fef23865f7568e019d1f76248cf"
+      },
+      "state": "accepted",
+      "token_dto_ast": {
+        "byte_count": 278,
+        "path": "parser/finite-float-spellings/tokens.json",
+        "sha256": "08645160202bbc5cce9274c2920f2a5ba94c44626735dfdafc86cc36c5421f31"
+      }
+    },
+    {
+      "canonical_ast": {
+        "byte_count": 27,
+        "path": "parser/negative-zero-spellings/canonical.json",
+        "sha256": "d23e3c3d79b48976e6c90ada92136fe2f4adfad3d0af30e156ff10f4c26e98a2"
+      },
+      "case": "negative-zero-spellings",
+      "expectation": {
+        "byte_count": 1089,
+        "path": "parser/negative-zero-spellings/expectation.json",
+        "sha256": "48080a3326ef74e43682ae8d44ade09b814f8173bf51371dac4c140ef6a057b7"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 27,
+        "path": "parser/negative-zero-spellings/input.bin",
+        "sha256": "c15ed2c0105fcd0bc4c9826bb49ca02aca6617c320e6b37de6a16bc37a449178"
+      },
+      "state": "accepted",
+      "token_dto_ast": {
+        "byte_count": 117,
+        "path": "parser/negative-zero-spellings/tokens.json",
+        "sha256": "5e42b56979524964c44774dc5af2a8701a329a23d1ff82512112bbbffa7eb7dc"
+      }
+    },
+    {
+      "canonical_ast": {
+        "byte_count": 63,
+        "path": "parser/codepoint-unicode-order/canonical.json",
+        "sha256": "9762a8db4590e1f01c0c481d0fbfd4ff454708375bbfccdc05ad5205ebb3b55e"
+      },
+      "case": "codepoint-unicode-order",
+      "expectation": {
+        "byte_count": 1089,
+        "path": "parser/codepoint-unicode-order/expectation.json",
+        "sha256": "6a89dbad7ab87e5f53e86cb7019db385d5b1f6d5c4b46e1c471c67dba2c8c923"
+      },
+      "expected_error_code": null,
+      "input": {
+        "byte_count": 63,
+        "path": "parser/codepoint-unicode-order/input.bin",
+        "sha256": "2757d52de441e5fdb07b6bb5ddfc84cc02ebd4100a82883f86dedd5a794c274a"
+      },
+      "state": "accepted",
+      "token_dto_ast": {
+        "byte_count": 198,
+        "path": "parser/codepoint-unicode-order/tokens.json",
+        "sha256": "0874912d9e35d9d4f081ce62bfa2b0532d5af96975fefa6f5eb52088c49c4b86"
+      }
+    },
+    {
+      "canonical_ast": null,
+      "case": "floating-overflow-positive",
+      "expectation": {
+        "byte_count": 788,
+        "path": "parser/floating-overflow-positive/expectation.json",
+        "sha256": "b56df663d25201d28d451c7266361f4040dea715927b28e6c6c4f0445f5fcb00"
+      },
+      "expected_error_code": "device_ai_number_nonfinite",
+      "input": {
+        "byte_count": 15,
+        "path": "parser/floating-overflow-positive/input.bin",
+        "sha256": "318f3d44b647eb80b8352742f9de6b3fd57c555240d4164a30c56415e9b0998b"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "floating-overflow-negative",
+      "expectation": {
+        "byte_count": 788,
+        "path": "parser/floating-overflow-negative/expectation.json",
+        "sha256": "64dd335efde13b1a2691147b4d196d8b923d82bd550fbe07d4ff5aeb3bcd50e5"
+      },
+      "expected_error_code": "device_ai_number_nonfinite",
+      "input": {
+        "byte_count": 16,
+        "path": "parser/floating-overflow-negative/input.bin",
+        "sha256": "73784ba3c05b010625283d7b9bf79b386dfad697e982c8a7dd2ed72f8babd19f"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "duplicate-key",
+      "expectation": {
+        "byte_count": 777,
+        "path": "parser/duplicate-key/expectation.json",
+        "sha256": "30bfe00a8604ffe48a0d158d702d2341805fc557b40312fb61877f5443c18a85"
+      },
+      "expected_error_code": "device_ai_json_duplicate_key",
+      "input": {
+        "byte_count": 13,
+        "path": "parser/duplicate-key/input.bin",
+        "sha256": "d38245cfdb5d2239d67fe2a719312768b668a6928d8d97d04fbce83215e50b44"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "escaped-duplicate-key",
+      "expectation": {
+        "byte_count": 785,
+        "path": "parser/escaped-duplicate-key/expectation.json",
+        "sha256": "8ebb76ac4be719a359cd339583795e10b4af3d722bab0b269b4449b36512435d"
+      },
+      "expected_error_code": "device_ai_json_duplicate_key",
+      "input": {
+        "byte_count": 18,
+        "path": "parser/escaped-duplicate-key/input.bin",
+        "sha256": "9b76ab5d01163a68899e361838ef85cf791c1a4aee792d8c714db00237a32647"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "invalid-utf8",
+      "expectation": {
+        "byte_count": 766,
+        "path": "parser/invalid-utf8/expectation.json",
+        "sha256": "013ec39b5ea25263210514192380a4c8a361b64ccc8815d0c28475348ced43b9"
+      },
+      "expected_error_code": "device_ai_json_utf8",
+      "input": {
+        "byte_count": 9,
+        "path": "parser/invalid-utf8/input.bin",
+        "sha256": "36781faac995a68b69aab7d540747e0c70efed427e66a608cdf64fc4feaaff12"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "utf8-bom",
+      "expectation": {
+        "byte_count": 761,
+        "path": "parser/utf8-bom/expectation.json",
+        "sha256": "bac0dbd08003355de0c04c9b0a74f46cbe9a55fe0ca34448871c8cc2d117b08e"
+      },
+      "expected_error_code": "device_ai_json_bom",
+      "input": {
+        "byte_count": 5,
+        "path": "parser/utf8-bom/input.bin",
+        "sha256": "aa25e978046d680ef8740d837e6de5bc1e2a2dc6089dbda1012544b538d53f65"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "unpaired-surrogate",
+      "expectation": {
+        "byte_count": 776,
+        "path": "parser/unpaired-surrogate/expectation.json",
+        "sha256": "dfbbfa3c2d45a4aa0e86d334472d115e9eb612b90d7527c170ebd34e590ddec9"
+      },
+      "expected_error_code": "device_ai_json_unicode",
+      "input": {
+        "byte_count": 14,
+        "path": "parser/unpaired-surrogate/input.bin",
+        "sha256": "7f3c6b6b4a88409efe4d2fba1cb3cf2b79b682fe4387678cba2e6b9645b58221"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "depth-33",
+      "expectation": {
+        "byte_count": 764,
+        "path": "parser/depth-33/expectation.json",
+        "sha256": "590ab1a1e823449564bfaba4f55b353599fa2e095daee4745f8261563e0418af"
+      },
+      "expected_error_code": "device_ai_json_depth",
+      "input": {
+        "byte_count": 67,
+        "path": "parser/depth-33/input.bin",
+        "sha256": "eac9bf029c22e177c74309fb891e3351dccfb04f055127ea82dc2dc3136cd899"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "trailing-value",
+      "expectation": {
+        "byte_count": 771,
+        "path": "parser/trailing-value/expectation.json",
+        "sha256": "1efe25d51c1cf1d1bd1a3c928050c5b9ce24a0f67c0f79df5ee1e2ae55c26b13"
+      },
+      "expected_error_code": "device_ai_json_invalid",
+      "input": {
+        "byte_count": 5,
+        "path": "parser/trailing-value/input.bin",
+        "sha256": "2cec2bbf1a64ea5249e8a7ab9ecc782fa48be13f0b35ad5f52bdea741841a230"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "nan",
+      "expectation": {
+        "byte_count": 763,
+        "path": "parser/nan/expectation.json",
+        "sha256": "b73e494566552e00e56c60faebf7a01736e54c07d6c891d05650e83394234e22"
+      },
+      "expected_error_code": "device_ai_number_invalid",
+      "input": {
+        "byte_count": 13,
+        "path": "parser/nan/input.bin",
+        "sha256": "159f99e03ec6dfb7edcad87bac613ac97a235493ad8b79b33cfa4002fb4477f8"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    },
+    {
+      "canonical_ast": null,
+      "case": "infinity",
+      "expectation": {
+        "byte_count": 768,
+        "path": "parser/infinity/expectation.json",
+        "sha256": "cfb5494f239eb5af38b014f7447918d269732b1a39aecd3cc09df96ef54ba810"
+      },
+      "expected_error_code": "device_ai_number_invalid",
+      "input": {
+        "byte_count": 18,
+        "path": "parser/infinity/input.bin",
+        "sha256": "c0681e2196267b176f9dbbfce0b6dde7ed7b92762c3a19c79ac5e9332886becb"
+      },
+      "state": "rejected",
+      "token_dto_ast": null
+    }
+  ],
+  "producer_source_bindings_unchanged": {
+    "apps/api/tests/test_offline_packs.py": "0b19f003faecbb20dbf05a09a87c10bebec7f3431cdf0974d246c00e404ef6d7",
+    "apps/api/tests/test_offline_packs_v2.py": "f81c78633f92900e65f936c0edede62a23ba07eb1432600484d402ce23012135",
+    "apps/api/tests/test_recall_discovery.py": "29de1c1fd43fdd09242d80b95a6ca2ec2f166c18a8cee30e508925b4625c17f8",
+    "apps/api/tire_api/offline_evidence.py": "bc23514980426ebe4f60a866741f3b5f22861020246db5fba1f442493bd8cc06",
+    "apps/api/tire_api/offline_models.py": "cc4bb2d12ad21399605bcceef6f4ce3c48edf7e694cb4416bf3ad10ef82de9db",
+    "apps/api/tire_api/offline_packs.py": "9c62a72ecb65a96529fac4c0055bab20f63170e55471118ea27cc19f233ed045"
+  },
+  "schema": "internal-device-ai-projection-vectors@1",
+  "source_core": {
+    "path": "apps/api/tire_api/device_ai_projection.py",
+    "sha256": "c8633ac0108b2b624e532afc157b91568d0381190f18aa70160931a5c7a2f774"
+  },
+  "source_time_scope": "Original producer timestamps, receipt IDs, source fields and private historical selection are unchanged. Binding is client/caller metadata, never attestation of physical installation or actor permission.",
+  "state": "generated_and_self_checked"
+}

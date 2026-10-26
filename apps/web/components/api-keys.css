@@ -1,0 +1,15 @@
+.api-key-panel { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); min-width: 0; }
+.api-key-panel h3 { font-size: 19px; line-height: 1.5; }
+.api-key-panel p, .api-key-panel label { font-size: 12px; line-height: 1.9; color: var(--muted); overflow-wrap: anywhere; }
+.api-key-fields { min-width: 0; margin: 20px 0; padding: 18px; border: 1px solid var(--border); }
+.api-key-fields legend { padding-inline: 6px; font-size: 13px; }
+.api-key-field { display: grid; gap: 8px; margin: 12px 0; min-width: 0; }
+.api-key-panel input:not([type=checkbox]), .api-key-panel select, .api-key-panel textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); font: inherit; }
+.api-key-panel textarea { min-height: 100px; font-family: monospace; font-size: 12px; overflow-wrap: anywhere; resize: vertical; }
+.api-key-check { display: flex; align-items: start; gap: 10px; margin: 14px 0; }
+.api-key-check input { width: 18px; height: 18px; margin-top: 3px; flex-shrink: 0; accent-color: var(--accent); }
+.api-key-result, .api-key-row { padding: 16px; margin-block: 18px; border: 1px solid var(--border); min-width: 0; }
+.api-key-panel code { overflow-wrap: anywhere; }
+.api-key-panel button { min-height: 44px; max-width: 100%; white-space: normal; }
+.api-key-list { margin-top: 24px; }
+@media (max-width: 460px) { .api-key-fields, .api-key-result, .api-key-row { padding: 12px; } }

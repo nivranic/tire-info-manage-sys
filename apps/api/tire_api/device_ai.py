@@ -1,8 +1,8 @@
 """第50轮设备AI桥接：prepare 侧内部 DTO 与 canonical 化（圆桌纪要步骤1）。
 
-内部接口不冻结 wire（device_ai_projection.py:10-11 原则；纪要 D15）：本模块只
-定义 closed StrictModel、规范化 validator 与 canonical 请求摘要，冻结时仅替换
-序列化层。无路由、无数据库、无网络、无归档访问。
+第63轮现行请求合同已迁入 packages/domain-types/src/device-ai.ts（ADR-2026-063）；
+本模块继续提供 closed StrictModel、规范化 validator 与 canonical 请求摘要。
+历史草案中的分层字段不属于现行 wire。无路由、无数据库、无网络、无归档访问。
 
 三禁令落点（encoder-spec.md §7）：payload 组装禁止把 as_token_dto()/token_dto()
 输出当 DeviceAIValue——本模块不产生任何 token 形状；业务值编码只在路由层经

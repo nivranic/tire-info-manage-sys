@@ -2,10 +2,12 @@
 import asyncio
 from copy import deepcopy
 from datetime import timedelta
+import sqlite3
 
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import event, func, select, update
+from sqlalchemy.exc import OperationalError
 
 from tire_api.db import FallbackConsent, QueryRun, UserSession, uid, utcnow
 from tire_api.domain import LiveQueryRequest
@@ -185,6 +187,68 @@ def test_policy_receipt_is_durable_before_business_read_and_each_attempt_unique(
     second = live(client).json()
     assert second['fallback_authorization']['use']['id'] != use['id']
     assert count(database, QueryFallbackUse) == 2
+
+
+@pytest.mark.parametrize('case', ['no_policy', 'ask', 'never', 'ineligible_failure', 'existing_consent'])
+def test_claim_without_use_releases_write_lock_before_session_cleanup(setup, case):
+    client, registry, database = setup
+    import tire_api.query_fallback_policies as module
+    outage(registry, 'source_fetch_failed' if case == 'ineligible_failure' else 'upstream_timeout')
+    failed = live(client).json()
+    if case == 'existing_consent':
+        assert grant(client, failed['query_id']).status_code == 201
+    if case != 'no_policy':
+        allow(client, case if case in {'ask', 'never'} else 'query_allow')
+
+    with database.sessions() as db, database.sessions() as contender:
+        # Reserve a different physical connection before the claim can release
+        # its own connection. A reused pooled connection would hide a leaked lock.
+        competing_connection = contender.connection()
+        competing_connection.exec_driver_sql('PRAGMA busy_timeout=0')
+        run = db.get(QueryRun, failed['query_id'])
+        assert (db.connection().connection.driver_connection
+                is not competing_connection.connection.driver_connection)
+        assert module.claim_policy_use(db, registry, run, 'tire', 'programmatic') is None
+
+        # Keep the original Session alive: dependency cleanup must not be needed
+        # for another request to acquire its SQLite write transaction.
+        competing_connection.exec_driver_sql('BEGIN IMMEDIATE')
+        contender.rollback()
+        assert not db.in_transaction()
+        assert run.state == ('source_unavailable' if case == 'never' else 'consent_required')
+    assert count(database, QueryFallbackUse) == 0
+
+
+def test_claimed_use_keeps_write_lock_until_authorized_result(setup):
+    client, registry, database = setup
+    import tire_api.query_fallback_policies as module
+    outage(registry)
+    failed = live(client).json()
+    allow(client)
+
+    with database.sessions() as db, database.sessions() as contender:
+        competing_connection = contender.connection()
+        competing_connection.exec_driver_sql('PRAGMA busy_timeout=0')
+        run = db.get(QueryRun, failed['query_id'])
+        assert (db.connection().connection.driver_connection
+                is not competing_connection.connection.driver_connection)
+        use = module.claim_policy_use(db, registry, run, 'tire', 'programmatic')
+        assert use is not None and db.in_transaction()
+        # The use is durable already, while the final policy/source guard still
+        # owns a write lock protecting the caller's authorized historical read.
+        assert contender.get(QueryFallbackUse, use.id) is not None
+        with pytest.raises(OperationalError) as blocked:
+            competing_connection.exec_driver_sql('BEGIN IMMEDIATE')
+        assert blocked.value.orig.sqlite_errorcode & 0xFF == sqlite3.SQLITE_BUSY
+        contender.rollback()
+
+        result = module.authorized_result(db, registry, run, use, {'data_state': 'local_snapshot'})
+        assert result['fallback_authorization']['use']['id'] == use.id
+        assert not db.in_transaction()
+        contender.connection().exec_driver_sql('PRAGMA busy_timeout=0')
+        contender.connection().exec_driver_sql('BEGIN IMMEDIATE')
+        contender.rollback()
+    assert count(database, QueryFallbackUse) == 1
 
 
 def test_all_tire_filters_are_kept_in_policy_authorized_selection(setup):

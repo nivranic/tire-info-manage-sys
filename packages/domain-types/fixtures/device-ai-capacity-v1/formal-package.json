@@ -1,0 +1,67 @@
+{
+  "base_descriptor": "base-descriptor.json",
+  "base_pack": "base-pack.json",
+  "cases": [
+    {
+      "expected": {
+        "projection_byte_count": 11377,
+        "projection_file": "projections/formal-base.canonical.json",
+        "projection_sha256": "e6c42637f571dfb6695ec470a9c80d77d7ab42a879eeec1d7354ca0a2b5144e8",
+        "state": "accepted"
+      },
+      "id": "formal-base",
+      "input_byte_count": 82981,
+      "input_sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
+      "padding_spaces": 0,
+      "parser_expected": {
+        "state": "accepted"
+      }
+    },
+    {
+      "expected": {
+        "projection_byte_count": 11377,
+        "projection_file": "projections/formal-n-minus-1.canonical.json",
+        "projection_sha256": "94404f3028a52f21d4a707ff4626c3ce71ebd74b8237d6ce64f852a0d2340a16",
+        "state": "accepted"
+      },
+      "id": "formal-n-minus-1",
+      "input_byte_count": 8388607,
+      "input_sha256": "62737466bf247707690481910ce8e0d69eee8861ee0eee4ef3c5ea7f51a73d4d",
+      "padding_spaces": 8305626,
+      "parser_expected": {
+        "state": "accepted"
+      }
+    },
+    {
+      "expected": {
+        "projection_byte_count": 11377,
+        "projection_file": "projections/formal-n.canonical.json",
+        "projection_sha256": "7d41557ad365e2b0d27762286ef3bfef1ee96aac14e6d2cfacbf66bb4b3aae4e",
+        "state": "accepted"
+      },
+      "id": "formal-n",
+      "input_byte_count": 8388608,
+      "input_sha256": "455867e22a40f663d4c9f9b341c3dcaf3ed87bff57d86bd87aeecf719dcb624b",
+      "padding_spaces": 8305627,
+      "parser_expected": {
+        "state": "accepted"
+      }
+    },
+    {
+      "expected": {
+        "error_code": "device_ai_metadata_number_invalid",
+        "state": "rejected"
+      },
+      "id": "formal-n-plus-1",
+      "input_byte_count": 8388609,
+      "input_sha256": "8fd8ff333fd140cd1aff08d5f1fcb57d3835d501c8f41a712b9963a2a8b5d6f8",
+      "padding_spaces": 8305628,
+      "parser_expected": {
+        "error_code": "device_ai_package_capacity",
+        "state": "rejected"
+      }
+    }
+  ],
+  "projection_input": "projection-input.json",
+  "schema": "device-ai-formal-capacity@1"
+}

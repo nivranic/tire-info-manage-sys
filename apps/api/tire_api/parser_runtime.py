@@ -24,6 +24,7 @@ from .parser_limits import CPU_SECONDS, MEMORY_BYTES, WindowsJob, apply_parent_l
 from . import parser_bundles as bundles
 
 PROTOCOL = 'parser-json@2'
+PDF_ERROR_CODES = frozenset({'vehicle_pdf_invalid', 'vehicle_pdf_revision_unreviewed'})
 MAX_BODY_BYTES = 8 * 1024 * 1024
 MAX_PROTOCOL_BYTES = 12 * 1024 * 1024
 MAX_OUTPUT_BYTES = 4 * 1024 * 1024
@@ -72,7 +73,7 @@ def _specs():
         values[source] = (config['parser_version'], 'tire', ['adapters/michelin.py', 'adapters/michelin_regions.py', 'adapters/registry.py'])
     for adapter in (hankook, toyo, pirelli):
         values[adapter.SOURCE_CONFIG['id']] = (adapter.PARSER_VERSION, 'tire', [f'adapters/{adapter.__name__.rsplit(".", 1)[1]}.py', 'adapters/registry.py'])
-    values[xiaomi.SOURCE_ID] = (xiaomi.PARSER_VERSION, 'vehicle', ['adapters/xiaomi.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py', 'db.py'])
+    values[xiaomi.SOURCE_ID] = (xiaomi.PARSER_VERSION, 'vehicle', ['adapters/xiaomi.py', 'adapters/xiaomi_first_generation_pdf.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py', 'db.py'])
     values[nhtsa.SOURCE_ID] = (nhtsa.PARSER_VERSION, 'recall', ['adapters/nhtsa.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py'])
     return values
 
@@ -140,6 +141,18 @@ def _environment(directory):
         if not system_root or not Path(system_root).is_dir():
             raise ParserRunError('parser_isolation_unavailable')
         environment.update(SystemRoot=system_root, WINDIR=system_root)
+        # platform.machine() reads these on Windows. The bundle manifest binds
+        # that value, so stripping it made every isolated child look like an
+        # incompatible machine. Retain only known architecture identifiers,
+        # never the parent's general environment or executable search path.
+        for name in ('PROCESSOR_ARCHITECTURE', 'PROCESSOR_ARCHITEW6432'):
+            architecture = os.environ.get(name)
+            if architecture is not None:
+                if architecture.upper() not in {'AMD64', 'X86', 'ARM64', 'ARM', 'IA64'}:
+                    raise ParserRunError('parser_isolation_unavailable')
+                environment[name] = architecture
+        if not any(name in environment for name in ('PROCESSOR_ARCHITECTURE', 'PROCESSOR_ARCHITEW6432')):
+            raise ParserRunError('parser_isolation_unavailable')
     elif sys.platform == 'linux':
         environment['LANG'] = 'C.UTF-8'
     else:
@@ -270,7 +283,7 @@ def _run_sync(request, descriptor, cancelled, execution):
                     if not isinstance(response, dict) or response.get('protocol') != PROTOCOL or response.get('run_id') != request['run_id'] or type(response.get('ok')) is not bool:
                         raise ValueError('invalid_response')
                     if not response['ok']:
-                        if set(response) != {'protocol', 'run_id', 'ok', 'error'} or response['error'] not in {'parser_schema_changed', 'parser_failed'} | bundles.ERROR_CODES:
+                        if set(response) != {'protocol', 'run_id', 'ok', 'error'} or response['error'] not in {'parser_schema_changed', 'parser_failed'} | PDF_ERROR_CODES | bundles.ERROR_CODES:
                             raise ValueError('invalid_error')
                         raise ParserRunError(response['error'])
                     if set(response) != {'protocol', 'run_id', 'ok', 'payload', 'source_id', 'parser_version', 'parser_digest',

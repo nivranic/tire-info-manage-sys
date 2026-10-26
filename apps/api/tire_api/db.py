@@ -11,7 +11,7 @@ import tempfile
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint, create_engine, event
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint, create_engine, event
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -119,6 +119,15 @@ class Verification(Base):
 class RawCapture(Base):
     """Durably received text, committed before parsing; never an accepted snapshot."""
     __tablename__ = "raw_captures"
+    __table_args__ = (
+        CheckConstraint("body_encoding IN ('utf-8', 'binary')", name="ck_raw_captures_body_encoding"),
+        CheckConstraint("body_encoding = 'utf-8' OR (body_encoding = 'binary' AND source_id = 'xiaomi-cn-vehicles' "
+                        "AND target_kind = 'vehicle' AND content_type = 'application/pdf')", name="ck_raw_captures_body_storage"),
+        CheckConstraint("typeof(raw_body) = 'blob' AND byte_count >= 1 AND byte_count <= 8388608 AND byte_count = length(raw_body)",
+                        name="ck_raw_captures_byte_count").ddl_if(dialect="sqlite"),
+        CheckConstraint("byte_count >= 1 AND byte_count <= 8388608 AND byte_count = length(raw_body)",
+                        name="ck_raw_captures_byte_count").ddl_if(dialect="postgresql"),
+    )
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     query_id: Mapped[str] = mapped_column(ForeignKey("query_runs.id"), unique=True)
     source_id: Mapped[str] = mapped_column(String(80), index=True)
@@ -127,6 +136,7 @@ class RawCapture(Base):
     source_url: Mapped[str] = mapped_column(Text)
     raw_hash: Mapped[str] = mapped_column(String(64))
     raw_body: Mapped[bytes] = mapped_column(LargeBinary)
+    body_encoding: Mapped[str] = mapped_column(String(16), default="utf-8", server_default="utf-8")
     byte_count: Mapped[int]
     content_type: Mapped[str] = mapped_column(String(120))
     parser_version: Mapped[str] = mapped_column(String(100))
@@ -163,6 +173,11 @@ class EvidenceDocument(Base):
 class RejectedObservation(Base):
     """Fetched text that could not form validated facts; never an accepted cache."""
     __tablename__ = "rejected_observations"
+    __table_args__ = (
+        CheckConstraint("body_encoding IN ('utf-8', 'binary')", name="ck_rejected_observations_body_encoding"),
+        CheckConstraint("body_encoding = 'utf-8' OR (body_encoding = 'binary' AND source_id = 'xiaomi-cn-vehicles' "
+                        "AND target_kind = 'vehicle' AND content_type = 'application/pdf')", name="ck_rejected_observations_body_storage"),
+    )
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     query_id: Mapped[str] = mapped_column(ForeignKey("query_runs.id"), unique=True)
     source_id: Mapped[str] = mapped_column(String(80), index=True)
@@ -173,6 +188,7 @@ class RejectedObservation(Base):
     source_url: Mapped[str] = mapped_column(Text)
     raw_hash: Mapped[str] = mapped_column(String(64))
     raw_body: Mapped[bytes] = mapped_column(LargeBinary)
+    body_encoding: Mapped[str] = mapped_column(String(16), default="utf-8", server_default="utf-8")
     content_type: Mapped[str] = mapped_column(String(120))
     parser_version: Mapped[str] = mapped_column(String(100))
     parser_identity: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -487,7 +503,10 @@ class Database:
                                 or time.monotonic() >= deadline):
                             raise
                         time.sleep(0.05)
-        self.sessions = sessionmaker(self.engine, expire_on_commit=False, info={"object_store": self.object_store})
+        from .webhook_policy import load_targets
+        self.webhook_catalog = load_targets()
+        self.sessions = sessionmaker(self.engine, expire_on_commit=False,
+            info={"object_store": self.object_store, "webhook_catalog": self.webhook_catalog})
         self.backend = parsed.get_backend_name()
 
     def initialize(self) -> None:
@@ -496,7 +515,18 @@ class Database:
         from . import identity_models  # noqa: F401
         from . import identity_contract_models  # noqa: F401
         from . import fitment_relation_models  # noqa: F401
+        from . import test_events  # noqa: F401
+        from . import test_sku_link_models  # noqa: F401
+        from . import source_material_models  # noqa: F401
+        from . import candidate_ai_models  # noqa: F401
+        from . import webhook_models  # noqa: F401
+        from . import external_api_models  # noqa: F401
+        from . import external_fact_models  # noqa: F401
+        from . import query_owner_models  # noqa: F401
         from . import golden_models  # noqa: F401
+        from . import test_event_golden_models  # noqa: F401
+        from . import ai_pricing_models  # noqa: F401
+        from . import source_page_models  # noqa: F401
         from . import source_setting_models  # noqa: F401
         from . import monitor_task_models  # noqa: F401
         from . import vehicles  # noqa: F401
@@ -507,6 +537,9 @@ class Database:
         from . import offline_models  # noqa: F401
         from . import query_fallback_policies  # noqa: F401
         from . import device_ai_models  # noqa: F401
+        from . import interest_models  # noqa: F401
+        from . import interest_catalog_models  # noqa: F401
+        from . import interest_applicability_models  # noqa: F401
         from .migrations import upgrade
         from .knowledge_models import initialize_search
         from .embedding_models import initialize_vectors
@@ -518,6 +551,8 @@ class Database:
                 connection.exec_driver_sql("BEGIN IMMEDIATE")
             elif self.backend == "postgresql":
                 connection.exec_driver_sql("SELECT pg_advisory_xact_lock(821741906)")
+            from .vehicle_binary_migration import preflight
+            preflight(connection)
             Base.metadata.create_all(connection)
             upgrade(connection)
             initialize_search(connection)

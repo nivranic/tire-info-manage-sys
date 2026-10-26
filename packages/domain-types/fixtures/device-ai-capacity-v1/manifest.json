@@ -1,0 +1,117 @@
+{
+  "files": [
+    {
+      "byte_count": 8,
+      "path": ".gitattributes",
+      "sha256": "705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da"
+    },
+    {
+      "byte_count": 1100,
+      "path": "authority.json",
+      "sha256": "d1e6f668c3a8e69fe2df58c801c58a48e64e3e543e5d67d56f6ed86ff1960786"
+    },
+    {
+      "byte_count": 820,
+      "path": "base-descriptor.json",
+      "sha256": "9a647693195d96daa5a73237f108973dea4b43dce2b35eb94096ea404972629d"
+    },
+    {
+      "byte_count": 82981,
+      "path": "base-pack.json",
+      "sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862"
+    },
+    {
+      "byte_count": 4937,
+      "path": "boundary-recipes.json",
+      "sha256": "d74c5f907569e9db45c89f08ce1cc60ce0eb02db7a7a81aa829f0e292de3aa2a"
+    },
+    {
+      "byte_count": 33601,
+      "path": "closure-cross-variant.json",
+      "sha256": "b3dc8e6c17e3327deaf047d1ebcea5d6d50a6f50ab99b5cf49014cd96293cc57"
+    },
+    {
+      "byte_count": 38164,
+      "path": "closure-fingerprints.json",
+      "sha256": "393a1839d5c3919b50dc837d3e5eedd7c5187a864b31d7d7c70520c33f9cf9b2"
+    },
+    {
+      "byte_count": 33651,
+      "path": "closure-pack.json",
+      "sha256": "ef0322515a484e6439186f9bb318220accaab1ab452f22d09eb757b39c9a57f6"
+    },
+    {
+      "byte_count": 33329,
+      "path": "closure-package.json",
+      "sha256": "4e9da44aae6a86790f0068530d308ee6fe7f67e70949abc15aaf3b6728f0bb08"
+    },
+    {
+      "byte_count": 33659,
+      "path": "closure-restricted-dependency.json",
+      "sha256": "8d7b1a807dbd7299dc8a863d8e07f219098f26950765c6528747fd52ac244c70"
+    },
+    {
+      "byte_count": 2189,
+      "path": "formal-package.json",
+      "sha256": "0212909115b4d81faa03806715f9a0399c4a8edf6572dd7781455ca81cc9f11e"
+    },
+    {
+      "byte_count": 1169,
+      "path": "projection-input.json",
+      "sha256": "d2f1f1ad761c6f100ada487c2abb83e4996c57f3751305df1320766e4763faf4"
+    },
+    {
+      "byte_count": 9722,
+      "path": "projections/closure-a-to-b.canonical.json",
+      "sha256": "12475e70629f1172f64aae7e76780e7902a25ef4c2d79419f8a74bd562e8ffe9"
+    },
+    {
+      "byte_count": 9722,
+      "path": "projections/closure-approved-reversed.canonical.json",
+      "sha256": "12475e70629f1172f64aae7e76780e7902a25ef4c2d79419f8a74bd562e8ffe9"
+    },
+    {
+      "byte_count": 11377,
+      "path": "projections/formal-base.canonical.json",
+      "sha256": "e6c42637f571dfb6695ec470a9c80d77d7ab42a879eeec1d7354ca0a2b5144e8"
+    },
+    {
+      "byte_count": 11377,
+      "path": "projections/formal-n-minus-1.canonical.json",
+      "sha256": "94404f3028a52f21d4a707ff4626c3ce71ebd74b8237d6ce64f852a0d2340a16"
+    },
+    {
+      "byte_count": 11377,
+      "path": "projections/formal-n.canonical.json",
+      "sha256": "7d41557ad365e2b0d27762286ef3bfef1ee96aac14e6d2cfacbf66bb4b3aae4e"
+    },
+    {
+      "byte_count": 9729,
+      "path": "projections/selected-a-b.canonical.json",
+      "sha256": "69af153b916d9ea135de326083b01e61ea401519d5958d41526e169e235b3ac1"
+    },
+    {
+      "byte_count": 9729,
+      "path": "projections/selected-b-a.canonical.json",
+      "sha256": "69af153b916d9ea135de326083b01e61ea401519d5958d41526e169e235b3ac1"
+    },
+    {
+      "byte_count": 2558,
+      "path": "projections/single-a-isolated.canonical.json",
+      "sha256": "707899f577ba6dce7f73a74ba3622d244a3b0388b64869c503b7cf65648c4f2d"
+    },
+    {
+      "byte_count": 4119,
+      "path": "README.md",
+      "sha256": "7b553e9879758b93eb0c430f14eb9dc101aa446b6728323563228e4d509a99d9"
+    },
+    {
+      "byte_count": 12827,
+      "path": "specs/fingerprint-spec.md",
+      "sha256": "d2b7524d0e86101885f08442d139ef0128481dba3992d396a46ef7af2e497345"
+    }
+  ],
+  "max_package_bytes": 8388608,
+  "schema": "device-ai-capacity-corpus@1",
+  "synthetic_only": true
+}

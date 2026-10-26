@@ -6,6 +6,7 @@ import type { AIAnalysis, AIPack, EvidenceReportDetail, EvidenceReportRecord, Re
 import { IdentityContractEvidence } from "./identity-contract";
 import { FrozenFieldResolutions } from "./field-authority";
 import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope } from "./recall-evidence-meta";
+import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import { useToast } from "./toast";
 
@@ -65,7 +66,8 @@ export function SaveReportDialog({ pack, analysis, onClose, onSaved }: {
     <header className="fact-review-heading"><div><span className="eyebrow">FROZEN EVIDENCE REPORT</span><h2 id="report-save-title">{analysis ? "保存含分析的报告" : "保存证据报告"}</h2></div><button type="button" className="text-button" disabled={busy} onClick={onClose}>关闭</button></header>
     <div className="ai-content"><p className="review-boundary">报告保存在{platform.sessionLabel}的本地报告库。报告包含个人标题、备注或问题，统一按私有材料保存。正文固定保存已预览的来源、事实与冲突{analysis ? "，以及同一证据包已经完成的分析" : ""}，始终作为历史记录；保存不调用模型、不产生新的 AI 请求。</p>
       <RecallAnalysisBoundary boundary={pack.recall_boundary} pending={pack.evidence.some(evidence => evidence.evidence_type === "recall")} />
-      <section className="snapshot-banner"><strong>{pack.evidence.length} 条来源 · {pack.facts.length} 个事实字段</strong><span>证据准备 {stamp(pack.created_at)} · {analysis ? pack.recall_boundary ? "包含已完成的公告事实整理，具体轮胎适用性尚未评估" : "包含已完成分析，推断仍需人工核对" : "纯证据报告，不包含模型分析"}</span></section>
+      <TestAnalysisScope boundary={pack.test_boundary} pending={containsTestEvidence(pack.evidence)} />
+      <section className="snapshot-banner"><strong>{pack.evidence.length} 条来源 · {pack.facts.length} 个事实字段</strong><span>证据准备 {stamp(pack.created_at)} · {analysis ? pack.test_boundary ? "包含已完成的测试事实摘录，精确 SKU 性能关联尚未建立" : pack.recall_boundary ? "包含已完成的公告事实整理，具体轮胎适用性尚未评估" : "包含已完成分析，推断仍需人工核对" : "纯证据报告，不包含模型分析"}</span></section>
       {!analysisMatches ? <p className="inline-error" role="alert">这条分析未完成或不属于当前证据包，不能合并保存。</p> : null}
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       <form className="review-form" onSubmit={event => { event.preventDefault(); void save(); }}>
@@ -92,6 +94,7 @@ function FrozenReportBody({ report }: { report: EvidenceReportDetail }) {
     <div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 冻结报告正文</strong><span>证据包准备于 {stamp(body.source_pack.created_at)}；准备时状态 {body.source_pack.data_state}，原始证据包分类为{body.source_pack.privacy_class === "public" ? "公开来源" : "非公开材料"}。报告整体仍按私有材料保存；打开报告不代表重新在线核验。</span></div>
     <p className="review-boundary">{body.notice}</p>
     <RecallAnalysisBoundary boundary={body.recall_boundary} pending={recallPack} />
+    <TestAnalysisScope boundary={body.test_boundary} historical={!body.test_boundary && containsTestEvidence(body.evidence)} />
     <details className="report-hashes"><summary>正文与证据包校验值</summary><p>正文 SHA-256 <code>{report.body_hash}</code></p><p>证据包 <code>{body.source_pack.id}</code></p><p>证据包指纹 <code>{body.source_pack.fingerprint}</code></p></details>
     <h3>来源与原始事实</h3>
     {body.evidence.map(source => <section className="ai-evidence" key={source.id} id={`report-${report.id}-source-${source.id}`} tabIndex={-1}>
@@ -109,8 +112,8 @@ function FrozenReportBody({ report }: { report: EvidenceReportDetail }) {
     <FrozenFieldResolutions resolutions={body.field_resolutions} policy={body.field_policy} context="saved" />
     {body.conflicts.length ? <section className="source-conflict"><h3>来源冲突 · 未裁定</h3><p>这些冲突随正文冻结保存；模型解释不会自动裁定。</p><details><summary>原始冲突记录</summary><pre>{JSON.stringify(body.conflicts, null, 2)}</pre></details></section> : <p className="review-boundary">所保存的证据包没有记录来源冲突。</p>}
     {body.analysis ? <section className="report-analysis"><h3>已完成的证据分析</h3><p className="draft-original">{body.analysis.question}</p><p>{body.analysis.model} · 完成 {stamp(body.analysis.completed_at)} · {body.analysis.usage ? `${body.analysis.usage.total_tokens} tokens` : "原调用用量未确认"}</p>
-      {(recallPack ? ["fact"] as const : ["fact", "inference"] as const).map(kind => <section key={kind}><h4>{kind === "fact" ? "引用事实" : "模型推断 · 需人工核对"}</h4>{claims.filter(claim => claim.type === kind).map((claim, index) => <article className={`ai-claim ${kind}`} key={index}><p>{claim.text}</p><div className="variant-actions">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} disabled={!body.facts.some(fact => fact.id === id)} onClick={() => citation("fact", id)}>核对字段 {id}</button>)}{claim.evidence_ids.map(id => <button type="button" className="text-button" key={id} disabled={!body.evidence.some(source => source.id === id)} onClick={() => citation("source", id)}>核对来源 {id}</button>)}</div></article>)}{!claims.some(claim => claim.type === kind) ? <p>这份分析没有此类内容。</p> : null}</section>)}
-      {!recallPack ? <section className="ai-claim inference"><h4>模型报告的不确定性</h4><p>{body.analysis.uncertainty || "未另行陈述；不表示不存在不确定性。"}</p></section> : null}
+      {((recallPack || body.test_boundary) ? ["fact"] as const : ["fact", "inference"] as const).map(kind => <section key={kind}><h4>{kind === "fact" ? "引用事实" : "模型推断 · 需人工核对"}</h4>{claims.filter(claim => claim.type === kind).map((claim, index) => <article className={`ai-claim ${kind}`} key={index}><p>{claim.text}</p><div className="variant-actions">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} disabled={!body.facts.some(fact => fact.id === id)} onClick={() => citation("fact", id)}>核对字段 {id}</button>)}{claim.evidence_ids.map(id => <button type="button" className="text-button" key={id} disabled={!body.evidence.some(source => source.id === id)} onClick={() => citation("source", id)}>核对来源 {id}</button>)}</div></article>)}{!claims.some(claim => claim.type === kind) ? <p>这份分析没有此类内容。</p> : null}</section>)}
+      {!recallPack && !body.test_boundary ? <section className="ai-claim inference"><h4>模型报告的不确定性</h4><p>{body.analysis.uncertainty || "未另行陈述；不表示不存在不确定性。"}</p></section> : null}
     </section> : <p className="review-boundary">这是一份纯证据报告，没有保存模型分析。</p>}
   </section>;
 }

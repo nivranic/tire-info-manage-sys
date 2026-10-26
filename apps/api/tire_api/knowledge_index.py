@@ -2,6 +2,7 @@
 import re
 import unicodedata
 
+from fastapi import HTTPException
 from sqlalchemy import delete, func, select, text
 
 from .curation import FIELD_CATALOG
@@ -57,16 +58,20 @@ def query_tokens(value):
     return list(dict.fromkeys(result))
 
 
-def _heads(db):
-    """Do not select any payload/body columns while checking for changes."""
-    from .field_evidence import latest_tire_heads
-    tire = latest_tire_heads(db)
+def _vehicle_heads(db):
     ranks = select(VehicleVerification.id, VehicleVerification.snapshot_id, VehicleVerification.vehicle_id,
         VehicleVerification.verified_at, VehicleSnapshot.source_id,
         func.row_number().over(partition_by=(VehicleSnapshot.source_id, VehicleVerification.vehicle_id),
             order_by=(VehicleVerification.verified_at.desc(), VehicleVerification.id.desc())).label('n'))\
         .join(VehicleSnapshot, VehicleSnapshot.id == VehicleVerification.snapshot_id).subquery()
-    vehicle = [dict(row) for row in db.execute(select(ranks).where(ranks.c.n == 1)).mappings()]
+    return [dict(row) for row in db.execute(select(ranks).where(ranks.c.n == 1)).mappings()]
+
+
+def _heads(db):
+    """Do not select any payload/body columns while checking for changes."""
+    from .field_evidence import latest_tire_heads
+    tire = latest_tire_heads(db)
+    vehicle = _vehicle_heads(db)
     ranks = select(TireTestRevision.id, TireTestRevision.event_id, TireTestRevision.revision, TireTestRevision.state,
         func.row_number().over(partition_by=TireTestRevision.event_id,
                               order_by=TireTestRevision.revision.desc()).label('n')).subquery()
@@ -225,6 +230,91 @@ def _vehicle_documents(db, heads):
     return docs
 
 
+def _check_binary_vehicle_heads(db, heads):
+    if not heads:
+        return {}
+    from .vehicle_raw import (FIRST_GENERATION_ID, VehicleRawIntegrityError, VehicleUseNotAllowed,
+                              checked_vehicle_consumer_capsule, require_vehicle_consumer_use)
+    capsules = {}
+    try:
+        with db.no_autoflush:
+            ids = {head['snapshot_id'] for head in heads}
+            binary_ids = set(db.scalars(select(VehicleSnapshot.id).where(
+                VehicleSnapshot.id.in_(ids), (VehicleSnapshot.body_encoding == 'binary')
+                | (VehicleSnapshot.vehicle_id == FIRST_GENERATION_ID))))
+            # Removing a source/encoding marker cannot change the fixed identity.
+            binary_ids.update(head['snapshot_id'] for head in heads if head['vehicle_id'] == FIRST_GENERATION_ID)
+            for head in heads:
+                if head['snapshot_id'] not in binary_ids:
+                    continue
+                capsule = checked_vehicle_consumer_capsule(db, head['snapshot_id'], verification_id=head['id'])
+                if capsule is None or head['vehicle_id'] != capsule['vehicle_id']:
+                    raise VehicleRawIntegrityError()
+                capsules[head['snapshot_id']] = capsule
+            # Validate every retained head before applying any source-use policy.
+            for capsule in capsules.values():
+                require_vehicle_consumer_use(capsule, 'local_structured')
+    except VehicleUseNotAllowed as error:
+        raise HTTPException(403, {'code': error.code}) from None
+    except (VehicleRawIntegrityError, KeyError, TypeError, ValueError):
+        raise HTTPException(409, {'code': 'vehicle_raw_integrity_failed'}) from None
+    return capsules
+
+
+def check_current_vehicle_heads(db):
+    """All accepted vehicle heads, before filters, cache hits or model checks."""
+    with db.no_autoflush:
+        return _check_binary_vehicle_heads(db, _vehicle_heads(db))
+
+
+def check_vehicle_document_use(db, documents, purpose='local_structured'):
+    """Bind existing projection bytes to current binary evidence; never repair it."""
+    from .vehicle_raw import (FIRST_GENERATION_ID, SOURCE_ID, VehicleRawIntegrityError, VehicleUseNotAllowed,
+                              checked_vehicle_consumer_capsule, require_vehicle_consumer_use)
+    with db.no_autoflush:
+        heads = _vehicle_heads(db)
+        capsules = _check_binary_vehicle_heads(db, heads)
+        expected = {item['id']: item for item in _vehicle_documents(db, [
+            head for head in heads if head['snapshot_id'] in capsules])}
+        selected = []
+        for document in documents:
+            payload = document.payload if type(document.payload) is dict else {}
+            reference = payload.get('reference') if type(payload.get('reference')) is dict else {}
+            values = payload.get('_values') if type(payload.get('_values')) is dict else {}
+            vehicle = values.get('vehicle') if type(values.get('vehicle')) is dict else {}
+            recognized = (document.id in expected or document.kind == 'vehicle' or payload.get('kind') == 'vehicle'
+                          or reference.get('kind') == 'vehicle' or document.source_id == SOURCE_ID
+                          or payload.get('source_id') == SOURCE_ID or vehicle.get('id') == FIRST_GENERATION_ID)
+            if not recognized:
+                continue
+            snapshot_id = reference.get('snapshot_id')
+            if type(snapshot_id) is not str or not snapshot_id:
+                raise HTTPException(409, {'code': 'vehicle_evidence_binding_failed'})
+            try:
+                capsule = capsules.get(snapshot_id)
+                if capsule is None:
+                    capsule = checked_vehicle_consumer_capsule(db, snapshot_id)
+                if capsule is None:  # Existing genuine UTF-8 material keeps its contract.
+                    if document.id in expected or vehicle.get('id') == FIRST_GENERATION_ID:
+                        raise HTTPException(409, {'code': 'vehicle_evidence_binding_failed'})
+                    continue
+            except VehicleRawIntegrityError:
+                raise HTTPException(409, {'code': 'vehicle_raw_integrity_failed'}) from None
+            wanted = expected.get(document.id)
+            if (wanted is None or snapshot_id != wanted['payload']['reference']['snapshot_id']
+                    or any(getattr(document, key) != wanted[key]
+                           for key in ('id', 'kind', 'source_id', 'variant_id', 'tokens', 'payload'))):
+                raise HTTPException(409, {'code': 'vehicle_evidence_binding_failed'})
+            selected.append(capsule)
+        try:
+            for capsule in selected:
+                require_vehicle_consumer_use(capsule, purpose)
+        except VehicleUseNotAllowed as error:
+            raise HTTPException(403, {'code': error.code}) from None
+        except VehicleRawIntegrityError:
+            raise HTTPException(409, {'code': 'vehicle_raw_integrity_failed'}) from None
+
+
 def _event_documents(db, heads):
     ids = {head['id'] for head in heads if head['state'] == 'active'}
     rows = db.execute(select(TireTestRevision.event_id, TireTestRevision.revision, TireTestRevision.payload,
@@ -309,6 +399,7 @@ def datetime_value(value):
 def refresh_index(db, registry):
     """Caller holds ingestion lock; projection replacement and FTS are atomic."""
     heads = _heads(db)
+    _check_binary_vehicle_heads(db, heads[1])
     sources = {item['id']: item.get('source_class', 'unclassified') for item in registry.sources()}
     from .field_authority import policy_descriptor
     from .recall_evidence import recall_policy_descriptor

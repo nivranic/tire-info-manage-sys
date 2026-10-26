@@ -184,6 +184,9 @@ def append_revision(db: Session, variant_id: str, payload: RevisionRequest, sess
     db.add(row)
     shared.audit(session_id, "manual_fact_revision", variant_id=variant_id, source_id=payload.source_id,
                  revision_id=row.id, action_kind=row.action, field=row.field)
+    db.flush()
+    from .interest_events import publish
+    publish(db, 'tire_curation', row, allow_indeterminate=True)
     db.commit()
     return review_state(db, variant_id, payload.source_id)
 

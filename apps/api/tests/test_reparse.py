@@ -198,9 +198,12 @@ def test_object_integrity_failure_is_durable_and_never_falls_back_to_db(setup, m
                 connection.execute(update(CaptureObject).where(CaptureObject.capture_id == capture).values(raw_hash=other))
             elif corruption == 'object_size':
                 connection.execute(update(EvidenceObject).values(byte_count=1))
+            elif corruption == 'capture_hash':
+                connection.execute(update(RawCapture).where(RawCapture.id == capture).values(raw_hash='0' * 64))
             else:
-                key, value = ('raw_hash', '0' * 64) if corruption == 'capture_hash' else ('byte_count', 1)
-                connection.execute(update(RawCapture).where(RawCapture.id == capture).values(**{key: value}))
+                # Keep the local 024 length CHECK valid; the unchanged object
+                # still conflicts with these capture bytes/count and hash.
+                connection.execute(update(RawCapture).where(RawCapture.id == capture).values(raw_body=b'x', byte_count=1))
     key = str(uuid4())
     response = create(client, capture, key=key)
     assert response.status_code == 503 and 'private storage path' not in response.text
@@ -217,7 +220,8 @@ def test_legacy_bytes_are_explicitly_checked_and_damaged_bytes_rejected(setup):
     assert create(client, good).json()['input']['storage_kind'] == 'database_legacy'
     bad = seed_capture(client, database, legacy=True)
     with database.engine.begin() as connection:
-        connection.execute(update(RawCapture).where(RawCapture.id == bad).values(raw_body=b'damaged'))
+        # Equal-length corruption reaches the reader's hash check after 024.
+        connection.execute(update(RawCapture).where(RawCapture.id == bad).values(raw_body=b'!' * len(BODY.encode())))
     assert create(client, bad).status_code == 503 and len(calls) == 1
 
 

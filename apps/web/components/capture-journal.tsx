@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { RawCaptureEvidence, RawCaptureRecord, Source } from "@tire/domain-types";
+import type { RawCaptureRecord, Source } from "@tire/domain-types";
 import { tireApi } from "@tire/api-client";
 import { Icon } from "./icons";
 import ReparseReviewDialog, { queryScope, targetLabel } from "./reparse-review";
+import { RawEvidenceV2View, useRawEvidenceV2 } from "./raw-evidence-v2";
 
 const time = (value: string) => new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 const errorText = (value: unknown) => value instanceof Error ? value.message : "读取未完成，请重试。";
@@ -18,12 +19,12 @@ export default function CaptureJournal({ sources, sessionReady }: { sources: Sou
   const [rows, setRows] = useState<RawCaptureRecord[] | null>(null);
   const [listError, setListError] = useState("");
   const [selected, setSelected] = useState("");
-  const [detail, setDetail] = useState<RawCaptureEvidence | null>(null);
-  const [detailError, setDetailError] = useState("");
   const [detailRevision, setDetailRevision] = useState(0);
+  const reader = useRawEvidenceV2({ kind: "capture", id: selected, enabled: opened && sessionReady, selectionKey: String(detailRevision),
+    validate(value) { const row = rows?.find(item => item.id === selected); if (!row || value.source_id !== row.source_id || value.target_kind !== row.target_kind
+      || value.raw_hash !== row.raw_hash || value.byte_count !== row.byte_count || value.source_url !== row.source_url) throw new Error("接收原文与所选来源、类型或哈希不一致。"); } });
   const [reparseCapture, setReparseCapture] = useState<RawCaptureRecord | null>(null);
   const listRequest = useRef<AbortController | null>(null);
-  const detailRequest = useRef<AbortController | null>(null);
   const panel = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const name = (id: string) => sources.find(source => source.id === id)?.name || (id.startsWith("xiaomi") ? "小米汽车官方配置" : id);
@@ -40,18 +41,12 @@ export default function CaptureJournal({ sources, sessionReady }: { sources: Sou
 
   useEffect(() => {
     if (!selected) return;
-    const controller = new AbortController();
-    detailRequest.current = controller;
     panel.current?.focus({ preventScroll: true });
     panel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    void tireApi.captureEvidence(selected, controller.signal).then(result => {
-      if (!controller.signal.aborted) setDetail(result);
-    }).catch(error => { if (!controller.signal.aborted) setDetailError(errorText(error)); });
-    return () => controller.abort();
   }, [selected, detailRevision]);
 
   function closeDetail(restoreFocus = false) {
-    detailRequest.current?.abort(); setSelected(""); setDetail(null); setDetailError("");
+    reader.cancel(); setSelected("");
     if (restoreFocus) trigger.current?.focus();
   }
   function reload(pending = pendingOnly) {
@@ -83,11 +78,7 @@ export default function CaptureJournal({ sources, sessionReady }: { sources: Sou
       {selected ? <section id="capture-evidence" className="quarantine-evidence" aria-labelledby="capture-evidence-title" ref={panel} tabIndex={-1} onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); closeDetail(true); } }}>
         <div className="panel-title"><span id="capture-evidence-title">已接收的原始内容</span><button type="button" className="icon-button" aria-label="关闭接收原文" onClick={() => closeDetail(true)}><Icon name="close" size={18} /></button></div>
         <div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 原文接收记录</strong><span>此处只证明原文已收到，不据此判断数据有效或召回适用性，也不会加入比较或离线回退。</span></div>
-        {detailError ? <div className="inline-error" role="alert">{detailError}<button type="button" className="text-button" onClick={() => { setDetailError(""); setDetailRevision(value => value + 1); }}>重试读取</button></div> : detail?.id === selected ? <div className="quarantine-detail-content">
-          <dl className="quality-detail-meta"><div><dt>来源</dt><dd>{name(detail.source_id)}</dd></div><div><dt>原文接收时间</dt><dd>{time(detail.observed_at)}</dd></div><div><dt>处理情况</dt><dd>{queryLabel(detail)}</dd></div><div><dt>来源地址</dt><dd>{detail.source_url}</dd></div></dl>
-          <details className="quality-technical"><summary>查看记录校验信息</summary><dl className="quality-detail-meta"><div><dt>解析器版本</dt><dd>{detail.parser_version}</dd></div><div><dt>SHA-256</dt><dd className="mono">{detail.raw_hash}</dd></div><div><dt>原文大小</dt><dd>{detail.byte_count.toLocaleString("zh-CN")} 字节</dd></div></dl></details>
-          <details className="raw-evidence"><summary>展开接收原文<span className="mono">TEXT</span></summary><p>仅作纯文本核对，不执行网页脚本或指令。内容类型：{detail.content_type}</p><pre>{detail.body}</pre></details>
-        </div> : <div className="run-loading" role="status"><span className="spinner" />正在读取接收原文…</div>}
+        <RawEvidenceV2View reader={reader} />
       </section> : null}
     </div> : null}
     {reparseCapture ? <ReparseReviewDialog key={reparseCapture.id} capture={reparseCapture} sourceName={name(reparseCapture.source_id)} onClose={() => setReparseCapture(null)} /> : null}

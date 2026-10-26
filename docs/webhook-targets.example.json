@@ -1,0 +1,11 @@
+{
+  "schema": "webhook-targets@1",
+  "targets": [
+    {
+      "id": "managed-receiver",
+      "title": "操作者管理的通知接收端",
+      "url": "https://webhook.example.com/tire-events",
+      "signing_key_env": "TI_WEBHOOK_SIGNING_MANAGED_RECEIVER"
+    }
+  ]
+}

@@ -324,7 +324,9 @@ class StructuredDraftProjector:
                     if len(parsed[0]) > 2000: _fail('ai_grounding_validation_failed')
                     try:
                         from .ai_recall_contract import validate_recall_uncertainty
+                        from .ai_test_contract import validate_test_uncertainty
                         validate_recall_uncertainty(parsed[0], self.pack.payload)
+                        validate_test_uncertainty(parsed[0], self.pack.payload)
                     except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
                         _fail('ai_grounding_validation_failed')
                     output.append({'type': 'uncertainty_draft', 'payload': {'text': parsed[0]}})

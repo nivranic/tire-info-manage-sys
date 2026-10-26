@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import unicodedata
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from pydantic import Field, StrictBool, StrictInt, field_validator
+from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -37,7 +37,7 @@ def guard_claim(db: Session, claim: dict) -> None:
     assert_source_access(db, job.source_id, generation)
 
 
-Kind = Literal["facts_changed", "variant_observed"]
+Kind = Literal["facts_changed", "variant_observed", "page_changed"]
 FieldName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,79}$")]
 
 
@@ -99,11 +99,23 @@ class RuleSettings(StrictModel):
     def unique_values(cls, values):
         return sorted(set(values))
 
+    @model_validator(mode='after')
+    def page_scope(self):
+        if 'page_changed' in self.kinds and (self.kinds != ['page_changed'] or self.fields or self.conditions):
+            raise ValueError('来源原文变化必须独立监控，不能同时设置规格类型、字段或技术条件')
+        return self
+
 
 class RuleCreate(RuleSettings):
     source_id: str = Field(min_length=1, max_length=80)
     query: TireQuery
     variant_id: str | None = Field(default=None, min_length=1, max_length=64)
+
+    @model_validator(mode='after')
+    def page_has_no_sku(self):
+        if self.kinds == ['page_changed'] and self.variant_id is not None:
+            raise ValueError('来源原文变化针对固定来源查询，不接受精确 SKU 条件')
+        return self
 
 
 class RuleEdit(RuleSettings):
@@ -156,7 +168,10 @@ def record_alerts(db: Session, events: list[ChangeEvent]) -> None:
             alert = AlertEvent(id=uid(), rule_id=rule.id, rule_revision_id=revision.id, change_id=change.id)
             db.add(alert)
             db.flush()
-            db.add(NotificationDelivery(alert_id=alert.id))
+            notification = NotificationDelivery(id=uid(), alert_id=alert.id, channel='in_app', delivered_at=utcnow())
+            db.add(notification)
+            from .webhook_delivery import enqueue_notification
+            enqueue_notification(db, 'tire_monitor', notification, alert, origin=change)
 
 
 def interval_for(db: Session, job_id: str) -> int | None:
@@ -287,6 +302,8 @@ def validate_rule_target(db: Session, registry, payload: RuleCreate) -> tuple[di
     source = next((item for item in registry.sources() if item["id"] == payload.source_id), None)
     if not source or source.get("status") != "ready" or source.get("target_kind") == "recall":
         raise HTTPException(422, "请选择已接入的轮胎来源")
+    if payload.kinds == ['page_changed'] and source.get('target_kind') not in (None, 'tire'):
+        raise HTTPException(422, "来源原文变化当前仅支持已登记的轮胎来源")
     query = payload.query.canonical()
     if not query.get("model") or (source.get("supported_models") is not None and query["model"] not in source["supported_models"]):
         raise HTTPException(422, "请选择此来源已接入的型号")
@@ -360,6 +377,8 @@ def register_monitoring_routes(app: FastAPI) -> None:
         rule, before = find_rule(db, rule_id, payload.expected_revision)
         if before.archived:
             raise HTTPException(409, "请先恢复已归档规则")
+        if (before.kinds == ['page_changed']) != (payload.kinds == ['page_changed']):
+            raise HTTPException(422, '来源原文监控与规格监控不能互换，请新建另一规则')
         settings = payload.model_dump(exclude={"expected_revision"})
         if "conditions" not in payload.model_fields_set:
             settings["conditions"] = before.conditions or {}
@@ -436,3 +455,6 @@ def register_monitoring_routes(app: FastAPI) -> None:
             service.audit(request.state.session_id, "notification_read_changed", delivery_id=row.id, read=payload.read)
             db.commit()
         return {"id": row.id, "read_at": timestamp(row.read_at) if row.read_at else None}
+
+    from .source_page_monitoring import register_source_page_routes
+    register_source_page_routes(app)

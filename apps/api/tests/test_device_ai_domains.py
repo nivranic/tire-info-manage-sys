@@ -19,6 +19,7 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import pytest
+from device_ai_fixture_corpus import read_producer_sample
 from sqlalchemy import func, select
 
 from tire_api import ai_analysis
@@ -37,7 +38,6 @@ from test_core import FixtureRegistry
 from datetime import timedelta
 
 ROOT = Path(__file__).resolve().parents[3]
-SAMPLES = ROOT / '.artifacts/query-fallback49/producer-v2-samples-a'
 QUESTION = '这份归档里保存的配置与公告记录如何解读？'
 # 投影核 converter ↔ 投影模式一一对应（device_ai_projection.py:753-765）。
 DOMAIN_MODES = {'tire': 'single_observation', 'vehicle': 'complete_observation',
@@ -91,8 +91,8 @@ class RouteEnv:
         self.client, self.app, self.session_id, self.model = client, app, session_id, model
 
     def seed(self, *, name='nonempty', mutate=None):
-        original = (SAMPLES / f'{name}-pack.json').read_bytes()
-        descriptor = json.loads((SAMPLES / f'{name}-descriptor.json').read_bytes())
+        original = read_producer_sample(f'{name}-pack.json')
+        descriptor = json.loads(read_producer_sample(f'{name}-descriptor.json'))
         envelope = json.loads(original)
         envelope['owner_scope_id'] = digest({'namespace': 'offline-owner-scope@1', 'session': self.session_id})
         if mutate is not None:

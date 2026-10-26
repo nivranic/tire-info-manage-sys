@@ -9,6 +9,10 @@ export type AuthResult = { ok: true; user: AuthState["user"] } | { ok: false; er
 type WorkbenchAuth = {
   state: AuthState;
   ready: boolean;
+  /** Changes at the start of every identity/revalidation operation. */
+  ownerEpoch: number;
+  ownerSignal: AbortSignal;
+  isCurrentOwner: (epoch: number) => boolean;
   refresh: () => Promise<AuthState | null>;
   login: (username: string, password: string) => Promise<AuthResult>;
   register: (username: string, password: string, displayName?: string) => Promise<AuthResult>;
@@ -16,8 +20,9 @@ type WorkbenchAuth = {
 };
 
 const anonymous: AuthState = { authenticated: false, user: null };
+const unavailableOwner = AbortSignal.abort();
 const WorkbenchAuthContext = createContext<WorkbenchAuth>({
-  state: anonymous, ready: false,
+  state: anonymous, ready: false, ownerEpoch: 0, ownerSignal: unavailableOwner, isCurrentOwner: () => false,
   refresh: async () => null,
   login: async () => ({ ok: false, error: "账户服务尚未就绪，请稍后重试。" }),
   register: async () => ({ ok: false, error: "账户服务尚未就绪，请稍后重试。" }),
@@ -46,43 +51,101 @@ export const authErrorText = (cause: unknown, context?: "profile" | "delete_user
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>(anonymous);
   const [ready, setReady] = useState(false);
+  const [ownerEpoch, setOwnerEpoch] = useState(0);
+  const [ownerSignal, setOwnerSignal] = useState<AbortSignal>(unavailableOwner);
+  const generation = useRef(0);
   const session = useRef<AbortController | null>(null);
+  const mutation = useRef<AbortController | null>(null);
 
-  const refresh = useCallback(async () => {
+  const begin = useCallback(() => {
     session.current?.abort();
     const controller = new AbortController(); session.current = controller;
+    setOwnerSignal(controller.signal);
+    const epoch = ++generation.current;
+    setOwnerEpoch(epoch); setReady(false);
+    return controller;
+  }, []);
+  const isCurrentOwner = useCallback((epoch: number) => generation.current === epoch, []);
+  const current = (controller: AbortController) => !controller.signal.aborted && session.current === controller;
+
+  const readCurrent = useCallback(async (controller: AbortController) => {
     try {
       const result = await tireApi.authMe(controller.signal);
-      if (controller.signal.aborted) return null;
+      if (!current(controller)) return null;
       setState(result); setReady(true); return result;
     } catch {
-      if (controller.signal.aborted) return null;
-      // Without a readable session we can only conclude "not authenticated on this client".
-      setState(anonymous); setReady(true); return null;
-    } finally { if (session.current === controller) session.current = null; }
+      if (!current(controller)) return null;
+      // A failed identity read cannot authorize loading private actor state.
+      setState(anonymous); setReady(false); return null;
+    }
   }, []);
+  const refresh = useCallback(async () => readCurrent(begin()), [begin, readCurrent]);
 
-  useEffect(() => { void refresh(); return () => session.current?.abort(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    const revalidate = () => {
+      // Window focus can return during an account write. Private state is
+      // already invalidated; let that operation settle and confirm its owner.
+      if (document.visibilityState !== "hidden" && (!mutation.current || mutation.current.signal.aborted)) void refresh();
+    };
+    const unavailable = () => { begin(); setState(anonymous); };
+    window.addEventListener("online", revalidate);
+    window.addEventListener("offline", unavailable);
+    window.addEventListener("focus", revalidate);
+    document.addEventListener("visibilitychange", revalidate);
+    window.addEventListener("tire-session-revalidate", revalidate);
+    window.addEventListener("tire-session-unavailable", unavailable);
+    window.addEventListener("tire-offline-owner-changed", unavailable);
+    return () => {
+      session.current?.abort(); generation.current++;
+      window.removeEventListener("online", revalidate);
+      window.removeEventListener("offline", unavailable);
+      window.removeEventListener("focus", revalidate);
+      document.removeEventListener("visibilitychange", revalidate);
+      window.removeEventListener("tire-session-revalidate", revalidate);
+      window.removeEventListener("tire-session-unavailable", unavailable);
+      window.removeEventListener("tire-offline-owner-changed", unavailable);
+    };
+  }, [begin, refresh]);
 
   const login = useCallback(async (username: string, password: string): Promise<AuthResult> => {
-    try { const result = await tireApi.authLogin({ username, password }); setState(result); setReady(true); return { ok: true, user: result.user }; }
-    catch (cause) { return { ok: false, error: authErrorText(cause) }; }
-  }, []);
+    const controller = begin();
+    mutation.current = controller;
+    try {
+      const result = await tireApi.authLogin({ username, password }, controller.signal);
+      if (!current(controller)) return { ok: false, error: "账户操作已变化，请重新核对当前账户。" };
+      setState(result); setReady(true); return { ok: true, user: result.user };
+    } catch (cause) {
+      if (current(controller)) await readCurrent(controller);
+      return { ok: false, error: authErrorText(cause) };
+    } finally { if (mutation.current === controller) mutation.current = null; }
+  }, [begin, readCurrent]);
 
   const register = useCallback(async (username: string, password: string, displayName?: string): Promise<AuthResult> => {
     const trimmed = displayName?.trim();
+    const controller = begin();
+    mutation.current = controller;
     try {
-      const result = await tireApi.authRegister({ username, password, ...(trimmed ? { display_name: trimmed } : {}) });
+      const result = await tireApi.authRegister({ username, password, ...(trimmed ? { display_name: trimmed } : {}) }, controller.signal);
+      if (!current(controller)) return { ok: false, error: "账户操作已变化，请重新核对当前账户。" };
       setState(result); setReady(true); return { ok: true, user: result.user };
-    } catch (cause) { return { ok: false, error: authErrorText(cause) }; }
-  }, []);
+    } catch (cause) {
+      if (current(controller)) await readCurrent(controller);
+      return { ok: false, error: authErrorText(cause) };
+    } finally { if (mutation.current === controller) mutation.current = null; }
+  }, [begin, readCurrent]);
 
   const logout = useCallback(async () => {
-    try { setState(await tireApi.authLogout()); }
-    catch { // The cookie may already be gone; re-check instead of asserting a stale view.
-      await refresh();
+    const controller = begin();
+    mutation.current = controller;
+    try {
+      const result = await tireApi.authLogout(controller.signal);
+      if (current(controller)) { setState(result); setReady(true); }
     }
-  }, [refresh]);
+    catch { // The cookie may already be gone; re-check instead of asserting a stale view.
+      if (current(controller)) await readCurrent(controller);
+    } finally { if (mutation.current === controller) mutation.current = null; }
+  }, [begin, readCurrent]);
 
-  return <WorkbenchAuthContext.Provider value={{ state, ready, refresh, login, register, logout }}>{children}</WorkbenchAuthContext.Provider>;
+  return <WorkbenchAuthContext.Provider value={{ state, ready, ownerEpoch, ownerSignal, isCurrentOwner, refresh, login, register, logout }}>{children}</WorkbenchAuthContext.Provider>;
 }

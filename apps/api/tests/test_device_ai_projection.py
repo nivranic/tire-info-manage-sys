@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 import pytest
+from device_ai_fixture_corpus import read_producer_sample
 
 from tire_api import device_ai_projection as projection
 from tire_api.device_ai_projection import (
@@ -22,7 +23,6 @@ from tire_api.device_ai_projection import (
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SAMPLES = ROOT / ".artifacts/query-fallback49/producer-v2-samples-a"
 PINNED = {
     "legacy": "0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00",
     "nonempty": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862",
@@ -34,9 +34,9 @@ MODES = {"tire": "single_observation", "vehicle": "complete_observation",
 
 
 def sample(name="nonempty"):
-    raw = (SAMPLES / f"{name}-pack.json").read_bytes()
+    raw = read_producer_sample(f"{name}-pack.json")
     assert hashlib.sha256(raw).hexdigest() == PINNED[name]
-    descriptor = json.loads((SAMPLES / f"{name}-descriptor.json").read_bytes())
+    descriptor = json.loads(read_producer_sample(f"{name}-descriptor.json"))
     metadata = json.loads(raw)
     assert descriptor["sha256"] == PINNED[name] and descriptor["byte_count"] == len(raw)
     binding = FrozenPackBinding(descriptor["id"], descriptor["owner_scope_id"], descriptor["sha256"],
@@ -423,7 +423,7 @@ def test_capacity_rejects_whole_projection_and_input_bytes_are_unchanged():
     expect_error("device_ai_projection_capacity", lambda: project_offline_pack(
         raw, binding, [selector_for(envelope, "tire")], max_projection_bytes=1))
     assert hashlib.sha256(raw).hexdigest() == before
-    assert (SAMPLES / "nonempty-pack.json").read_bytes() == raw
+    assert read_producer_sample("nonempty-pack.json") == raw
 
 
 @pytest.mark.parametrize("kind", ["recall", "recall_search"])

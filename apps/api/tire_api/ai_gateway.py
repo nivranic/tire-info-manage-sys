@@ -23,7 +23,9 @@ AI_PROVIDERS = frozenset({'openai_responses', 'openai_chat', 'anthropic'})
 MAX_RESPONSE_BYTES = 512 * 1024
 MAX_REQUEST_BYTES = 48_000
 PROMPT_VERSION = 'tire-grounding@1'
-SAFE_ERRORS = {'ai_disabled', 'ai_configuration_required', 'ai_configuration_invalid', 'ai_evidence_too_large',
+SAFE_ERRORS = {'vehicle_provider_use_not_allowed', 'vehicle_raw_integrity_failed', 'vehicle_evidence_binding_failed',
+               'ai_disabled', 'ai_configuration_required', 'ai_configuration_invalid', 'ai_evidence_too_large',
+               'candidate_ai_pre_dispatch_changed',
                'ai_provider_http_error', 'ai_response_invalid', 'ai_response_too_large', 'ai_provider_timeout',
                'ai_provider_network_error', 'ai_response_incomplete', 'ai_refused', 'ai_provider_failed',
                'ai_stream_protocol_error', 'ai_stream_interrupted', 'ai_grounding_validation_failed'}
@@ -210,12 +212,16 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
                  output_schema=OUTPUT_SCHEMA, schema_name='tire_evidence_answer', stream=False) -> tuple[dict, int]:
     from .ai_recall_contract import (RECALL_OUTPUT_SCHEMA, RECALL_SCHEMA_NAME, RECALL_SYSTEM_PROMPT,
                                      contains_recall, validate_recall_payload)
+    from .ai_test_contract import TEST_OUTPUT_SCHEMA, TEST_SCHEMA_NAME, TEST_SYSTEM_PROMPT, contains_test
     if contains_recall(evidence):
         try:
             validate_recall_payload(evidence)
         except (ValueError, TypeError, KeyError, AttributeError):
             raise GatewayError('ai_grounding_validation_failed') from None
         system_prompt, output_schema, schema_name = RECALL_SYSTEM_PROMPT, RECALL_OUTPUT_SCHEMA, RECALL_SCHEMA_NAME
+    if contains_test(evidence):
+        system_prompt = (system_prompt + '\n\n' if contains_recall(evidence) else '') + TEST_SYSTEM_PROMPT
+        output_schema, schema_name = TEST_OUTPUT_SCHEMA, TEST_SCHEMA_NAME
     if config.provider == 'anthropic':
         # Anthropic has no native response_format; the output contract rides in the system
         # prompt (ADR-2026-055 D-2). Appended before measurement so the byte gate and token
@@ -257,11 +263,19 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
 
 def analysis_contract(payload):
     from .ai_recall_contract import RECALL_PROMPT_VERSION, RECALL_PURPOSE, contains_recall, validate_recall_payload
+    from .ai_test_contract import TEST_PROMPT_VERSION, test_boundary
     if contains_recall(payload):
         validate_recall_payload(payload)
-        return {'prompt_version': RECALL_PROMPT_VERSION, 'purpose': RECALL_PURPOSE,
-                'recall_policy': payload['recall_policy']}
-    return {'prompt_version': PROMPT_VERSION, 'purpose': payload.get('purpose', 'analysis')}
+        contract = {'prompt_version': RECALL_PROMPT_VERSION, 'purpose': RECALL_PURPOSE,
+                    'recall_policy': payload['recall_policy']}
+    else:
+        contract = {'prompt_version': PROMPT_VERSION, 'purpose': payload.get('purpose', 'analysis')}
+    boundary = test_boundary(payload)
+    if boundary:
+        if contains_recall(payload):
+            contract['recall_prompt_version'] = RECALL_PROMPT_VERSION
+        contract.update(prompt_version=TEST_PROMPT_VERSION, test_boundary=boundary)
+    return contract
 
 
 def safe_usage(value) -> dict | None:

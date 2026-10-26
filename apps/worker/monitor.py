@@ -20,6 +20,7 @@ from tire_api.service import QueryService
 from tire_api.monitoring import LeaseLost, claim_job, finish_job, guard_claim
 from tire_api.source_settings import SourceAccessBlocked
 from tire_api.telemetry import TelemetryRuntime, observe
+from tire_api.webhook_delivery import run_webhook_cycle
 
 
 def observed_cycle(function):
@@ -106,8 +107,9 @@ async def run_scheduled_cycle(database: Database, *, max_jobs: int = 100) -> dic
             results.append({"job_id": claim["id"], "state": state, "reason": reason, "finalized": finalized})
     recalls = await run_recall_cycle(database, max_jobs=max_jobs)
     discovery = await run_recall_discovery_cycle(database, max_jobs=max_jobs)
-    return {"checked_at": utcnow().isoformat(), "jobs": len(results) + recalls["jobs"] + discovery['jobs'],
-            "results": results + recalls["results"] + discovery['results']}
+    webhooks = await run_webhook_cycle(database, max_jobs=max_jobs)
+    return {"checked_at": utcnow().isoformat(), "jobs": len(results) + recalls["jobs"] + discovery['jobs'] + webhooks['jobs'],
+            "results": results + recalls["results"] + discovery['results'] + webhooks['results']}
 
 
 @observed_cycle
@@ -218,17 +220,21 @@ async def run_cycle(database: Database) -> dict:
                 results.append({"source": source, "state": response["data_state"], "reason": response.get("reason")})
     recalls = await run_recall_cycle(database)
     discovery = await run_recall_discovery_cycle(database)
-    return {"checked_at": utcnow().isoformat(), "jobs": len(jobs) + recalls["jobs"] + discovery['jobs'],
-            "results": results + recalls["results"] + discovery['results']}
+    webhooks = await run_webhook_cycle(database)
+    return {"checked_at": utcnow().isoformat(), "jobs": len(jobs) + recalls["jobs"] + discovery['jobs'] + webhooks['jobs'],
+            "results": results + recalls["results"] + discovery['results'] + webhooks['results']}
 
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="轮胎监控规则 Worker（持久租约）")
     parser.add_argument("--once", action="store_true")
+    parser.add_argument("--webhooks-once", action="store_true", help="仅派送Webhook队列一次，不运行来源采集")
     parser.add_argument("--legacy-watchlists", action="store_true", help="旧关注列表单实例刷新；不代替监控规则")
     parser.add_argument("--interval", type=int, default=None, help="检查周期秒数；规则模式默认 60，旧关注模式默认 21600")
     parser.add_argument("--metrics-port", type=int, default=None, help="显式开启本机指标读取端口（1024–65535）；默认不监听")
     args = parser.parse_args()
+    if args.webhooks_once and args.legacy_watchlists:
+        parser.error('webhooks-once and legacy-watchlists are mutually exclusive')
     interval = args.interval if args.interval is not None else 21600 if args.legacy_watchlists else 60
     if interval < (300 if args.legacy_watchlists else 10):
         parser.error("interval is below the supported polling minimum")
@@ -245,9 +251,10 @@ async def main() -> None:
             print(json.dumps(endpoint, ensure_ascii=False), flush=True)
         with telemetry.scope():
             while True:
-                cycle = await run_cycle(database) if args.legacy_watchlists else await run_scheduled_cycle(database)
+                cycle = (await run_webhook_cycle(database) if args.webhooks_once else
+                    await run_cycle(database) if args.legacy_watchlists else await run_scheduled_cycle(database))
                 print(json.dumps(cycle, ensure_ascii=False), flush=True)
-                if args.once:
+                if args.once or args.webhooks_once:
                     break
                 await asyncio.sleep(interval)
     finally:

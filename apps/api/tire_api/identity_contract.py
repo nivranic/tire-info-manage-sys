@@ -69,6 +69,23 @@ def _checked_binding(row):
     return row
 
 
+def _exact_current_binding(db, variant_id, *, budget=None):
+    """Internal bounded reader helper; never falls back to legacy assessments.
+
+    Caller owns the transaction and preflights JSON bytes before this load.
+    """
+    rows = (list(db.scalars(select(VariantIdentityBinding).where(
+        VariantIdentityBinding.schema == schema_version(),
+        VariantIdentityBinding.variant_id == variant_id).limit(2))) if budget is None else
+        budget.load(db, VariantIdentityBinding,
+                    VariantIdentityBinding.schema == schema_version(),
+                    VariantIdentityBinding.variant_id == variant_id, maximum=2,
+                    limits={"current_identity": 64 * 1024, "proof": 64 * 1024}))
+    if len(rows) != 1:
+        raise IdentityContractError('identity_contract_review_required')
+    return _checked_binding(rows[0])
+
+
 def _application_hash(row):
     return digest({key: getattr(row, key) for key in ('revision', 'schema', 'contract_digest', 'preview_fingerprint',
         'summary', 'assessments', 'binding_ids', 'operator', 'reason')})

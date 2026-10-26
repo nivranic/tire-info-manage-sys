@@ -15,9 +15,9 @@ from .embedding_gateway import (EmbeddingError, OpenAIEmbeddingAdapter, configur
                                 model_status, safe_error, validate_receipt)
 from .embedding_models import EmbeddingCompletion, EmbeddingRequest
 from .embedding_service import (begin_idempotent, complete, prepare_plan, require_config, reserve_request,
-                                run_view, save_vectors, validate_plan)
+                                run_view, save_vectors, validate_plan, check_embedding_dispatch, LOCAL_VEHICLE_ERRORS)
 from .knowledge import CURRENT_WORDS, KnowledgeSearch, interpret, lexical_candidates, search_history
-from .knowledge_index import refresh_index
+from .knowledge_index import check_current_vehicle_heads, refresh_index
 from .service import QueryService
 
 
@@ -58,6 +58,30 @@ async def call_embedding(app, config, inputs):
         return None, 'embeddings_provider_failed'
 
 
+async def dispatch_embedding(app, config, inputs, *, request_id, session_id):
+    """Keep a proven local refusal separate from every Provider outcome."""
+    try:
+        check_embedding_dispatch(app.state.database, request_id, config, inputs, session_id)
+    except HTTPException as error:
+        code = error.detail.get('code') if type(error.detail) is dict else None
+        if code not in LOCAL_VEHICLE_ERRORS:
+            raise
+        return None, code, True
+    if not inputs:
+        return None, None, False
+    receipt, error = await call_embedding(app, config, inputs)
+    return receipt, error, False
+
+
+def _local_usage(refused):
+    return {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0} if refused else None
+
+
+def _completion_error(error):
+    code = error.detail.get('code') if isinstance(error, HTTPException) and type(error.detail) is dict else None
+    return code if code in LOCAL_VEHICLE_ERRORS else 'embeddings_storage_failed'
+
+
 def observed_embedding(execute):
     """Observe only a reserved external attempt, through validation and commit."""
     from .telemetry import observe
@@ -80,6 +104,7 @@ def register_embedding_routes(app: FastAPI):
 
     @app.get('/v1/knowledge/vector-status')
     def status(db: Session = Depends(get_db)):
+        check_current_vehicle_heads(db)
         available, reason = capability(db)
         model, scope = model_status(), None
         if model['state'] != 'configured':
@@ -111,18 +136,21 @@ def register_embedding_routes(app: FastAPI):
             response.status_code = 202 if value['state'] == 'pending' else 200
             return value
         external_consent(payload.allow_external_processing)
+        check_current_vehicle_heads(db)
         config = require_config(db)
-        plan, materials, missing = validate_plan(db, app.state.registry, payload.plan_id, request.state.session_id, config)
+        plan, materials, missing = validate_plan(db, app.state.registry, payload.plan_id,
+                                               request.state.session_id, config, purpose='provider')
         inputs = [chunk['text'] for chunk in missing]
         row = reserve_request(db, config=config, session_id=request.state.session_id, key=key, kind='index',
             request_hash=request_hash, payload={'plan_id': plan.id, 'input_hashes': [chunk['hash'] for chunk in missing]},
             inputs=inputs, plan_id=plan.id)
         def execute():
             usage, written = None, 0
-            if inputs:
-                receipt, error = asyncio.run(call_embedding(app, config, inputs))
-                if error:
-                    return complete(db, row, error=error)
+            receipt, error, local_refusal = asyncio.run(dispatch_embedding(app, config, inputs,
+                request_id=row.id, session_id=request.state.session_id))
+            if error:
+                return complete(db, row, usage=_local_usage(local_refusal), error=error)
+            if receipt is not None:
                 usage = receipt['usage']
             try:
                 QueryService(db, None).lock_ingestion()
@@ -136,9 +164,9 @@ def register_embedding_routes(app: FastAPI):
                 return complete(db, row, usage=usage, result={'cached_chunks': unique_count - len(missing),
                     'written_chunks': written, 'documents': len(materials), 'coverage': coverage(now),
                     'notice': '内容缓存保留历史向量；检索只关联当前正式投影，撤销记录不会因旧缓存复活。'})
-            except Exception:
+            except Exception as error:
                 db.rollback()
-                return complete(db, row, usage=usage, error='embeddings_storage_failed')
+                return complete(db, row, usage=usage, error=_completion_error(error))
         return observed_embedding(execute) if inputs else execute()
 
     @app.post('/v1/knowledge/hybrid-search')
@@ -153,6 +181,7 @@ def register_embedding_routes(app: FastAPI):
         if CURRENT_WORDS.search(payload.search.text):
             raise HTTPException(409, {'code': 'online_query_required', 'message': '当前信息须使用在线查询，历史混合检索不能回答'})
         external_consent(payload.allow_external_processing)
+        check_current_vehicle_heads(db)
         filters, _, terms, sufficient = interpret(payload.search)
         if sufficient:
             result = search_history(db, app.state.registry, payload.search)
@@ -174,6 +203,10 @@ def register_embedding_routes(app: FastAPI):
                 return value
             row = reserve_request(db, config=None, session_id=request.state.session_id, key=key, kind='hybrid',
                 request_hash=request_hash, payload=payload.search.model_dump(), inputs=[])
+            _receipt, error, local_refusal = asyncio.run(dispatch_embedding(app, None, [],
+                request_id=row.id, session_id=request.state.session_id))
+            if error:
+                return complete(db, row, usage=_local_usage(local_refusal), error=error)
             return complete(db, row, result=result)
         config = require_config(db)
         refresh_index(db, app.state.registry)
@@ -186,9 +219,10 @@ def register_embedding_routes(app: FastAPI):
         row = reserve_request(db, config=config, session_id=request.state.session_id, key=key, kind='hybrid',
             request_hash=request_hash, payload=payload.search.model_dump(), inputs=[payload.search.text])
         def execute():
-            receipt, error = asyncio.run(call_embedding(app, config, [payload.search.text]))
+            receipt, error, local_refusal = asyncio.run(dispatch_embedding(app, config, [payload.search.text],
+                request_id=row.id, session_id=request.state.session_id))
             if error:
-                return complete(db, row, error=error)
+                return complete(db, row, usage=_local_usage(local_refusal), error=error)
             try:
                 QueryService(db, None).lock_ingestion()
                 state = refresh_index(db, app.state.registry)
@@ -200,9 +234,9 @@ def register_embedding_routes(app: FastAPI):
                     {'engine': 'postgresql_fts_pgvector', 'documents': state.documents, 'version': state.version},
                     materials, receipt['vectors'][0])
                 return complete(db, row, result=result, usage=receipt['usage'])
-            except Exception:
+            except Exception as error:
                 db.rollback()
-                return complete(db, row, usage=receipt['usage'], error='embeddings_storage_failed')
+                return complete(db, row, usage=receipt['usage'], error=_completion_error(error))
         return observed_embedding(execute)
 
     @app.get('/v1/knowledge/embedding-runs/{run_id}')

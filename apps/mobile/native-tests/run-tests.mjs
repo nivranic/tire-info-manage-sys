@@ -17,9 +17,10 @@ function run(name, args) {
   if (result.status !== 0) throw new Error(`${name} exited ${result.status}`);
 }
 try {
-  run('javac', ['-encoding', 'UTF-8', '-d', output, ...['NativeFailure.java', 'NativePolicy.java', 'RequestRegistry.java', 'SessionState.java', 'DownloadJob.java'].map(name => path.join(source, name)), path.join(here, 'NativeCoreTest.java'), path.join(here, 'DownloadJobTest.java')]);
+  run('javac', ['-encoding', 'UTF-8', '-d', output, ...['NativeFailure.java', 'NativePolicy.java', 'RequestRegistry.java', 'SessionState.java', 'DownloadAuthority.java', 'DownloadJob.java'].map(name => path.join(source, name)), path.join(here, 'NativeCoreTest.java'), path.join(here, 'DownloadAuthorityTest.java'), path.join(here, 'DownloadJobTest.java')]);
   run('java', ['-cp', output, 'org.taiji.tireintelligence.mobile.NativeCoreTest']);
   run('java', ['-cp', output, 'org.taiji.tireintelligence.mobile.DownloadJobTest']);
+  run('java', ['-cp', output, 'org.taiji.tireintelligence.mobile.DownloadAuthorityTest']);
 } finally {
   const relative = path.relative(temporaryRoot, output);
   if (path.dirname(output) !== temporaryRoot || !path.basename(output).startsWith('tire-mobile-native-')

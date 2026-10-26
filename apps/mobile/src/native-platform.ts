@@ -58,7 +58,9 @@ export interface TireNativePlugin {
   apiRequest(options: { request: { id: string; path: string; method: string; headers: Record<string, string>; body_base64?: string } }): Promise<NativeResponse>;
   apiCancel(options: { id: string }): Promise<void>;
   resetSession(options: Record<string, never>): Promise<void>;
-  saveDownload(options: { filename: string; mime: string; body_base64: string }): Promise<{ saved: boolean }>;
+  prepareDownload(options: Record<string, never>): Promise<{ lease: string }>;
+  releaseDownload(options: { lease: string }): Promise<void>;
+  saveDownload(options: { lease: string; filename: string; mime: string; body_base64: string }): Promise<{ saved: boolean }>;
   openExternal(options: { url: string }): Promise<void>;
   resolveBack(options: { id: string; handled: boolean }): Promise<void>;
   setSystemTheme(options: { theme: "light" | "dark" }): Promise<void>;
@@ -112,6 +114,8 @@ export function createMobileInvoke(plugin: TireNativePlugin): NativeInvoke {
         case "offline_fallback_revoke": return await plugin.offlineFallbackRevoke(args as Parameters<TireNativePlugin["offlineFallbackRevoke"]>[0]) as T;
         case "api_request": return await plugin.apiRequest(args as Parameters<TireNativePlugin["apiRequest"]>[0]) as T;
         case "api_cancel": return await plugin.apiCancel(args as Parameters<TireNativePlugin["apiCancel"]>[0]) as T;
+        case "prepare_download": return await plugin.prepareDownload({}) as T;
+        case "release_download": return await plugin.releaseDownload(args as Parameters<TireNativePlugin["releaseDownload"]>[0]) as T;
         case "save_download": return await plugin.saveDownload(args as Parameters<TireNativePlugin["saveDownload"]>[0]) as T;
         case "open_external": return await plugin.openExternal(args as Parameters<TireNativePlugin["openExternal"]>[0]) as T;
         case "device_ai_prepare": return await plugin.deviceAiPrepare(args as Parameters<TireNativePlugin["deviceAiPrepare"]>[0]) as T;

@@ -2,9 +2,11 @@
 
 import { SourceStatus } from "./source-status";
 import QuarantineReview from "./quarantine-review";
+import BinaryQuarantineReview from "./binary-quarantine-review";
+import { createBinaryReviewRevocation, isBinaryQuarantineDetail, type BinaryReviewRevocation } from "./binary-quarantine-review-context";
 
 import { useEffect, useRef, useState } from "react";
-import type { QuarantineEvidence, QuarantineRecord, Source, SourceHealthRecord, SourceHealthResult } from "@tire/domain-types";
+import type { QuarantineEvidenceV2, QuarantineRecord, Source, SourceHealthRecord, SourceHealthResult } from "@tire/domain-types";
 import { tireApi } from "@tire/api-client";
 import { Icon } from "./icons";
 import { useWorkbenchAuth } from "./auth";
@@ -15,6 +17,7 @@ import GoldenSets from "./golden-sets";
 import IdentityDirectory from "./identity-directory";
 import IdentityMigration from "./identity-migration";
 import FieldConflictCenter from "./field-conflicts";
+import { RawEvidenceV2View, useRawEvidenceV2, type RawEvidenceReader } from "./raw-evidence-v2";
 
 const healthLabels: Record<SourceHealthRecord["status"], string> = {
   unknown: "未检查", healthy: "最近核验正常", degraded: "最近核验未完成", quarantined: "数据更新已隔离",
@@ -67,11 +70,22 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
   const [listLoading, setListLoading] = useState(true);
   const [listRevision, setListRevision] = useState(0);
   const [selectedId, setSelectedId] = useState("");
-  const [detail, setDetail] = useState<QuarantineEvidence | null>(null);
-  const [detailError, setDetailError] = useState("");
   const [detailRevision, setDetailRevision] = useState(0);
+  const binaryRevocation = useRef<BinaryReviewRevocation | null>(null);
+  if (!binaryRevocation.current) binaryRevocation.current = createBinaryReviewRevocation();
+  const rawReader = useRawEvidenceV2({ kind: "quarantine", id: selectedId, enabled: sessionReady, selectionKey: `${sourceId}:${detailRevision}`,
+    validate(value) { const row = records?.find(item => item.id === selectedId); if (!row || value.source_id !== row.source_id || value.target_kind !== (row.target_kind || "tire")
+      || value.kind !== row.kind || value.raw_hash !== row.raw_hash
+      || value.body_encoding === "binary" && (value.query_id !== row.query_id || value.previous_snapshot_id !== row.previous_snapshot_id
+        || value.source_url !== row.source_url || value.parser_version !== row.parser_version)) throw new Error("隔离原文与所选记录范围或哈希不一致。"); } });
+  // Revoke approval in event handlers, including reader controls, before waiting for an unmount/effect.
+  const reader = { ...rawReader,
+    cancel() { binaryRevocation.current!.revoke(); rawReader.cancel(); },
+    reload() { binaryRevocation.current!.revoke(); rawReader.reload(); },
+    abortOperations() { binaryRevocation.current!.revoke(); rawReader.abortOperations(); },
+  };
+  const detail = reader.metadata;
   const listController = useRef<AbortController | null>(null);
-  const detailController = useRef<AbortController | null>(null);
   const detailPanel = useRef<HTMLElement>(null);
   const listPanel = useRef<HTMLElement>(null);
 
@@ -100,20 +114,16 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
 
   useEffect(() => {
     if (!selectedId) return;
-    const controller = new AbortController();
-    detailController.current = controller;
-    setDetail(null); setDetailError("");
-    void tireApi.quarantineEvidence(selectedId, controller.signal).then(result => {
-      if (!controller.signal.aborted) setDetail(result);
-    }).catch(error => { if (!controller.signal.aborted) setDetailError(errorText(error)); });
     detailPanel.current?.focus({ preventScroll: true });
     detailPanel.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    return () => controller.abort();
   }, [selectedId, detailRevision]);
 
   function closeDetail() {
-    detailController.current?.abort(); detailController.current = null;
-    setSelectedId(""); setDetail(null); setDetailError("");
+    reader.cancel(); setSelectedId("");
+  }
+
+  function refreshHealth() {
+    binaryRevocation.current!.revoke(); setHealthRevision(value => value + 1);
   }
 
   function selectSource(id: string) {
@@ -129,7 +139,7 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
   }
 
   function openDetail(id: string) {
-    detailController.current?.abort(); setDetail(null); setDetailError(""); setSelectedId(id); setDetailRevision(value => value + 1);
+    reader.cancel(); setSelectedId(id); setDetailRevision(value => value + 1);
   }
 
   const names = new Map(sources.map(source => [source.id, source.name]));
@@ -141,9 +151,9 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
 
   return <div className="source-quality">
     <section className="quality-health-panel" aria-labelledby="source-health-title" aria-busy={healthLoading}>
-      <div className="panel-title"><span id="source-health-title"><Icon name="shield" size={18} />来源健康</span><button type="button" className="text-button" disabled={!sessionReady || healthLoading} onClick={() => setHealthRevision(value => value + 1)}><Icon name="refresh" size={14} />刷新记录</button></div>
+      <div className="panel-title"><span id="source-health-title"><Icon name="shield" size={18} />来源健康</span><button type="button" className="text-button" disabled={!sessionReady || healthLoading} onClick={refreshHealth}><Icon name="refresh" size={14} />刷新记录</button></div>
       <p className="quality-intro">记录轮胎与车型来源最近 24 小时的在线核验，打开此页不会向来源发起查询。此期间没有检查记录的来源保持「未检查」。</p>
-      {healthLoading ? <div className="run-loading" role="status"><span className="spinner" />正在读取来源健康记录…</div> : healthError ? <div className="inline-error" role="alert">来源健康记录读取失败：{healthError}<button type="button" className="text-button" onClick={() => setHealthRevision(value => value + 1)}>重试</button></div> : health ? <>
+      {healthLoading ? <div className="run-loading" role="status"><span className="spinner" />正在读取来源健康记录…</div> : healthError ? <div className="inline-error" role="alert">来源健康记录读取失败：{healthError}<button type="button" className="text-button" onClick={refreshHealth}>重试</button></div> : health ? <>
         <div className="quality-window"><span>最近 24 小时</span><span>核验 <b>{totalAttempts}</b> 次 · 字段隔离 <b>{totalQuarantined}</b> 次 · 异常原文 <b>{totalRejected}</b> 份</span><small>{formatTime(health.window.since)} — {formatTime(health.window.until)}</small></div>
         <div className="quality-health-list">{health.sources.map(source => <article className="quality-health-item" key={source.source_id}>
           <div className="quality-item-heading"><h3>{sourceName(source.source_id)}</h3><span className={`tag ${source.status === "healthy" ? "success" : source.status === "unknown" ? "quiet" : "warning"}`}>{source.status === "unknown" && source.attempts > 0 ? "尚无完成核验" : healthLabels[source.status]}</span></div>
@@ -171,7 +181,8 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
       {selectedId ? <section id="quarantine-evidence" className="quarantine-evidence" ref={detailPanel} tabIndex={-1} aria-labelledby="quarantine-evidence-title">
         <div className="panel-title"><span id="quarantine-evidence-title">隔离原始记录</span><button type="button" className="icon-button" aria-label="关闭隔离原文" onClick={closeDetail}><Icon name="close" size={18} /></button></div>
         <div className="snapshot-banner"><strong>LOCAL SNAPSHOT · 未采纳的历史内容</strong><span>这份来源内容未通过数据质量检查，不作为当前参数，也不会加入比较。</span></div>
-        {detailError ? <div className="inline-error" role="alert">隔离原文读取失败：{detailError}<button type="button" className="text-button" onClick={() => { setDetailError(""); setDetailRevision(value => value + 1); }}>重试读取</button></div> : detail?.id === selectedId ? <QuarantineDetail detail={detail} name={sourceName(detail.source_id)} /> : <div className="run-loading" role="status"><span className="spinner" />正在读取所选隔离原文…</div>}
+        {detail?.id === selectedId ? <QuarantineDetail detail={detail} name={sourceName(detail.source_id)} reader={reader}
+          selectionKey={`${sourceId}:${selectedId}:${detailRevision}`} revocation={binaryRevocation.current} enabled={sessionReady} /> : <RawEvidenceV2View reader={reader} />}
       </section> : null}
     </section>
     <FieldConflictCenter sources={sources} sessionReady={sessionReady} />
@@ -185,7 +196,10 @@ export default function SourceQuality({ sources, sessionReady }: { sources: Sour
   </div>;
 }
 
-function QuarantineDetail({ detail, name }: { detail: QuarantineEvidence; name: string }) {
+function QuarantineDetail({ detail, name, reader, selectionKey, revocation, enabled }: {
+  detail: QuarantineEvidenceV2; name: string; reader: RawEvidenceReader; selectionKey: string;
+  revocation: BinaryReviewRevocation; enabled: boolean;
+}) {
   const auth = useWorkbenchAuth();
   const adminBlocked = auth.ready && (!auth.state.authenticated || !auth.state.user?.is_admin);
   const url = safeUrl(detail.source_url);
@@ -194,7 +208,8 @@ function QuarantineDetail({ detail, name }: { detail: QuarantineEvidence; name: 
     {detail.metrics ? <div className="quality-loss-metrics"><div><span>规格缺失</span><strong>{detail.metrics.lost_rows} / {detail.metrics.baseline_rows}</strong><small>{formatRatio(detail.metrics.row_loss_ratio)}</small></div><div><span>已知字段缺失</span><strong>{detail.metrics.lost_fields} / {detail.metrics.known_fields}</strong><small>{formatRatio(detail.metrics.field_loss_ratio)}</small></div></div> : <p className="quality-intro">{detail.target_kind === "vehicle" ? "车型" : "轮胎"}原文未能形成通过校验的参数记录，未计算字段缺失比例。此原文不会用于在线验证、授权回退或比较。</p>}
     {detail.quality?.groups ? <section className="vehicle-quality-groups" aria-label="车型分组质量检查"><h4>按资料类型分别检查</h4><p className="quality-intro">任一分组的记录或已知字段缺失达到 30% 即隔离，合计比例不替代分组判断。</p>{Object.entries(detail.quality.groups).map(([key, group]) => <div key={key}><h5>{{ vehicle: "车型信息", trims: "配置版本", fitments: "轮毂与轴位" }[key] || key}</h5><div className="quality-loss-metrics"><div><span>记录缺失</span><strong>{group.lost_rows} / {group.baseline_rows}</strong><small>{formatRatio(group.row_loss_ratio)}</small></div><div><span>已知字段缺失</span><strong>{group.lost_field_count} / {group.known_fields}</strong><small>{formatRatio(group.field_loss_ratio)}</small></div></div>{group.reason_codes.length ? <ul className="quality-reason-list">{group.reason_codes.map(code => <li key={code}><QualityReason code={code} /></li>)}</ul> : null}</div>)}</section> : null}
     <details className="quality-technical"><summary>查看记录校验信息</summary><dl className="quality-detail-meta"><div><dt>解析器版本</dt><dd>{detail.parser_version}</dd></div><div><dt>SHA-256</dt><dd className="mono">{detail.raw_hash}</dd></div><div><dt>对照快照</dt><dd className="mono">{detail.previous_snapshot_id || "无适用基线（未形成合格参数）"}</dd></div><div><dt>隔离记录</dt><dd className="mono">{detail.id}</dd></div></dl></details>
-    <details className="raw-evidence"><summary>展开纯文本原文<span className="mono">TEXT</span></summary><p>仅作为待核验证据展示，不执行来源脚本或指令。内容类型：{detail.content_type}</p><pre>{detail.body}</pre></details>
-    {detail.kind === "field_loss" ? <>{adminBlocked ? <p className="review-warning" role="status">隔离复核审批需要管理员账户登录；提交将被服务端拒绝，核对与浏览不受影响。</p> : null}<QuarantineReview key={detail.id} id={detail.id} /></> : <p className="quality-intro">解析或结构校验失败须先修复解析器，不能人工跳过。</p>}
+    <RawEvidenceV2View reader={reader} />
+    {isBinaryQuarantineDetail(detail) ? <BinaryQuarantineReview key={detail.id} detail={detail} reader={reader}
+      selectionKey={selectionKey} revocation={revocation} enabled={enabled} /> : detail.body_encoding !== "binary" && detail.kind === "field_loss" ? <>{adminBlocked ? <p className="review-warning" role="status">隔离复核审批需要管理员账户登录；提交将被服务端拒绝，核对与浏览不受影响。</p> : null}<QuarantineReview key={detail.id} id={detail.id} /></> : <p className="quality-intro">解析或结构校验失败须先修复解析器，不能人工跳过。</p>}
   </div>;
 }

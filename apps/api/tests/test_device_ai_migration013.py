@@ -1,8 +1,9 @@
-"""Synthetic exact pre-013 ledger-trigger migration; no normal databases are read.
+"""Synthetic current-shape/pre-013-ledger fixture; no normal databases are read.
 
-Pre-state models a fully migrated 012 database: every table (including both
-device ledgers) already exists, versions 001-012 are applied, and no triggers
-exist. 013 must add only the six SQLite triggers plus one version row, leave
+The fixture uses current table shapes with versions 001-012 applied; it is not
+an exact historical backup. Both device ledgers already exist, with no device
+triggers. Current non-device after_create guards are independently pinned.
+The real 013 milestone must add only six device triggers plus one version, leave
 every predecessor row untouched, and rebuild identically (DROP ... IF EXISTS
 prefix) when the version row is stripped.
 """
@@ -26,6 +27,8 @@ from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import OLD_VERSIONS
 from test_device_ai_migration012 import (ACTOR, ARCHIVE_HASH, CONTRACT_HASH, OTHER_ACTOR, PROJECTION_HASH,
                                          analysis_request, claim, preparation)
+from historical_migration_support import (assert_full_chain_preserved, assert_trigger_contract,
+    initialize_observing_version, separate_triggers)
 
 VERSIONS = [*OLD_VERSIONS, '009_ai_streaming', '010_offline_packs', '011_query_fallback_policies',
             '012_device_ai_preparations']
@@ -92,23 +95,34 @@ def table_columns(connection, table):
 
 def test_013_adds_only_six_ledger_triggers_and_one_version_row(predecessor):
     before = state(predecessor)
-    assert before['triggers'] == {}
-    predecessor.initialize()
+    assert_trigger_contract(before, device=False, candidate=False)
+    assert not EXPECTED_TRIGGERS.intersection(before['triggers'])
+    stage = separate_triggers(initialize_observing_version(predecessor, '013_device_ai_ledger_triggers'))
+    assert stage['tables'] == before['tables'] and stage['schema'] == before['schema']
+    assert set(stage['triggers']) - set(before['triggers']) == EXPECTED_TRIGGERS
+    assert all(stage['triggers'][name] == sql for name, sql in before['triggers'].items())
+    assert_trigger_contract(stage, device=True, candidate=False)
+    for table in before['tables'] - {'tire_schema_versions'}:
+        assert stage['rows'][table] == before['rows'][table], table
+    assert len(stage['rows']['tire_schema_versions']) == len(before['rows']['tire_schema_versions']) + 1
+    first = state(predecessor)
     predecessor.initialize()
     after = state(predecessor)
+    assert after == first
     assert after['tables'] == before['tables']
     assert after['schema'] == before['schema']  # non-trigger schema objects untouched.
     for table in before['tables'] - {'tire_schema_versions'}:
         assert before['rows'][table] == after['rows'][table], table
     assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
-    assert set(after['triggers']) == EXPECTED_TRIGGERS
+    assert_full_chain_preserved(before, after)
     with predecessor.engine.connect() as connection:
         assert set(connection.execute(text('SELECT version FROM tire_schema_versions')).scalars()) == ALL_VERSIONS
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
-        assert set(trigger_tables(connection).values()) == set(LEDGER_TABLES)
-        for name, sql in after['triggers'].items():
+        assert {table for name, table in trigger_tables(connection).items() if name in EXPECTED_TRIGGERS} == set(LEDGER_TABLES)
+        for name in EXPECTED_TRIGGERS:
+            sql = after['triggers'][name]
             assert "RAISE(FAIL, 'device_ai_ledger_immutable')" in sql, name
-        no_replace = {name: sql for name, sql in after['triggers'].items() if name.endswith('_no_replace')}
+        no_replace = {name: after['triggers'][name] for name in EXPECTED_TRIGGERS if name.endswith('_no_replace')}
         assert len(no_replace) == 2 and all('WHEN EXISTS' in sql for sql in no_replace.values())
 
 
@@ -142,7 +156,7 @@ def test_013_ddl_and_version_rollback_together(predecessor, monkeypatch):
             predecessor.initialize()
     assert state(predecessor) == before  # SQLite DDL is transactional: no partial triggers.
     predecessor.initialize()
-    assert set(state(predecessor)['triggers']) == EXPECTED_TRIGGERS
+    assert_trigger_contract(state(predecessor), device=True, candidate=True)
 
 
 def test_triggers_block_raw_update_delete_and_replace_while_appends_succeed(predecessor):
@@ -238,6 +252,7 @@ def test_two_engines_initialize_the_same_pre013_file_concurrently_without_duplic
     with predecessor.engine.connect() as connection:
         versions = connection.execute(text('SELECT version FROM tire_schema_versions')).scalars().all()
         assert len(versions) == len(EXPECTED_SCHEMA_VERSIONS) and set(versions) == ALL_VERSIONS
-        assert set(trigger_tables(connection)) == EXPECTED_TRIGGERS
+        assert_trigger_contract(state(predecessor), device=True, candidate=True)
+        assert {name for name in trigger_tables(connection) if name in EXPECTED_TRIGGERS} == EXPECTED_TRIGGERS
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
         assert connection.execute(text('SELECT COUNT(*) FROM device_ai_preparations')).scalar() == 1

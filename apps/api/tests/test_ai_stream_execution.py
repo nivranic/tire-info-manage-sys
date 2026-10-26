@@ -2,8 +2,16 @@
 import asyncio
 from copy import deepcopy
 
+import pytest
+
 from tire_api.ai_gateway import GatewayError, OpenAIConfig
 from test_ai_stream_parser import PACK, TEXT
+
+
+@pytest.fixture(autouse=True)
+def isolated_producer_dispatch_port(monkeypatch):
+    from tire_api import ai_execution
+    monkeypatch.setattr(ai_execution, 'require_vehicle_dispatch', lambda *_args, **_kwargs: None)
 
 
 class Store:

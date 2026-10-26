@@ -111,6 +111,8 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
     from .ai_evidence import require_frozen_field_contract, require_frozen_identity_contracts
     from .identity_resolution import require_ai_identity
     from .ai_analysis import DEVICE_CLAIM_PLAN_KEY
+    from .candidate_ai import reserve_gate, claim_reserved
+    candidate_gate = reserve_gate(db, pack, session_id)
     preparation = _device_preparation(db, pack, session_id)
     plan = None
     if preparation is not None:
@@ -136,6 +138,8 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
         require_ai_identity(db, [item['variant_id'] for item in pack.payload.get('evidence', []) if item.get('variant_id')])
         require_frozen_identity_contracts(db, pack.payload.get('evidence', []))
         require_frozen_field_contract(pack.payload)
+    from .ai_evidence import require_vehicle_evidence
+    require_vehicle_evidence(db, pack.payload, purpose='provider', pack_id=pack.id)
     budget = budget_usage(db)
     if budget['requests'] >= config.daily_request_limit or budget['accounted_tokens'] + reserve > config.daily_token_limit:
         raise HTTPException(429, '本地 AI 当日预算不足，未调用模型')
@@ -147,6 +151,7 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
         request_contract={**contract, **extra_contract, 'body_hash': digest(body), 'max_output_tokens': config.max_output_tokens, 'store': False})
     db.add(row)
     db.flush()
+    claim_reserved(db, row, candidate_gate)
     QueryService(db, None).audit(session_id, 'ai_request_started', request_id=row.id,
                                pack_id=pack.id, question_hash=digest(question), reserved_tokens=reserve,
                                **({'origin': 'device_history'} if preparation is not None else {}))
@@ -170,6 +175,80 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
     return row
 
 
+def _vehicle_dispatch_input(body):
+    """Read only the server-built user envelope; never infer authority from it."""
+    if not isinstance(body, dict):
+        return None
+    messages = body.get('messages', body.get('input'))
+    if not isinstance(messages, list):
+        return None
+    users = [item for item in messages if isinstance(item, dict) and item.get('role') == 'user']
+    if len(users) != 1 or not isinstance(users[0].get('content'), str):
+        return None
+    try:
+        value = json.loads(users[0]['content'])
+    except (ValueError, TypeError):
+        return None
+    return value if isinstance(value, dict) and isinstance(value.get('untrusted_evidence_pack'), dict) else None
+
+
+def require_vehicle_dispatch(database, request_id, config, body, pack=None):
+    """Last vehicle fence, owning and closing only this reader's transaction."""
+    from .ai_evidence import (vehicle_evidence_capsules, require_vehicle_capsule_use, vehicle_payload_marker,
+                              _vehicle_preparation_refs)
+    from .ai_models import AIEvidencePack
+    from .auth import session_scope
+    from .device_ai_models import DeviceAIPreparation
+    try:
+        with database.sessions() as checked_db:
+            with checked_db.no_autoflush:
+                request = checked_db.get(AIRequest, request_id, populate_existing=True)
+                if request is None:
+                    raise GatewayError('vehicle_evidence_binding_failed')
+                frozen = checked_db.get(AIEvidencePack, request.pack_id, populate_existing=True)
+                if frozen is None:
+                    raise GatewayError('vehicle_evidence_binding_failed')
+                outbound = _vehicle_dispatch_input(body)
+                preparation_contract = checked_db.scalar(select(DeviceAIPreparation.contract).where(
+                    DeviceAIPreparation.ai_pack_id == frozen.id))
+                # An archived body or authoritative preparation can retain vehicle
+                # identity after the durable payload's visible markers are stripped.
+                marked = (vehicle_payload_marker(frozen.payload)
+                    or outbound is not None and vehicle_payload_marker(outbound['untrusted_evidence_pack'])
+                    or isinstance(pack, dict) and vehicle_payload_marker(pack.get('payload')))
+                expected_refs = _vehicle_preparation_refs(preparation_contract, marked=marked)
+                marked = marked or bool(expected_refs)
+                if not marked:
+                    return
+                capsules = vehicle_evidence_capsules(checked_db, frozen.payload, pack_id=frozen.id)
+                expected_payload = {**frozen.payload, 'data_state': frozen.data_state}
+                if preparation_contract is not None:
+                    from .ai_analysis import _device_request_evidence
+                    expected_payload = _device_request_evidence(expected_payload)
+                if (frozen.actor_session_id not in session_scope(checked_db, request.actor_session_id)
+                        or request.provider != config.provider or request.model != config.model
+                        or digest(frozen.payload) != frozen.fingerprint
+                        or not isinstance(request.request_contract, dict)
+                        or request.request_contract.get('body_hash') != digest(body)
+                        or outbound is None or outbound.get('question') != request.question
+                        or digest(outbound['untrusted_evidence_pack']) != digest(expected_payload)
+                        or pack is not None and (not isinstance(pack, dict)
+                            or pack.get('data_state') != frozen.data_state
+                            or digest(pack.get('payload')) != frozen.fingerprint)):
+                    raise GatewayError('vehicle_evidence_binding_failed')
+                for capsule in capsules:
+                    require_vehicle_capsule_use(capsule, 'provider')
+    except HTTPException as error:
+        code = error.detail.get('code') if isinstance(error.detail, dict) else None
+        if code not in {'vehicle_provider_use_not_allowed', 'vehicle_raw_integrity_failed', 'vehicle_evidence_binding_failed'}:
+            code = 'vehicle_evidence_binding_failed'
+        raise GatewayError(code) from None
+    except GatewayError:
+        raise
+    except Exception:
+        raise GatewayError('vehicle_raw_integrity_failed') from None
+
+
 def execute_response(db, app, row, config, body, validator):
     """Called in a FastAPI worker, after the durable reservation has committed."""
     from .telemetry import observe
@@ -182,7 +261,15 @@ def execute_response(db, app, row, config, body, validator):
 def _execute_response(db, app, row, config, body, validator):
     receipt = {'usage': None, 'provider_response_id': None}
     answer, error = None, None
+    local_vehicle_denial = False
     try:
+        try:
+            require_vehicle_dispatch(app.state.database, row.id, config, body)
+        except GatewayError:
+            local_vehicle_denial = True
+            raise
+        from .candidate_ai import before_dispatch
+        before_dispatch(db, app, row, config, body)
         receipt = asyncio.run(app.state.ai_adapter.generate(config, body))
         error = safe_error(receipt['error']) if receipt.get('error') else None
         if not error:
@@ -195,6 +282,8 @@ def _execute_response(db, app, row, config, body, validator):
         error = 'ai_provider_failed'
     if not isinstance(receipt, dict):
         receipt = {}
+    if local_vehicle_denial:
+        receipt = {'usage': {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0}}
     response_id = receipt.get('provider_response_id')
     if not isinstance(response_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', response_id):
         response_id = None

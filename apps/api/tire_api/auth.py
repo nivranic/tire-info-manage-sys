@@ -244,6 +244,8 @@ def register_auth_routes(app: FastAPI) -> None:
 
     @app.post("/v1/auth/users/{user_id}/password", dependencies=[Depends(admin_guard)])
     def reset_password(user_id: str, payload: PasswordResetRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+        QueryService(db, None).lock_ingestion()
+        require_admin(request, db)
         target = db.get(User, user_id)
         if target is None:
             raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
@@ -252,6 +254,8 @@ def register_auth_routes(app: FastAPI) -> None:
         sessions = db.scalars(select(UserSession).where(UserSession.user_id == target.id)).all()
         for session in sessions:
             session.user_id = None
+        from .external_api import revoke_account_keys
+        revoke_account_keys(db, target.id)
         QueryService(db, None).audit(request.state.session_id, "user_password_reset",
                                      target_user_id=target.id, target_username=target.username,
                                      sessions_unbound=len(sessions))

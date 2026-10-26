@@ -54,8 +54,11 @@ def record_notifications(db: Session, revision: RecallRevision, event: RecallEve
         if db.scalar(select(RecallNotification.id).where(RecallNotification.rule_id == rule.id,
                                                        RecallNotification.event_id == event.id)):
             continue
-        db.add(RecallNotification(session_id=rule.session_id, rule_id=rule.id,
-                                 rule_revision_id=settings.id, event_id=event.id))
+        notification = RecallNotification(id=uid(), session_id=rule.session_id, rule_id=rule.id,
+            rule_revision_id=settings.id, event_id=event.id, delivered_at=utcnow())
+        db.add(notification)
+        from .webhook_delivery import enqueue_notification
+        enqueue_notification(db, 'recall_monitor', notification, event)
 
 
 def reschedule(db: Session, job: RecallMonitorJob) -> None:

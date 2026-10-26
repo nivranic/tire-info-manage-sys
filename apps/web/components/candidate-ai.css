@@ -1,0 +1,47 @@
+.candidate-ai-panel { min-width: 0; margin-top: 16px; padding: 24px 0 0; border-top: 1px solid var(--border); }
+.candidate-ai-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; flex-wrap: wrap; }
+.candidate-ai-heading h3 { margin: 8px 0 12px; font-size: 19px; line-height: 1.5; }
+.candidate-ai-panel p, .candidate-ai-panel li { color: var(--muted); font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.candidate-ai-panel h4 { margin: 0 0 14px; font-size: 15px; line-height: 1.7; }
+.candidate-ai-panel h5 { margin: 16px 0 8px; font-size: 13px; line-height: 1.7; }
+.candidate-ai-panel fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.candidate-ai-panel .candidate-ai-selection { padding: 18px 0; border-block: 1px solid var(--border); margin: 20px 0 16px; }
+.candidate-ai-selection legend { padding: 0 0 8px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.candidate-ai-choice { display: flex; gap: 11px; align-items: start; padding: 14px; margin-bottom: 8px; border: 1px solid var(--border); background: var(--surface); min-width: 0; }
+.candidate-ai-choice input, .candidate-ai-consent input { flex: 0 0 auto; width: 17px; height: 17px; margin-top: 3px; accent-color: var(--accent); }
+.candidate-ai-choice span { min-width: 0; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.candidate-ai-choice small { display: block; color: var(--muted); margin-top: 4px; }
+.candidate-ai-actions { display: flex; gap: 10px 16px; flex-wrap: wrap; align-items: center; }
+.candidate-ai-field, .candidate-ai-admin-grid label { display: grid; gap: 8px; min-width: 0; font-size: 12px; color: var(--muted); }
+.candidate-ai-panel input:not([type=checkbox]), .candidate-ai-panel select, .candidate-ai-panel textarea { min-width: 0; width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--ink); font: inherit; line-height: 1.7; box-sizing: border-box; }
+.candidate-ai-panel textarea { resize: vertical; }
+.candidate-ai-preparation, .candidate-ai-result { margin-top: 22px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); min-width: 0; }
+.candidate-ai-facts, .candidate-ai-recovery { margin: 12px 0; padding: 14px 0; border-top: 1px solid var(--border); min-width: 0; }
+.candidate-ai-panel summary { cursor: pointer; font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; }
+.candidate-ai-facts dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-block: 18px; }
+.candidate-ai-facts dt { color: var(--muted); font-size: 11px; }
+.candidate-ai-facts dd { margin: 5px 0 0; color: var(--ink); font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.candidate-ai-facts article { padding: 4px 0; border-top: 1px dashed var(--border); }
+.candidate-ai-hash, .candidate-ai-attempt code { font-family: var(--font-mono, monospace); font-size: 10px !important; overflow-wrap: anywhere; word-break: break-word; }
+.candidate-ai-dependencies { margin-block: 20px; }
+.candidate-ai-dependency { padding: 16px 0; border-top: 1px solid var(--border); min-width: 0; }
+.candidate-ai-dependency > strong { display: inline-block; font-size: 12px; margin-right: 10px; }
+.candidate-ai-dependency > .tag { white-space: normal; }
+.candidate-ai-admin { margin-top: 14px; padding: 14px; border: 1px dashed var(--border); min-width: 0; }
+.candidate-ai-admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.candidate-ai-full { grid-column: 1 / -1; }
+.candidate-ai-consent { display: flex; align-items: start; gap: 10px; margin: 20px 0; min-width: 0; font-size: 12px; line-height: 1.9; color: var(--ink); }
+.candidate-ai-consent span { min-width: 0; }
+.candidate-ai-provider { padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; }
+.candidate-ai-blockers { padding-left: 20px; }
+.candidate-ai-attempt { margin-top: 18px; padding: 16px; border: 1px dashed var(--border); }
+.candidate-ai-proposal { padding: 15px 0; border-block: 1px solid var(--border); font-size: 13px; overflow-wrap: anywhere; }
+.candidate-ai-recovery .candidate-ai-field { margin: 14px 0; }
+.candidate-ai-panel button { max-width: 100%; white-space: normal; }
+@media (max-width: 460px) {
+  .candidate-ai-preparation, .candidate-ai-result { padding: 15px; }
+  .candidate-ai-facts dl, .candidate-ai-admin-grid { grid-template-columns: minmax(0, 1fr); }
+  .candidate-ai-full { grid-column: auto; }
+  .candidate-ai-panel button { min-height: 44px; }
+  .candidate-ai-admin { padding: 12px; }
+}

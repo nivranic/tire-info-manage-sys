@@ -108,6 +108,30 @@ def test_draft_proposal_has_no_side_effect_before_review_and_apply_is_once(setup
     assert client.get('/v1/alert-rules').json()['items'][0]['origin']['draft_id'] == draft['id']
 
 
+def test_completed_unapplied_draft_cannot_expand_frozen_kinds_to_page_monitoring(setup):
+    client, _, _, database = setup
+    draft = generate(client, prepare(client)).json()
+    page = {**draft['draft']['rule'], 'kinds': ['page_changed'], 'fields': [],
+            'conditions': {}, 'variant_id': None}
+    response = apply(client, draft, page)
+    assert response.status_code == 422 and '提醒类型' in response.json()['detail']
+    assert count(database, AlertRule) == count(database, AIDraftApplication) == count(database, MonitorJob) == 0
+
+
+def test_legal_applied_draft_replay_stays_before_catalog_and_changed_page_payload_is_409(setup):
+    client, _, _, database = setup
+    draft = generate(client, prepare(client)).json()
+    key = str(uuid4())
+    legal = draft['draft']['rule']
+    first = apply(client, draft, legal, key)
+    assert first.status_code == 201
+    page = {**legal, 'kinds': ['page_changed'], 'fields': [], 'conditions': {}, 'variant_id': None}
+    assert apply(client, draft, page, key).status_code == 409
+    assert apply(client, draft, page).status_code == 409
+    assert apply(client, draft, legal, key).json() == first.json()
+    assert count(database, AlertRule) == count(database, AIDraftApplication) == count(database, MonitorJob) == 1
+
+
 @pytest.mark.parametrize('mutation', ['source', 'enabled', 'model', 'field', 'technology', 'interval', 'missing_key'])
 def test_invalid_or_outside_capability_model_output_fails_closed(setup, mutation):
     client, _, model, database = setup

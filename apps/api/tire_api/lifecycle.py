@@ -101,6 +101,9 @@ def append_lifecycle_event(db: Session, variant_id: str, payload: LifecycleReque
     db.add(row)
     shared.audit(session_id, "variant_lifecycle_changed", variant_id=variant_id, event_id=row.id,
                  action_kind=row.action, before=before["state"], after=after)
+    db.flush()
+    from .interest_events import publish
+    publish(db, 'tire_lifecycle', row, allow_indeterminate=True)
     db.commit()
     return lifecycle_review(db, variant_id)
 

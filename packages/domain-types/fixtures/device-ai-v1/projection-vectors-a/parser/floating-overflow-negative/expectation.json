@@ -1,0 +1,16 @@
+{
+  "canonical_ast": null,
+  "core_sha256": "c8633ac0108b2b624e532afc157b91568d0381190f18aa70160931a5c7a2f774",
+  "expected_error_code": "device_ai_number_nonfinite",
+  "input": {
+    "byte_count": 16,
+    "path": "parser/floating-overflow-negative/input.bin",
+    "sha256": "73784ba3c05b010625283d7b9bf79b386dfad697e982c8a7dd2ed72f8babd19f"
+  },
+  "schema": "internal-device-ai-parser-vector@1",
+  "source_backed_domain_fact": false,
+  "source_kind": "synthetic_parser_literal",
+  "state": "rejected",
+  "token_dto_ast": null,
+  "warning": "Synthetic JSON grammar/lexeme example, not a tire measurement or a frozen domain fact. Floating tokens retain source binary64 semantics, including finite underflow; lexeme retention adds no precision. No Host parity run or public wire freeze."
+}

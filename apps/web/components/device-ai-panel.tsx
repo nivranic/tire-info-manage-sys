@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { AIStatus, AIStreamAcceptance, AIStreamDetail, OfflineReadResult, OfflineSearchResult, OfflineSlot } from "@tire/domain-types";
 import { useWorkbenchPlatform, type WorkbenchPlatform } from "./workbench-platform";
+import { useThemePreferences } from "./theme-preferences";
 import AiBudgetMeter from "./ai-budget";
 import { AIStreamProgress } from "./ai-stream-progress";
 import { offlineError } from "./offline-crypto";
@@ -53,7 +54,7 @@ export function DeviceAiEntry({ platform, className = "text-button" }: { platfor
 
 export default function DeviceAiDialog({ platform: supplied, onClose }: { platform?: WorkbenchPlatform; onClose: () => void }) {
   const inherited = useWorkbenchPlatform(), platform = supplied || inherited;
-  const [portalTheme] = useState(() => typeof document === "undefined" ? "light" : document.querySelector<HTMLElement>(".app-shell")?.dataset.theme || "light");
+  const { appearance } = useThemePreferences();
   const dialog = useRef<HTMLDialogElement>(null);
   const operation = useRef<AbortController | null>(null);
   const frozenSubmission = useRef<FrozenSubmission | null>(null);
@@ -402,7 +403,7 @@ export default function DeviceAiDialog({ platform: supplied, onClose }: { platfo
   const dailyBudget = budget && typeof budget.daily_budget === "object" && budget.daily_budget !== null ? budget.daily_budget as Record<string, unknown> : null;
   const budgetBlocked = budget?.blocked === true || dailyBudget?.blocked === true;
   const activeStream = stream;
-  return createPortal(<div className="offline-portal" data-theme={portalTheme}><dialog ref={dialog} className="fact-review-dialog offline-dialog device-ai-dialog" aria-labelledby="device-ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
+  return createPortal(<div className="offline-portal" data-theme={appearance.palette}><dialog ref={dialog} className="fact-review-dialog offline-dialog device-ai-dialog" aria-labelledby="device-ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">DEVICE HISTORY → AI</span><h2 id="device-ai-title">设备 AI 分析</h2><p>本机预览 · 一次决定 · 服务端复核 · 流式结果</p></div><button type="button" className="text-button" onClick={onClose}>关闭</button></header>
     <div className="offline-content">
       <p className="review-boundary">分析对象是本设备保存的离线历史观察（轮胎 / 车辆 / 召回公告 / 公告检索四域）。先在本机重算并展示即将外发的材料指纹；只有你明确确认后才会创建服务端准备记录，第二次确认后才交给 AI Provider。普通在线查询历史与此完全分开。</p>

@@ -1,0 +1,30 @@
+{
+  "approved_closure": null,
+  "binding": {
+    "byte_count": 82981,
+    "owner_scope_id": "e6b0aac1f7ab69c856dde1be3a0e84f4aa39ca15be472d53accc1f63b6eb9f4f",
+    "package_id": "b1be7a53-799d-4950-b62e-c1cb3bae324f",
+    "schema": "offline-pack@2",
+    "sha256": "5d5250cbd24e38d5c610ee75429ce3915b295d4e4f74dd47ede0e11bf318e862"
+  },
+  "core_sha256": "c8633ac0108b2b624e532afc157b91568d0381190f18aa70160931a5c7a2f774",
+  "host_parity_verified": false,
+  "max_projection_bytes": 44000,
+  "mode": "complete_event_context",
+  "public_wire_frozen": false,
+  "schema": "internal-device-ai-projection-vector-input@1",
+  "selectors": [
+    {
+      "document_id": "member:abdde324ad1fcb2c995bdef6110533e41700c9f8f6ca4dcb088ae7447a9ecc5d:record:0",
+      "kind": "test_event",
+      "member_key": "abdde324ad1fcb2c995bdef6110533e41700c9f8f6ca4dcb088ae7447a9ecc5d",
+      "record_index": 0,
+      "reference": {
+        "event_id": "123b9b75-a8d5-48d9-a8f5-e0b5072f5384",
+        "event_revision": 1,
+        "kind": "test_event"
+      }
+    }
+  ],
+  "source_kind": "exact_producer49_download"
+}

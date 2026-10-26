@@ -5,6 +5,7 @@ separate from source facts; selection never infers a tire/vehicle relationship.
 """
 from copy import deepcopy
 import hashlib
+import json
 
 from fastapi import HTTPException
 from sqlalchemy import desc, func, select
@@ -14,6 +15,8 @@ from .domain import VariantInput, digest, stable_json
 from .field_authority import resolve_fields
 from .field_evidence import complete_missing_candidates, latest_tire_heads, snapshot_field_candidates
 from .identity_contract import contract_metadata
+from .garage import (checked_fitment_reference, checked_garage_revision, checked_vehicle_reference,
+                     require_vehicle_reference_use)
 from .recall_evidence import (canonical_recall_facts, load_recall_evidence, recall_boundary_descriptor,
                               recall_policy_descriptor)
 from .recall_models import RecallRevision, RecallSnapshot, RecallVerification
@@ -21,7 +24,9 @@ from .recall_discovery import (NOTICES as RECALL_SEARCH_NOTICES, RecallSearchQue
                                RecallSearchVerification, SearchDiscovery)
 from .service import timestamp
 from .test_events import EventPayload, TireTestRevision, metadata
-from .vehicles import VehicleSnapshot, VehicleVerification, fitment_fact_hash, validate_vehicle_structure
+from .vehicles import (VehicleSnapshot, VehicleVerification, fitment_fact_hash, validate_vehicle_structure,
+                       vehicle_provenance)
+from .vehicle_raw import VehicleRawIntegrityError, checked_vehicle_consumer_capsule
 
 
 def member_key(reference):
@@ -63,6 +68,15 @@ def _source(snapshot, receipt):
 
 
 def _receipt(db, model, snapshot, reference):
+    if isinstance(snapshot, VehicleSnapshot):
+        try:
+            capsule = checked_vehicle_consumer_capsule(db, snapshot.id,
+                                                       verification_id=reference.get('verification_id'))
+        except VehicleRawIntegrityError:
+            raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+        require_vehicle_reference_use(capsule, 'export')
+        if capsule is not None:
+            return db.get(model, capsule['verification_id'])
     statement = select(model, QueryRun).join(QueryRun, QueryRun.id == model.query_id).where(
         model.snapshot_id == snapshot.id).order_by(desc(model.verified_at), desc(model.id))
     if reference.get('verification_id'):
@@ -294,6 +308,12 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
         for missing in sorted(set(requested or []) - {row.vehicle_id for row in rows}):
             omissions.append(omission('garage', missing, 'active_garage_missing', True))
         for row in rows:
+            try:
+                checked_garage_revision(db, row, purpose='export')
+            except HTTPException as error:
+                counts['garage_profiles'] -= 1
+                omissions.append(omission('garage', row.vehicle_id, _failure_reason(error), requested is not None))
+                continue
             context = {'id': 'garage:' + row.vehicle_id, 'kind': 'garage', 'scope': 'local_workspace',
                 'privacy_class': 'private', 'payload': {'vehicle_id': row.vehicle_id, 'revision': row.revision,
                 'basis': row.basis, 'profile': deepcopy(row.profile), 'fitment_reference': deepcopy(row.fitment_reference),
@@ -308,7 +328,8 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
                     selected.extend((ref, reason('garage', row.vehicle_id, row.revision, axle), context) for ref in refs)
             copied = row.fitment_reference
             if copied and copied.get('snapshot_id'):
-                selected.append(({'kind': 'vehicle', 'snapshot_id': copied['snapshot_id']},
+                selected.append(({'kind': 'vehicle', 'snapshot_id': copied['snapshot_id'],
+                                  **({'verification_id': copied['verification_id']} if copied.get('verification_id') else {})},
                                  reason('garage', row.vehicle_id, row.revision), context))
 
     if scope['watchlist']['include']:
@@ -368,8 +389,7 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
                 loaded_cache[requested_key] = (load_member(db, registry, ref, candidate_cache=candidate_cache,
                                                          session_id=session_id, pack_schema=pack_schema), None)
             except (HTTPException, ValueError, KeyError, TypeError) as error:
-                detail = error.detail if isinstance(error, HTTPException) else 'offline_invalid_formal_material'
-                loaded_cache[requested_key] = (None, str(detail))
+                loaded_cache[requested_key] = (None, _failure_reason(error))
         cached, detail = loaded_cache[requested_key]
         if cached is None:
             omissions.append(omission(why['selector'], why['object_id'] or member_key(ref), str(detail),
@@ -413,6 +433,126 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
             item['payload']['field_resolution'] = resolution
     omissions.append(omission('rights', None, 'raw_html_json_pdf_images_and_linked_media_excluded'))
     return contexts, members, omissions, counts
+
+
+def _failure_reason(error):
+    detail = error.detail if isinstance(error, HTTPException) else 'offline_invalid_formal_material'
+    if isinstance(detail, dict):
+        return detail.get('code') if type(detail.get('code')) is str else 'offline_invalid_formal_material'
+    return detail if type(detail) is str else 'offline_invalid_formal_material'
+
+
+def _frozen_invalid():
+    raise HTTPException(503, {'code': 'offline_frozen_object_unavailable'})
+
+
+def check_frozen_vehicle_use(db, material):
+    contexts, references = check_frozen_vehicle_structure(db, material)
+    for context in contexts.values():
+        if context.get('kind') == 'garage':
+            payload = context['payload']
+            checked_fitment_reference(db, payload['fitment_reference'], frozen=True, purpose='export',
+                                      copied=payload['basis'] == 'copied_fitment')
+    for selected in references.values():
+        capsule = checked_vehicle_reference(db, selected['reference'], vehicle_id=selected['vehicle_id'], frozen=True)
+        require_vehicle_reference_use(capsule, 'export')
+
+
+def check_frozen_vehicle_structure(db, material):
+    try:
+        return _frozen_vehicle_bindings(db, material)
+    except (ValueError, TypeError, KeyError, AttributeError):
+        _frozen_invalid()
+
+
+def _frozen_vehicle_bindings(db, material):
+    """Read frozen identities, including context-only and blocked old previews.
+
+    No source refresh, parser, receipt replacement or frozen-byte repair occurs.
+    Genuine legacy bodies are deliberately outside this redistribution check.
+    """
+    if (type(material) is not dict or type(material.get('contexts')) is not list
+            or type(material.get('documents')) is not list):
+        _frozen_invalid()
+    schema = material.get('schema')
+    if type(schema) is not str or schema not in {'offline-pack@1', 'offline-pack@2', 'offline-pack-plan@1', 'offline-pack-plan@2'}:
+        _frozen_invalid()
+    preview = schema in {'offline-pack-plan@1', 'offline-pack-plan@2'}
+    items = material.get('resolved' if preview else 'members')
+    if type(items) is not list:
+        _frozen_invalid()
+    references, contexts, item_keys = {}, {}, set()
+    source_keys = {'source_id', 'source_url', 'raw_hash', 'parser_version', 'parser_identity',
+                   'observed_at', 'verified_at', 'verification_id'}
+    for item in items:
+        if type(item) is not dict or type(item.get('reference')) is not dict or type(item.get('key')) is not str:
+            _frozen_invalid()
+        if item['key'] in item_keys:
+            _frozen_invalid()
+        item_keys.add(item['key'])
+        if item['reference'].get('kind') != 'vehicle':
+            continue
+        reference = item['reference']
+        if (type(reference.get('snapshot_id')) is not str or not reference['snapshot_id']
+                or type(reference.get('verification_id')) is not str or not reference['verification_id']):
+            raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'})
+        if preview:
+            # The old resolved wire has no source fields. Its matching frozen
+            # search document supplies vehicle identity; current metadata can
+            # identify a restricted source but never prove it was permitted.
+            snapshot = db.get(VehicleSnapshot, reference.get('snapshot_id'))
+            bound = {**(vehicle_provenance(snapshot) if snapshot else {}), **reference}
+            payload = None
+        else:
+            source, payload = item.get('source'), item.get('payload')
+            if (type(source) is not dict or set(source) != source_keys or type(payload) is not dict
+                    or type(payload.get('vehicle')) is not dict
+                    or source['verification_id'] != reference.get('verification_id') or item.get('raw_included') is not False):
+                _frozen_invalid()
+            if (any(type(source[key]) is not str or not source[key] for key in source_keys - {'parser_identity'})
+                    or source['parser_identity'] is not None and type(source['parser_identity']) is not dict):
+                _frozen_invalid()
+            bound = {'snapshot_id': reference.get('snapshot_id'), **source, 'fact_hash': payload.get('fact_hash')}
+        references[item['key']] = {'reference': bound, 'payload': payload, 'vehicle_id': None, 'document': False}
+    for context in material['contexts']:
+        if type(context) is not dict or type(context.get('id')) is not str or type(context.get('payload')) is not dict:
+            _frozen_invalid()
+        if context['id'] in contexts:
+            _frozen_invalid()
+        contexts[context['id']] = context
+        if context.get('kind') == 'garage':
+            payload = context['payload']
+            if (type(payload.get('profile')) is not dict or 'fitment_reference' not in payload
+                    or type(payload.get('basis')) is not str):
+                _frozen_invalid()
+    for document in material['documents']:
+        if type(document) is not dict or type(document.get('text')) is not str:
+            _frozen_invalid()
+        context_id = document.get('context_id')
+        if context_id is not None and type(context_id) is not str:
+            _frozen_invalid()
+        if context_id is not None:
+            context = contexts.get(context_id)
+            if context is None or document['text'] != stable_json(context['payload']):
+                _frozen_invalid()
+        if document.get('kind') != 'vehicle':
+            continue
+        if type(document.get('member_key')) is not str:
+            _frozen_invalid()
+        selected = references.get(document.get('member_key'))
+        if selected is None:
+            _frozen_invalid()
+        try:
+            payload = json.loads(document['text'])
+            vehicle_id = payload['vehicle']['id']
+            if type(vehicle_id) is not str or not vehicle_id or (selected['payload'] is not None and payload != selected['payload']):
+                _frozen_invalid()
+        except (ValueError, KeyError, TypeError):
+            _frozen_invalid()
+        selected.update(vehicle_id=vehicle_id, document=True)
+    if any(not item['document'] for item in references.values()):
+        _frozen_invalid()
+    return contexts, references
 
 
 def document_count(contexts, members):

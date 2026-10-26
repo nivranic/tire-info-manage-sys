@@ -1,0 +1,951 @@
+{
+  "binding": {
+    "byte_count": 33651,
+    "owner_scope_id": "e6b0aac1f7ab69c856dde1be3a0e84f4aa39ca15be472d53accc1f63b6eb9f4f",
+    "package_id": "capacity-synthetic-multimember",
+    "schema": "offline-pack@2",
+    "sha256": "ef0322515a484e6439186f9bb318220accaab1ab452f22d09eb757b39c9a57f6"
+  },
+  "cases": [
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "expected": {
+        "projection_byte_count": 9722,
+        "projection_file": "projections/closure-a-to-b.canonical.json",
+        "projection_sha256": "12475e70629f1172f64aae7e76780e7902a25ef4c2d79419f8a74bd562e8ffe9",
+        "resolved_closure": [
+          {
+            "document_id": "capacity-document-a",
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-a",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-a"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-b",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-b"
+            }
+          }
+        ],
+        "state": "accepted"
+      },
+      "id": "closure-a-to-b",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        },
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ],
+      "expected": {
+        "projection_byte_count": 9722,
+        "projection_file": "projections/closure-approved-reversed.canonical.json",
+        "projection_sha256": "12475e70629f1172f64aae7e76780e7902a25ef4c2d79419f8a74bd562e8ffe9",
+        "resolved_closure": [
+          {
+            "document_id": "capacity-document-a",
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-a",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-a"
+            }
+          },
+          {
+            "document_id": null,
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-b",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-b"
+            }
+          }
+        ],
+        "state": "accepted"
+      },
+      "id": "closure-approved-reversed",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": "capacity-document-b",
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "expected": {
+        "projection_byte_count": 9729,
+        "projection_file": "projections/selected-a-b.canonical.json",
+        "projection_sha256": "69af153b916d9ea135de326083b01e61ea401519d5958d41526e169e235b3ac1",
+        "resolved_closure": [
+          {
+            "document_id": "capacity-document-a",
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-a",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-a"
+            }
+          },
+          {
+            "document_id": "capacity-document-b",
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-b",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-b"
+            }
+          }
+        ],
+        "state": "accepted"
+      },
+      "id": "selected-a-b",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": "capacity-document-b",
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-b",
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        },
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ],
+      "expected": {
+        "projection_byte_count": 9729,
+        "projection_file": "projections/selected-b-a.canonical.json",
+        "projection_sha256": "69af153b916d9ea135de326083b01e61ea401519d5958d41526e169e235b3ac1",
+        "resolved_closure": [
+          {
+            "document_id": "capacity-document-a",
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-a",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-a"
+            }
+          },
+          {
+            "document_id": "capacity-document-b",
+            "kind": "tire",
+            "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-b",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-b"
+            }
+          }
+        ],
+        "state": "accepted"
+      },
+      "id": "selected-b-a",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-b",
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        },
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": null,
+      "expected": {
+        "projection_byte_count": 2558,
+        "projection_file": "projections/single-a-isolated.canonical.json",
+        "projection_sha256": "707899f577ba6dce7f73a74ba3622d244a3b0388b64869c503b7cf65648c4f2d",
+        "resolved_closure": [
+          {
+            "document_id": "capacity-document-a",
+            "kind": "tire",
+            "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+            "record_index": null,
+            "reference": {
+              "kind": "tire",
+              "snapshot_id": "capacity-snapshot-a",
+              "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+              "verification_id": "capacity-verification-a"
+            }
+          }
+        ],
+        "state": "accepted"
+      },
+      "id": "single-a-isolated",
+      "mode": "single_observation",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": null,
+      "expected": {
+        "error_code": "device_ai_closure_consent_required",
+        "state": "rejected"
+      },
+      "id": "approval-absent",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_closure_consent_required",
+        "state": "rejected"
+      },
+      "id": "approval-missing-b",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_closure_consent_required",
+        "state": "rejected"
+      },
+      "id": "approval-duplicate-a",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "4444444444444444444444444444444444444444444444444444444444444444",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-d",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-d"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_closure_consent_required",
+        "state": "rejected"
+      },
+      "id": "approval-superset-d",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": "capacity-document-b",
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_closure_consent_required",
+        "state": "rejected"
+      },
+      "id": "approval-wrong-document",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": 0,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_selector_mismatch",
+        "state": "rejected"
+      },
+      "id": "approval-wrong-index",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "wrong-receipt"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_receipt_mismatch",
+        "state": "rejected"
+      },
+      "id": "approval-wrong-reference",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_selector_ambiguous",
+        "state": "rejected"
+      },
+      "id": "selected-duplicate",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "expected": {
+        "error_code": "device_ai_document_mismatch",
+        "state": "rejected"
+      },
+      "id": "selected-wrong-document",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": "capacity-document-b",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": null,
+      "expected": {
+        "error_code": "device_ai_projection_mode_unsupported",
+        "state": "rejected"
+      },
+      "id": "selected-non-tire",
+      "mode": "frozen_decision_closure",
+      "selectors": [
+        {
+          "document_id": null,
+          "kind": "vehicle",
+          "member_key": "4c7fd69e724461f47f774b2747b76ef4201abeeb5b3e32241b4978fa19206140",
+          "record_index": null,
+          "reference": {
+            "kind": "vehicle",
+            "snapshot_id": "7241551a-9e2c-450c-adcd-847c36710f89",
+            "verification_id": "1755e86a-23da-4ae7-9ad8-16df1e544d2c"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "capacity-different-variant",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "binding": {
+        "byte_count": 33601,
+        "owner_scope_id": "e6b0aac1f7ab69c856dde1be3a0e84f4aa39ca15be472d53accc1f63b6eb9f4f",
+        "package_id": "capacity-synthetic-multimember",
+        "schema": "offline-pack@2",
+        "sha256": "b3dc8e6c17e3327deaf047d1ebcea5d6d50a6f50ab99b5cf49014cd96293cc57"
+      },
+      "expected": {
+        "error_code": "device_ai_decision_dependency_mismatch",
+        "state": "rejected"
+      },
+      "id": "cross-variant",
+      "mode": "frozen_decision_closure",
+      "package_file": "closure-cross-variant.json",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    },
+    {
+      "approved_closure": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        },
+        {
+          "document_id": null,
+          "kind": "tire",
+          "member_key": "2222222222222222222222222222222222222222222222222222222222222222",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-b",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-b"
+          }
+        }
+      ],
+      "binding": {
+        "byte_count": 33659,
+        "owner_scope_id": "e6b0aac1f7ab69c856dde1be3a0e84f4aa39ca15be472d53accc1f63b6eb9f4f",
+        "package_id": "capacity-synthetic-multimember",
+        "schema": "offline-pack@2",
+        "sha256": "8d7b1a807dbd7299dc8a863d8e07f219098f26950765c6528747fd52ac244c70"
+      },
+      "expected": {
+        "error_code": "device_ai_selected_restricted",
+        "state": "rejected"
+      },
+      "id": "restricted-dependency",
+      "mode": "frozen_decision_closure",
+      "package_file": "closure-restricted-dependency.json",
+      "selectors": [
+        {
+          "document_id": "capacity-document-a",
+          "kind": "tire",
+          "member_key": "1111111111111111111111111111111111111111111111111111111111111111",
+          "record_index": null,
+          "reference": {
+            "kind": "tire",
+            "snapshot_id": "capacity-snapshot-a",
+            "variant_id": "5170d99e-70e3-45ec-b019-55d3be33ccf5",
+            "verification_id": "capacity-verification-a"
+          }
+        }
+      ]
+    }
+  ],
+  "dependency_edges": [
+    [
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "1111111111111111111111111111111111111111111111111111111111111111"
+    ],
+    [
+      "1111111111111111111111111111111111111111111111111111111111111111",
+      "2222222222222222222222222222222222222222222222222222222222222222"
+    ],
+    [
+      "2222222222222222222222222222222222222222222222222222222222222222",
+      "2222222222222222222222222222222222222222222222222222222222222222"
+    ]
+  ],
+  "package_file": "closure-pack.json",
+  "schema": "device-ai-full-closure@1",
+  "unselected_member_keys": [
+    "4444444444444444444444444444444444444444444444444444444444444444",
+    "4c7fd69e724461f47f774b2747b76ef4201abeeb5b3e32241b4978fa19206140"
+  ]
+}

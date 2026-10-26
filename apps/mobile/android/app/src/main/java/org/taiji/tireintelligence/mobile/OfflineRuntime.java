@@ -20,6 +20,7 @@ final class OfflineRuntime {
     final AtomicBoolean resetting = new AtomicBoolean();
     final AtomicLong documentGeneration = new AtomicLong();
     final NativeHttpBridge http;
+    final DownloadAuthority downloads = new DownloadAuthority();
     final String httpError;
     private OfflinePackStore store;
     private String storeError;
@@ -49,7 +50,7 @@ final class OfflineRuntime {
         else {
             try {
                 initialized = new NativeHttpBridge("http://127.0.0.1:" + BuildConfig.API_PORT,
-                    new EncryptedSessionStore(context, namespace + ":127.0.0.1:" + BuildConfig.API_PORT));
+                    new EncryptedSessionStore(context, namespace + ":127.0.0.1:" + BuildConfig.API_PORT), new NativeQueryDenials(), downloads);
             } catch (NativeFailure failure) { error = failure.code; }
         }
         http = initialized;

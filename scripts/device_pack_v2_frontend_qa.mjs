@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readCorpusBytes, readCorpusJson } from "../packages/api-client/tests/device-ai/corpus.mjs";
 import test from "node:test";
-import { loadOfflineTypeScript } from "./load_offline_typescript.mjs";
-const values = await loadOfflineTypeScript("../apps/web/components/offline-values.ts", import.meta.url);
-const api = await loadOfflineTypeScript("../packages/api-client/src/index.ts", import.meta.url);
-const native = await loadOfflineTypeScript("../packages/native-client/src/index.ts", import.meta.url);
-const base = new URL("../.artifacts/query-fallback49/producer-v2-samples-a/", import.meta.url);
-const source = async name => { const bytes = new Uint8Array(await readFile(new URL(name + "-pack.json", base))), descriptor = JSON.parse(await readFile(new URL(name + "-descriptor.json", base), "utf8")); return { bytes, descriptor }; };
+import "../packages/api-client/tests/device-ai/json-esm-hook.mjs";
+// The test-only hook preserves the existing flagless `node <script>` entry.
+const values = await import("../apps/web/components/offline-values.ts");
+const api = await import("../packages/api-client/src/index.ts");
+const native = await import("../packages/native-client/src/index.ts");
+const source = async name => ({ bytes: readCorpusBytes("projection-vectors-a/inputs/" + name + "-pack.json"), descriptor: readCorpusJson("projection-vectors-a/inputs/" + name + "-descriptor.json") });
 const slotId = "00000000-0000-4000-8000-000000000049", profileId = "00000000-0000-4000-8000-000000000050";
 test("frozen actual @2 producer original bytes preserve all members, record pages and exact numeric facts", async () => {
   for (const name of ["nonempty", "empty"]) {

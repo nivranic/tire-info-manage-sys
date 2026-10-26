@@ -1,0 +1,587 @@
+{
+  "schema": "professional-golden-case@1",
+  "case_id": "synthetic-exact-two",
+  "tier": "synthetic_contract",
+  "materials": [
+    {
+      "material_label": "material",
+      "origin": "synthetic",
+      "title": "SYNTHETIC synthetic-exact-two",
+      "publisher": "Project synthetic fixture authors",
+      "publication_date": "2026-10-18",
+      "doi": null,
+      "source_reference_url": "https://fixture.invalid/professional-golden/synthetic-exact-two",
+      "download_url": null,
+      "original": {
+        "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-exact-two.pdf",
+        "byte_count": 3961,
+        "sha256": "946e9122c017b3cb5b8f5ebad948849d069298c730e5c18fcf1fff50aad1e012"
+      },
+      "capture_receipt": null,
+      "agent_review_record": null,
+      "rights": {
+        "rights_holder": "Project synthetic fixture authors",
+        "basis": "Project-authored synthetic material, local engineering evaluation only",
+        "license_url": null,
+        "attribution": "Project synthetic fixture authors; not a professional publication",
+        "store_original": true,
+        "workspace_reopen": true,
+        "quote_identifiers": true,
+        "provider_use": false,
+        "export": false
+      }
+    }
+  ],
+  "input": {
+    "mode": "private_http",
+    "event": {
+      "title": "SYNTHETIC synthetic-exact-two",
+      "organization": "Project synthetic fixture authors",
+      "relationship": "independent",
+      "publication_date": "2026-10-18",
+      "source_url": "https://fixture.invalid/professional-golden/synthetic-exact-two",
+      "rights_basis": "Project-authored synthetic material, local engineering evaluation only",
+      "tested_size": "245/40R20",
+      "vehicle": null,
+      "surface": "Synthetic surface",
+      "conditions": "SYNTHETIC 20 C; local contract exercise; no real road observations",
+      "coverage": "selected_results",
+      "reported_participants": 20,
+      "participants": [
+        {
+          "key": "a",
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "source_designation": "SYNTHETIC row A"
+        },
+        {
+          "key": "b",
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "source_designation": "SYNTHETIC row B"
+        }
+      ],
+      "metrics": [
+        {
+          "key": "wet",
+          "label": "Synthetic wet distance",
+          "unit": "m",
+          "protocol": "SYNTHETIC wet method",
+          "direction": "lower"
+        },
+        {
+          "key": "noise",
+          "label": "Synthetic noise",
+          "unit": "dB",
+          "protocol": "SYNTHETIC noise method",
+          "direction": "lower"
+        },
+        {
+          "key": "dry",
+          "label": "Synthetic zero ties",
+          "unit": "points",
+          "protocol": "SYNTHETIC signed-zero method",
+          "direction": "higher"
+        }
+      ],
+      "measurements": [
+        {
+          "participant_key": "a",
+          "metric_key": "wet",
+          "raw_value": "38.00",
+          "source_rank": 3,
+          "evidence_span": "SYNTHETIC A 38.00 m rank 3",
+          "evidence_locator": "SYNTHETIC wet row A"
+        },
+        {
+          "participant_key": "b",
+          "metric_key": "wet",
+          "raw_value": "40.0",
+          "source_rank": 5,
+          "evidence_span": "SYNTHETIC B 40.0 m rank 5",
+          "evidence_locator": "SYNTHETIC wet row B"
+        },
+        {
+          "participant_key": "a",
+          "metric_key": "noise",
+          "raw_value": "70",
+          "source_rank": null,
+          "evidence_span": "SYNTHETIC A 70 dB",
+          "evidence_locator": "SYNTHETIC noise row A"
+        },
+        {
+          "participant_key": "a",
+          "metric_key": "dry",
+          "raw_value": "-0",
+          "source_rank": null,
+          "evidence_span": "SYNTHETIC A -0 points",
+          "evidence_locator": "SYNTHETIC dry row A"
+        },
+        {
+          "participant_key": "b",
+          "metric_key": "dry",
+          "raw_value": "0",
+          "source_rank": 8,
+          "evidence_span": "SYNTHETIC B 0 points rank 8",
+          "evidence_locator": "SYNTHETIC dry row B"
+        }
+      ]
+    },
+    "skus": [
+      {
+        "sku_label": "sku-a",
+        "value": {
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "manufacturer_product_code": "SYNTHETIC-001",
+          "region": "CN",
+          "size": "245/40R20",
+          "load_index": "101",
+          "speed_rating": "Y",
+          "xl": true,
+          "hl": false,
+          "oe_mark": "SYNTH",
+          "acoustic_technology": "Synthetic acoustic",
+          "run_flat": false,
+          "source_variant_name": null,
+          "facts": {
+            "product_code_type": "MSPN"
+          }
+        }
+      },
+      {
+        "sku_label": "sku-b",
+        "value": {
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "manufacturer_product_code": "SYNTHETIC-002",
+          "region": "CN",
+          "size": "245/40R20",
+          "load_index": "101",
+          "speed_rating": "Y",
+          "xl": true,
+          "hl": false,
+          "oe_mark": "SYNTH",
+          "acoustic_technology": "Synthetic acoustic",
+          "run_flat": false,
+          "source_variant_name": null,
+          "facts": {
+            "product_code_type": "MSPN"
+          }
+        }
+      }
+    ],
+    "bridge_attempts": [
+      {
+        "attempt_id": "bridge-a",
+        "participant_key": "a",
+        "sku_label": "sku-a",
+        "material_labels": [
+          "material"
+        ],
+        "event_locator": {
+          "page": 1,
+          "region": "SYNTHETIC event title",
+          "quote": "SYNTHETIC synthetic-exact-two"
+        },
+        "participant_locator": {
+          "page": 1,
+          "region": "SYNTHETIC participant a",
+          "quote": "SYNTHETIC participant a"
+        },
+        "assertions": [
+          {
+            "field": "brand",
+            "material_label": "material",
+            "material_value": "Synthetic",
+            "page": 1,
+            "region": "SYNTHETIC identity a brand",
+            "quote": "SYNTHETIC brand = Synthetic"
+          },
+          {
+            "field": "model",
+            "material_label": "material",
+            "material_value": "Synthetic Tire",
+            "page": 1,
+            "region": "SYNTHETIC identity a model",
+            "quote": "SYNTHETIC model = Synthetic Tire"
+          },
+          {
+            "field": "manufacturer_product_code",
+            "material_label": "material",
+            "material_value": "SYNTHETIC-001",
+            "page": 1,
+            "region": "SYNTHETIC identity a manufacturer_product_code",
+            "quote": "SYNTHETIC manufacturer_product_code = SYNTHETIC-001"
+          },
+          {
+            "field": "region",
+            "material_label": "material",
+            "material_value": "CN",
+            "page": 1,
+            "region": "SYNTHETIC identity a region",
+            "quote": "SYNTHETIC region = CN"
+          },
+          {
+            "field": "size",
+            "material_label": "material",
+            "material_value": "245/40R20",
+            "page": 1,
+            "region": "SYNTHETIC identity a size",
+            "quote": "SYNTHETIC size = 245/40R20"
+          },
+          {
+            "field": "load_index",
+            "material_label": "material",
+            "material_value": "101",
+            "page": 1,
+            "region": "SYNTHETIC identity a load_index",
+            "quote": "SYNTHETIC load_index = 101"
+          },
+          {
+            "field": "speed_rating",
+            "material_label": "material",
+            "material_value": "Y",
+            "page": 1,
+            "region": "SYNTHETIC identity a speed_rating",
+            "quote": "SYNTHETIC speed_rating = Y"
+          },
+          {
+            "field": "xl",
+            "material_label": "material",
+            "material_value": true,
+            "page": 1,
+            "region": "SYNTHETIC identity a xl",
+            "quote": "SYNTHETIC xl = True"
+          },
+          {
+            "field": "hl",
+            "material_label": "material",
+            "material_value": false,
+            "page": 1,
+            "region": "SYNTHETIC identity a hl",
+            "quote": "SYNTHETIC hl = False"
+          },
+          {
+            "field": "oe_mark",
+            "material_label": "material",
+            "material_value": "SYNTH",
+            "page": 1,
+            "region": "SYNTHETIC identity a oe_mark",
+            "quote": "SYNTHETIC oe_mark = SYNTH"
+          },
+          {
+            "field": "acoustic_technology",
+            "material_label": "material",
+            "material_value": "Synthetic acoustic",
+            "page": 1,
+            "region": "SYNTHETIC identity a acoustic_technology",
+            "quote": "SYNTHETIC acoustic_technology = Synthetic acoustic"
+          },
+          {
+            "field": "run_flat",
+            "material_label": "material",
+            "material_value": false,
+            "page": 1,
+            "region": "SYNTHETIC identity a run_flat",
+            "quote": "SYNTHETIC run_flat = False"
+          },
+          {
+            "field": "product_code_type",
+            "material_label": "material",
+            "material_value": "MSPN",
+            "page": 1,
+            "region": "SYNTHETIC identity a product_code_type",
+            "quote": "SYNTHETIC product_code_type = MSPN"
+          }
+        ],
+        "evidence_level": "source_explicit_identifiers_in_supplied_material",
+        "review": true,
+        "revoke": false
+      },
+      {
+        "attempt_id": "bridge-b",
+        "participant_key": "b",
+        "sku_label": "sku-b",
+        "material_labels": [
+          "material"
+        ],
+        "event_locator": {
+          "page": 1,
+          "region": "SYNTHETIC event title",
+          "quote": "SYNTHETIC synthetic-exact-two"
+        },
+        "participant_locator": {
+          "page": 1,
+          "region": "SYNTHETIC participant b",
+          "quote": "SYNTHETIC participant b"
+        },
+        "assertions": [
+          {
+            "field": "brand",
+            "material_label": "material",
+            "material_value": "Synthetic",
+            "page": 1,
+            "region": "SYNTHETIC identity b brand",
+            "quote": "SYNTHETIC brand = Synthetic"
+          },
+          {
+            "field": "model",
+            "material_label": "material",
+            "material_value": "Synthetic Tire",
+            "page": 1,
+            "region": "SYNTHETIC identity b model",
+            "quote": "SYNTHETIC model = Synthetic Tire"
+          },
+          {
+            "field": "manufacturer_product_code",
+            "material_label": "material",
+            "material_value": "SYNTHETIC-002",
+            "page": 1,
+            "region": "SYNTHETIC identity b manufacturer_product_code",
+            "quote": "SYNTHETIC manufacturer_product_code = SYNTHETIC-002"
+          },
+          {
+            "field": "region",
+            "material_label": "material",
+            "material_value": "CN",
+            "page": 1,
+            "region": "SYNTHETIC identity b region",
+            "quote": "SYNTHETIC region = CN"
+          },
+          {
+            "field": "size",
+            "material_label": "material",
+            "material_value": "245/40R20",
+            "page": 1,
+            "region": "SYNTHETIC identity b size",
+            "quote": "SYNTHETIC size = 245/40R20"
+          },
+          {
+            "field": "load_index",
+            "material_label": "material",
+            "material_value": "101",
+            "page": 1,
+            "region": "SYNTHETIC identity b load_index",
+            "quote": "SYNTHETIC load_index = 101"
+          },
+          {
+            "field": "speed_rating",
+            "material_label": "material",
+            "material_value": "Y",
+            "page": 1,
+            "region": "SYNTHETIC identity b speed_rating",
+            "quote": "SYNTHETIC speed_rating = Y"
+          },
+          {
+            "field": "xl",
+            "material_label": "material",
+            "material_value": true,
+            "page": 1,
+            "region": "SYNTHETIC identity b xl",
+            "quote": "SYNTHETIC xl = True"
+          },
+          {
+            "field": "hl",
+            "material_label": "material",
+            "material_value": false,
+            "page": 1,
+            "region": "SYNTHETIC identity b hl",
+            "quote": "SYNTHETIC hl = False"
+          },
+          {
+            "field": "oe_mark",
+            "material_label": "material",
+            "material_value": "SYNTH",
+            "page": 1,
+            "region": "SYNTHETIC identity b oe_mark",
+            "quote": "SYNTHETIC oe_mark = SYNTH"
+          },
+          {
+            "field": "acoustic_technology",
+            "material_label": "material",
+            "material_value": "Synthetic acoustic",
+            "page": 1,
+            "region": "SYNTHETIC identity b acoustic_technology",
+            "quote": "SYNTHETIC acoustic_technology = Synthetic acoustic"
+          },
+          {
+            "field": "run_flat",
+            "material_label": "material",
+            "material_value": false,
+            "page": 1,
+            "region": "SYNTHETIC identity b run_flat",
+            "quote": "SYNTHETIC run_flat = False"
+          },
+          {
+            "field": "product_code_type",
+            "material_label": "material",
+            "material_value": "MSPN",
+            "page": 1,
+            "region": "SYNTHETIC identity b product_code_type",
+            "quote": "SYNTHETIC product_code_type = MSPN"
+          }
+        ],
+        "evidence_level": "source_explicit_identifiers_in_supplied_material",
+        "review": true,
+        "revoke": false
+      }
+    ],
+    "candidate": {
+      "vehicle_fixture": "synthetic-staggered-245-265@1",
+      "axle": "front",
+      "reviewed_fitment_sku_labels": [
+        "sku-a",
+        "sku-b"
+      ],
+      "attempt_ids": [
+        "bridge-a",
+        "bridge-b"
+      ],
+      "preference_weights": {
+        "dry": 20,
+        "wet": 30,
+        "quiet": 15,
+        "comfort": 10,
+        "wear": 10,
+        "energy": 10,
+        "appearance": 5
+      },
+      "metric_dimensions": [
+        {
+          "metric_key": "wet",
+          "dimension": "wet"
+        },
+        {
+          "metric_key": "noise",
+          "dimension": "quiet"
+        },
+        {
+          "metric_key": "dry",
+          "dimension": "dry"
+        }
+      ]
+    },
+    "source_review": null
+  },
+  "expected": {
+    "bridges": [
+      {
+        "attempt_id": "bridge-a",
+        "truth": "linked",
+        "preview": {
+          "http_status": 200,
+          "can_submit": true,
+          "blockers": [],
+          "error_code": null
+        },
+        "current": {
+          "http_status": 200,
+          "eligibility": "conditional_reviewed_transcription",
+          "effective_state": "reviewed",
+          "blockers": [],
+          "stale_reasons": [],
+          "error_code": null
+        }
+      },
+      {
+        "attempt_id": "bridge-b",
+        "truth": "linked",
+        "preview": {
+          "http_status": 200,
+          "can_submit": true,
+          "blockers": [],
+          "error_code": null
+        },
+        "current": {
+          "http_status": 200,
+          "eligibility": "conditional_reviewed_transcription",
+          "effective_state": "reviewed",
+          "blockers": [],
+          "stale_reasons": [],
+          "error_code": null
+        }
+      }
+    ],
+    "distinct_pairs": [
+      {
+        "left_sku_label": "sku-a",
+        "right_sku_label": "sku-b",
+        "truth": "distinct",
+        "evidence_refs": [
+          "material:page1:participant-a",
+          "material:page1:participant-b"
+        ]
+      }
+    ],
+    "candidate": {
+      "http_status": 200,
+      "error_code": null,
+      "status": "conditional_observations",
+      "eligible_sku_labels": [
+        "sku-a",
+        "sku-b"
+      ],
+      "excluded": [],
+      "personal_interpretation_allowed": true,
+      "metric_comparisons": [
+        {
+          "metric_key": "wet",
+          "dimension": "wet",
+          "observed_participant_keys": [
+            "a",
+            "b"
+          ],
+          "missing_participant_keys": [],
+          "complete_comparable": true,
+          "limitations": [],
+          "favorable_participant_keys": [
+            "a"
+          ]
+        },
+        {
+          "metric_key": "noise",
+          "dimension": "quiet",
+          "observed_participant_keys": [
+            "a"
+          ],
+          "missing_participant_keys": [
+            "b"
+          ],
+          "complete_comparable": false,
+          "limitations": [
+            "missing_measurements",
+            "insufficient_observations"
+          ],
+          "favorable_participant_keys": null
+        },
+        {
+          "metric_key": "dry",
+          "dimension": "dry",
+          "observed_participant_keys": [
+            "a",
+            "b"
+          ],
+          "missing_participant_keys": [],
+          "complete_comparable": true,
+          "limitations": [],
+          "favorable_participant_keys": [
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "coverage": {
+        "mapped_weight": 65,
+        "fully_comparable_weight": 50,
+        "unmapped_weight": 35,
+        "mapped_not_fully_comparable_weight": 15
+      }
+    },
+    "source_review_findings": []
+  },
+  "review": {
+    "state": "pending_external_review",
+    "record": null
+  }
+}

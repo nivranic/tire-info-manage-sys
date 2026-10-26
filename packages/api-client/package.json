@@ -4,6 +4,21 @@
   "private": true,
   "type": "module",
   "exports": {".": "./src/index.ts"},
-  "scripts": {"test": "node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/device-ai-host-selftest.mts && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/decoder-fixtures.mts"},
+  "scripts": {
+    "test:api-key-inventory": "tsc -p ./tests/tsconfig.api-key-inventory.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/api-key-inventory.mts",
+    "test:external-api": "tsc -p ./tests/tsconfig.external-api-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/external-api.mts",
+    "test:external-tire-facts": "tsc -p ./tests/tsconfig.external-tire-facts-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/external-tire-facts.mts",
+    "test:external-tire-fact-page": "tsc -p ./tests/tsconfig.external-tire-fact-page-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/external-tire-fact-page.mts",
+    "test:webhooks": "tsc -p ./tests/tsconfig.webhooks-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/webhooks.mts",
+    "test:candidate-ai": "tsc -p ./tests/tsconfig.candidate-ai-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/candidate-ai.mts",
+    "test": "node --experimental-transform-types --import ./tests/device-ai/no-artifacts-hook.mjs --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/device-ai-host-selftest.mts && node --experimental-transform-types --import ./tests/device-ai/no-artifacts-hook.mjs --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/decoder-fixtures.mts && npm run test:capacity && npm run test:contract && npm run test:preference && npm run test:interests && npm run test:source-quality-interests && npm run test:personalization",
+    "test:candidate-interpretation": "tsc -p ./tests/tsconfig.candidate-interpretation-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/test-candidate-interpretation.mts",
+    "test:capacity": "node --experimental-transform-types --import ./tests/device-ai/no-artifacts-hook.mjs --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/capacity-fixtures.mts",
+    "test:contract": "tsc -p ./tests/device-ai/tsconfig.public-contract.json && node --experimental-transform-types --import ./tests/device-ai/no-artifacts-hook.mjs --import ./tests/device-ai/json-esm-hook.mjs ./tests/device-ai/public-contract.mts",
+    "test:preference": "tsc -p ./tests/tsconfig.preference-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/test-preference-interpretation.mts",
+    "test:interests": "tsc -p ./tests/tsconfig.interests-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/interests.mts",
+    "test:source-quality-interests": "tsc -p ./tests/tsconfig.source-quality-interests.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/source-quality-interests.mts",
+    "test:personalization": "tsc -p ./tests/tsconfig.personalization-contract.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/personalization.mts"
+  },
   "dependencies": {"@tire/domain-types": "0.1.0"}
 }

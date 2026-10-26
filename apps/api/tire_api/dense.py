@@ -22,7 +22,10 @@ def capability(db):
 
 
 def current_materials(db, config, filters=None):
+    from .knowledge_index import check_current_vehicle_heads, check_vehicle_document_use
+    check_current_vehicle_heads(db)
     documents = list(db.scalars(_filtered_statement(filters or {})))
+    check_vehicle_document_use(db, documents)
     chunks = {document.id: document_chunks(document, config) for document in documents}
     keys = {item['cache_id'] for values in chunks.values() for item in values}
     cached = {row.id: row for row in db.scalars(select(EmbeddingCache).where(

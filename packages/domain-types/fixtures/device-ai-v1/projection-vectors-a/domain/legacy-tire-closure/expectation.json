@@ -1,0 +1,18 @@
+{
+  "canonical_projection": {
+    "byte_count": 32059,
+    "path": "domain/legacy-tire-closure/projection.canonical.json",
+    "sha256": "1544885ef27dace261623164e6f25311d99335e9acdd4fc682857605ee709856"
+  },
+  "data_state": "local_snapshot",
+  "expected_error_code": null,
+  "member_count": 1,
+  "privacy_class": "private",
+  "source_refresh_performed": false,
+  "state": "accepted",
+  "token_dto_projection": {
+    "byte_count": 32149,
+    "path": "domain/legacy-tire-closure/projection.tokens.json",
+    "sha256": "e113c62f228064cc5e408af815367b415a64394f7740c40b414dc243582e2e11"
+  }
+}

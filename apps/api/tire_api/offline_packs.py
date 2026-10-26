@@ -18,7 +18,8 @@ from .documents import record_object
 from .domain import StrictModel, digest
 from .field_authority import policy_catalog
 from .object_store import ObjectStoreError
-from .offline_evidence import document_count, documents, omission, resolve_scope, scope_limit
+from .offline_evidence import (check_frozen_vehicle_structure, check_frozen_vehicle_use, document_count,
+                               documents, omission, resolve_scope, scope_limit)
 from .offline_models import OfflinePack, OfflinePackPlan
 from .recall_evidence import recall_policy_descriptor
 from .service import QueryService, timestamp
@@ -220,6 +221,44 @@ def content(db, row):
         raise HTTPException(503, {'code': 'offline_frozen_object_unavailable'}) from None
 
 
+def checked_frozen_envelope(db, row):
+    raw = content(db, row)
+    try:
+        envelope = json.loads(raw)
+        fingerprint = row.fingerprint if isinstance(row, OfflinePackPlan) else row.descriptor['plan_fingerprint']
+        package_id = row.package_id if isinstance(row, OfflinePackPlan) else row.id
+        if (type(envelope) is not dict or envelope.get('schema') not in {'offline-pack@1', 'offline-pack@2'}
+                or envelope.get('package_id') != package_id or envelope.get('plan_fingerprint') != fingerprint
+                or any(type(envelope.get(key)) is not list for key in ('contexts', 'members', 'documents', 'omissions'))
+                or CanonicalJSON().measure({key: value for key, value in envelope.items()
+                                            if key != 'plan_fingerprint'})[1] != fingerprint):
+            raise ValueError('offline_frozen_metadata_mismatch')
+        return envelope
+    except (ValueError, TypeError, KeyError, UnicodeError):
+        raise HTTPException(503, {'code': 'offline_frozen_object_unavailable'}) from None
+
+
+def check_frozen_plan_use(db, plan):
+    preview = plan.preview
+    if (type(preview) is not dict or type(preview.get('schema')) is not str
+            or preview['schema'] not in {'offline-pack-plan@1', 'offline-pack-plan@2'}
+            or preview.get('id') != plan.id or preview.get('package_id') != plan.package_id
+            or preview.get('fingerprint') != plan.fingerprint or type(preview.get('can_confirm')) is not bool
+            or preview['can_confirm'] and not plan.content_hash):
+        raise HTTPException(503, {'code': 'offline_frozen_object_unavailable'})
+    if plan.content_hash:
+        envelope = checked_frozen_envelope(db, plan)
+        if any(preview.get(key) != envelope[key] for key in ('contexts', 'documents')):
+            raise HTTPException(503, {'code': 'offline_frozen_object_unavailable'})
+        check_frozen_vehicle_structure(db, envelope)
+    check_frozen_vehicle_structure(db, preview)
+    if plan.content_hash:
+        check_frozen_vehicle_use(db, envelope)
+    # Blocked historical plans have no object but can still contain copied
+    # profiles/search text. Their preview is always an independent use boundary.
+    check_frozen_vehicle_use(db, preview)
+
+
 @dataclass
 class PreparedPlan:
     envelope: dict
@@ -323,7 +362,7 @@ def create_plan(db, registry, request, session_id):
     QueryService(db, None).lock_ingestion()
     previous = None
     if request.base_pack_id:
-        previous = json.loads(content(db, owned(db, OfflinePack, request.base_pack_id, session_scope(db, session_id))))
+        previous = checked_frozen_envelope(db, owned(db, OfflinePack, request.base_pack_id, session_scope(db, session_id)))
     return persist_plan(db, prepare_plan(db, registry, request, session_id, previous), session_id)
 
 
@@ -411,11 +450,11 @@ def confirm_plan(db, request, session_id, key):
         raise HTTPException(409, {'code': 'offline_plan_fingerprint_mismatch'})
     if utc(plan.expires_at) <= utcnow():
         raise HTTPException(409, {'code': 'offline_plan_expired'})
+    check_frozen_plan_use(db, plan)
     if not plan.preview['can_confirm'] or not plan.content_hash:
         raise HTTPException(409, {'code': 'offline_plan_blocked'})
     if db.scalar(select(OfflinePack.id).where(OfflinePack.plan_id == plan.id)):
         raise HTTPException(409, {'code': 'offline_plan_already_confirmed'})
-    content(db, plan)  # Verify original bytes; never reload current domain evidence.
     created = utcnow()
     preview = plan.preview
     if preview.get('schema') not in {'offline-pack-plan@1', 'offline-pack-plan@2'}:
@@ -451,7 +490,9 @@ def register_offline_routes(app):
     def get_plan(plan_id: str, request: Request, response: Response, mode: Literal['history'] = Query(...)):
         response.headers['Cache-Control'] = 'no-store'
         with app.state.database.sessions() as db:
-            return owned(db, OfflinePackPlan, plan_id, session_scope(db, request.state.session_id)).preview
+            plan = owned(db, OfflinePackPlan, plan_id, session_scope(db, request.state.session_id))
+            check_frozen_plan_use(db, plan)
+            return deepcopy(plan.preview)
 
     @app.post('/v1/offline-packs', status_code=201)
     def confirm(payload: ConfirmRequest, request: Request, response: Response,
@@ -479,6 +520,7 @@ def register_offline_routes(app):
     def download(package_id: str, request: Request, mode: Literal['history'] = Query(...)):
         with app.state.database.sessions() as db:
             row = owned(db, OfflinePack, package_id, session_scope(db, request.state.session_id))
+            check_frozen_vehicle_use(db, checked_frozen_envelope(db, row))
             raw = content(db, row)
             headers = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
                 'Content-Length': str(row.byte_count), 'ETag': '"' + row.content_hash + '"',

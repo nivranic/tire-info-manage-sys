@@ -23,6 +23,22 @@ EXPECTED_SCHEMA_VERSIONS = [
     '013_device_ai_ledger_triggers',
     '014_local_sessions_user',
     '015_local_sessions_user_index',
+    '016_private_interests',
+    '017_interest_governance_catalog',
+    '018_interest_manual_applicability',
+    '019_test_sku_links',
+    '020_source_materials',
+    '021_candidate_ai_assistance',
+    '022_webhook_delivery',
+    '023_external_api_keys',
+    '024_vehicle_binary_raw',
+    '025_external_fact_governance',
+    '026_query_ownership',
+    '027_test_event_golden',
+    '028_ai_price_versions',
+    '029_source_page_monitoring',
+    '030_interest_source_quality',
+    '031_source_material_stops',
 ]
 
 # 008 之前的历史基线（构造 pre-009 升级起点用；与断言基线是两个概念，勿合并）。

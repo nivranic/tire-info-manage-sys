@@ -22,6 +22,9 @@ _LEGACY_SOURCES = {'michelin-us': 'tire', 'michelin-uk': 'tire', 'michelin-fr': 
             'hankook-us': 'tire', 'xiaomi-cn-vehicles': 'vehicle'}
 _NHTSA_SOURCES = {**_LEGACY_SOURCES, 'nhtsa-us-recalls': 'recall'}
 _SOURCES = {**_NHTSA_SOURCES, 'pirelli-us': 'tire'}
+# Exact reviewed capability versions; file presence alone never enables PDF.
+XIAOMI_PDF_PARSER_VERSIONS = frozenset({'xiaomi-param-comparison@1.1.0'})
+XIAOMI_PDF_MAPPING_FILE = 'adapters/xiaomi_first_generation_pdf.py'
 _HASH = re.compile(r'^[a-f0-9]{64}$')
 MAX_FILES = 256
 MAX_FILE_BYTES = 2 * 1024 * 1024
@@ -188,6 +191,9 @@ def checked_manifest(manifest, *, protocol, limits, environment=True):
                     or not isinstance(item['parser_version'], str)
                     or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._@+-]{0,99}', item['parser_version'])):
                 raise BundleError('parser_bundle_manifest_invalid')
+        if (parsers['xiaomi-cn-vehicles']['parser_version'] in XIAOMI_PDF_PARSER_VERSIONS
+                and XIAOMI_PDF_MAPPING_FILE not in files):
+            raise BundleError('parser_bundle_manifest_invalid')
         return manifest
     except (TypeError, ValueError, KeyError, OverflowError, RecursionError, UnicodeError):
         raise BundleError('parser_bundle_manifest_invalid') from None

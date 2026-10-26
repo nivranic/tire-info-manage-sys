@@ -1,13 +1,16 @@
 """Durable pre-parser receipt journal and separate rejected-response evidence."""
+from copy import deepcopy
 import hashlib
 from typing import Any, Callable, Literal
 from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from sqlalchemy import desc, func, select
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, load_only
+from sqlalchemy.pool import NullPool, QueuePool
 
-from .db import AuditEvent, CaptureObject, EvidenceObject, QueryRun, RawCapture, RejectedObservation, uid, utc
+from .db import AuditEvent, CaptureObject, EvidenceObject, QueryRun, RawCapture, RejectedObservation, SourceQuarantine, uid, utc
 
 
 class CaptureWriteError(Exception):
@@ -24,12 +27,15 @@ def parser_failure_reason(code: Any) -> str:
         'parser_input_invalid', 'parser_input_too_large', 'parser_output_too_large',
         'parser_stderr_too_large', 'parser_source_not_allowed',
         'parser_selection_invalid', 'parser_selection_mismatch',
+        'vehicle_pdf_invalid', 'vehicle_pdf_revision_unreviewed',
     }
     return code if type(code) is str and code in codes else 'parser_failed'
 
 
 def checked_capture_bytes(db: Session, row: RawCapture) -> tuple[bytes, str]:
     """An existing object reference is authoritative; never fall back to the DB copy."""
+    if row.body_encoding == 'binary':
+        raise HTTPException(409, {'code': 'binary_evidence_format_required'})
     from .object_store import ObjectStoreError
     reference = db.get(CaptureObject, row.id)
     try:
@@ -52,11 +58,73 @@ def checked_capture_bytes(db: Session, row: RawCapture) -> tuple[bytes, str]:
     return body, 'object_store' if reference is not None else 'database_legacy'
 
 
-def validated_observation(observation: Any) -> dict | None:
+def checked_text_raw_metadata(db: Session, row) -> tuple[dict, str | None]:
+    """Explicit non-vehicle V2 text adapter; never bypass a retained object."""
+    try:
+        if (type(row) not in (RawCapture, RejectedObservation, SourceQuarantine)
+                or getattr(row, 'body_encoding', 'utf-8') != 'utf-8'
+                or row.content_type not in {'text/html', 'application/json', 'text/javascript',
+                                             'application/javascript', 'text/plain'}):
+            raise ValueError('invalid text evidence')
+        storage_kind, capture_id = None, None
+        if type(row) is RawCapture:
+            raw, storage_kind = checked_capture_bytes(db, row)
+            capture_id = row.id
+        else:
+            if type(row) is SourceQuarantine:
+                if type(row.body) is not str:
+                    raise ValueError('invalid text body')
+                raw = row.body.encode('utf-8', errors='strict')
+            else:
+                raw = row.raw_body
+            capture = db.scalar(select(RawCapture).where(RawCapture.query_id == row.query_id))
+            if capture is not None:
+                if (capture.body_encoding != 'utf-8'
+                        or any(getattr(capture, key) != getattr(row, key) for key in
+                               ('source_id', 'query_key', 'source_url', 'raw_hash', 'content_type',
+                                'parser_version', 'parser_identity'))
+                        or type(row) is RejectedObservation and capture.target_kind != row.target_kind):
+                    raise ValueError('text capture mismatch')
+                captured, _ = checked_capture_bytes(db, capture)
+                if captured != raw:
+                    raise ValueError('text capture bytes mismatch')
+                capture_id = capture.id
+        if (type(raw) is not bytes or not 1 <= len(raw) <= 8 * 1024 * 1024
+                or hashlib.sha256(raw).hexdigest() != row.raw_hash):
+            raise ValueError('text integrity mismatch')
+        text = raw.decode('utf-8', errors='strict')
+        return ({'evidence_format': 'raw-evidence-v2', 'body_encoding': 'utf-8', 'body': text,
+                 'raw_capture_id': capture_id, 'raw_hash': row.raw_hash, 'byte_count': len(raw),
+                 'content_type': row.content_type, 'content_path': None,
+                 'parse_method': None, 'mapping_id': None}, storage_kind)
+    except Exception:
+        raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+
+
+def validated_observation(observation: Any, *, source_id: str | None = None,
+                          query: dict | None = None) -> dict | None:
     if not isinstance(observation, dict):
         return None
     body, url = observation.get("body"), observation.get("url")
     parser, mime = observation.get("parser_version"), observation.get("content_type")
+    encoding = observation.get('body_encoding', 'utf-8')
+    if encoding == 'binary':
+        from .vehicle_raw import FIRST_GENERATION_ID, MAX_BYTES, PDF_URL, SOURCE_ID
+        from .parser_provenance import parser_identity
+        identity = parser_identity(observation.get('parser_identity'))
+        if (source_id != SOURCE_ID or type(query) is not dict or query != {'vehicle_id': FIRST_GENERATION_ID}
+                or type(body) is not bytes or not 1 <= len(body) <= MAX_BYTES or not body.startswith(b'%PDF-')
+                or url != PDF_URL or mime != 'application/pdf'
+                or type(parser) is not str or not 1 <= len(parser) <= 100
+                or any(ord(character) < 32 for character in parser)
+                or identity is None or type(observation.get('parser_identity')) is not dict
+                or observation['parser_identity'] != identity):
+            return None
+        return {'source_url': url, 'raw_body': body, 'raw_hash': hashlib.sha256(body).hexdigest(),
+                'content_type': mime, 'parser_version': parser, 'parser_identity': identity,
+                'body_encoding': 'binary'}
+    if encoding != 'utf-8':
+        return None
     if (not isinstance(body, str) or not body or not isinstance(url, str) or len(url) > 8192
             or not isinstance(parser, str) or not 1 <= len(parser) <= 100
             or not isinstance(mime, str) or mime not in {"text/html", "application/json", "text/javascript", "application/javascript", "text/plain"}):
@@ -89,6 +157,29 @@ def capture_target(run: QueryRun) -> str:
     return 'vehicle' if 'vehicle_id' in run.query else 'tire'
 
 
+def _binary_journal_bind(db: Session):
+    """Only the project's known independent checkout pools support binary journals.
+
+    Reject shared/unknown pools before opening a journal: closing a Session on
+    a shared DBAPI connection could roll back the caller's transaction.
+    """
+    bind = db.get_bind()
+    if not isinstance(bind, Engine) or type(bind.pool) not in (QueuePool, NullPool):
+        raise CaptureWriteError('evidence_capture_failed')
+    if bind.dialect.name == 'sqlite' and (bind.url.database in (None, '', ':memory:')
+            or bind.url.query.get('mode') == 'memory' or bind.url.query.get('cache') == 'shared'):
+        raise CaptureWriteError('evidence_capture_failed')
+    return bind
+
+
+def _binary_original_run(journal, query_id, source_id, query_key, query, session_id):
+    original = journal.get(QueryRun, query_id)
+    if (original is None or original.source_id != source_id or original.query_key != query_key
+            or original.query != query or original.session_id != session_id):
+        raise CaptureWriteError('evidence_capture_failed')
+    return original
+
+
 def before_parse_recorder(db: Session, run: QueryRun) -> Callable[[dict], None]:
     """Caller has committed QueryRun and closed its transaction before network I/O.
 
@@ -98,6 +189,7 @@ def before_parse_recorder(db: Session, run: QueryRun) -> Callable[[dict], None]:
     """
     context = {"query_id": run.id, "source_id": run.source_id, "query_key": run.query_key,
                "target_kind": capture_target(run)}
+    trusted_query = deepcopy(run.query)
     expected_url = None
     if context['target_kind'] == 'recall':
         from .adapters.nhtsa import query_url
@@ -106,17 +198,32 @@ def before_parse_recorder(db: Session, run: QueryRun) -> Callable[[dict], None]:
     store = db.info.get('object_store')
 
     def record(observation: dict) -> None:
-        values = validated_observation(observation)
+        values = validated_observation(observation, source_id=context['source_id'], query=trusted_query)
         if values is None or expected_url and (values['source_url'] != expected_url or values['content_type'] != 'application/json'):
             raise CaptureWriteError("evidence_capture_failed")
         try:
-            with Session(bind, expire_on_commit=False) as journal:
+            binary = values.get('body_encoding') == 'binary'
+            if binary and db.in_transaction():
+                raise CaptureWriteError('evidence_capture_failed')
+            journal_bind = _binary_journal_bind(db) if binary else bind
+            with Session(journal_bind, expire_on_commit=False, info={'object_store': store}) as journal:
+                if binary:
+                    from .vehicle_raw import checked_vehicle_capture, checked_vehicle_capture_pin
+                    original = _binary_original_run(journal, context['query_id'], context['source_id'],
+                                                    context['query_key'], trusted_query, session_id)
+                    checked_vehicle_capture_pin(journal, original, parser_version=values['parser_version'],
+                                                parser_identity=values['parser_identity'])
+                    if journal.scalar(select(RawCapture.id).where(RawCapture.query_id == original.id)) is not None:
+                        raise CaptureWriteError('evidence_capture_failed')
                 from .documents import record_object
                 digest = record_object(journal, values['raw_body'], store)
                 row = RawCapture(id=uid(), **context, **values, byte_count=len(values["raw_body"]))
                 journal.add(row)
                 journal.flush()
                 journal.add(CaptureObject(capture_id=row.id, raw_hash=digest))
+                if binary:
+                    journal.flush()
+                    checked_vehicle_capture(journal, original, observation)
                 journal.add(AuditEvent(session_id=session_id, query_id=context["query_id"],
                     action="raw_response_received", detail={"capture_id": row.id, "raw_hash": row.raw_hash,
                                                             "target_kind": row.target_kind}))
@@ -131,9 +238,20 @@ def before_parse_recorder(db: Session, run: QueryRun) -> Callable[[dict], None]:
 def retain_rejected_response(db: Session, run: QueryRun, observation: Any,
                              stage: Literal["parser", "schema"]) -> str | None:
     """No snapshots, parameters, validators or latest accepted records are read here."""
-    values = validated_observation(observation)
+    values = validated_observation(observation, source_id=run.source_id, query=run.query)
     if values is None:
         return None
+    if values.get('body_encoding') == 'binary':
+        try:
+            from .vehicle_raw import checked_vehicle_capture
+            with Session(_binary_journal_bind(db), expire_on_commit=False,
+                         info={'object_store': db.info.get('object_store')}) as journal:
+                original = _binary_original_run(journal, run.id, run.source_id, run.query_key,
+                                                run.query, run.session_id)
+                checked_vehicle_capture(journal, original, observation)
+        except Exception:
+            # No new capture or object is created to rescue a failed observation.
+            return None
     target = capture_target(run)
     if target == 'recall':
         from .adapters.nhtsa import query_url
@@ -188,6 +306,7 @@ def register_capture_routes(app: FastAPI) -> None:
 
     @app.get("/v1/captures/{capture_id}")
     def capture(capture_id: str, request: Request, mode: Literal["history"] = Query(...),
+                evidence_format: Literal['raw-evidence-v2'] | None = Query(None, alias='format'),
                 db: Session = Depends(get_db)) -> dict:
         result = db.execute(select(RawCapture, QueryRun.state, QueryRun.reason, QueryRun.query)
                             .join(QueryRun, QueryRun.id == RawCapture.query_id)
@@ -195,11 +314,54 @@ def register_capture_routes(app: FastAPI) -> None:
         if result is None:
             raise HTTPException(404, "未找到原文接收记录")
         row, state, reason, query = result
-        raw_body, storage_kind = checked_capture_bytes(db, row)
+        from .vehicle_raw import vehicle_raw_requires_v2
+        requires_v2 = vehicle_raw_requires_v2(db, row)
+        if evidence_format is None:
+            if requires_v2:
+                raise HTTPException(409, {'code': 'binary_evidence_format_required'})
+            raw_body, storage_kind = checked_capture_bytes(db, row)
+            fields = {'body': raw_body.decode('utf-8')}
+        elif requires_v2 or row.target_kind == 'vehicle':
+            from .vehicle_raw import (VehicleOriginalUseNotAllowed, VehicleRawIntegrityError,
+                                      VehicleUseNotAllowed, checked_vehicle_v2_metadata)
+            try:
+                fields = checked_vehicle_v2_metadata(db, row)
+                storage_kind = 'object_store' if db.get(CaptureObject, row.id) else 'database_legacy'
+            except VehicleRawIntegrityError:
+                raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+            except (VehicleOriginalUseNotAllowed, VehicleUseNotAllowed) as error:
+                raise HTTPException(403, {'code': error.code}) from None
+        else:
+            fields, storage_kind = checked_text_raw_metadata(db, row)
         response = {**metadata(row, state, reason, query), "data_state": "local_snapshot",
-                    "body": raw_body.decode("utf-8"), "receipt_only": True,
-                    "storage_kind": storage_kind}
+                    **fields, "receipt_only": True, "storage_kind": storage_kind}
         db.add(AuditEvent(session_id=request.state.session_id, query_id=row.query_id,
                           action="raw_capture_history_read", detail={"capture_id": row.id}))
         db.commit()
         return response
+
+    @app.get('/v1/captures/{capture_id}/content')
+    def capture_content(capture_id: str, request: Request, mode: Literal['history'] = Query(...),
+                        evidence_format: Literal['raw-evidence-v2'] | None = Query(None, alias='format'),
+                        db: Session = Depends(get_db)) -> Response:
+        row = db.scalar(select(RawCapture).join(QueryRun, QueryRun.id == RawCapture.query_id)
+                        .where(RawCapture.id == capture_id))
+        if row is None:
+            raise HTTPException(404, '未找到原文接收记录')
+        from .vehicle_raw import (VehicleOriginalUseNotAllowed, VehicleRawIntegrityError,
+                                  checked_vehicle_original_bytes, vehicle_raw_requires_v2)
+        if not vehicle_raw_requires_v2(db, row):
+            raise HTTPException(409, {'code': 'raw_evidence_content_unavailable'})
+        try:
+            raw = checked_vehicle_original_bytes(db, row)
+        except VehicleRawIntegrityError:
+            raise HTTPException(503, {'code': 'vehicle_raw_integrity_failed'}) from None
+        except VehicleOriginalUseNotAllowed as error:
+            raise HTTPException(403, {'code': error.code}) from None
+        db.add(AuditEvent(session_id=request.state.session_id, query_id=row.query_id,
+                          action='raw_capture_downloaded', detail={'capture_id': row.id}))
+        db.commit()
+        return Response(raw, media_type='application/pdf', headers={
+            'Content-Disposition': 'attachment; filename="vehicle-evidence.pdf"',
+            'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "sandbox; default-src 'none'", 'X-Evidence-SHA256': row.raw_hash})

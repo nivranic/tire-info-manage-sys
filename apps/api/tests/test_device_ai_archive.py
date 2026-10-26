@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import pytest
+from device_ai_fixture_corpus import read_producer_sample
 from sqlalchemy import Column, MetaData, String, Table, create_engine, event, inspect
 from sqlalchemy.orm import Session
 
@@ -19,7 +20,6 @@ from tire_api.offline_models import OfflinePack, OfflinePackPlan
 
 
 ROOT = Path(__file__).resolve().parents[3]
-SAMPLES = ROOT / ".artifacts/query-fallback49/producer-v2-samples-a"
 ACTOR = "synthetic-archive-owner"
 FIXED_PACKS = {
     "legacy": ("0d3f27af8747b9fc390d7dbb685e8ea34fab1fbe27ef7331bc9b1a704a7ced00", 78418),
@@ -294,8 +294,8 @@ def test_three_original_producer_archives_with_synthetic_owner_fixture(records_f
     # producer private.sqlite or recover cookies. This maps a new synthetic row
     # actor to the frozen scope for byte/descriptor/parser coverage only; it does
     # not reproduce or attest the original captured actor relationship.
-    raw = (SAMPLES / (name + "-pack.json")).read_bytes()
-    descriptor_raw = (SAMPLES / (name + "-descriptor.json")).read_bytes()
+    raw = read_producer_sample(name + "-pack.json")
+    descriptor_raw = read_producer_sample(name + "-descriptor.json")
     expected_hash, expected_size = FIXED_PACKS[name]
     assert hashlib.sha256(raw).hexdigest() == expected_hash and len(raw) == expected_size
     assert hashlib.sha256(descriptor_raw).hexdigest() == FIXED_DESCRIPTORS[name]
@@ -319,8 +319,8 @@ def test_three_original_producer_archives_with_synthetic_owner_fixture(records_f
     assert_error(records, "device_ai_archive_not_found", 404, reads=1, actor_session_id="foreign-actor")
     monkeypatch.setattr(archive, "digest", original_digest)
     assert_error(records, "device_ai_archive_metadata_invalid", reads=1)
-    assert hashlib.sha256((SAMPLES / (name + "-pack.json")).read_bytes()).hexdigest() == expected_hash
-    assert hashlib.sha256((SAMPLES / (name + "-descriptor.json")).read_bytes()).hexdigest() == FIXED_DESCRIPTORS[name]
+    assert hashlib.sha256(read_producer_sample(name + "-pack.json")).hexdigest() == expected_hash
+    assert hashlib.sha256(read_producer_sample(name + "-descriptor.json")).hexdigest() == FIXED_DESCRIPTORS[name]
 
 
 @pytest.mark.parametrize("case", ["valid", "missing", "corrupt"])

@@ -1,0 +1,306 @@
+{
+  "schema": "professional-golden-case@1",
+  "case_id": "synthetic-manual-unknown",
+  "tier": "synthetic_contract",
+  "materials": [
+    {
+      "material_label": "material",
+      "origin": "synthetic",
+      "title": "SYNTHETIC synthetic-manual-unknown",
+      "publisher": "Project synthetic fixture authors",
+      "publication_date": "2026-10-18",
+      "doi": null,
+      "source_reference_url": "https://fixture.invalid/professional-golden/synthetic-manual-unknown",
+      "download_url": null,
+      "original": {
+        "path": "packages/domain-types/fixtures/professional-test-material-v1/synthetic-manual-unknown.pdf",
+        "byte_count": 3976,
+        "sha256": "0e402e0406ac70e4343222909b91729ebb8a109954f92d34bc4a38e39f15a050"
+      },
+      "capture_receipt": null,
+      "agent_review_record": null,
+      "rights": {
+        "rights_holder": "Project synthetic fixture authors",
+        "basis": "Project-authored synthetic material, local engineering evaluation only",
+        "license_url": null,
+        "attribution": "Project synthetic fixture authors; not a professional publication",
+        "store_original": true,
+        "workspace_reopen": true,
+        "quote_identifiers": true,
+        "provider_use": false,
+        "export": false
+      }
+    }
+  ],
+  "input": {
+    "mode": "private_http",
+    "event": {
+      "title": "SYNTHETIC synthetic-manual-unknown",
+      "organization": "Project synthetic fixture authors",
+      "relationship": "independent",
+      "publication_date": "2026-10-18",
+      "source_url": "https://fixture.invalid/professional-golden/synthetic-manual-unknown",
+      "rights_basis": "Project-authored synthetic material, local engineering evaluation only",
+      "tested_size": "245/40R20",
+      "vehicle": null,
+      "surface": "Synthetic surface",
+      "conditions": "SYNTHETIC 20 C; local contract exercise; no real road observations",
+      "coverage": "selected_results",
+      "reported_participants": 20,
+      "participants": [
+        {
+          "key": "a",
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "source_designation": "SYNTHETIC row A"
+        },
+        {
+          "key": "b",
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "source_designation": "SYNTHETIC row B"
+        }
+      ],
+      "metrics": [
+        {
+          "key": "wet",
+          "label": "Synthetic wet distance",
+          "unit": "m",
+          "protocol": "SYNTHETIC wet method",
+          "direction": "lower"
+        },
+        {
+          "key": "noise",
+          "label": "Synthetic noise",
+          "unit": "dB",
+          "protocol": "SYNTHETIC noise method",
+          "direction": "lower"
+        },
+        {
+          "key": "dry",
+          "label": "Synthetic zero ties",
+          "unit": "points",
+          "protocol": "SYNTHETIC signed-zero method",
+          "direction": "higher"
+        }
+      ],
+      "measurements": [
+        {
+          "participant_key": "a",
+          "metric_key": "wet",
+          "raw_value": "38.00",
+          "source_rank": 3,
+          "evidence_span": "SYNTHETIC A 38.00 m rank 3",
+          "evidence_locator": "SYNTHETIC wet row A"
+        },
+        {
+          "participant_key": "b",
+          "metric_key": "wet",
+          "raw_value": "40.0",
+          "source_rank": 5,
+          "evidence_span": "SYNTHETIC B 40.0 m rank 5",
+          "evidence_locator": "SYNTHETIC wet row B"
+        },
+        {
+          "participant_key": "a",
+          "metric_key": "noise",
+          "raw_value": "70",
+          "source_rank": null,
+          "evidence_span": "SYNTHETIC A 70 dB",
+          "evidence_locator": "SYNTHETIC noise row A"
+        },
+        {
+          "participant_key": "a",
+          "metric_key": "dry",
+          "raw_value": "-0",
+          "source_rank": null,
+          "evidence_span": "SYNTHETIC A -0 points",
+          "evidence_locator": "SYNTHETIC dry row A"
+        },
+        {
+          "participant_key": "b",
+          "metric_key": "dry",
+          "raw_value": "0",
+          "source_rank": 8,
+          "evidence_span": "SYNTHETIC B 0 points rank 8",
+          "evidence_locator": "SYNTHETIC dry row B"
+        }
+      ]
+    },
+    "skus": [
+      {
+        "sku_label": "sku-a",
+        "value": {
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "manufacturer_product_code": "SYNTHETIC-001",
+          "region": "CN",
+          "size": "245/40R20",
+          "load_index": "101",
+          "speed_rating": "Y",
+          "xl": true,
+          "hl": false,
+          "oe_mark": "SYNTH",
+          "acoustic_technology": "Synthetic acoustic",
+          "run_flat": false,
+          "source_variant_name": null,
+          "facts": {
+            "product_code_type": "MSPN"
+          }
+        }
+      },
+      {
+        "sku_label": "sku-b",
+        "value": {
+          "brand": "Synthetic",
+          "model": "Synthetic Tire",
+          "manufacturer_product_code": "SYNTHETIC-002",
+          "region": "CN",
+          "size": "245/40R20",
+          "load_index": "101",
+          "speed_rating": "Y",
+          "xl": true,
+          "hl": false,
+          "oe_mark": "SYNTH",
+          "acoustic_technology": "Synthetic acoustic",
+          "run_flat": false,
+          "source_variant_name": null,
+          "facts": {
+            "product_code_type": "MSPN"
+          }
+        }
+      }
+    ],
+    "bridge_attempts": [
+      {
+        "attempt_id": "bridge-a",
+        "participant_key": "a",
+        "sku_label": "sku-a",
+        "material_labels": [],
+        "event_locator": null,
+        "participant_locator": null,
+        "assertions": [],
+        "evidence_level": "manual_assertion",
+        "review": false,
+        "revoke": false
+      },
+      {
+        "attempt_id": "bridge-b",
+        "participant_key": "b",
+        "sku_label": "sku-b",
+        "material_labels": [],
+        "event_locator": null,
+        "participant_locator": null,
+        "assertions": [],
+        "evidence_level": "manual_assertion",
+        "review": false,
+        "revoke": false
+      }
+    ],
+    "candidate": {
+      "vehicle_fixture": "synthetic-staggered-245-265@1",
+      "axle": "front",
+      "reviewed_fitment_sku_labels": [
+        "sku-a",
+        "sku-b"
+      ],
+      "attempt_ids": [
+        "bridge-a",
+        "bridge-b"
+      ],
+      "preference_weights": {
+        "dry": 20,
+        "wet": 30,
+        "quiet": 15,
+        "comfort": 10,
+        "wear": 10,
+        "energy": 10,
+        "appearance": 5
+      },
+      "metric_dimensions": [
+        {
+          "metric_key": "wet",
+          "dimension": "wet"
+        },
+        {
+          "metric_key": "noise",
+          "dimension": "quiet"
+        },
+        {
+          "metric_key": "dry",
+          "dimension": "dry"
+        }
+      ]
+    },
+    "source_review": null
+  },
+  "expected": {
+    "bridges": [
+      {
+        "attempt_id": "bridge-a",
+        "truth": "unknown",
+        "preview": {
+          "http_status": 200,
+          "can_submit": true,
+          "blockers": [],
+          "error_code": null
+        },
+        "current": {
+          "http_status": 200,
+          "eligibility": "none",
+          "effective_state": "pending_review",
+          "blockers": [],
+          "stale_reasons": [],
+          "error_code": null
+        }
+      },
+      {
+        "attempt_id": "bridge-b",
+        "truth": "unknown",
+        "preview": {
+          "http_status": 200,
+          "can_submit": true,
+          "blockers": [],
+          "error_code": null
+        },
+        "current": {
+          "http_status": 200,
+          "eligibility": "none",
+          "effective_state": "pending_review",
+          "blockers": [],
+          "stale_reasons": [],
+          "error_code": null
+        }
+      }
+    ],
+    "distinct_pairs": [],
+    "candidate": {
+      "http_status": 200,
+      "error_code": null,
+      "status": "insufficient_evidence",
+      "eligible_sku_labels": [],
+      "excluded": [
+        {
+          "sku_label": "sku-a",
+          "reason_codes": [
+            "link_not_eligible"
+          ]
+        },
+        {
+          "sku_label": "sku-b",
+          "reason_codes": [
+            "link_not_eligible"
+          ]
+        }
+      ],
+      "personal_interpretation_allowed": false,
+      "metric_comparisons": [],
+      "coverage": null
+    },
+    "source_review_findings": []
+  },
+  "review": {
+    "state": "pending_external_review",
+    "record": null
+  }
+}

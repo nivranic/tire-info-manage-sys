@@ -1,0 +1,16 @@
+{
+  "canonical_ast": null,
+  "core_sha256": "c8633ac0108b2b624e532afc157b91568d0381190f18aa70160931a5c7a2f774",
+  "expected_error_code": "device_ai_json_duplicate_key",
+  "input": {
+    "byte_count": 18,
+    "path": "parser/escaped-duplicate-key/input.bin",
+    "sha256": "9b76ab5d01163a68899e361838ef85cf791c1a4aee792d8c714db00237a32647"
+  },
+  "schema": "internal-device-ai-parser-vector@1",
+  "source_backed_domain_fact": false,
+  "source_kind": "synthetic_parser_literal",
+  "state": "rejected",
+  "token_dto_ast": null,
+  "warning": "Synthetic JSON grammar/lexeme example, not a tire measurement or a frozen domain fact. Floating tokens retain source binary64 semantics, including finite underflow; lexeme retention adds no precision. No Host parity run or public wire freeze."
+}

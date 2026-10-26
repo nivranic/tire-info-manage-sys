@@ -1,0 +1,18 @@
+{
+  "canonical_projection": {
+    "byte_count": 11377,
+    "path": "domain/empty-tire-single/projection.canonical.json",
+    "sha256": "88e0b87ddb75f62c0797d9a21b0650a2c68c3062971218a693aaf8243ec81708"
+  },
+  "data_state": "local_snapshot",
+  "expected_error_code": null,
+  "member_count": 1,
+  "privacy_class": "private",
+  "source_refresh_performed": false,
+  "state": "accepted",
+  "token_dto_projection": {
+    "byte_count": 11422,
+    "path": "domain/empty-tire-single/projection.tokens.json",
+    "sha256": "85b62ef1edca71a7e0c803e9ea9344cf4d89714e6ce7bc060604f98d7dad5574"
+  }
+}
