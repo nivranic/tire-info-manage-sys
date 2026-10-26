@@ -1,3 +1,13 @@
+## 当前交接入口（2026-10-26）：工程已推送，完整V1仍未完成
+
+请先读[2026-10-26 Agent交接卡](AGENT-HANDOFF-2026-10-26.md)：原规格12模块覆盖、R136停点、失败与证据边界、未完成Gate及接手顺序。工程提交 `07a69a2940694081917259cb5181d06465659bb2` 已推送至既有 `origin/main`，本卡及入口更新另以文档提交交付；最终提交以交付消息或 `git log -2` 为准。检查见[本轮记录](assurance/evidence/publish-2026-10-26.md)。
+
+Git不包含 `.artifacts/`、`data/`、本机环境配置、依赖和构建产物；新clone没有原始回执／截图／私库，不能只凭报告称现场复验。R136限定通过不等于完整V1；R137只有候选研究。KIT C2原UUID继续封存，PDF未取得；不重开其私槽、不重POST或换UUID重抓。正常／保留SQLite及默认API不碰，无EPREL Key继续独立工作。
+
+本次用户已授权commit／push，旧段“未提交／未推送”仍表示其历史时点，不批量改写。以下旧HANDOFF **214996 B**／SHA256 `6acc4b6d9dfb88a8e3d1a8684d21b83c2bd151fffd6f4d8024ac67a6139a6785` 完整保留为字节尾文；本机备份 `.artifacts/publish-handoff-20261026/HANDOFF.before-2026-10-26.md`。
+
+---
+
 ## 最新进展（2026-10-25）：R136未确认材料请求停止采纳通过，完整V1仍active
 
 本人可对仍无可靠终态的来源材料请求明确停止后续采纳，填写署名、单段原因并确认原UUID。停止新增不可变账本与031迁移，状态为stopped_unconfirmed，completed_at/failure_code/document/receipt仍全null。停止、成功采纳和失败落账在原ingestion锁内仲裁；停止先赢后，迟到执行不能登记对象、文档、outcome或received/failed审计。网络结果继续未知，物理store.put可能已留下无引用对象；不证明网络终止、对象删除或捕获失败。详见[正式报告](assurance/evidence/round-136-source-material-stop-adoption.md)、[计划](plans/2026-10-25-source-material-stop-adoption.md)及[冻结合同](../.artifacts/r136-source-material-stop-20261025/wire-contract.md)。
