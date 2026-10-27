@@ -79,6 +79,8 @@ R136的 `stopped_unconfirmed` **仍表示网络结果未知**。`completed_at`�
 
 > **2026-10-26 P2 二次更新（URL迁移事件切片，迁移032）**：剩余监控域推进——`url_moved` 事件全链路落地（模型+守卫+迁移032+监控/通知路由+service 挂载+16 测试），配套族 22 文件 463 过 0 败；同轮实证并修复 **HEAD 潜伏红**（迁移 029/030/031 的 after_create 守卫未同步 `_TRIGGER_CONTRACT`，ai_stream/012/013 共 5 测试在 HEAD 即红，因复核批显式目标列表绕开里程碑文件而潜伏两轮，风险 R-023）；受管正式批槽 `url032-r1`（12 模块）。证据见 [URL迁移切片报告](assurance/evidence/url-move-032-2026-10-26.md)。出界项：Web UI 集成、Worker 长周期真实观察、解析失败/隔离观察语义、来源特定噪声策略；性能C/真实账单/语义重排仍受阻于凭据与网络。
 
+> **2026-10-26 P2 三次更新（镜像补全 + 36 潜伏红清剿 + 首份默认清单全量回执）**：URL迁移切片完成 client/domain-types/UI 全镜像（契约测试 6/6、typecheck 净、web 50/50）与交互补测（20/20）；全量批追查链修复**两轮共 36 个潜伏红**（R-023 契约 5 + reader 25/legacy024 3/telemetry 3/device_ai 1/cli 1 + 护栏适配 28+1——固定 .artifacts 草稿根与自定义 sqlite factory，`TIRE_TEST_SCRATCH_ROOT` 方案落定，R-024）；**u032ful4 首次完整默认 183 模块受管全量回执：4955 过/5 败/54 跳过、零拒绝**，剩余 5 败为 test_vehicle_binary_consumers 的 S2 解析器回放潜伏红（R-025，开放）。两次全量批死于会话中断的教训：全量批必须 pwsh Start-Process 分离进程跑。证据同上报告 §7-9。
+
 - R136扩展11模块468个pytest均通过，但runner因被阻止的urllib3 IPv6导入探针 **exit3／passed:false**，不能称全量绿、预导入绕门或忽略raw拒绝。
 - 旧Parser批两项断言失败根因未定位。新完整27／27不证明旧故障已根治，也不能套用R135的长路径解释。
 - 首两UI失败、c批截图拍错区域的REQUEST_CHANGES、首资源观察failed均保留；最终d是独立完整批，不能拼接旧结果。

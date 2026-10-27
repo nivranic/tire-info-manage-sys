@@ -260,3 +260,13 @@ risks:
     compensating_control: 五文件修复后组合 71 过；全量批以分离进程重开（u032ful3，pwsh Start-Process 脱离会话生存期，此前两批 u032full/u032ful2 均被会话中断连带杀死）；显式目标批不得再作为"全量绿"声明的依据（R-023/R-024 同源教训）
     reassess_trigger: u032ful3 批完成后核验；或任何新轮次宣称全量绿前必须默认清单批回执
     status: root-caused-mitigated
+  - id: R-025
+    asset: test_vehicle_binary_consumers 的 S2 真实解析器回放链（5 用例）
+    finding: 2026-10-26 全量批 u032ful4（4955 过/5 败）暴露 test_vehicle_binary_consumers 五用例确定性失败（隔离与批内同形、HEAD worktree 复现=潜伏红）；症状为 PrivatePDFReplay 基线采纳即 source_unavailable；已排除 MAX_PATH（槽内最长 249）与护栏（零拒绝）；根因在真实解析子进程执行链，待下一轮专项诊断
+    impact: medium
+    likelihood: n/a
+    priority: medium
+    owner: engineering
+    compensating_control: 证据 url-move-032-2026-10-26.md §9（含精确用例名与排除项）；该文件其余 31 用例过；不影响本切片已验证面
+    reassess_trigger: 下一轮 S2 解析器诊断或该夹具链任何改动时
+    status: open
