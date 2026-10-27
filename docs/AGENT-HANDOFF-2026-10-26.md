@@ -81,6 +81,8 @@ R136的 `stopped_unconfirmed` **仍表示网络结果未知**。`completed_at`�
 
 > **2026-10-26 P2 三次更新（镜像补全 + 36 潜伏红清剿 + 首份默认清单全量回执）**：URL迁移切片完成 client/domain-types/UI 全镜像（契约测试 6/6、typecheck 净、web 50/50）与交互补测（20/20）；全量批追查链修复**两轮共 36 个潜伏红**（R-023 契约 5 + reader 25/legacy024 3/telemetry 3/device_ai 1/cli 1 + 护栏适配 28+1——固定 .artifacts 草稿根与自定义 sqlite factory，`TIRE_TEST_SCRATCH_ROOT` 方案落定，R-024）；**u032ful4 首次完整默认 183 模块受管全量回执：4955 过/5 败/54 跳过、零拒绝**，剩余 5 败为 test_vehicle_binary_consumers 的 S2 解析器回放潜伏红——**当日已根因修复**（loss()/decide() 跨模块导入依赖 approval autouse 权限补丁的作用域缺口；allowed_local 扩展补授；隔离 37/37 + 受管槽 vbc-r1 严格绿，R-025 关闭）。两次全量批死于会话中断的教训：全量批必须 pwsh Start-Process 分离进程跑。证据同上报告 §7-9。
 
+> **2026-10-27 P2 四次更新（切片收尾：终批 + 浏览器 E2E + 环境还原）**：**u032ful5 终批** 4947 过/13 败/54 跳过、零拒绝——13 败为 S2 真实解析器族的负载轮转签名（批内失败≠隔离失败≠单测复跑，单测级全绿 113s，R-003/R-021 类），判定非回归；全绿全量回执需安静机器窗口，登记为环境受限项。**浏览器端到端验收通过**（真实 uvicorn+next dev+Playwright，一次性 DB）：「来源地址迁移提醒」面板渲染、编辑器第三选项、地址迁移规则全链路创建均验证，截图 `.artifacts/urlmv-e2e-monitoring-center.png`。一次性 DB 已删、端口还原至会话起始态（空闲）；正常 API 不启动属按设计（正常库 legacy 前置 024，预检按冻结契约拒绝自动升级，正式库升级需独立执行合同）。证据同上报告 §10。
+
 - R136扩展11模块468个pytest均通过，但runner因被阻止的urllib3 IPv6导入探针 **exit3／passed:false**，不能称全量绿、预导入绕门或忽略raw拒绝。
 - 旧Parser批两项断言失败根因未定位。新完整27／27不证明旧故障已根治，也不能套用R135的长路径解释。
 - 首两UI失败、c批截图拍错区域的REQUEST_CHANGES、首资源观察failed均保留；最终d是独立完整批，不能拼接旧结果。
