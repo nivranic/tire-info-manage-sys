@@ -66,6 +66,12 @@ def allowed_local(monkeypatch):
     original = vehicle_raw._vehicle_consumer_rights
     monkeypatch.setattr(vehicle_raw, '_vehicle_consumer_rights', lambda capsule:
         {**original(capsule), 'structured_fact_use': 'allowed'})
+    # The imported loss()/decide() review flow also reads approved originals.
+    # approval.py's autouse rights patch ends at that module, so grant the same
+    # private original-read rights here instead of relying on import side effects.
+    original_policy = vehicle_raw._vehicle_original_policy
+    monkeypatch.setattr(vehicle_raw, '_vehicle_original_policy', lambda scope:
+        {**original_policy(scope), 'local_original_read': 'allowed', 'structured_fact_use': 'allowed'})
 
 
 @pytest.fixture

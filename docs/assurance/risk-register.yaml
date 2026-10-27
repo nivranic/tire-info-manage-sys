@@ -262,11 +262,11 @@ risks:
     status: root-caused-mitigated
   - id: R-025
     asset: test_vehicle_binary_consumers 的 S2 真实解析器回放链（5 用例）
-    finding: 2026-10-26 全量批 u032ful4（4955 过/5 败）暴露 test_vehicle_binary_consumers 五用例确定性失败（隔离与批内同形、HEAD worktree 复现=潜伏红）；症状为 PrivatePDFReplay 基线采纳即 source_unavailable；已排除 MAX_PATH（槽内最长 249）与护栏（零拒绝）；根因在真实解析子进程执行链，待下一轮专项诊断
+    finding: 2026-10-26 全量批 u032ful4（4955 过/5 败）暴露 test_vehicle_binary_consumers 五用例确定性失败（隔离与批内同形、HEAD worktree 复现=潜伏红）；根因=从 approval.py 导入的 loss()/decide() 依赖该模块 autouse 的 original-read 权限补丁，autouse 作用域不跨模块，consumers 侧缺失致基线 source_unavailable
     impact: medium
     likelihood: n/a
     priority: medium
     owner: engineering
-    compensating_control: 证据 url-move-032-2026-10-26.md §9（含精确用例名与排除项）；该文件其余 31 用例过；不影响本切片已验证面
-    reassess_trigger: 下一轮 S2 解析器诊断或该夹具链任何改动时
-    status: open
+    compensating_control: 已修复并验证：allowed_local 夹具扩展补授 _vehicle_original_policy 私有读权限（探针实证归因）；全文件隔离 37/37 + 受管短槽 vbc-r1 严格绿（exit 0）；证据 url-move-032-2026-10-26.md §9
+    reassess_trigger: 跨模块导入共享助手且依赖 autouse 夹具副作用时重查作用域
+    status: root-caused-mitigated
