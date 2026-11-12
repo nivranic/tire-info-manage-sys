@@ -106,7 +106,8 @@ def upgrade(connection: Connection, *, include_vehicle_binary: bool = True,
             include_source_material_stops: bool = True,
             include_source_page_url_moves: bool = True,
             include_source_text: bool = True,
-            include_document_text: bool = True) -> None:
+            include_document_text: bool = True,
+            include_text_embeddings: bool = True) -> None:
     """Called inside Database.initialize's locked schema transaction."""
     connection.exec_driver_sql(
         "CREATE TABLE IF NOT EXISTS tire_schema_versions "
@@ -412,3 +413,13 @@ def upgrade(connection: Connection, *, include_vehicle_binary: bool = True,
             model.__table__.create(connection, checkfirst=True)
         connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
                            {'version': '034_document_text_index'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and include_source_page_monitoring and include_source_quality_interests
+            and include_source_material_stops and include_source_page_url_moves
+            and include_source_text and include_document_text and include_text_embeddings
+            and '035_text_embedding_authorizations' not in applied):
+        from .text_embedding_models import TextEmbeddingAuthorization, install_guards
+        TextEmbeddingAuthorization.__table__.create(connection, checkfirst=True)
+        install_guards(connection)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '035_text_embedding_authorizations'})

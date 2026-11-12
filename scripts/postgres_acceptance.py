@@ -14,6 +14,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import subprocess
 import shutil
@@ -586,13 +587,22 @@ def run():
     query_filter_checkpoint = verify_query_filter_persistence(url)
     record(STEP)
 
-    # Identity acceptance freezes all source tables, including the shared raw
-    # receipt journal. Complete both recall acceptance flows before freezing it.
+    text_embedding_checkpoint = None
+    if REPORT['vector_available']:
+        STEP = 'original_text_embedding_pgvector_permissions_and_accounting'
+        with psycopg.connect(host='127.0.0.1', port=port, user='tire_verify_admin', password=password,
+                             dbname=name) as extension_admin:
+            extension_admin.execute('CREATE EXTENSION IF NOT EXISTS vector')
+        from test_text_embeddings import verify_text_embedding_persistence
+        text_checks = verify_text_embedding_persistence(url, authenticate=login_admin)
+        text_embedding_checkpoint = text_checks.pop('checkpoint')
+        REPORT['text_embeddings'] = text_checks
+        record(STEP)
+    # Freeze after every source-producing flow, including text material fixtures.
     STEP = 'identity_decision_concurrent_cas_uuid_withdrawal_and_restart'
     from identity_acceptance import assert_identity_checkpoint, verify_identity_persistence
     identity_checkpoint = verify_identity_persistence(url, authenticate=login_admin)
     record(STEP)
-
     STEP = 'dump_restore_all_evidence_and_audit_tables'
     before = database_fingerprint(database)
     assert before['identity_revisions']['rows'] >= 3
@@ -608,10 +618,35 @@ def run():
     restored_url = new_database(restore_name)
     environment = {**os.environ, 'PGHOST': '127.0.0.1', 'PGPORT': str(port), 'PGUSER': role, 'PGPASSWORD': app_password}
     pg_bin = Path(os.environ['TIRE_PG_BIN'])
-    for command in ([str(pg_bin / 'pg_dump.exe'), '--format=custom', '--no-owner', '--no-acl', '--no-password', '--dbname', name, '--file', str(archive)],
-                    [str(pg_bin / 'pg_restore.exe'), '--exit-on-error', '--no-owner', '--no-acl', '--no-password', '--dbname', restore_name, str(archive)]):
-        completed = subprocess.run(command, env=environment, capture_output=True, timeout=60)
-        assert completed.returncode == 0, 'PostgreSQL dump/restore command failed'
+    dumped = subprocess.run([str(pg_bin / 'pg_dump.exe'), '--format=custom', '--no-owner', '--no-acl',
+        '--no-password', '--dbname', name, '--file', str(archive)], env=environment, capture_output=True, timeout=60)
+    assert dumped.returncode == 0, 'PostgreSQL dump command failed'
+    restore_stages = [(environment, [])]
+    if text_embedding_checkpoint is not None:
+        listed = subprocess.run([str(pg_bin / 'pg_restore.exe'), '--list', str(archive)],
+            capture_output=True, timeout=30)
+        assert listed.returncode == 0, 'PostgreSQL archive inventory failed'
+        entries = [line for line in listed.stdout.decode('utf-8').splitlines() if re.match(r'^\d+;', line)]
+        extension_entries = [line for line in entries if re.search(r' (?:EXTENSION - vector|COMMENT - EXTENSION vector)\s*$', line)]
+        assert len(extension_entries) == 2 and len({line.split(';')[0] for line in extension_entries}) == 2
+        application_entries = [line for line in entries if line not in extension_entries]
+        assert len(extension_entries) + len(application_entries) == len(entries)
+        extension_list = expected_data.parent / 'extension-restore.list'
+        application_list = expected_data.parent / 'application-restore.list'
+        extension_list.write_text('\n'.join(extension_entries) + '\n', encoding='utf-8')
+        application_list.write_text('\n'.join(application_entries) + '\n', encoding='utf-8')
+        administrator = {**environment, 'PGUSER': 'tire_verify_admin', 'PGPASSWORD': password}
+        restore_stages = [(administrator, ['--use-list', str(extension_list)]),
+                          (environment, ['--use-list', str(application_list)])]
+        REPORT['extension_restore'] = {'administrator_items': len(extension_entries),
+            'application_items': len(application_entries), 'total_items': len(entries), 'complete_partition': True}
+    for restore_environment, selection_args in restore_stages:
+        completed = subprocess.run([str(pg_bin / 'pg_restore.exe'), '--exit-on-error', '--no-owner', '--no-acl',
+            '--no-password', '--dbname', restore_name, *selection_args, str(archive)],
+            env=restore_environment, capture_output=True, timeout=60)
+        assert completed.returncode == 0, 'PostgreSQL restore command failed'
+    if text_embedding_checkpoint is not None:
+        record('restored_extension_metadata_and_non_superuser_application_objects')
     restored = Database(restored_url)
     restored.initialize()
     STEP = 'restored_database_fingerprint'
@@ -623,6 +658,11 @@ def run():
     # Exercise report content downloads against the restored object copy, not
     # the original live directory which would conceal an incomplete backup.
     with patch.dict(os.environ, {'TI_OBJECT_STORE_ROOT': str(object_backup)}):
+        if text_embedding_checkpoint is not None:
+            STEP = 'restored_original_text_vectors_permissions_and_cached_run'
+            from test_text_embeddings import assert_text_embedding_checkpoint
+            assert_text_embedding_checkpoint(restored_url, text_embedding_checkpoint, authenticate=login_admin)
+            record(STEP)
         STEP = 'restored_query_filter_checkpoint'
         assert_query_filter_checkpoint(restored_url, query_filter_checkpoint)
         STEP = 'restored_report_checkpoint'

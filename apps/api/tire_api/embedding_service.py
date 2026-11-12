@@ -15,10 +15,12 @@ from .embedding_text import TEXT_CONTRACT, bounded_batch, document_chunks
 from .knowledge_index import check_current_vehicle_heads, check_vehicle_document_use, refresh_index
 from .knowledge_models import KnowledgeDocument
 from .service import QueryService, timestamp
+from .text_embeddings import (LOCAL_ERRORS as TEXT_LOCAL_ERRORS, TEXT_CONTRACT as ORIGINAL_TEXT_CONTRACT,
+                              checked_plan_materials as checked_text_plan_materials)
 
 
 LOCAL_VEHICLE_ERRORS = frozenset({'vehicle_structured_fact_use_not_allowed', 'vehicle_provider_use_not_allowed',
-                                'vehicle_raw_integrity_failed', 'vehicle_evidence_binding_failed'})
+                                'vehicle_raw_integrity_failed', 'vehicle_evidence_binding_failed'}) | TEXT_LOCAL_ERRORS
 
 
 def _binding_failed():
@@ -91,6 +93,11 @@ def _material_signature(values):
 
 
 def _checked_plan_materials(db, plan, config, *, purpose, request_payload=None, inputs=None):
+    if type(plan.payload) is dict and plan.payload.get('text_contract') == ORIGINAL_TEXT_CONTRACT:
+        current, missing = checked_text_plan_materials(db, plan, config)
+        if inputs is not None:
+            _bind_index_inputs(request_payload, current, inputs)
+        return current, missing
     try:
         payload = plan.payload
         if (type(payload) is not dict or digest(payload) != plan.fingerprint
@@ -131,9 +138,11 @@ def validate_plan(db, registry, plan_id, session_id, config, *, purpose='local_s
     if plan is None or plan.actor_session_id != session_id:
         raise HTTPException(404, '未找到本会话的向量建立计划')
     if (utc(plan.expires_at) <= utcnow() or type(plan.payload) is not dict or digest(plan.payload) != plan.fingerprint
-            or plan.model_space != config.model_space or plan.payload.get('text_contract') != TEXT_CONTRACT):
+            or plan.model_space != config.model_space
+            or plan.payload.get('text_contract') not in {TEXT_CONTRACT, ORIGINAL_TEXT_CONTRACT}):
         raise HTTPException(409, '计划已过期或模型配置已变化，请重新预览')
-    refresh_index(db, registry)
+    if plan.payload['text_contract'] == TEXT_CONTRACT:
+        refresh_index(db, registry)
     current, missing = _checked_plan_materials(db, plan, config, purpose=purpose)
     return plan, current, missing
 
@@ -267,7 +276,8 @@ def save_vectors(db, config, chunks, vectors):
         if chunk['cache_id'] not in existing:
             cache = EmbeddingCache(id=chunk['cache_id'], model_space=config.model_space,
                 provider='openai_embeddings', model=config.model, dimensions=config.dimensions,
-                text_contract=TEXT_CONTRACT, privacy_class=chunk['privacy_class'], text_hash=chunk['hash'], vector=vector)
+                text_contract=chunk.get('text_contract', TEXT_CONTRACT),
+                privacy_class=chunk['privacy_class'], text_hash=chunk['hash'], vector=vector)
             db.add(cache)
             added.append(cache)
             existing.add(cache.id)

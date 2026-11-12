@@ -123,10 +123,11 @@ def checked_document(db, document_id):
     return row, raw, metadata, fingerprint
 
 
-async def extract_original(db, document_id):
+async def extract_original(db, document_id, *, release_transaction=True):
     _row, raw, _metadata, fingerprint = checked_document(db, document_id)
     descriptor = current_parser(SOURCE_ID)
-    db.rollback()
+    if release_transaction:
+        db.rollback()
     result = await parse_isolated(SOURCE_ID, raw, {'document_id': document_id},
         descriptor['parser_version'], descriptor['parser_digest'])
     try:
@@ -233,6 +234,20 @@ def render_excerpt(metadata, reference, value):
         'document': metadata, 'data_state': 'local_snapshot', 'verification_status': 'original_text_excerpt', 'notice': NOTICE}
 
 
+def resolve_extracted_reference(reference, extracted, metadata, fingerprint):
+    if reference.extractor_version != extractor_version():
+        fail('document_text_extractor_unavailable', 409)
+    if reference.page > len(extracted.pages):
+        fail('document_text_reference_invalid', 409)
+    original = extracted.pages[reference.page - 1].text
+    if (reference.start >= len(original) or reference.start % (CHUNK_CHARACTERS - CHUNK_OVERLAP)
+            or reference.end != min(reference.start + CHUNK_CHARACTERS, len(original))
+            or reference.model_dump() != reference_for(reference.document_id, fingerprint, metadata['raw_hash'],
+                                                      reference.page, reference.start, reference.end)):
+        fail('document_text_reference_invalid', 409)
+    return render_excerpt(metadata, reference.model_dump(), original[reference.start:reference.end])
+
+
 def begin_read(db):
     if db.get_bind().dialect.name == 'sqlite':
         db.connection().exec_driver_sql('BEGIN')
@@ -337,12 +352,4 @@ def register_document_text_routes(app: FastAPI):
         if reference.raw_hash != metadata['raw_hash'] or reference.document_fingerprint != fingerprint:
             fail('document_text_reference_invalid', 409)
         extracted, _receipt, metadata, fingerprint = await extract(db, reference.document_id, request.state.session_id)
-        if reference.page > len(extracted.pages):
-            fail('document_text_reference_invalid', 409)
-        original = extracted.pages[reference.page - 1].text
-        if (reference.start >= len(original) or reference.start % (CHUNK_CHARACTERS - CHUNK_OVERLAP)
-                or reference.end != min(reference.start + CHUNK_CHARACTERS, len(original))
-                or reference.model_dump() != reference_for(reference.document_id, fingerprint, metadata['raw_hash'],
-                                                          reference.page, reference.start, reference.end)):
-            fail('document_text_reference_invalid', 409)
-        return render_excerpt(metadata, reference.model_dump(), original[reference.start:reference.end])
+        return resolve_extracted_reference(reference, extracted, metadata, fingerprint)

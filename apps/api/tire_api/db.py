@@ -521,6 +521,7 @@ class Database:
         from . import source_page_url_models  # noqa: F401
         from . import source_text_models  # noqa: F401
         from . import document_text_models  # noqa: F401
+        from . import text_embedding_models  # noqa: F401
         from . import candidate_ai_models  # noqa: F401
         from . import webhook_models  # noqa: F401
         from . import external_api_models  # noqa: F401

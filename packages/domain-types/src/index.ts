@@ -214,12 +214,38 @@ export interface EmbeddingPlan {
   documents: { id: string; label: string; privacy_class: string; chunks: { text: string; hash: string; cached: boolean }[] }[];
   pending_chunks: number; reserved_tokens: number;
 }
-export interface EmbeddingIndexResult { cached_chunks: number; written_chunks: number; documents: number }
+export interface EmbeddingIndexResult {
+  cached_chunks: number; written_chunks: number; documents: number;
+  text_contract?: "original-text-semantic@1";
+}
 export interface EmbeddingRun {
   id: string; kind: "index" | "hybrid"; state: "pending" | "outcome_unknown" | "completed" | "failed";
   error_code: string | null; usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
   result: EmbeddingIndexResult | KnowledgeSearchResult | null;
   created_at: string; completed_at: string | null; reserved_tokens: number;
+}
+export type TextEmbeddingSelection = { kind: "source_text"; reference: SourceTextReference }
+  | { kind: "document_text"; reference: DocumentTextReference };
+export interface TextEmbeddingAuthorizationState {
+  state: "missing" | "granted" | "revoked" | "expired";
+  revision: number; revision_id: string | null;
+}
+export interface TextEmbeddingAuthorizationRequest {
+  selection: TextEmbeddingSelection; expected_revision: number; action: "grant" | "revoke";
+  scope_hash?: string;
+  rights_basis: string; privacy_class: "public" | "private"; expires_at: string | null; acknowledged: boolean;
+}
+export interface TextEmbeddingAuthorizationResult {
+  purpose: "original_text_embedding@1"; scope_hash: string;
+  authorization: TextEmbeddingAuthorizationState;
+}
+export interface TextEmbeddingAuthorizationPreview extends TextEmbeddingAuthorizationResult {
+  selection: TextEmbeddingSelection; text: string; text_hash: string;
+  recipient: { provider: "openai_embeddings"; endpoint: string; allowed_host: string }; notice: string;
+}
+export interface TextEmbeddingPlan extends EmbeddingPlan {
+  text_contract: "original-text-semantic@1";
+  selections: { selection: TextEmbeddingSelection; authorization_id: string }[];
 }
 export type AIPrepareRequest = { mode: "history"; references: AIAnalysisReference[] }
   | { mode: "current"; query_kind?: "tire"; source_id: string; query: TireQuery; variant_ids: string[]; consent_id?: string }

@@ -19,6 +19,7 @@ from .embedding_service import (begin_idempotent, complete, prepare_plan, requir
 from .knowledge import CURRENT_WORDS, KnowledgeSearch, interpret, lexical_candidates, search_history
 from .knowledge_index import check_current_vehicle_heads, refresh_index
 from .service import QueryService
+from .text_embeddings import TEXT_CONTRACT as ORIGINAL_TEXT_CONTRACT, checked_plan_materials as checked_text_plan_materials
 
 
 class PlanRequest(StrictModel):
@@ -61,7 +62,10 @@ async def call_embedding(app, config, inputs):
 async def dispatch_embedding(app, config, inputs, *, request_id, session_id):
     """Keep a proven local refusal separate from every Provider outcome."""
     try:
-        check_embedding_dispatch(app.state.database, request_id, config, inputs, session_id)
+        # This fresh-session check includes synchronous SQL and bounded PDF
+        # recovery. Its parser loop must finish before the Provider is awaited.
+        await asyncio.to_thread(check_embedding_dispatch, app.state.database,
+                                request_id, config, inputs, session_id)
     except HTTPException as error:
         code = error.detail.get('code') if type(error.detail) is dict else None
         if code not in LOCAL_VEHICLE_ERRORS:
@@ -154,6 +158,16 @@ def register_embedding_routes(app: FastAPI):
                 usage = receipt['usage']
             try:
                 QueryService(db, None).lock_ingestion()
+                if plan.payload['text_contract'] == ORIGINAL_TEXT_CONTRACT:
+                    checked_text_plan_materials(db, plan, config)
+                    if inputs:
+                        written = save_vectors(db, config, missing, receipt['vectors'])
+                    ensure_hnsw(db, config)
+                    unique_count = len({chunk['cache_id'] for doc in materials for chunk in doc['chunks']})
+                    return complete(db, row, usage=usage, result={
+                        'cached_chunks': unique_count - len(missing), 'written_chunks': written,
+                        'documents': len(materials), 'coverage': None, 'text_contract': ORIGINAL_TEXT_CONTRACT,
+                        'notice': '正文向量绑定原件引用和用途许可，当前正式检索范围由检索入口核对。'})
                 if inputs:
                     written = save_vectors(db, config, missing, receipt['vectors'])
                 refresh_index(db, app.state.registry)

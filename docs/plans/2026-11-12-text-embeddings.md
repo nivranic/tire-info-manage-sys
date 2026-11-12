@@ -1,0 +1,51 @@
+# 正文分块向量实施计划
+
+## 目标与设计
+
+复用现行Embeddings计划、单次同意、共享预算、幂等账本及向量缓存，为正式HTML／文本和已保存PDF的原件引用建立向量。首个生成Provider沿用OpenAI Responses。
+
+正文采用独立合同original-text-semantic@1，输入为按原件恢复的摘录。选中引用绑定原始哈希、抽取版本、Unicode码点区间及PDF页码／元信息指纹。用途授权记录明确的权利依据、公开性、接收端、引用和修订，支持撤销。每次外发确认仍由现行embedding-runs承担。捕获时的许可凭证保留其历史状态，后续新增的用途授权通过独立只追加记录表达。
+
+正文计划使用独立入口，embedding-runs统一执行正文与结构化计划。计划中的文本合同决定原件恢复、用途复核和缓存绑定方式。
+
+## 实施顺序
+
+1. 增加正文引用选择、用途预览／授权／撤销API及035只追加授权表，复用现有管理员权限和乐观修订。预览和授权阶段本地恢复原件，记录权利依据的声明性质。
+2. 增加正文向量计划入口。重用EmbeddingPlan，在准备、受理及Provider实际调用前核对最新授权、原件、文本、接收端和模型空间。PDF恢复复用受限Parser，所有重建保留页码绑定。
+3. 让embedding-runs接收正文计划，缓存ID与写入携带正文合同。覆盖权限撤销、过期、来源变化、并发、重放、未知结果、旧缓存和损坏反例。
+4. 补共享类型、SDK和Web选择／预览／同意／运行恢复，并通过生产浏览器验证。
+5. 实现正文密集检索与本地FTS融合、权威／地区／时效重排，冻结所选原件引用进入AI证据包，贯通Responses、grounding、流式和报告。
+
+## 文件与验证
+
+后端新增text_embedding_models.py、text_embeddings.py及对应测试，修改db.py、migrations.py、main.py、document_text.py、embedding_service.py和embedding_api.py。共享协议与SDK复用现有向量类型及HTTP传输，Web复用正文结果卡与向量工具。
+
+API测试通过受管入口执行，每轮使用新槽。
+
+```powershell
+apps/api/.venv/Scripts/python.exe scripts/run_api_worker_regression.py --phase run --output-root .artifacts/txemb-r1 --targets apps/api/tests/test_text_embeddings.py apps/api/tests/test_embeddings.py apps/api/tests/test_source_text.py apps/api/tests/test_document_text.py
+```
+
+测试使用隔离数据库、自有合成原件和合成Provider。后续在真实PostgreSQL／pgvector验证035、正文缓存写入、检索和备份恢复，再执行生产Web与实际模型质量验收。实际结果与剩余项写入本计划及续作记录。
+
+## 后端与SDK执行结果
+
+第1–3步及三个SDK方法已实现。三个新API为用途预览、用途授权／撤销及正文向量计划，现行embedding-runs负责执行、共享预算与幂等恢复。正文合同为original-text-semantic@1，缓存绑定完整接收端与模型空间，结构化计划使用tire-structured-semantic@1。
+
+035增加独立的只追加授权表，管理员按引用、接收端、声明依据、公开性及修订记录授权，支持到期和撤销。撤销可沿保存的scope_hash执行，原件损坏或模型配置移除后仍可撤回既有授权。原件保存记录与后续用途授权保留各自发生时的记录。
+
+PDF引用在准备、受理、实际外发前及回写时复用受限Parser恢复原件。外发前的同步持久化核对在工作线程执行，完成后才等待Provider。引用恢复复用页码、元信息指纹及Unicode区间校验。
+
+六模块受管批 `.artifacts/txemb-r4/result.json` 为239／239，包含新增模块28项。792个输入在执行期间稳定，资源关闭、非自检拒绝0。原始r1的审计参数冲突、r2的PDF嵌套事件循环，以及r3的两项旧库尾表清单断言均保留。修正后的完整批覆盖正文、Embeddings、数据库初始化及旧库升级。
+
+后续补充三项边界反例，覆盖撤销时携带过期许可元数据、调用方确认的接收端scope，以及同主机不同路径的缓存隔离。r5为28／31，三个反例均取得原始失败。修正后r6两模块60／60，包含正文31项与既有Embeddings29项，792个输入稳定、资源关闭、非自检拒绝0。正文缓存使用完整接收端，授权提交支持确认预览scope，撤销可保留过期许可元数据。r4与r6保留各自源码绑定和执行范围。
+
+SDK正文用途专项5项、HTML专项9项、PDF专项7项分别通过。三端类型及Web现有50项测试通过。现有向量历史结果增加正文合同提示。正文授权与建立计划的Web交互面板、正文向量召回／融合重排及正文证据包仍需实施，生产构建与对应浏览器验收按后续UI范围执行。
+
+## 真实PostgreSQL与恢复验收
+
+2026-11-13完成54项检查，153张模型表实际dump／restore指纹一致。新增正文向量和035业务通过生产应用路由运行，模型使用合成固定向量。备份恢复覆盖向量镜像、余弦值、正文引用、授权撤销、缓存复用及历史账本，授权表在恢复后实际拒绝UPDATE、DELETE和TRUNCATE。
+
+归档1072项内容完整分配，管理员恢复2项vector扩展元数据，非超级用户应用角色恢复1070项业务对象。扩展创建权限及注释所有权的前两次失败，以及新增源数据位于身份指纹冻结之后的第三次失败均保留。最终将新增材料验证移至冻结前，完整身份及源表指纹断言通过。
+
+最终报告为 `.artifacts/postgres/pgverify-0569be10ddbf4accb2421ff0628798e5/report.json`，SHA256 `c06d174362eb8aaa1aa515760d3bba994df3cc3467d540a8c6c212b01d7fefe0`。集群已停止，独立pg_ctl状态exit3，55466无监听。回执汇总位于 `.artifacts/text-embeddings-20261112/`，后续按第4–5步继续Web、召回／融合重排和证据包，再执行真实模型质量验收。

@@ -49,6 +49,7 @@ VERSION_031 = '031_source_material_stops'
 VERSION_032 = '032_source_page_url_moves'
 VERSION_033 = '033_source_text_index'
 VERSION_034 = '034_document_text_index'
+VERSION_035 = '035_text_embedding_authorizations'
 TABLES_025 = {'external_fact_license_evidence', 'external_fact_grant_revisions'}
 TABLES_026 = {'query_run_owner_receipts'}
 TABLES_027 = {'test_event_golden_cases', 'test_event_golden_case_revisions',
@@ -63,7 +64,8 @@ TABLES_033 = {'source_text_indexes', 'source_text_chunks', 'source_text_fts'} | 
 FTS_034_INTERNAL_TABLES = {'document_text_fts_data', 'document_text_fts_idx', 'document_text_fts_content',
                          'document_text_fts_docsize', 'document_text_fts_config'}
 TABLES_034 = {'document_text_indexes', 'document_text_pages', 'document_text_chunks', 'document_text_fts'} | FTS_034_INTERNAL_TABLES
-CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034
+TABLES_035 = {'text_embedding_authorizations'}
+CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034 | TABLES_035
 
 
 @pytest.fixture
@@ -412,9 +414,9 @@ def test_new_application_preflight_rejects_view_only_owned_name_without_ddl(tmp_
 
 
 def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False):
-    """025-029/031 add tables; previously omitted 030 only appends an interest bool."""
+    """025-035 add their declared tables and the 030 interest boolean."""
     after = inventory(connection)
-    added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032, VERSION_033, VERSION_034]
+    added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032, VERSION_033, VERSION_034, VERSION_035]
     assert after['versions'] == before['versions'] + added_versions == EXPECTED_SCHEMA_VERSIONS
     assert set(after['tables']) == set(before['tables']) | CURRENT_TAIL_TABLES
     # 030's exact single-column DDL change is checked separately, with every
@@ -438,7 +440,7 @@ def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False
         if table == 'tire_schema_versions':
             assert after['tables'][table]['columns'] == expected['columns']
             assert after['tables'][table]['foreign_keys'] == expected['foreign_keys']
-            where = " WHERE version NOT IN ('025_external_fact_governance','026_query_ownership','027_test_event_golden','028_ai_price_versions','029_source_page_monitoring','030_interest_source_quality','031_source_material_stops','032_source_page_url_moves','033_source_text_index','034_document_text_index')"
+            where = " WHERE version NOT IN ('025_external_fact_governance','026_query_ownership','027_test_event_golden','028_ai_price_versions','029_source_page_monitoring','030_interest_source_quality','031_source_material_stops','032_source_page_url_moves','033_source_text_index','034_document_text_index','035_text_embedding_authorizations')"
             if backfill_024:
                 where += " AND version != '024_vehicle_binary_raw'"
             assert rows_digest(connection, table, where=where) == {

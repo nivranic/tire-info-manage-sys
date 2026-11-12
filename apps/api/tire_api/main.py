@@ -248,6 +248,8 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
     register_source_text_routes(app)
     from .document_text import register_document_text_routes
     register_document_text_routes(app)
+    from .text_embeddings import register_text_embedding_routes
+    register_text_embedding_routes(app)
     from .embedding_api import register_embedding_routes
     register_embedding_routes(app)
     from .offline_packs import register_offline_routes
