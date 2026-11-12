@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-> [Agent交接卡](docs/AGENT-HANDOFF-2026-11-13.md)汇总原规格12模块、10项发布Gate、13项SLO、15项决策及接手顺序。正文证据包、用途、OpenAI Responses、grounding与报告已接通。分页修复取得161项API、58项综合PG及153模型表恢复、14项独立向量业务及155实际表恢复、SDK9项、Web55项和三端类型通过。Web无障碍14份快照100分、22项功能检查及生产构建通过。上述工程验收采用合成材料与Provider。最新真实文献转录在隔离库录入1场／10款／20值，11项检查通过，原始PDF、精确SKU关联和真人审核继续待完成，详见[材料核验记录](docs/assurance/evidence/material-review-2026-11-13.md)。真实模型质量、生产权限、原生平台、读屏及完整V1继续验收。历史记录见[HANDOFF](docs/HANDOFF.md)。
+> [Agent交接卡](docs/AGENT-HANDOFF-2026-11-13.md)汇总原规格12模块、10项发布Gate、13项SLO、15项决策及接手顺序。正文证据包、用途、OpenAI Responses、grounding与报告已接通。分页修复取得161项API、58项综合PG及153模型表恢复、14项独立向量业务及155实际表恢复、SDK9项、Web55项和三端类型通过。Web无障碍14份快照100分、22项功能检查及生产构建通过。上述工程验收采用合成材料与Provider。最新已追溯汽车之家原始测试报道，核对10款载速和20条成绩，识别两处型号差异。原始报道事件12项API检查及真实Web桌面／390／320页面通过，原件、精确SKU关联和真人审核继续待完成，详见[材料核验记录](docs/assurance/evidence/material-review-2026-11-13.md)。真实模型质量、生产权限、原生平台、读屏及完整V1继续验收。历史记录见[HANDOFF](docs/HANDOFF.md)。
 
 > **第78轮历史入口：**[Webhook交付与复核](docs/assurance/evidence/round-78-webhook-delivery.md)、[使用与签名](docs/WEBHOOKS.md)、[冻结合同](docs/plans/2026-10-18-webhook-delivery.md)。受管理目标、事务内引用通知、HMAC与有限重试、人工动作、UUID恢复和三端共享面板已实现，默认不外发。自有15／独立125／补充144／SDK77及类型和三端前端build分别通过；实际React桌面／390／320各21项、owner5项、受控重试9项通过，不相加为全量。正常库022、真实接收端／Responses、专业材料完整身份、原生设备及完整V1仍未验收；当前交接见docs/HANDOFF.md。
 
