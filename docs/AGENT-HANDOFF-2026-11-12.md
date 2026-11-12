@@ -1,16 +1,16 @@
 # 胎迹 Agent 交接卡
 
-更新于2026-11-12。用户本次要求汇总当前进度、推送所有改动并形成Agent交接文档。完整V1目标持续开放。
+更新于2026-11-13。汇总原规格完整V1的当前实现、验证、剩余需求与接手顺序。完整V1目标持续开放。
 
 ## 当前停点
 
 完整需求共12个核心模块、10项发布Gate、13项SLO和15项产品／技术决策。各模块已有工程实现，10项发布Gate均保留待验收项，当前仍在补齐完整V1。
 
-原文RAG第1步后端由 `675f968` 交付，第2步共享类型、SDK及Web正文检索／引用查看由 `54e749d` 交付，已有生产浏览器合成验收。PDF基础工程由 `21d00a7` 交付，后续工程提交 `5a29f39` 已接通知识检索中的PDF结果和页码引用，并完成合成材料上的生产浏览器及真实PostgreSQL验收。当前首项为正文向量／融合／重排，随后接入正文证据包和Responses链路。[实施计划](plans/2026-11-12-original-text-rag.md)
+原文RAG第1步后端由 `675f968` 交付，第2步共享类型、SDK及Web正文检索／引用查看由 `54e749d` 交付。PDF基础工程为 `21d00a7`，后续 `5a29f39` 接通知识检索中的PDF结果和页码引用，已有合成材料、生产浏览器及真实PostgreSQL验收。正文向量用途授权、035迁移、独立文本合同、计划／共享执行链和SDK已实现。当前首项为正文授权与索引的Web入口，再推进正文召回／融合／重排及证据包与Responses链路。[实施计划](plans/2026-11-12-original-text-rag.md)
 
 用户选定OpenAI Responses API作为首个真实AI接入，默认Provider为 `openai_responses`。本机OpenAI配置及EPREL Key此前核对缺失，独立工程可继续执行。Gemini适配属于此前Agent依据规格自行提前安排的工程，详细来源见下文AI接入决策。
 
-本次交接复核起点为 `a1c6da619a0172b97761517c8d44e68261a9e570`，当时本地HEAD、跟踪引用与实时远端main一致，工作区干净。应用工程基线为 `5a29f39`。正文向量已完成合同预查，设计、数据库／API扩展与实现仍待执行。接手首批工作应覆盖正文用途许可、独立文本合同和正常外发路径，具体发现见[原文RAG预查](plans/2026-11-12-original-text-rag.md#正文向量接入预查)。本次追加交接文档后的SHA通过Git记录及即时远端查询核对。
+前次交接复核起点为 `a1c6da619a0172b97761517c8d44e68261a9e570`，当时本地HEAD、跟踪引用与实时远端main一致，工作区干净。正文向量工程自 `7a64b23` 继续，原件、用途与缓存的具体设计及执行记录见[正文向量计划](plans/2026-11-12-text-embeddings.md)。当前完整V1及真实模型、材料、平台验收继续开放。
 
 ## 已交付工程与验证摘要
 
@@ -35,6 +35,29 @@
 - `TI_AI_PROVIDER` 可以覆盖代码默认值。接手启动本次Responses验收进程时，在该进程环境显式选择 `openai_responses`，再核对AI状态接口返回的Provider。模型与专用Key由服务端环境提供，凭据齐备及实际调用结果分别记录。
 - Gemini来自原规格第710行的多模型接入表，用途为大上下文／多模态备选。此前Agent自行决定提前开发，正式提交为 `d5fded1`。该排期属于Agent的实施选择。已有适配器及合成回归，真实Google调用仍待验证。[原始规格](requirements/2026-09-26-tire-intelligence-original.md)
 - 后续优先推进Responses真实语义与API→Provider→Web链路，额度读取故障的合成浏览器验收已完成。真实调用需要本机配置及符合材料用途的输入。材料选择已授权Agent自主决定，可继续核对公开出版许可并记录实际允许的用途。
+
+## 正文向量后端与SDK
+
+工程提交为 `985338f7bf89c6d0b5222f8c804c62332f07ea2a`。
+
+新增035及 `text_embedding_authorizations`，以只追加修订记录具体引用、接收端、声明用途依据、公开性和到期时间。用途声明由管理员提交，建立向量仍需个人单次外发确认。撤销支持保存的scope_hash，覆盖原件损坏、配置移除及过期许可元数据。接收端scope可随授权提交确认，正文缓存绑定完整端点与模型空间。
+
+| 入口 | 当前交付 |
+| --- | --- |
+| `POST /v1/knowledge/text-embedding-authorizations/preview` | 本地恢复HTML／PDF原件引用，返回摘录、接收端与许可修订 |
+| `POST /v1/knowledge/text-embedding-authorizations` | 管理员声明授权或撤销，按expected_revision执行乐观修订 |
+| `POST /v1/knowledge/text-embedding-plans` | 选择最多32条不同原件引用，本地准备original-text-semantic@1计划 |
+| `POST /v1/knowledge/embedding-runs` | 复用既有同意、幂等、共享预算、只追加账本、缓存及恢复入口 |
+
+准备、受理、外发前及回写均核对原件和当前授权。PDF通过受限Parser恢复逐页文字，外发前同步持久化核对在工作线程完成。Provider等待结束后再次核对用途，调用期间撤销时保留实际用量并拒绝回写向量。
+
+六模块r4为239／239，包含正文28项、Embeddings29项、HTML正文41项、PDF正文24项、初始化5项及旧库升级112项。后续增加三项边界反例并修正，r6两模块60／60，包含正文31项及Embeddings29项。两批各有792个执行期间稳定的输入，资源关闭、非自检拒绝0。r6为本次正文执行链的最新绑定，SHA256 `913f1842bdc1a38db9c2dc5c00ddcf6c104d04ecb00f08883728fdc9737e1943`。
+
+SDK三个专项5／9／7分别通过，三端最终类型检查及现有Web50项通过。向量历史结果补充正文合同提示，完整正文授权／索引面板、正文向量召回／融合重排、证据包与真实模型语义继续推进。具体文件、原始失败及执行顺序见[正文向量计划](plans/2026-11-12-text-embeddings.md)。
+
+真实PostgreSQL18.3与pgvector完成54项检查，153张模型表实际dump／restore指纹一致。新增HTML／PDF正文向量、原件引用、真实余弦及撤销检查，恢复后从备份对象读取PDF、复用向量缓存、重读账本，并实际拒绝授权表UPDATE／DELETE／TRUNCATE。1072项归档目录中的2项扩展元数据由管理员恢复，1070项业务对象由非超级用户应用角色恢复。模型采用固定合成向量，真实语义继续待验。
+
+最终报告为 `.artifacts/postgres/pgverify-0569be10ddbf4accb2421ff0628798e5/report.json`，SHA256 `c06d174362eb8aaa1aa515760d3bba994df3cc3467d540a8c6c212b01d7fefe0`。集群已停止，独立pg_ctl状态exit3、55466无监听。完整验证汇总与关闭证据在 `.artifacts/text-embeddings-20261112/`。前三次恢复失败分别为扩展创建权限、扩展注释所有权和新增源数据晚于身份指纹冻结，原报告及日志保留，处理与范围见续作记录。
 
 ## 最新正文检索工程
 
@@ -311,7 +334,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 ## 下一步执行顺序
 
 1. 核对HEAD、工作区、远端及本机证据是否可用，阅读本卡、原规格和拟修改模块的后续报告。依赖和S2已在本机恢复，新clone仍需安装依赖并取得可信原件。
-2. 继续原文RAG第4–5步，先处理该计划的正文向量预查发现。PDF检索界面及034已完成本卡所列合成材料、真实PostgreSQL与生产浏览器验收。接下来为正文接通向量计划／缓存、融合及重排，再冻结正文引用进入AI证据包，贯通现行同意、预算、流式、grounding与报告。真实Embeddings质量、真实Responses语义及完整RAG仍待验收。
+2. 继续原文RAG第4–5步，正文用途授权、035、向量计划／执行及SDK已实现。先补正文授权与索引的Web面板，再实现正文向量召回、融合及重排，随后冻结正文引用进入AI证据包，贯通同意、预算、流式、grounding与报告。真实Embeddings质量、真实Responses语义及完整RAG仍待验收。[正文向量计划](plans/2026-11-12-text-embeddings.md)
 3. 沿用用户选定的OpenAI Responses主线。冒烟grounding／用量修复、8种流式模式、终态额度、额度读取故障及关闭恢复已通过合成验收。继续真实Provider接入准备，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
 4. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
 5. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。此前四个候选及新增JRC／PERS研究线索、PERS真实捕获timeout均在续作记录中。匿名样本需先取得可核对的型号映射再建立SKU关联。
@@ -350,6 +373,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 | 正文检索与引用 | `apps/api/tire_api/source_text.py`、`source_text_models.py`、`apps/api/tests/test_source_text.py`及原文RAG计划，迁移033 |
 | PDF正文与页码 | `apps/api/tire_api/document_pdf.py`、`document_text.py`、`document_text_models.py`、`apps/api/tests/test_document_pdf.py`、`test_document_text.py`、`apps/web/components/document-text-panel.tsx`及[PDF计划](plans/2026-11-12-pdf-page-text.md)，迁移034 |
 | 受管回归 | `scripts/run_api_worker_regression.py`及对应阶段报告 |
+| 正文向量及用途 | `apps/api/tire_api/text_embeddings.py`、`text_embedding_models.py`、`apps/api/tests/test_text_embeddings.py`及[正文向量计划](plans/2026-11-12-text-embeddings.md)，迁移035 |
 
 表中省略目录的后端文件名均相对于 `apps/api/tire_api/`。
 
@@ -411,4 +435,4 @@ git rev-parse origin/main
 >
 > Gemini适配由此前Agent依据原规格提前排期，当前默认Provider为openai_responses。材料由Agent自主选择，JRC匿名样本映射待核对，PERS原件CC BY 3.0已定位但直连TCP超时，新增保存成功原件及TestEvent均为0。旧KIT C2封存约束继续有效。保留失败记录、他人改动及现有证据／许可合同，完成声明绑定实际执行范围。
 >
-> 最新正文向量合同预查见RAG计划。现有向量合同仅覆盖结构化KnowledgeDocument，正文需明确独立文本合同与用途凭证，并贯通计划、缓存、只追加账本和外发前持久化复核。材料策略及共享类型目前把provider_use、export限定为false，普通PDF保存依据也需补充实际用途核对。先完成具体设计与相关兼容反例，再实施第4步。启动Responses验收进程时显式核对TI_AI_PROVIDER，环境值可以覆盖代码默认值。
+> 最新工程为985338f，正文向量后端与SDK已实现，迁移035记录独立用途声明，original-text-semantic@1绑定HTML／PDF原件引用与完整接收端，执行复用embedding-runs。六模块239项及后续正文／Embeddings60项、SDK5／9／7、Web50项与三端类型检查分别通过。真实PostgreSQL54项及153表备份恢复通过，恢复后正文缓存、引用、权限和写保护通过，集群已关闭。原始失败保留，模型为合成Provider。先补正文用途与索引的Web面板，再推进正文向量召回／融合重排、证据包及Responses链。启动Responses验收进程时显式核对TI_AI_PROVIDER，环境值可以覆盖代码默认值。

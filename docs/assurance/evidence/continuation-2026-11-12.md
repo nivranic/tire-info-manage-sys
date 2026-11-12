@@ -608,3 +608,29 @@ PDF生产浏览器35项最终检查通过，覆盖实际文档表单上传、索
 正文向量预查发现，现有Embeddings计划、缓存及dense投影绑定结构化KnowledgeDocument和tire-structured-semantic@1。save_vectors固定写入该合同，外发前复核仅支持index／hybrid及严格payload。材料canonical_policy与共享类型均把provider_use、export限定为false，普通PDF的保存依据及车辆候选dependency授权也需要按通用正文用途继续核对。具体入口和接手行为已补充到[原文RAG计划](../../plans/2026-11-12-original-text-rag.md#正文向量接入预查)，正文向量的具体设计及实现继续待执行。
 
 本轮执行文档链接、源码绑定、既有回执哈希、增量隐私及差异检查。787个API与629个前端输入逐字节匹配，三份关键回执SHA256匹配，77个本地文档链接有效。HANDOFF历史尾文保持216248字节及既有SHA256，新增行个人路径／高置信度凭据模式零命中。复核回执位于本机 `.artifacts/handoff-closeout-20261112-r1/validation.json`。103项API、51项PostgreSQL及152表恢复、35项PDF浏览器及5项兼容结果沿用已绑定的历史执行范围。完整V1、真实材料、模型、平台与生产发布继续验收。
+
+## 正文向量用途、共享执行与真实PG验收（2026-11-13）
+
+正式工程提交为 `985338f7bf89c6d0b5222f8c804c62332f07ea2a`。
+
+续作自7a64b23，按[正文向量计划](../../plans/2026-11-12-text-embeddings.md)实现独立用途授权、035、original-text-semantic@1及正文向量计划。HTML／PDF均按原件引用恢复输入，经现行embedding-runs执行，复用个人同意、预算、幂等与只追加账本。缓存绑定完整接收端，授权提交可确认预览scope。撤销覆盖原件损坏、配置移除和过期许可元数据，调用中撤销时保留实际用量并拒绝回写。
+
+PDF恢复复用现行受限Parser和页码／Unicode引用检查。新鲜持久化复核在工作线程执行，完成后才进入Provider等待。共享类型和三个SDK方法已接入，聚合测试增加对应专项，受审SDK脚本哈希已同步。Web历史结果显示正文合同状态，正文用途／索引交互面板及正文召回／融合重排与证据包继续推进。
+
+### API与前端结果
+
+六模块r4为239／239，SHA256 `a29c35265f403b7433bc82a5f2d66a3eec9579a403e740a0ed6b75fd967f10cc`，包含正文28、Embeddings29、HTML41、PDF24、初始化5及旧库升级112项。随后新增三项反例，r5为28／31，分别暴露过期元数据阻挡撤销、未核对调用方scope及同主机不同端点的缓存复用。修正后r6两模块60／60，含正文31及Embeddings29项，SHA256 `913f1842bdc1a38db9c2dc5c00ddcf6c104d04ecb00f08883728fdc9737e1943`。两批各有792个执行期间稳定的输入，资源关闭、非自检拒绝0，当前正文执行链以r6绑定为准。
+
+r1为101／120，失败集中于审计调用重复传入action参数。r2为56／57，PDF外发前的同步校验在已有事件循环中再次调用asyncio.run，标准库runners.py第191行抛RuntimeError。改为在线程中完成该校验后通过。r3为237／239，两项旧库测试的当前尾表及版本清单需要精确加入035，保留旧表、旧行、资产及外键断言后，r4完整通过。原始各槽保留。
+
+SDK正文专项5、HTML9、PDF7分别通过，三端最终类型及现有Web50项通过。631个前端输入已绑定本轮检查。生产构建与正文向量浏览器业务验收随后续完整UI实施继续执行，真实模型、专业材料及原生设备仍待验。
+
+### 真实PostgreSQL与恢复
+
+真实PostgreSQL18.3与pgvector最终54项通过，153张模型表实际dump／restore指纹一致。正文HTML及PDF通过正常API形成向量和账本，真实SQL余弦、权限撤销、035写保护及恢复后缓存读取通过。恢复校验从备份对象恢复PDF引用，并实际拒绝授权表UPDATE、DELETE和TRUNCATE。另覆盖12个证据对象、4个报告对象及3个Parser归档。
+
+前三轮失败保留于pgverify-829ed64fef7f48d6b81e80083b0c9c5c、pgverify-499cc86d160640d19e6ed97d5e12c4d1和pgverify-624248ddc3b94d338cace4cf69de37d6。原始日志分别确认非超级用户不能创建vector扩展、不能为管理员所属扩展写注释，以及新增材料夹具晚于身份源表指纹冻结。恢复流程按归档目录完整分配1072项内容，管理员恢复2项扩展元数据，应用角色恢复1070项业务对象。新增材料验证移至身份冻结前，完整源表指纹断言通过。
+
+最终报告为 `.artifacts/postgres/pgverify-0569be10ddbf4accb2421ff0628798e5/report.json`，SHA256 `c06d174362eb8aaa1aa515760d3bba994df3cc3467d540a8c6c212b01d7fefe0`。脚本退出0并停库，独立pg_ctl状态exit3、55466无监听，关闭记录在 `.artifacts/text-embeddings-20261112/closure.json`。模型使用固定合成向量，完整V1和真实语义质量继续验收。
+
+交付前重新核对792个API输入、631个前端输入和20个受审子进程来源，当前字节匹配。14个改动Python文件AST、87个本地文档链接、增量隐私和差异检查通过。HANDOFF历史尾文保持216248字节及既有SHA256。交付复核入口为 `.artifacts/text-embeddings-20261112/delivery-validation.json`，新clone需取得本机回执或在新槽复验。
