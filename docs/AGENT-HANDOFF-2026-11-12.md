@@ -6,7 +6,7 @@
 
 完整需求共12个核心模块、10项发布Gate、13项SLO和15项产品／技术决策。各模块已有工程实现，10项发布Gate均保留待验收项，当前仍在补齐完整V1。
 
-原文RAG第1步后端已由 `675f968` 交付，本轮完成第2步共享类型、SDK及Web正文检索／引用查看，并通过生产浏览器合成验收。接手后的首个可执行任务为第3步PDF逐页抽取，后续推进正文向量／融合／重排、证据包和Responses链路。最新工程提交可通过本卡末尾的Git命令核对。[实施计划](plans/2026-11-12-original-text-rag.md)
+原文RAG第1步后端由 `675f968` 交付，第2步共享类型、SDK及Web正文检索／引用查看由 `54e749d` 交付，已有生产浏览器合成验收。本次工程提交为 `21d00a7`，补充PDF受限逐页抽取、034正文索引、四个API、共享SDK和原始文档页码面板。接手首项为将PDF命中接入知识检索界面，并补充该阶段PostgreSQL与生产浏览器验收，随后推进正文向量／融合／重排、证据包和Responses链路。[实施计划](plans/2026-11-12-original-text-rag.md)
 
 用户选定OpenAI Responses API作为首个真实AI接入，默认Provider为 `openai_responses`。本机OpenAI配置及EPREL Key此前核对缺失，独立工程可继续执行。Gemini适配属于此前Agent依据规格自行提前安排的工程，详细来源见下文AI接入决策。
 
@@ -53,7 +53,42 @@
 
 本轮SDK合同9／9、Web测试50／50、三端类型及独立Web生产构建通过。正文／知识检索两模块受管回归67／67，780个输入稳定、资源关闭、非自检拒绝0。生产浏览器在合成原文上完成24项业务及请求仲裁检查，覆盖分页、旧引用、原件损坏、显式来源和精确筛选。1440、390及320像素视口均无横向溢出，窄屏引用恢复通过。400个前端输入与构建前逐字节一致。
 
-本机回执为 `.artifacts/source-text-web-20261112/verification.json`，SHA256 `67baa05c803872de3ea3966a027ddc5eb2c321e79d999948a586588a224f50ae`。API回归为 `.artifacts/stweb-r2/result.json`，SHA256 `77c589c0c49cda6a653b26cd16fcf1a27db222624087a0c0abe768962ab805b4`。私有API退出0，Web经SIGINT退出1，浏览器页已关闭，8003及18002均无监听。来源调用、真实Provider、外网尝试和正常数据库使用均为0。当前PDF、正文向量／融合／重排及证据包继续待实施，真实模型与原生平台仍待各自验收。
+本机回执为 `.artifacts/source-text-web-20261112/verification.json`，SHA256 `67baa05c803872de3ea3966a027ddc5eb2c321e79d999948a586588a224f50ae`。API回归为 `.artifacts/stweb-r2/result.json`，SHA256 `77c589c0c49cda6a653b26cd16fcf1a27db222624087a0c0abe768962ab805b4`。私有API退出0，Web经SIGINT退出1，浏览器页已关闭，8003及18002均无监听。来源调用、真实Provider、外网尝试和正常数据库使用均为0。该批范围为HTML／文本正文。PDF当前交付及剩余项见下节，正文向量／融合／重排、证据包、真实模型与原生平台继续推进各自实施和验收。
+
+## PDF逐页正文当前交付
+
+本次新增固定内部Parser能力 `workspace-pdf-text@1`，复用现行GO握手、8秒超时、CPU／内存边界、并发限制和进程回收。pypdf移入生产依赖并同步锁文件，当前锁定6.19.0。034迁移新增文档索引、逐页文字和正文分块三张派生表，SQLite使用FTS5，PostgreSQL使用GIN。八、九、十来源历史Parser清单继续按各自能力运行，当前完整清单含十一项能力。
+
+| 入口 | 交付内容 |
+| --- | --- |
+| `POST /v1/documents/{id}/text-index` | 显式history索引，在发布前后核对原件、文档及材料捕获凭证 |
+| `GET /v1/documents/{id}/text?mode=history&page=1` | 状态与逐页正文，区分全部有字、部分有字、无可抽取文字及加密 |
+| `POST /v1/knowledge/document-text/search` | 搜索已明确建立的PDF正文索引，支持文档过滤及分页 |
+| `POST /v1/knowledge/document-text/resolve` | 按文档、元信息指纹、原件哈希、抽取版本、页码、页内Unicode码点区间及chunk ID重新抽取并恢复引用 |
+
+共享SDK已提供四个方法。原始文档卡新增提取／索引、状态重读和逐页查看，关闭、停止等待与卸载会取消前端请求采纳。索引已提交后停止等待，界面提示重新读取状态核对结果。原始凭证保留既有 `unparsed_receipt` 合同，正文索引与事实核验分别记录。
+
+### 本次验证结果
+
+| 范围 | 已观察结果 |
+| --- | --- |
+| 九模块API广批 | 332项执行，331通过、1失败，PDF两模块36项全部通过。失败处为历史十来源清单仍与当前十一项清单整体比较 |
+| 最终Parser包专项 | 修正旧清单比较断言并同步受审哈希后，完整模块25／25通过，覆盖旧包实际重放及进程回收 |
+| 共享SDK | 新PDF合同7／7、既有HTML正文合同9／9通过，覆盖四入口、页码／引用、错误及取消 |
+| Web与构建 | Web50／50、Web／桌面／移动三端类型检查、独立Web生产构建通过，629个前端输入逐字节匹配 |
+| 检出字节 | 固定20个受管文件各自现行换行格式，`core.autocrlf=true` 和false共40项暂存内容过滤检查通过 |
+| 源码与资源 | 最终专项787个输入稳定，两个API批次资源关闭、非自检拒绝0。广批后变更范围为Parser包测试及其受审哈希清单两文件 |
+
+广批保存在 `.artifacts/pdfh-r1/result.json`，SHA256为 `af5c872bba51431c05f35541fc097ceb6374a08ee7595a2ea1520efd311340f8`。该批结论为失败，原回执继续保留。最终专项在 `.artifacts/pdfh-r2/result.json`，SHA256为 `c15b715ffd6a4cb858a2d4a613317f414bcfebb33f96f5696a6d30e57ada5d2a`。最终受管输入核对、前端构建、SDK日志、检出检查及配置存在性记录位于 `.artifacts/pdf-handoff-20261112/`。
+
+本次复核补齐生产依赖锁文件、SDK合同测试和20个受管文件的换行约束。Windows自动CRLF转换此前会改变18个受审文件的哈希，现按已审查字节固定LF或CRLF。OpenAI模型／Key、EPREL Key与Gemini Key在Process／User／Machine三个作用域均复核为空。PDF输入为合成材料，真实专业材料、模型语义、原生平台及本节后续验收各自继续推进。
+
+### 接手需补齐
+
+- 知识检索界面中的PDF结果及引用恢复尚待接入。现有HTML／文本 `source-text-search.tsx` 可复用分页和请求仲裁。PDF仅在 `applied_filters` 完全为空时展示，PDF文档当前缺少精确SKU、实体类型及来源分类，接入时需保持用户筛选范围。
+- `test_document_text.py` 已提供 `verify_document_text_persistence` 与 `assert_document_text_checkpoint`。接入 `scripts/postgres_acceptance.py` 后，在新隔离集群验证034、GIN查询、重启、实际备份及恢复。
+- PDF生产浏览器验收待执行，覆盖上传、索引、翻页、无字／加密／损坏、搜索、引用、取消及迟到响应，并核对宽屏与窄屏显示。
+- 后续继续正文向量、融合／重排、证据包与Responses真实语义。前次HTML生产浏览器和PostgreSQL结果保留各自执行范围。
 
 ## 最新额度故障验收
 
@@ -97,9 +132,9 @@
 | 5 测评数据库 | TestEvent、参与者、指标、环境、原件捕获、身份桥及Golden工作台 | 真实精确SKU正例、合法原件与外部真人Golden |
 | 6 信息监控 | Worker、参数变化、召回、兴趣提醒、原文变化、质量隔离、地址迁移事件与通知 | 任意网页／PDF差异、更多事件、真实长周期与交付可靠性 |
 | 7 传统CRUD | 来源、规则、偏好、测试、修订、账户、Provider、外部Key及费用规划切片 | 全实体覆盖、生产权限、BYOK与真实账单 |
-| 8 证据浏览 | 快照、哈希、解析版本、冲突、文本与二进制原文、未确认请求停止采纳，开发库副本升级／恢复 | 实际部署旧库切换、全域许可治理、正式再采纳及生产对象存储 |
+| 8 证据浏览 | 快照、哈希、解析版本、冲突、文本与二进制原文、PDF索引及逐页面板、未确认请求停止采纳，开发库副本升级／恢复 | PDF生产浏览器及034真实数据库验收、实际部署旧库切换、全域许可治理、正式再采纳及生产对象存储 |
 | 9 个性化 | 车库、关注、七维偏好、保存比较、非SKU兴趣与账户生命周期处理 | 真实推荐质量、跨设备与长期运行 |
-| 10 AI研究 | grounding、引用、流式解释与报告、多模型适配及向量检索工程，HTML／文本正文FTS、引用恢复与SDK／Web接入 | PDF抽取、正文向量／融合／重排及证据包，Responses真实语义与Embeddings质量、专业性能解释及模型治理 |
+| 10 AI研究 | grounding、引用、流式解释与报告、多模型适配及向量检索工程，HTML／文本正文FTS和Web引用，PDF逐页抽取／检索／引用API及SDK | PDF知识检索界面与专项验收、正文向量／融合／重排及证据包，Responses真实语义与Embeddings质量、专业性能解释及模型治理 |
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名与有限重试、Key及字段许可治理 | 真实接收端、公网生产验收、SDK产品化与完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权与审计 | 生产身份／租户／RLS、完整角色治理、灾备及发布验收 |
 
@@ -263,7 +298,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 ## 下一步执行顺序
 
 1. 核对HEAD、工作区、远端及本机证据是否可用，阅读本卡、原规格和拟修改模块的后续报告。依赖和S2已在本机恢复，新clone仍需安装依赖并取得可信原件。
-2. 继续原文RAG计划第3–5步。先通过现行受限Parser补齐PDF逐页抽取与页码定位，再推进正文向量与融合／重排、证据包和模型链。首步后端及033迁移已有204项受管回归、49项真实PostgreSQL及149张模型表恢复证据。SDK／Web接入另有67项API、9项SDK、50项Web及生产浏览器合成验收。真实Embeddings质量及原规格完整RAG继续待验。
+2. 收尾原文RAG第3步的PDF知识检索界面、034真实PostgreSQL及生产浏览器验收。当前PDF受限抽取、索引／逐页／搜索／引用API、共享SDK与文档面板已交付，测试范围见本卡PDF段。将PDF结果限定在无结构化筛选的查询，完成实际页码引用查看后，继续第4–5步的正文向量、融合／重排、证据包和模型链。033已有的49项PostgreSQL及149表恢复结果沿用其原执行范围。
 3. 沿用用户选定的OpenAI Responses主线。冒烟grounding／用量修复、8种流式模式、终态额度、额度读取故障及关闭恢复已通过合成验收。继续真实Provider接入准备，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
 4. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
 5. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。此前四个候选及新增JRC／PERS研究线索、PERS真实捕获timeout均在续作记录中。匿名样本需先取得可核对的型号映射再建立SKU关联。
@@ -300,6 +335,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 | Responses冒烟及回归 | `scripts/ai_real_provider_smoke.py`、`apps/api/tests/test_ai_provider_smoke.py`、`docs/plans/2026-11-12-responses-smoke-grounding.md` |
 | Responses生产Web夹具 | `scripts/ai_stream_acceptance.py`，私有API与独立Web使用显式隔离端口及本机忽略目录 |
 | 正文检索与引用 | `apps/api/tire_api/source_text.py`、`source_text_models.py`、`apps/api/tests/test_source_text.py`及原文RAG计划，迁移033 |
+| PDF正文与页码 | `apps/api/tire_api/document_pdf.py`、`document_text.py`、`document_text_models.py`、`apps/api/tests/test_document_pdf.py`、`test_document_text.py`、`apps/web/components/document-text-panel.tsx`及[PDF计划](plans/2026-11-12-pdf-page-text.md)，迁移034 |
 | 受管回归 | `scripts/run_api_worker_regression.py`及对应阶段报告 |
 
 表中省略目录的后端文件名均相对于 `apps/api/tire_api/`。
@@ -318,10 +354,14 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 - `fcb2d2a` 包含Windows下Responses生产Web夹具兼容修复及实际合成浏览器验收记录。
 - `b1c3acb` 包含Responses终态额度自动刷新、过期响应仲裁及8种流式模式验收记录。本次交接补充作为后续正式文档提交交付，最终SHA以即时远端核对为准。
 - `675f968` 包含033正文索引、HTML／文本FTS及可恢复引用API，41项新增用例、旧库兼容及PostgreSQL原文恢复检查，完整RAG的后续步骤见本卡最新工程段。
+- `54e749d` 包含HTML／文本正文检索的共享SDK、Web结果及引用恢复入口。
+- `21d00a7` 包含本次034、PDF逐页抽取／索引／引用API、SDK与文档面板、依赖锁及受管检出换行约束。本卡及续作记录通过其后续文档提交交付，最终远端SHA由交付消息及即时查询核对。
 
 `bce22a4`交付的静态复核为 `.artifacts/handoff-final-20261112/validation.json`，当时774个回归输入逐字节匹配，14个本地链接有效，历史尾文SHA保持。后续恢复与Responses修复按各自新回执绑定，交付核对见 `.artifacts/responses-smoke-20261112/delivery-validation.json`。
 
-本次原文检索交付复核已核对204项回归与49项PostgreSQL报告的SHA256，778个受管输入逐字节匹配，10个改动Python文件AST通过，18个本地文档链接有效。HANDOFF历史尾文仍为216248字节及原SHA256，待推送新增行个人路径／高置信度凭据模式零命中，差异检查通过。本机复核入口为 `.artifacts/source-text-delivery-20261112/validation.json`。本次新增验证覆盖文档、源码绑定及既有回执，产品测试、构建与数据库运行结果沿用各自已执行批次。
+033后端交付复核核对了204项回归与49项PostgreSQL报告的SHA256，778个受管输入逐字节匹配，10个改动Python文件AST通过，18个本地文档链接有效。HANDOFF历史尾文为216248字节及原SHA256，待推送新增行个人路径／高置信度凭据模式零命中，差异检查通过。该次本机复核入口为 `.artifacts/source-text-delivery-20261112/validation.json`，产品测试、构建与数据库运行结果沿用各自已执行批次。
+
+本次PDF交付复核入口为 `.artifacts/pdf-handoff-20261112/delivery-validation.json`，最终787个受管输入及629个前端输入匹配，16个改动Python文件语法及24个本地文档链接通过，历史尾文216248字节和原SHA保持，增量隐私与差异检查通过。该报告保留历史失败与后续专项的分别结论。完整V1持续开放，PDF当前验证范围见本卡对应章节。
 
 - 当前分支为既有 `main`。新分支／工作树须取得用户明确同意。工作区中的他人修改、历史红绿回执及证据按现有归属保留。
 - Windows使用PowerShell 7，exec显式设置工作目录。网络使用直连，代理的启动／配置／连接须先取得用户明确同意。
@@ -347,7 +387,7 @@ git rev-parse origin/main
 
 > 继续按原需求规格推进胎迹完整V1，先读 `docs/AGENT-HANDOFF-2026-11-12.md` 并核对main、HEAD、dirty及本机回执。范围为12个核心模块、10项发布Gate，整体验收持续开放。
 >
-> 原文后端基线为675f968，033迁移及HTML／文本正文FTS、引用恢复API已有五模块204／204、真实PostgreSQL49项检查及149张模型表恢复证据。本轮SDK／Web接通，67项API、9项SDK、50项Web、三端类型及生产构建通过，生产浏览器24项业务检查与1440／390／320视口通过，私有服务及页面已关闭。继续原文RAG计划第3–5步，优先PDF逐页抽取，再推进正文向量／融合／重排和AI证据包。
+> 原文后端基线为675f968，HTML／文本SDK及Web基线为54e749d，033已有204项API与真实PostgreSQL49项检查、149表恢复，HTML界面已有生产浏览器24项业务及三个视口验收。当前工程提交21d00a7新增034、PDF受限逐页抽取、索引／逐页／搜索／引用恢复四API、SDK与文档面板。广批331／332，历史清单断言修正后完整Parser包专项25／25，PDF两模块36项、SDK16项、Web50项、三端类型及生产构建已通过。先接入知识检索PDF卡和引用恢复，仅消费无结构化筛选的查询，再补齐034真实PostgreSQL与PDF生产浏览器，随后推进正文向量／融合／重排和AI证据包。
 >
 > Responses终态额度及8种合成流式模式、50项Web测试、三端类型及生产构建已有回执。后续额度503、手动刷新、过期错误、关闭取消及迟到成功／错误已通过生产Web合成验收，4次提交对应4次调用及2400 tokens，服务已关闭。继续用户选定的OpenAI Responses真实语义链，本机OpenAI配置及EPREL Key缺失，继续独立工程。
 >
