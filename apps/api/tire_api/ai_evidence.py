@@ -1,5 +1,6 @@
 """Exact structured evidence selection before any model call or document retrieval."""
 from copy import deepcopy
+import asyncio
 from datetime import datetime, timedelta
 import json
 from typing import Literal
@@ -16,6 +17,7 @@ from .identity_contract import contract_context, contract_metadata
 from .recall_models import RecallQuery, SOURCE_ID as RECALL_SOURCE_ID
 from .service import QueryService, provenance, timestamp
 from .source_settings import SourceAccessBlocked
+from .text_embeddings import TextSelection
 
 
 class PackReference(StrictModel):
@@ -46,7 +48,7 @@ class PackReference(StrictModel):
 
 class PreparePack(StrictModel):
     mode: Literal['current', 'history']
-    references: list[PackReference] = Field(default_factory=list, max_length=6)
+    references: list[PackReference | TextSelection] = Field(default_factory=list, max_length=6)
     source_id: str | None = Field(default=None, max_length=80)
     query_kind: Literal['tire', 'recall_by_campaign'] | None = None
     query: TireQuery | RecallQuery | None = None
@@ -546,6 +548,7 @@ def require_frozen_field_contract(payload):
 
 async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, recall_adapter=None) -> dict:
     builder = PackBuilder()
+    pdfs = {}
     state, query_result = 'local_snapshot', None
     if payload.mode == 'current' and payload.query_kind == 'recall_by_campaign':
         from .recall_models import RecallLiveRequest, RecallVerification
@@ -584,7 +587,10 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
                                   'data_state': state, 'consent_id': query_result['consent_id']}, registry)
     else:
         for ref in payload.references:
-            if ref.kind == 'recall':
+            if ref.kind in {'source_text', 'document_text'}:
+                from .ai_original_text import add_original
+                await asyncio.to_thread(add_original, builder, db, ref, pdfs)
+            elif ref.kind == 'recall':
                 builder.recall(db, ref.snapshot_id, ref.recall_revision_id, state=state)
             elif ref.kind == 'change_event':
                 from .ai_monitoring import add_change_event
@@ -662,6 +668,9 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
                'conflicts': builder.conflicts, 'query_id': query_result['query_id'] if query_result else None,
                'consent_id': query_result['consent_id'] if query_result else None,
                'source_state': 'snapshot' if state == 'local_snapshot' else 'live'}
+    if any(ref.kind in {'source_text', 'document_text'} for ref in payload.references):
+        from .ai_original_text import POLICY
+        content.update(original_text_policy=POLICY, retrieval='selected_original_and_structured_evidence')
     if any(reference.kind == 'change_event' for reference in payload.references):
         content['purpose'] = 'monitor_explanation'
     if any(item.get('evidence_type') == 'recall' for item in builder.evidence):

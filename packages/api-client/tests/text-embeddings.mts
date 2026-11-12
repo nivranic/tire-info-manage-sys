@@ -5,6 +5,7 @@ import type {
   TextEmbeddingAuthorizationPreview, TextEmbeddingAuthorizationRequest,
   TextEmbeddingAuthorizationResult, TextEmbeddingSelection, TextEmbeddingPlan,
   EmbeddingRun, KnowledgeSearchRequest, OriginalTextSearchResult,
+  TextUseAuthorizationPreview, TextUseAuthorizationRequest, TextUseAuthorizationResult,
 } from "@tire/domain-types";
 
 const selections: TextEmbeddingSelection[] = [
@@ -18,6 +19,38 @@ const authorization: TextEmbeddingAuthorizationResult = {
   purpose: "original_text_embedding@1", scope_hash: "f".repeat(64),
   authorization: { state: "granted", revision: 1, revision_id: "合成授权" },
 };
+
+for (const purpose of ["original_text_ai@1", "original_text_report_export@1"] as const) {
+  await test(`${purpose} preview and revision preserve their own recipient and request scope`, async () => {
+    const controller = new AbortController();
+    const result: TextUseAuthorizationResult = { ...authorization, purpose };
+    const preview: TextUseAuthorizationPreview = { ...result, selection: selections[1], text: "PDF原文🛞",
+      text_hash: "1".repeat(64), notice: "合成用途",
+      recipient: purpose === "original_text_ai@1"
+        ? { provider: "openai_responses", endpoint: "https://api.openai.com/v1/responses", allowed_host: "api.openai.com" }
+        : { destination: "research_report_download", formats: ["markdown", "html", "pdf"] } };
+    const payload: TextUseAuthorizationRequest = { selection: selections[1], purpose, scope_hash: result.scope_hash,
+      expected_revision: 1, action: "revoke", rights_basis: "合成撤销", privacy_class: "private", expires_at: null, acknowledged: true };
+    let calls = 0;
+    const restore = setApiTransport(async (path, init) => {
+      assert.equal(init.signal, controller.signal);
+      assert.equal(init.credentials, "include");
+      assert.equal(init.cache, "no-store");
+      if (calls++ === 0) {
+        assert.equal(path, "/v1/ai/text-authorizations/preview");
+        assert.deepEqual(JSON.parse(String(init.body)), { selection: selections[1], purpose });
+        return new Response(JSON.stringify(preview));
+      }
+      assert.equal(path, "/v1/ai/text-authorizations");
+      assert.deepEqual(JSON.parse(String(init.body)), payload);
+      return new Response(JSON.stringify(result));
+    });
+    try {
+      assert.deepEqual(await tireApi.textUseAuthorizationPreview(selections[1], purpose, controller.signal), preview);
+      assert.deepEqual(await tireApi.authorizeTextUse(payload, controller.signal), result);
+    } finally { restore(); }
+  });
+}
 
 await test("HTML and PDF purpose previews preserve references, recipient and cancellation", async () => {
   for (const selection of selections) {

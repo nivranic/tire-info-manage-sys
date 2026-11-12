@@ -1,10 +1,9 @@
 ## 当前交接入口（2026-11-13）
 
-请先读[2026-11-13 Agent交接卡](AGENT-HANDOFF-2026-11-13.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、剩余工作与执行顺序。正文混合检索、地区偏好、pgvector镜像恢复及Web已接通，184项API、56项真实PG及153表备份恢复、29项浏览器、SDK7项、Web50项和生产构建通过。验收采用合成材料及Provider，具体范围和原始失败见交接卡。
+请先读[2026-11-13 Agent交接卡](AGENT-HANDOFF-2026-11-13.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、剩余工作与接手顺序。HTML／PDF正文证据包、独立用途、OpenAI Responses同步／流式grounding及报告导出已接通。最终269项API、58项真实PG及153表恢复、30项浏览器、SDK9项、Web50项、三端类型和生产构建通过，材料与Provider采用合成夹具。
 
-下一项为正文引用进入AI证据包，贯通OpenAI Responses、用途、同意、预算、grounding、流式与报告。完整V1持续开放，真实语义、专业材料、生产权限、平台及无障碍继续待验。用户首个真实接入选择为OpenAI Responses，EPREL当前无Key继续独立工作，专业材料由Agent自主核验。Gemini适配来自原规格，由此前Agent自行提前排期。旧KIT C2封存及以下历史记录保持现有约束。
+用户选定首个真实AI接入为OpenAI Responses，Gemini来自原规格并由此前Agent自行提前排期。真实Responses／Embeddings语义、语义reranker、专业SKU与人工审核、生产权限、六类平台、无障碍及完整V1 Gate继续开放。当前OpenAI与EPREL凭据缺失，继续独立工程和自主材料核验。原始失败、隔离服务关闭及操作约束见交接卡，旧KIT C2封存及以下历史记录保留。
 
----
 
 ## 当前交接入口（2026-10-26）：工程已推送，完整V1仍未完成
 

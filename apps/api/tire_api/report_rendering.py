@@ -86,6 +86,12 @@ def _validate(document):
             or not isinstance(body.get('source_pack'), dict)):
         raise ReportRenderError('invalid_document')
     evidence, facts = body.get('evidence'), body.get('facts')
+    from fastapi import HTTPException
+    from .ai_original_text import original_items
+    try:
+        original_items(body)
+    except (HTTPException, ValueError, TypeError, KeyError, AttributeError):
+        raise ReportRenderError('invalid_original_text_citation') from None
     if not isinstance(evidence, list) or not evidence or not isinstance(facts, list) or not facts:
         raise ReportRenderError('invalid_document')
     evidence_by_id, facts_by_id = {}, {}
@@ -243,6 +249,8 @@ _LABELS = {
     'record_scopes': '独立产品记录作用域', 'observation_kind': '观察类别',
     'applicability': '实物适用性（not_assessed 表示未评估）',
     'parser_identity': '解析器部署身份', 'region': '来源地区',
+    'original_text': '原文引用与摘录哈希', 'content_scope': '原文范围',
+    'document_id': '保存文档', 'retained_at': '原件留存时间',
 }
 
 

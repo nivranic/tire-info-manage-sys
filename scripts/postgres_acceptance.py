@@ -605,6 +605,12 @@ def run():
         original_hybrid_checkpoint = hybrid_checks.pop('checkpoint')
         REPORT['original_text_hybrid'] = hybrid_checks
         record(STEP)
+    STEP = 'original_text_ai_purposes_grounding_and_report_export'
+    from test_ai_original_text import verify_original_text_ai
+    original_ai_checks = verify_original_text_ai(url, authenticate=login_admin)
+    original_ai_checkpoint = original_ai_checks.pop('checkpoint')
+    REPORT['original_text_ai'] = original_ai_checks
+    record(STEP)
     # Freeze after every source-producing flow, including text material fixtures.
     STEP = 'identity_decision_concurrent_cas_uuid_withdrawal_and_restart'
     from identity_acceptance import assert_identity_checkpoint, verify_identity_persistence
@@ -665,6 +671,10 @@ def run():
     # Exercise report content downloads against the restored object copy, not
     # the original live directory which would conceal an incomplete backup.
     with patch.dict(os.environ, {'TI_OBJECT_STORE_ROOT': str(object_backup)}):
+        STEP = 'restored_original_text_ai_report_and_current_export_permission'
+        from test_ai_original_text import assert_original_text_ai_checkpoint
+        assert_original_text_ai_checkpoint(restored_url, original_ai_checkpoint, authenticate=login_admin)
+        record(STEP)
         if text_embedding_checkpoint is not None:
             STEP = 'restored_original_text_vectors_permissions_and_cached_run'
             from test_text_embeddings import assert_text_embedding_checkpoint

@@ -6,6 +6,7 @@ import type { AIAnalysis, AIPack, EvidenceReportDetail, EvidenceReportRecord, Re
 import { IdentityContractEvidence } from "./identity-contract";
 import { FrozenFieldResolutions } from "./field-authority";
 import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope } from "./recall-evidence-meta";
+import OriginalTextCitation from "./original-text-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import { useToast } from "./toast";
@@ -100,6 +101,7 @@ function FrozenReportBody({ report }: { report: EvidenceReportDetail }) {
     {body.evidence.map(source => <section className="ai-evidence" key={source.id} id={`report-${report.id}-source-${source.id}`} tabIndex={-1}>
       {source.kind === "tire" || source.identity_contract ? <IdentityContractEvidence contract={source.identity_contract} historical /> : null}
       <h4>{source.id} · {source.label}</h4><RecallEvidenceMeta evidence={source} />
+      {source.original_text ? <OriginalTextCitation selection={source.original_text.selection} retainedAt={source.retained_at} /> : null}
       <p>观察 {stamp(source.observed_at)} · 验证 {stamp(source.verified_at)}{source.revision ? ` · 修订 #${source.revision}` : ""}</p>
       <p>{source.source_id || "人工记录"} · {source.parser_version || "未记录解析器"}</p>
       {source.snapshot_id ? <p>快照 <code>{source.snapshot_id}</code></p> : null}

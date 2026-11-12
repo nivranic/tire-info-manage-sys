@@ -24,6 +24,7 @@ MAX_RESPONSE_BYTES = 512 * 1024
 MAX_REQUEST_BYTES = 48_000
 PROMPT_VERSION = 'tire-grounding@1'
 SAFE_ERRORS = {'vehicle_provider_use_not_allowed', 'vehicle_raw_integrity_failed', 'vehicle_evidence_binding_failed',
+               'ai_original_text_binding_failed', 'ai_original_text_original_invalid', 'ai_original_text_use_not_allowed',
                'ai_disabled', 'ai_configuration_required', 'ai_configuration_invalid', 'ai_evidence_too_large',
                'candidate_ai_pre_dispatch_changed',
                'ai_provider_http_error', 'ai_response_invalid', 'ai_response_too_large', 'ai_provider_timeout',
@@ -235,6 +236,10 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
     if contains_test(evidence):
         system_prompt = (system_prompt + '\n\n' if contains_recall(evidence) else '') + TEST_SYSTEM_PROMPT
         output_schema, schema_name = TEST_OUTPUT_SCHEMA, TEST_SCHEMA_NAME
+    if evidence.get('original_text_policy') is not None:
+        from .ai_original_text import NOTICE, original_items
+        original_items(evidence)
+        system_prompt += '\n\n' + NOTICE + '\n事实引用原文摘录时，text保持为空，由服务器呈现原文。'
     if config.provider == 'anthropic':
         # Anthropic has no native response_format; the output contract rides in the system
         # prompt (ADR-2026-055 D-2). Appended before measurement so the byte gate and token
@@ -288,6 +293,8 @@ def analysis_contract(payload):
                     'recall_policy': payload['recall_policy']}
     else:
         contract = {'prompt_version': PROMPT_VERSION, 'purpose': payload.get('purpose', 'analysis')}
+    if payload.get('original_text_policy') is not None:
+        contract['original_text_policy'] = payload['original_text_policy']
     boundary = test_boundary(payload)
     if boundary:
         if contains_recall(payload):

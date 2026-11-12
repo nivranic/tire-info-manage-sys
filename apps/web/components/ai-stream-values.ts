@@ -42,6 +42,9 @@ export const aiStreamStateLabels = {
 };
 
 export const aiStreamErrorMessages: Record<string, string> = {
+  ai_original_text_use_not_allowed: "正文用途许可已缺失、到期或撤销。请核对当前接收端和用途修订，再准备证据。",
+  ai_original_text_binding_failed: "正文引用与证据包绑定未通过核对。请重新准备所选证据并检查用途修订。",
+  ai_original_text_original_invalid: "保存原件或引用未能恢复，请核对原件完整性。",
   ai_stream_interrupted: "分析响应在完成前中断，结果与用量尚未确认。请核对原调用记录和供应商用量；不会自动重新调用模型。",
   ai_stream_protocol_error: "模型响应的顺序或最终正文不一致，未通过完整性校验，生成内容已丢弃。不会自动重试；请核对本次调用用量。",
   ai_stream_owner_expired: "执行期限已过，仍没有可信的完成记录。结果与用量尚未确认；读取进度不会恢复模型调用。",

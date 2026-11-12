@@ -79,3 +79,9 @@ PDF知识检索与原件引用已接通，生产浏览器PDF35项、HTML／PDF�
 沿用现行每块6000个UTF-8字节、单批32块／100KB的Embeddings输入边界，并在具体设计中核对正文分块的映射。索引与查询分别使用显式外发确认。随后实现融合与权威／地区／时效重排，将所选原件引用冻结进证据包，贯通Responses、流式、grounding及报告。
 
 首个真实生成接口继续采用用户选定的OpenAI Responses API。接手运行时核对进程中的TI_AI_PROVIDER，代码默认值为openai_responses。真实Embeddings／Responses质量、专业材料质量及完整V1继续按各自实际结果验收。
+
+## 第四及第五步工程收尾
+
+正文向量、FTS／RRF融合、来源类别／地区／时间排序、原文引用证据包、独立AI及导出用途、单次同意、预算、Responses同步／流式grounding与报告已贯通。第四步的语义reranker模型及真实模型质量继续待验。第五步工程取得269项API、58项PG及153表恢复、30项生产浏览器、SDK9项、Web50项、三端类型和生产构建通过，输入为合成原文与合成Provider。
+
+现阶段可按[正文AI计划](2026-11-13-original-text-ai.md)及[当前交接卡](../AGENT-HANDOFF-2026-11-13.md)复验工程链路，随后继续代表性真实材料、真实Responses／Embeddings语义及完整V1验收。

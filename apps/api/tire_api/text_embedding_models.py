@@ -1,4 +1,4 @@
-"""Append-only, original-bound permissions for embedding text excerpts."""
+"""Append-only original-bound text permissions, retaining the historical table name."""
 from datetime import datetime
 
 from sqlalchemy import DDL, DateTime, JSON, String, UniqueConstraint, event

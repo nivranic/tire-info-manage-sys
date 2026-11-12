@@ -80,6 +80,8 @@ def owned_report(db, report_id, scope):
 
 
 def canonical_facts(payload, *, frozen=False):
+    from .ai_original_text import original_items
+    original_items(payload)
     validate_recall_payload(payload, require_purpose=not frozen, frozen=frozen)
     evidence = deepcopy(payload.get('evidence'))
     if not isinstance(evidence, list) or not evidence or len({item['id'] for item in evidence}) != len(evidence):
@@ -121,6 +123,10 @@ def freeze_body(db, pack, analysis_id, session_id):
                                  purpose='local_structured', pack_id=pack.id)
         from .ai_evidence import frozen_field_resolutions
         field_contract = {}
+        if pack.payload.get('original_text_policy') is not None:
+            from .ai_original_text import require_originals
+            require_originals(db, pack.payload)
+            field_contract['original_text_policy'] = pack.payload['original_text_policy']
         if 'field_resolutions' in pack.payload:
             field_contract['field_resolutions'] = frozen_field_resolutions(pack.payload)
         if 'field_policy' in pack.payload:
@@ -345,6 +351,8 @@ def register_report_routes(app: FastAPI):
         document_hash = digest(document)
         from .ai_evidence import require_vehicle_evidence
         require_vehicle_evidence(db, report.body, purpose='export', pack_id=report.pack_id, frozen=True)
+        from .ai_original_text import EXPORT_PURPOSE, require_originals
+        require_originals(db, report.body, purpose=EXPORT_PURPOSE)
         existing = db.scalar(select(ReportExport).where(ReportExport.report_id == report_id,
             ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == renderer_version))
         if existing:
@@ -363,6 +371,7 @@ def register_report_routes(app: FastAPI):
         QueryService(db, None).lock_ingestion()
         fresh_report = owned_report(db, report_id, session_scope(db, request.state.session_id))
         require_vehicle_evidence(db, fresh_report.body, purpose='export', pack_id=fresh_report.pack_id, frozen=True)
+        require_originals(db, fresh_report.body, purpose=EXPORT_PURPOSE)
         # Concurrent identical exports reuse the first immutable object receipt.
         existing = db.scalar(select(ReportExport).where(ReportExport.report_id == report_id,
             ReportExport.revision == payload.revision, ReportExport.format == payload.format, ReportExport.renderer_version == renderer_version))
@@ -394,6 +403,8 @@ def register_report_routes(app: FastAPI):
             raise HTTPException(409, '导出与冻结报告修订的绑定校验失败')
         from .ai_evidence import require_vehicle_evidence
         require_vehicle_evidence(db, report.body, purpose='export', pack_id=report.pack_id, frozen=True)
+        from .ai_original_text import EXPORT_PURPOSE, require_originals
+        require_originals(db, report.body, purpose=EXPORT_PURPOSE)
         try:
             data = checked(db.info['object_store'].get(record.sha256, record.byte_count), record.sha256, record.byte_count)
         except ObjectStoreError:

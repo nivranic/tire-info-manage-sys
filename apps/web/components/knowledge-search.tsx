@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
-import type { AIPackReference, KnowledgeFilters, KnowledgeSearchItem, KnowledgeSearchResult, TextEmbeddingSelection } from "@tire/domain-types";
+import type { AIAnalysisReference, AIPackReference, KnowledgeFilters, KnowledgeSearchItem, KnowledgeSearchResult, TextEmbeddingSelection } from "@tire/domain-types";
 import { IdentityContractBadge } from "./identity-contract";
 import { FieldResolutionView } from "./field-authority";
 import VectorTools from "./vector-tools";
@@ -58,7 +58,7 @@ function ResultCard({ item, selected, disabled, onToggle }: { item: KnowledgeSea
 }
 
 export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery, onOffline }: {
-  onClose: () => void; onAnalyze: (references: AIPackReference[]) => void; onLiveQuery: (recall?: { campaign_number?: string }) => void; onOffline?: (references: AIPackReference[]) => void;
+  onClose: () => void; onAnalyze: (references: AIAnalysisReference[]) => void; onLiveQuery: (recall?: { campaign_number?: string }) => void; onOffline?: (references: AIPackReference[]) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const textInput = useRef<HTMLInputElement>(null);
@@ -154,7 +154,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   function close() { operation.current?.abort(); onClose(); }
   function analyze() {
     if (!result || busy) return;
-    const references = selectedReferences;
+    const references: AIAnalysisReference[] = [...selectedReferences, ...selectedText];
     if (references.length && references.length <= 6) { operation.current?.abort(); onAnalyze(references); }
   }
 
@@ -191,6 +191,6 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
       {sourceTextSearch ? <SourceTextSearch key={JSON.stringify(sourceTextSearch)} search={sourceTextSearch} automatic={result?.total === 0 && !result?.original_text} selected={selectedText} onToggle={toggleText} /> : null}
       {documentTextSearch ? <SourceTextSearch key={`document-${JSON.stringify(documentTextSearch)}`} origin="document" search={documentTextSearch} automatic={result?.total === 0 && !result?.original_text} selected={selectedText} onToggle={toggleText} /> : null}
     </div>
-    <footer className="knowledge-footer"><div><strong>已选 {selectedReferences.length} 份不同证据 · AI上限6份</strong>{selectedRecallReferences ? <small>召回产品命中 {selectedProducts} 条 · 公告 / 空观察证据 {selectedRecallReferences} 份</small> : null}<small>进入下一步核对全部记录后，才能授权发送给 AI。</small></div>{onOffline ? <button className="secondary-button" disabled={!selected.length || busy || !result} type="button" onClick={() => onOffline(selectedReferences)}>预览所选设备离线资料</button> : null}<button className="primary-button" disabled={!selected.length || selectedReferences.length > 6 || busy || !result} type="button" onClick={analyze}>用所选历史证据分析</button></footer>
+    <footer className="knowledge-footer"><div><strong>已选 {selectedReferences.length} 份结构化证据与 {selectedText.length} 段正文 · AI上限6份</strong>{selectedRecallReferences ? <small>召回产品命中 {selectedProducts} 条 · 公告 / 空观察证据 {selectedRecallReferences} 份</small> : null}<small>进入下一步核对全部记录后，才能授权发送给 AI。</small></div>{onOffline ? <button className="secondary-button" disabled={!selected.length || busy || !result} type="button" onClick={() => onOffline(selectedReferences)}>预览所选设备离线资料</button> : null}<button className="primary-button" disabled={!selectedReferences.length && !selectedText.length || selectedReferences.length + selectedText.length > 6 || busy || !result} type="button" onClick={analyze}>用所选历史证据分析</button></footer>
   </dialog>;
 }

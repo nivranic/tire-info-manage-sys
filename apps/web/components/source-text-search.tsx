@@ -50,7 +50,7 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
   }
 
   return <article className={`knowledge-card ${excerpt.kind === "document_text" ? "document-text-card" : "source-text-card"}${selected ? " selected" : ""}`}>
-    <div className="knowledge-card-heading"><label className="knowledge-select"><input type="checkbox" aria-label={`选择正文向量引用 ${excerpt.kind === "document_text" ? `${excerpt.document.title} 第 ${excerpt.reference.page} 页` : excerpt.reference.snapshot_id}`} checked={selected} disabled={disabled} onChange={onToggle} /><span>{excerpt.kind === "document_text" ? `${excerpt.document.title} · 第 ${excerpt.reference.page} 页` : `${excerpt.source_id} · 页面正文摘录`}</span></label></div>
+    <div className="knowledge-card-heading"><label className="knowledge-select"><input type="checkbox" aria-label={`选择正文引用 ${excerpt.kind === "document_text" ? `${excerpt.document.title} 第 ${excerpt.reference.page} 页` : excerpt.reference.snapshot_id}`} checked={selected} disabled={disabled} onChange={onToggle} /><span>{excerpt.kind === "document_text" ? `${excerpt.document.title} · 第 ${excerpt.reference.page} 页` : `${excerpt.source_id} · 页面正文摘录`}</span></label></div>
     <p className="knowledge-excerpt">{excerpt.text}</p>
     <p className="knowledge-stamp">{methods[item.match.method]}</p>
     <p className="knowledge-stamp">{excerpt.kind === "document_text" ? `留存 ${stamp(excerpt.document.created_at)}` : `观察 ${stamp(excerpt.observed_at)} · 验证 ${stamp(excerpt.verified_at)}`}</p>
@@ -75,7 +75,7 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
       <ul>{item.match.explanation.map(line => <li key={line}>{line}</li>)}</ul>
     </details> : null}
     <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void resolve()}>{busy ? "正在恢复引用…" : "核对原文引用"}</button>
-      <button type="button" className="secondary-button" onClick={() => setPurposeOpen(true)}>核对正文向量用途</button>
+      <button type="button" className="secondary-button" onClick={() => setPurposeOpen(true)}>核对正文用途</button>
       <span role="status" aria-live="polite">{resolved ? "已从保存原件恢复引用" : ""}</span></div>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}
     {purposeOpen ? <TextEmbeddingPurposeDialog selection={item.kind === "document_text" ? { kind: "document_text", reference: item.reference } : { kind: "source_text", reference: item.reference }} onClose={() => setPurposeOpen(false)} /> : null}

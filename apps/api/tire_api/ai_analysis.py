@@ -111,6 +111,8 @@ class ModelAnswer(StrictModel):
 
 
 def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
+    from .ai_original_text import POLICY, NOTICE as ORIGINAL_NOTICE, original_items
+    originals = original_items(pack.payload)
     from sqlalchemy.orm import object_session
     if isinstance(pack, AIEvidencePack):
         attached = object_session(pack)
@@ -172,6 +174,9 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
             'uncertainty': model.uncertainty, 'conflicts': pack.payload['conflicts'],
             'source_state': pack.payload['source_state'], 'data_state': pack.data_state,
             'notice': '事实文字由所选证据字段生成；模型推断与不确定性仍需核对，不是来源事实或安全适配认证。'}
+    if originals:
+        result['original_text_policy'] = POLICY
+        result['notice'] += '\n' + ORIGINAL_NOTICE
     if recall:
         result['recall_boundary'] = recall_boundary(pack.payload)
         result['notice'] = result['recall_boundary']['notice']
@@ -382,6 +387,8 @@ def prepare_analysis(db, payload, session_id, *, stream=False):
                     raise HTTPException(409, '测试事件已撤销，请重新核对')
         from .ai_evidence import require_vehicle_evidence
         require_vehicle_evidence(db, pack.payload, purpose='provider', pack_id=pack.id)
+        from .ai_original_text import AI_PURPOSE, require_originals
+        require_originals(db, pack.payload, purpose=AI_PURPOSE, config=config)
         body, reserve = request_body(config, payload.question, {**pack.payload, 'data_state': pack.data_state}, stream=stream)
     except GatewayError as error:
         raise HTTPException(503, str(error)) from None

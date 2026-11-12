@@ -140,6 +140,8 @@ def reserve_response(db, *, config, pack, session_id, key, request_hash, questio
         require_frozen_field_contract(pack.payload)
     from .ai_evidence import require_vehicle_evidence
     require_vehicle_evidence(db, pack.payload, purpose='provider', pack_id=pack.id)
+    from .ai_original_text import AI_PURPOSE, require_originals
+    require_originals(db, pack.payload, purpose=AI_PURPOSE, config=config)
     budget = budget_usage(db)
     if budget['requests'] >= config.daily_request_limit or budget['accounted_tokens'] + reserve > config.daily_token_limit:
         raise HTTPException(429, '本地 AI 当日预算不足，未调用模型')
@@ -259,6 +261,12 @@ def require_vehicle_dispatch(database, request_id, config, body, pack=None):
         raise GatewayError('vehicle_raw_integrity_failed') from None
 
 
+def require_evidence_dispatch(database, request_id, config, body, pack=None):
+    require_vehicle_dispatch(database, request_id, config, body, pack)
+    from .ai_original_text import require_dispatch
+    require_dispatch(database, request_id, config, body, pack)
+
+
 def execute_response(db, app, row, config, body, validator):
     """Called in a FastAPI worker, after the durable reservation has committed."""
     from .telemetry import observe
@@ -271,18 +279,20 @@ def execute_response(db, app, row, config, body, validator):
 def _execute_response(db, app, row, config, body, validator):
     receipt = {'usage': None, 'provider_response_id': None}
     answer, error = None, None
-    local_vehicle_denial = False
+    local_dispatch_denial = False
     try:
         try:
-            require_vehicle_dispatch(app.state.database, row.id, config, body)
+            require_evidence_dispatch(app.state.database, row.id, config, body)
         except GatewayError:
-            local_vehicle_denial = True
+            local_dispatch_denial = True
             raise
         from .candidate_ai import before_dispatch
         before_dispatch(db, app, row, config, body)
         receipt = asyncio.run(app.state.ai_adapter.generate(config, body))
         error = safe_error(receipt['error']) if receipt.get('error') else None
         if not error:
+            from .ai_original_text import require_dispatch
+            require_dispatch(app.state.database, row.id, config, body)
             answer = validator(receipt['text'])
     except GatewayError as cause:
         error = safe_error(str(cause))
@@ -292,7 +302,7 @@ def _execute_response(db, app, row, config, body, validator):
         error = 'ai_provider_failed'
     if not isinstance(receipt, dict):
         receipt = {}
-    if local_vehicle_denial:
+    if local_dispatch_denial:
         receipt = {'usage': {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0}}
     response_id = receipt.get('provider_response_id')
     if not isinstance(response_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', response_id):

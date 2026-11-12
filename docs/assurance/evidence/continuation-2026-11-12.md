@@ -689,3 +689,17 @@ API结果为 `.artifacts/txweb-r1/result.json`，SHA256 `feaf0eeac4b02566b8c8d92
 浏览器采用实际PostgreSQL／pgvector及合成HTML／PDF和Provider。覆盖地区／来源筛选、精确条件准入、引用恢复、单次确认、关闭及迟到响应、历史读取和回执丢失后的同标识恢复。最终7次合成调用、7条请求及完成账本、100 tokens和4块缓存，外网尝试、来源调用、真实Provider及正常数据库使用均为0。主动精确筛选拒绝反例产生一条409控制台记录。API退出0，Web经SIGINT退出1，两个隔离PG集群、验收端口和夹具进程关闭核对通过。
 
 本轮回执根目录为 `.artifacts/original-hybrid-20261113/`，入口为 `browser-final.json`、`closure-final.json`及 `delivery-validation.json`。新的当前入口为[11月13日交接卡](../../AGENT-HANDOFF-2026-11-13.md)。下一项为正文证据包与Responses链路，完整V1、真实语义、材料、生产权限、原生平台和无障碍继续待验。
+
+## 2026-11-13正文证据包与Responses交付
+
+新增 `original-text-grounding@1` 正文包，复用HTML／PDF引用和035只追加授权账本，分别绑定AI分析及报告导出用途。结构化／正文合计最多6份，准备、预留、最终外发和采纳核对原件、用途、接收端及持久请求。同步和流式均沿用Responses与grounding，报告保留冻结正文并在导出、渲染发布及下载检查独立许可。Web支持正文选择、三用途切换、原件恢复、PDF页码／留存时间及报告引用。
+
+本轮保留 `otai-r1` 的预期拒绝、`otai-r3` 的中断及 `otai-r4` 的109通过／1失败。流式测试改用文件SQLite，并将事件循环中的同步TestClient调用放入线程。r5取得269／269。首轮PG在Parser发布阶段失败，关闭回执未确认，随后独立确认集群及进程已退出，新集群r2全批58项通过。浏览器初次服务句柄消失并连接拒绝，改用有记录的独立后台进程继续实际生产构建验收。选择器、观察时限和底层知识窗口断言问题保留在浏览器回执，最终按实际目标窗口复验。
+
+最后统一PG验收脚本混合换行为LF，并为26个源码文件固定Git换行属性。最终受管r6十模块269／269，796个输入稳定、资源关闭及非自检拒绝0。PG r3为58项通过、153表实际dump／restore指纹一致，含原文用途、grounding、报告及恢复后下载。回执位于 `.artifacts/otai-r6/result.json` 和 `.artifacts/postgres/pgverify-97799fe74b514d1280339031bc1fa13f/report.json`。
+
+三端类型、末次Web类型、SDK9项、Web50项和生产构建通过。浏览器30项覆盖HTML＋PDF选择、用途修订、单次同意、Responses SSE、原件恢复、600 tokens、报告HTML校验下载、导出撤销后拒绝已有文件复用、冻结报告读取、迟到响应及320／390／1440像素布局。仅1次合成模型调用，对应1条请求和完成账本、1份报告，外网、来源及真实Provider调用0。浏览器与验收服务、隔离PG和端口关闭均独立核对。
+
+OpenAI模型／Key与EPREL Key在三个环境作用域再次核对缺失。用户选定首个真实生成Provider为OpenAI Responses。Gemini来自原规格第710行，其提前排期由此前Agent自行决定。真实模型语义、语义reranker、真实专业精确SKU及外部人工审核、生产权限、原生平台与完整V1 Gate继续开放。当前入口为[交接卡](../../AGENT-HANDOFF-2026-11-13.md)。
+
+Git HTTPS直连fetch两次连接重置，官方GitHub API直连返回200，并通过已有Git凭据核对远端仍在交付前基线。交付采用官方Git数据API逐对象哈希核对，最终远端SHA由交付消息及实时查询确认。本机回执根目录为 `.artifacts/original-text-ai-20261113/`。

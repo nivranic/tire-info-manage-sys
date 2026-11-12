@@ -47,9 +47,11 @@ class AIStreamSupervisor:
                 return result
             raise
 
-    async def _vehicle_dispatch(self, request_id, config, body, pack):
-        from .ai_execution import require_vehicle_dispatch
-        operation = asyncio.create_task(asyncio.to_thread(require_vehicle_dispatch,
+    async def _dispatch_evidence(self, request_id, config, body, pack, *, original_only=False):
+        from .ai_execution import require_evidence_dispatch
+        from .ai_original_text import require_dispatch
+        check = require_dispatch if original_only else require_evidence_dispatch
+        operation = asyncio.create_task(asyncio.to_thread(check,
             self.database, request_id, config, body, pack))
         try:
             return await asyncio.shield(operation)
@@ -66,7 +68,7 @@ class AIStreamSupervisor:
         answer = None
         state, error = 'outcome_unknown', 'ai_stream_interrupted'
         started = False
-        local_vehicle_denial = False
+        local_dispatch_denial = False
         with observe('ai.response', component='ai') as operation:
             try:
                 async with asyncio.timeout(PRODUCER_SECONDS):
@@ -75,9 +77,9 @@ class AIStreamSupervisor:
                         operation.finish('not_started')
                         return
                     try:
-                        await self._vehicle_dispatch(request_id, config, body, pack)
+                        await self._dispatch_evidence(request_id, config, body, pack)
                     except GatewayError:
-                        local_vehicle_denial = True
+                        local_dispatch_denial = True
                         raise
                     projector = StructuredDraftProjector(pack)
 
@@ -96,6 +98,7 @@ class AIStreamSupervisor:
                     else:
                         if receipt.get('text') != projector.text:
                             raise GatewayError('ai_stream_protocol_error')
+                        await self._dispatch_evidence(request_id, config, body, pack, original_only=True)
                         answer = projector.finish()
                         state, error = 'completed', None
             except asyncio.CancelledError:
@@ -113,7 +116,7 @@ class AIStreamSupervisor:
             # started event; owner-fenced finalization safely handles that window.
             if not isinstance(receipt, dict):
                 receipt = {}
-            if local_vehicle_denial and state == 'failed':
+            if local_dispatch_denial and state == 'failed':
                 receipt = {'usage': {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0}}
             usage = safe_usage(receipt.get('usage')) if state != 'outcome_unknown' else None
             try:

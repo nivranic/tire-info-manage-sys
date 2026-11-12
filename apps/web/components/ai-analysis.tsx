@@ -11,6 +11,7 @@ import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope, recallAnal
 import { recallCurrentRequest, uniqueAIReferences } from "./recall-evidence-values";
 import { AI_RECOVERY_KEY, aiStreamErrorMessage, aiStreamErrorMessages, canExportAIAnalysis, parseAIRecovery, type AIRecoveryPointer } from "./ai-stream-values";
 import AiBudgetMeter, { aiProviderLabel } from "./ai-budget";
+import OriginalTextCitation from "./original-text-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 
 export type AITarget = ({ variant: Variant; sourceId?: string } | { references: AIAnalysisReference[]; label: string }
@@ -241,6 +242,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         <section className="snapshot-banner"><strong>{pack.source_state === "snapshot" ? "LOCAL SNAPSHOT · 历史证据" : "已在线核验的所选证据"}</strong><span>准备时间 {stamp(pack.created_at)} · 提交有效期至 {stamp(pack.expires_at)} · {pack.privacy_class === "public" ? "公开来源证据" : "非公开工作区证据"}</span></section>
         <details className="ai-evidence" open><summary>查看 {pack.evidence.length} 条来源与 {pack.facts.length} 个字段</summary>{pack.evidence.map(e => <section key={e.id} id={`ai-source-${e.id}`}><h4>{e.id} · {e.label}</h4>{e.kind === "tire" || e.identity_contract ? <IdentityContractEvidence contract={e.identity_contract} historical /> : null}<p>观察 {stamp(e.observed_at)} · 验证 {stamp(e.verified_at)}{e.revision ? ` · 修订 #${e.revision}` : ""}</p><p>{sourceLink(e.source_url) ? <a href={sourceLink(e.source_url)} target="_blank" rel="noopener noreferrer">打开原始来源</a> : "来源链接不可打开"} · {e.parser_version || "人工录入 / 车型证据"}</p>
           <RecallEvidenceMeta evidence={e} />
+          {e.original_text ? <OriginalTextCitation key={`${pack.id}:${e.id}`} selection={e.original_text.selection} retainedAt={e.retained_at} /> : null}
           {e.kind === "change_event" ? <div className="ai-change-provenance"><p className="review-boundary">这是 {stamp(e.change_observed_at)} 记录的历史变化。首次观察不代表新发布，后快照也不代表当前在线参数。</p><dl>
             <div><dt>变化前快照</dt><dd>{e.previous_snapshot_id ? <><code>{e.previous_snapshot_id}</code><br />观察 {stamp(e.previous_observed_at)}{e.previous_source_url && sourceLink(e.previous_source_url) ? <> · <a href={sourceLink(e.previous_source_url)} target="_blank" rel="noopener noreferrer">打开变化前来源</a></> : null}<br /><span>SHA-256 {e.previous_raw_hash || "未记录"}</span></> : "此前没有已采纳快照，不能据此推断厂商刚发布。"}</dd></div>
             <div><dt>变化后快照</dt><dd><code>{e.snapshot_id}</code><br />观察 {stamp(e.observed_at)}<br /><span>SHA-256 {e.raw_hash || "未记录"}</span></dd></div>

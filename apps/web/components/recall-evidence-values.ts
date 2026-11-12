@@ -9,6 +9,8 @@ export function aiReferenceKey(reference: AIAnalysisReference): string {
     case "vehicle": return JSON.stringify([reference.kind, reference.snapshot_id]);
     case "test_event": return JSON.stringify([reference.kind, reference.event_id, reference.event_revision]);
     case "change_event": return JSON.stringify([reference.kind, reference.change_id]);
+    case "source_text":
+    case "document_text": return JSON.stringify([reference.kind, reference.reference.chunk_id]);
   }
 }
 

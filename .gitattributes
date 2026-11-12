@@ -28,3 +28,31 @@
 /packages/api-client/package.json text eol=lf
 /apps/api/tests/test_raw_evidence_v2_sdk.py text eol=lf
 /packages/api-client/tests/raw-evidence-v2.mts text eol=lf
+
+# Preserve source bytes bound to original-text AI validation.
+/apps/api/tests/test_ai_original_text.py text eol=lf
+/apps/api/tests/test_ai_stream_execution.py text eol=lf
+/apps/api/tire_api/ai_analysis.py text eol=lf
+/apps/api/tire_api/ai_evidence.py text eol=lf
+/apps/api/tire_api/ai_execution.py text eol=lf
+/apps/api/tire_api/ai_gateway.py text eol=lf
+/apps/api/tire_api/ai_original_text.py text eol=lf
+/apps/api/tire_api/ai_streaming.py text eol=lf
+/apps/api/tire_api/main.py text eol=crlf
+/apps/api/tire_api/report_rendering.py text eol=lf
+/apps/api/tire_api/reports.py text eol=lf
+/apps/api/tire_api/text_embedding_models.py text eol=lf
+/apps/api/tire_api/text_embeddings.py text eol=lf
+/apps/web/components/ai-analysis.tsx text eol=crlf
+/apps/web/components/ai-stream-values.ts text eol=lf
+/apps/web/components/knowledge-search.tsx text eol=lf
+/apps/web/components/original-text-citation.tsx text eol=lf
+/apps/web/components/recall-evidence-values.ts text eol=crlf
+/apps/web/components/reports.tsx text eol=crlf
+/apps/web/components/source-text-search.tsx text eol=lf
+/apps/web/components/text-embedding-purpose.tsx text eol=lf
+/packages/api-client/src/index.ts text eol=crlf
+/packages/api-client/tests/text-embeddings.mts text eol=lf
+/packages/domain-types/src/index.ts text eol=crlf
+/scripts/postgres_acceptance.py text eol=lf
+/scripts/run_api_worker_regression.py text eol=lf

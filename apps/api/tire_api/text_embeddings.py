@@ -262,6 +262,10 @@ def register_text_embedding_routes(app):
         if payload.scope_hash is not None and payload.scope_hash != scope:
             fail('text_embedding_binding_failed')
         previous = authorization_head(db, scope)
+        if previous is not None and (previous.payload.get('purpose') != PURPOSE
+                or digest({'purpose': PURPOSE, 'selection': payload.selection.model_dump(),
+                    'recipient': previous.payload.get('recipient')}) != scope):
+            fail('text_embedding_binding_failed')
         if payload.expected_revision != (previous.revision if previous else 0):
             fail('text_embedding_binding_failed')
         if payload.action == 'revoke':

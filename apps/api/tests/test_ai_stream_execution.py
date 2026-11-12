@@ -10,8 +10,9 @@ from test_ai_stream_parser import PACK, TEXT
 
 @pytest.fixture(autouse=True)
 def isolated_producer_dispatch_port(monkeypatch):
-    from tire_api import ai_execution
+    from tire_api import ai_execution, ai_original_text
     monkeypatch.setattr(ai_execution, 'require_vehicle_dispatch', lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(ai_original_text, 'require_dispatch', lambda *_args, **_kwargs: None)
 
 
 class Store:

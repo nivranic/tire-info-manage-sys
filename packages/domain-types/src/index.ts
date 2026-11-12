@@ -126,7 +126,7 @@ export interface Source {
 export interface TireQuery { size?: string; model?: string }
 
 export type AIPackReference = { kind: "tire"; snapshot_id: string; variant_id: string } | { kind: "vehicle"; snapshot_id: string } | { kind: "test_event"; event_id: string; event_revision: number } | import("./recalls").RecallAnalysisReference;
-export type AIAnalysisReference = AIPackReference | { kind: "change_event"; change_id: string };
+export type AIAnalysisReference = AIPackReference | { kind: "change_event"; change_id: string } | TextEmbeddingSelection;
 export interface KnowledgeFilters {
   kind?: "tire" | "vehicle" | "test_event" | "recall";
   brand?: string; model?: string; size?: string; region?: string; product_code?: string;
@@ -263,6 +263,16 @@ export interface TextEmbeddingAuthorizationPreview extends TextEmbeddingAuthoriz
   selection: TextEmbeddingSelection; text: string; text_hash: string;
   recipient: { provider: "openai_embeddings"; endpoint: string; allowed_host: string }; notice: string;
 }
+export type TextUsePurpose = "original_text_ai@1" | "original_text_report_export@1";
+export interface TextUseAuthorizationRequest extends TextEmbeddingAuthorizationRequest { purpose: TextUsePurpose }
+export interface TextUseAuthorizationResult {
+  purpose: TextUsePurpose; scope_hash: string; authorization: TextEmbeddingAuthorizationState;
+}
+export interface TextUseAuthorizationPreview extends TextUseAuthorizationResult {
+  selection: TextEmbeddingSelection; text: string; text_hash: string; notice: string;
+  recipient: { provider: string; endpoint: string; allowed_host: string }
+    | { destination: "research_report_download"; formats: ("markdown" | "html" | "pdf")[] };
+}
 export interface TextEmbeddingPlan extends EmbeddingPlan {
   text_contract: "original-text-semantic@1";
   selections: { selection: TextEmbeddingSelection; authorization_id: string }[];
@@ -280,7 +290,9 @@ export interface AIEvidence {
   record_scopes?: { record_key: string; record_hash: string; occurrence: number; index: number }[];
   identity_contract?: import("./identity-contract").IdentityContract;
   id: string; kind: string; label: string; source_url: string; source_id?: string;
-  observed_at: string; verified_at: string | null; snapshot_id?: string; variant_id?: string;
+  observed_at: string | null; verified_at: string | null; snapshot_id?: string; variant_id?: string;
+  original_text?: { selection: TextEmbeddingSelection; text_hash: string };
+  document_id?: string; retained_at?: string; content_scope?: "page" | "document_page";
   event_id?: string; revision?: number; parser_version?: string; raw_hash?: string;
   change_id?: string; change_observed_at?: string;
   previous_snapshot_id?: string | null; previous_source_url?: string | null;
@@ -297,6 +309,7 @@ export interface TestAnalysisBoundary {
 }
 export interface AIPack {
   purpose?: string;
+  original_text_policy?: "original-text-grounding@1";
   test_boundary?: TestAnalysisBoundary;
   recall_policy?: { version: "recall-fact-selection@1"; digest: string };
   recall_boundary?: import("./recalls").RecallBoundary;
@@ -322,6 +335,7 @@ export interface AIAnalysis {
   created_at: string; completed_at: string | null; state: "pending" | "outcome_unknown" | "failed" | "completed";
   reserved_tokens: number; usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
   error_code: string | null; answer: {
+    original_text_policy?: "original-text-grounding@1";
     test_boundary?: TestAnalysisBoundary;
     recall_boundary?: import("./recalls").RecallBoundary;
     claims: AIClaim[];
