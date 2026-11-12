@@ -56,6 +56,7 @@ TEST_MODULES = (
     'apps/api/tests/test_ai_monitoring.py',
     'apps/api/tests/test_ai_pricing.py',
     'apps/api/tests/test_ai_pricing_migration.py',
+    'apps/api/tests/test_ai_provider_smoke.py',
     'apps/api/tests/test_ai_rule_contract.py',
     'apps/api/tests/test_ai_rule_drafts.py',
     'apps/api/tests/test_ai_stream_api.py',
