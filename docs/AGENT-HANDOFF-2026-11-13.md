@@ -8,16 +8,18 @@
 
 HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式grounding、报告和导出已接通。此前正文向量、FTS／RRF融合与地区排序已有工程和隔离验证。生成主线采用用户选定的OpenAI Responses API，真实模型语义仍待验收。
 
-本轮沿既有 `main` 修复混合检索忽略offset导致第二页重复的问题，结构化与HTML／PDF正文均在全局排序后分页。六模块API161项、综合PG58项及153模型表恢复、独立向量业务14项及155实际表恢复、SDK9项、Web55项和三端类型通过。
+已推送工程沿既有 `main` 修复混合检索忽略offset导致第二页重复的问题，结构化与HTML／PDF正文均在全局排序后分页。六模块API161项、综合PG58项及153模型表恢复、独立向量业务14项及155实际表恢复、SDK9项、Web55项和三端类型通过。
+
+最新材料阶段经正常API在隔离库录入1场真实文献转录，含10款轮胎、20条测量值，11项检查通过。原始PDF字节、原始测试来源、精确SKU关联和真人审核继续待完成。PERS本次捕获终态为超时失败，详细范围与回执见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 
 此前Web核心流程无障碍补修取得14份Lighthouse无障碍100分快照、22项功能与键盘检查及生产构建通过。读屏、完整WCAG 2.2 AA及其余发布Gate继续开放。
 
-本轮交付前的已推送基线为 `bc538b5bffd6a985908fbf2097e26c81007ff5b7`。本轮最终SHA及远端一致性以交付消息和即时Git查询为准。
+本次文档收尾前的已推送工程基线为 `74b62a66d7e6abde52b5189f7b194a52142e5a05`，本次核对本地HEAD、origin/main与远端main一致。文档交付最终SHA及远端一致性以交付消息和即时Git查询为准。
 
 ## 用户决定与实施选择
 
 - 首个真实AI接入为OpenAI Responses API，网关配置对象及环境读取的默认Provider为 `openai_responses`。启动进程显式设置 `TI_AI_PROVIDER=openai_responses`，并核对 `GET /v1/ai/status` 的实际Provider，环境覆盖会影响运行时选择。
-- Gemini来自原规格第710行的多模型备选表，原生Adapter由此前Agent自行提前排期并以 `d5fded1` 交付。该排期属于Agent的实施选择。已有合成回归，真实Google调用待验证。
+- Gemini来自原规格第710行的多模型备选表，原生Adapter由此前Agent自行提前排期并以 `d5fded1` 交付。该排期属于Agent的实施选择。已有合成回归，真实Google调用待验证。首个真实Provider的实施与验收顺序依据用户选定的OpenAI Responses执行。
 - 专业测试材料由Agent自主选择，并核对原始出版物、许可和可证明的SKU身份。
 - 当前没有EPREL Key，继续独立工作。OpenAI模型／Key及EPREL Key本轮在Process／User／Machine三个作用域复核为空，凭据条件具备后再执行真实接口验收。
 - 当前授权包含复核优化、总结进度、提交并push全部改动、编写Agent交接文档。
@@ -30,7 +32,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 2 精确版本识别 | 产品代码／GTIN／OE／技术／地区身份、冲突修订、Golden工作台 | 代表性真实精确SKU、外部真人审核、错合并指标 |
 | 3 车型适配 | SU7前后轴、车库、轴位与SKU证据桥、官方PDF解析工程 | 首代官方来源online-ready、完整OE事实、更多车型、Native消费 |
 | 4 比较 | 精确SKU比较、保存、同场测试候选、条件化偏好解读 | 真实专业性能解释与推荐、完整性能候选AI辅助 |
-| 5 测评数据库 | TestEvent、参与者、指标、环境、原件捕获、身份桥、Golden评估器 | 真实精确SKU正例、合法专业原件、外部真人Golden |
+| 5 测评数据库 | TestEvent、参与者、指标、环境、原件捕获、身份桥、Golden评估器，真实文献转录已完成隔离验证 | 真实精确SKU正例、合法专业原件、外部真人Golden |
 | 6 信息监控 | Worker、参数diff、召回、兴趣提醒、原文变化、质量隔离、地址迁移 | 任意网页／PDF差异、更多事件、真实长周期及交付可靠性 |
 | 7 传统CRUD | 来源、规则、偏好、测试、修订、账户、Provider、Key、费用规划切片 | 全实体覆盖、生产权限、BYOK、真实账单 |
 | 8 证据浏览 | 快照、哈希、解析版本、冲突、二进制原件、HTML／PDF正文及引用恢复、停止采纳 | 实际部署旧库切换、全域许可治理、正式再采纳、生产对象存储 |
@@ -39,7 +41,16 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名及有限重试、外部Key、字段许可治理 | 真实接收端、公网生产验收、SDK产品化、完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权、审计 | 生产身份／租户／RLS、完整角色治理、灾备、发布验收 |
 
-## 本轮混合检索分页
+## 最新专业材料进度
+
+- SAGE文献表1经正常API录入1条待审核TestEvent，10个参与者、20条测量值，均保持participant_only。创建、同场比较、精确小数、无名次、真实FTS、数据库完整性及重启冻结读取共11项检查通过，隔离数据库已关闭。
+- 有效批次为 `.artifacts/material-sage-table1-20261113-r2/`，事件ID为 `fa1d272f-9254-4e2a-8bee-15d1227911da`。原始PDF字节、原始测试机构及权利、精确SKU关联和真人审核继续待完成。网页工具观察已保存，页面视觉核验待验。
+- 首批r1在工装计数中误用表名而失败，第二批使用模型表名及上下文关闭连接。原失败回执保留，产品源码沿用本次已推送工程基线。
+- PERS新批次的幂等UUID为 `90276487-1cea-4f6c-953a-648268d5d61f`，HTTP 201，业务终态failed／source_material_timeout，document与receipt为空。JRC书目页可访问，测试编号到型号的映射待核。
+
+来源、许可、转录解释及后续核验顺序见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。隔离库中的转录记录及其回执保存在本机Git忽略目录。
+
+## 混合检索分页工程
 
 核对原规格检索顺序时发现，KnowledgeSearch已支持offset，混合检索的结构化与正文集合却始终取前limit条。现已修正两个正常API结果入口，先完成当前候选的权威、地区、融合分数与时间排序，再按offset／limit取片，has_more依据分页终点计算。两组结果各自返回分页元信息，正文共享类型采用可选字段，历史完成账本继续读取其已保存结果。
 
@@ -179,7 +190,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。本轮两个隔离PG及此前API／Web已关闭。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
 3. 建立代表性真实材料上的检索评估，核对原规格要求的权威／版本／地区／时效排序与真实Embeddings质量。现有工程包含精确条件过滤、来源及字段权威、地区偏好、RRF与时间排序。语义重排模型属于此前Agent追加的实施选项，后续可按质量评估需求选择。
-4. 继续自主核验专业材料。JRC匿名样本仍待型号映射，PERS许可已定位CC BY 3.0但真实捕获曾直连TCP超时。本阶段新增保存成功原件、TestEvent、精确SKU关联及外部真人Golden均为0。
+4. 先复核SAGE表1转录的参考文献17，补原始测试机构、权利、协议及可留存原件，再推进可证明的精确SKU与外部真人Golden。现有隔离转录为1场／10款／20值，原件、SKU关联和真人审核继续待完成。JRC匿名样本待型号映射，PERS本次生产捕获超时失败。详见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
 原文RAG总计划见[实施计划](plans/2026-11-12-original-text-rag.md)，正文阶段见[正文AI计划](plans/2026-11-13-original-text-ai.md)与[正文融合计划](plans/2026-11-13-original-text-hybrid.md)，此前见[Web无障碍计划](plans/2026-11-13-web-accessibility.md)，本轮见[混合检索分页计划](plans/2026-11-13-hybrid-pagination.md)。
@@ -199,6 +210,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 | Web无障碍 | `apps/web/app/globals.css`、`apps/web/components/workbench.tsx`、`account-dialog.tsx`、`ai-analysis.tsx` |
 | 对比度回归 | `apps/web/tests/theme-contrast.test.ts` |
 | 本轮分页回归 | `apps/api/tests/test_original_text_retrieval.py`、`apps/api/tests/test_embeddings.py` |
+| 专业材料核验 | `docs/assurance/evidence/material-review-2026-11-13.md`、`apps/api/tire_api/test_events.py` |
 
 表中省略目录的后端文件名位于 `apps/api/tire_api/`，Web组件位于 `apps/web/components/`。
 
@@ -229,4 +241,4 @@ npm run typecheck --workspace @tire/mobile
 
 ## 可复制的接手指令
 
-> 按 `docs/AGENT-HANDOFF-2026-11-13.md` 接手胎迹完整V1，先核对Git和回执。12核心模块已有实现，10项发布Gate、13项SLO和原规格待确认决策继续跟踪。正文检索、向量融合、正文证据包、用途、同意、预算、同步／流式grounding与报告已接通。本轮混合分页修复取得161项API、58项综合PG及153模型表恢复、14项独立向量业务及155实际表恢复、SDK9项、Web55项和三端类型通过，两个测试集群已关闭。此前Web无障碍阶段14份Lighthouse快照100分、22项功能检查和生产构建通过，读屏和完整WCAG继续验收。材料及Provider采用合成夹具。用户选定首个真实Provider为OpenAI Responses，启动时显式设置TI_AI_PROVIDER并核对状态接口。当前OpenAI及EPREL凭据缺失，继续独立质量工程和专业材料核验。Gemini适配由此前Agent依据规格自行提前排期。接下来推进真实语义、原规格检索与排序质量、真实精确SKU及人工审核，以及生产权限、平台与发布Gate。语义重排模型为此前Agent追加的实施选项。遵守本卡操作约束，保留失败证据，完成声明以实际验收结果为依据。
+> 按 `docs/AGENT-HANDOFF-2026-11-13.md` 接手胎迹完整V1，先核对Git和回执。12核心模块已有实现，10项发布Gate、13项SLO和原规格待确认决策继续跟踪。工程基线为74b62a6，正文检索、向量融合、正文证据包、用途、同意、预算、同步／流式grounding与报告已接通。分页修复取得161项API、58项综合PG及153模型表恢复、14项独立向量业务及155实际表恢复、SDK9项、Web55项和三端类型通过，两个测试集群已关闭。Web无障碍阶段14份Lighthouse快照100分、22项功能检查和生产构建通过，读屏和完整WCAG继续验收。上述工程验收采用合成材料与Provider。最新SAGE真实文献转录在隔离库创建1场／10款／20值，11项检查通过，原始PDF、精确SKU关联和真人审核继续待完成。先追溯参考文献17及原始测试权利，详见材料核验记录。PERS本次捕获超时失败。用户选定首个真实Provider为OpenAI Responses，启动时显式设置TI_AI_PROVIDER并核对状态接口。当前OpenAI及EPREL凭据缺失，继续独立质量工程和材料核验。Gemini适配由此前Agent依据规格自行提前排期。接下来推进真实语义、检索与排序质量、真实精确SKU及人工审核，以及生产权限、平台与发布Gate。语义重排模型为此前Agent追加的实施选项。遵守本卡操作约束，保留失败证据，完成声明以实际验收结果为依据。
