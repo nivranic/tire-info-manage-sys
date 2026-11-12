@@ -8,6 +8,7 @@ import { FieldResolutionView } from "./field-authority";
 import VectorTools from "./vector-tools";
 import { RecallKnowledgeMeta } from "./recall-evidence-meta";
 import { canSelectKnowledgeReference, selectedKnowledgeReferences } from "./recall-evidence-values";
+import SourceTextSearch from "./source-text-search";
 
 const kindLabels = { tire: "轮胎规格", vehicle: "车型适配", test_event: "测试事件", recall: "正式召回公告 / 空观察" };
 const filterLabels: Record<keyof KnowledgeFilters, string> = {
@@ -77,6 +78,9 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   const selectedReferences = selectedKnowledgeReferences(result?.items || [], selected);
   const selectedProducts = selectedItems.filter(item => item.recall?.observation_kind === "records").length;
   const selectedRecallReferences = selectedReferences.filter(reference => reference.kind === "recall").length;
+  const sourceTextSearch = result && result.text.trim() && Object.entries(result.applied_filters).every(([name, value]) => name === "source_id" || (name === "kind" && value === "tire"))
+    ? { mode: "history" as const, text: result.text, source_id: result.applied_filters.source_id, limit: result.limit || limit }
+    : null;
   const liveQuery = () => onLiveQuery(filters.kind === "recall" || filters.campaign_number ? { campaign_number: filters.campaign_number?.trim().toUpperCase() } : undefined);
 
   useEffect(() => {
@@ -89,7 +93,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
 
   function invalidate() {
     operation.current?.abort(); operation.current = null;
-    setBusy(false); setResult(null); setSelected([]); setError(""); setNeedsLive(false); setStatus("");
+    setBusy(false); setMoreBusy(false); setResult(null); setSelected([]); setError(""); setNeedsLive(false); setStatus("");
     lastSearch.current = null;
   }
 
@@ -149,7 +153,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
       <div className="snapshot-banner" id="knowledge-boundary"><strong>LOCAL SNAPSHOT · 仅限历史记录</strong><span>{result?.external_processing?.query_text_sent ? "本条混合检索记录的查询文本经过单次授权发送到外部模型服务生成向量；结果仍为历史证据，不代表当前在线参数。" : "普通检索只读取已采纳的本地证据，不联网、不调用模型；结果不代表当前在线参数。"}隔离记录与未解析文档不参与检索。</span></div>
       <form className="review-form knowledge-form" onSubmit={event => { event.preventDefault(); void search(); }}>
         <label htmlFor="knowledge-text">关键词<input ref={textInput} id="knowledge-text" maxLength={500} value={text} onChange={event => { invalidate(); setText(event.target.value); }} aria-describedby="knowledge-text-hint" /></label>
-        <small id="knowledge-text-hint">支持已保存证据中的关键词；留空可按下方条件浏览历史记录。</small>
+        <small id="knowledge-text-hint">支持已保存证据中的关键词；留空可按下方条件浏览历史记录。按关键词和来源ID检索得到空结果时，会继续检索已保存页面正文。</small>
         <div className="knowledge-filter-grid">
           <label>证据类型<select value={filters.kind || ""} onChange={event => updateFilter("kind", event.target.value)}><option value="">全部类型</option>{Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label>关注字段<select value={filters.field || ""} onChange={event => updateFilter("field", event.target.value)}><option value="">不限字段</option>{Object.entries(fieldLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -171,6 +175,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   : <div className="compare-toolbar"><p>还有匹配记录未展示，可继续加载。</p><button type="button" className="secondary-button" disabled={busy || moreBusy} onClick={() => void loadMore()}>{moreBusy ? "正在加载…" : `继续加载（已展示 ${result.items.length} / ${result.total}）`}</button></div> : null}</> : <div className="knowledge-empty"><strong>没有匹配的已采纳证据</strong><p>可减少筛选条件，或先到在线查询保存所需来源记录。</p><button type="button" className="secondary-button" onClick={liveQuery}>前往在线查询</button></div>}
         <details className="knowledge-technical"><summary>检索能力与索引状态</summary><p>{result.index.engine} · {result.index.documents} 份索引文档 · {result.index.version}</p><ul>{result.stages.map((stage, index) => <li key={`${stage.name}-${index}`}><strong>{stage.name} · {stage.state === "succeeded" ? "已执行" : stage.state === "not_needed" ? "本次无需" : "尚不可用"}</strong><p>{stage.reason}</p></li>)}</ul></details>
       </section> : null}
+      {sourceTextSearch ? <SourceTextSearch key={JSON.stringify(sourceTextSearch)} search={sourceTextSearch} automatic={result?.total === 0} /> : null}
     </div>
     <footer className="knowledge-footer"><div><strong>已选 {selectedReferences.length} 份不同证据 · AI上限6份</strong>{selectedRecallReferences ? <small>召回产品命中 {selectedProducts} 条 · 公告 / 空观察证据 {selectedRecallReferences} 份</small> : null}<small>进入下一步核对全部记录后，才能授权发送给 AI。</small></div>{onOffline ? <button className="secondary-button" disabled={!selected.length || busy || !result} type="button" onClick={() => onOffline(selectedReferences)}>预览所选设备离线资料</button> : null}<button className="primary-button" disabled={!selected.length || selectedReferences.length > 6 || busy || !result} type="button" onClick={analyze}>用所选历史证据分析</button></footer>
   </dialog>;

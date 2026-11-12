@@ -42,7 +42,7 @@ REVIEWED = {
     'scripts/identity_contract.py': 'd518bf77981005c7808279119326f9c05eb77643a10cdb9e4e26b3939623ea05',
     'packages/api-client/tests/device-ai/json-esm-hook.mjs': 'f4327b15575b1f82f5bbc48469f84990a6b9127f6eb17ff4973b7a7fa6e5404d',
     'packages/api-client/tests/device-ai/no-artifacts-hook.mjs': '787b64dd38915cd78b17812271b22be8bac93cd4d952fe9e9edeb6b2363587cc',
-    'packages/api-client/package.json': '71a4620555797dff9bbc11e0bc9c39f9e5716900f10b6743eaf46a72fd15b7b5',
+    'packages/api-client/package.json': 'ca087de18cf4a391f1c9824a6eba0fb1ed7bfc1e971357751b088e232753f462',
     'apps/api/tests/test_raw_evidence_v2_sdk.py': 'f62e6f5dd1db7b62bbbde7777c69c90b242d96ed9dfab2f899d7258622c64268',
     'packages/api-client/tests/raw-evidence-v2.mts': 'db7bf5e993a89f226feae671a72cbb8c2385563441eb612e0cd8a644377d527c',
 }

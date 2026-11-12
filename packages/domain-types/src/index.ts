@@ -161,6 +161,46 @@ export interface KnowledgeSearchResult {
   coverage?: VectorCoverage | null;
   candidate_counts?: { fts: number; dense: number; merged: number; limit: number };
 }
+export interface SourceTextReference {
+  snapshot_id: string;
+  raw_hash: string;
+  extractor_version: string;
+  start: number;
+  end: number;
+  chunk_id: string;
+}
+export interface SourceTextSearchRequest {
+  mode: "history";
+  text: string;
+  source_id?: string;
+  limit?: number;
+  offset?: number;
+}
+export interface SourceTextExcerpt extends Provenance {
+  kind: "source_text";
+  reference: SourceTextReference;
+  text: string;
+  offset_unit: "unicode_codepoints";
+  content_type: "text/html" | "text/plain";
+  verified_at: string;
+  data_state: "local_snapshot";
+  verification_status: "original_text_excerpt";
+  notice: string;
+}
+export interface SourceTextSearchItem extends SourceTextExcerpt {
+  match: { method: "fts"; matched_terms: string[]; score: number };
+}
+export interface SourceTextSearchResult {
+  mode: "history";
+  data_state: "local_snapshot";
+  items: SourceTextSearchItem[];
+  total: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
+  index?: { engine: "sqlite_fts5" | "postgresql_fts"; extractor_version: string; snapshots: number };
+  notice: string;
+}
 export interface VectorCoverage { eligible_documents: number; indexed_documents: number; missing_documents: number }
 export interface VectorStatus {
   backend: string; available: boolean; reason: string | null;

@@ -630,6 +630,8 @@ export const tireApi = {
   embeddingRun: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").EmbeddingRun>(`/v1/knowledge/embedding-runs/${encodeURIComponent(id)}?mode=history`, { signal }),
   embeddingHistory: (signal?: AbortSignal) => request<{ items: import("@tire/domain-types").EmbeddingRun[] }>("/v1/knowledge/embedding-runs?mode=history", { signal }),
   searchKnowledge: (payload: import("@tire/domain-types").KnowledgeSearchRequest, signal?: AbortSignal) => post<import("@tire/domain-types").KnowledgeSearchResult>("/v1/knowledge/search", payload, signal),
+  searchSourceText: (payload: import("@tire/domain-types").SourceTextSearchRequest, signal?: AbortSignal) => post<import("@tire/domain-types").SourceTextSearchResult>("/v1/knowledge/source-text/search", payload, signal),
+  resolveSourceText: (reference: import("@tire/domain-types").SourceTextReference, signal?: AbortSignal) => post<import("@tire/domain-types").SourceTextExcerpt>("/v1/knowledge/source-text/resolve", { mode: "history", reference }, signal),
   aiStatus: (signal?: AbortSignal) => request<import("@tire/domain-types").AIStatus>("/v1/ai/status", { signal }),
   authMe: (signal?: AbortSignal) => request<AuthState>("/v1/auth/me", { signal }),
   authRegister: (payload: { username: string; password: string; display_name?: string }, signal?: AbortSignal) => post<AuthState>("/v1/auth/register", payload, signal),
