@@ -104,7 +104,8 @@ def upgrade(connection: Connection, *, include_vehicle_binary: bool = True,
             include_source_page_monitoring: bool = True,
             include_source_quality_interests: bool = True,
             include_source_material_stops: bool = True,
-            include_source_page_url_moves: bool = True) -> None:
+            include_source_page_url_moves: bool = True,
+            include_source_text: bool = True) -> None:
     """Called inside Database.initialize's locked schema transaction."""
     connection.exec_driver_sql(
         "CREATE TABLE IF NOT EXISTS tire_schema_versions "
@@ -392,3 +393,12 @@ def upgrade(connection: Connection, *, include_vehicle_binary: bool = True,
         install_url_move_schema(connection)
         connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
                            {'version': '032_source_page_url_moves'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and include_source_page_monitoring and include_source_quality_interests
+            and include_source_material_stops and include_source_page_url_moves
+            and include_source_text and '033_source_text_index' not in applied):
+        from .source_text_models import SourceTextChunk, SourceTextIndex
+        SourceTextIndex.__table__.create(connection, checkfirst=True)
+        SourceTextChunk.__table__.create(connection, checkfirst=True)
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '033_source_text_index'})

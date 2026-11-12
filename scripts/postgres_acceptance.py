@@ -513,6 +513,11 @@ def run():
     knowledge_checkpoint = verify_knowledge_persistence(url)
     record(STEP)
 
+    STEP = 'original_text_fts_citation_and_restart'
+    from test_source_text import assert_original_text_checkpoint, verify_original_text_persistence
+    original_text_checkpoint = verify_original_text_persistence(url)
+    record(STEP)
+
     STEP = 'monitor_identity_conditions_revisions_and_restart'
     from test_monitor_conditions import verify_monitor_conditions_persistence
     verify_monitor_conditions_persistence(url)
@@ -635,6 +640,7 @@ def run():
                    for reference in knowledge_checkpoint['references'])
         assert 'postgres' in restored_search['index']['engine']
         assert any(stage['name'] == 'fts' and stage['state'] == 'succeeded' for stage in restored_search['stages'])
+        assert_original_text_checkpoint(knowledge_client, original_text_checkpoint)
     backup_store = FileObjectStore(object_backup)
     STEP = 'restored_object_manifest'
     with restored.sessions() as db:
@@ -662,6 +668,7 @@ def run():
     record('dump_restore_all_evidence_and_audit_tables')
     record('restored_object_files_match_database_references')
     record('restored_postgres_full_text_query_preserves_references')
+    record('restored_original_text_chunks_and_recoverable_citations')
     record('restored_monitor_draft_origin_and_change_evidence')
     record('restored_report_exports_use_backup_object_directory')
     record('restored_reparse_lineage_review_and_original_object')

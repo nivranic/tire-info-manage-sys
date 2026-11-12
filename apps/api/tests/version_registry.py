@@ -40,6 +40,7 @@ EXPECTED_SCHEMA_VERSIONS = [
     '030_interest_source_quality',
     '031_source_material_stops',
     '032_source_page_url_moves',
+    '033_source_text_index',
 ]
 
 # 008 之前的历史基线（构造 pre-009 升级起点用；与断言基线是两个概念，勿合并）。
