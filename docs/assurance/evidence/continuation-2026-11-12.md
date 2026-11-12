@@ -407,3 +407,47 @@ apps/api/.venv/Scripts/python.exe scripts/run_api_worker_regression.py --phase r
 正式工程提交为 `243d72b`（实际S2外发回归）和 `0e2eb3f`（Responses冒烟修复），其后交付本轮记录与交接更新。复核时775个最新输入逐字节匹配，623个前端构建输入保持一致。与376项批次相比，共有输入仅smoke脚本及受管runner发生变化，新增输入为smoke测试模块。
 
 四个改动Python文件AST通过，13个本地文档链接有效，HANDOFF历史尾文216248字节及SHA保持。新增行机器路径／高置信度凭据模式检查零命中，差异检查通过。回执为 `.artifacts/responses-smoke-20261112/delivery-validation.json`。
+
+## Responses生产Web合成验收与交接补充
+
+### 方向与实现范围
+
+用户选定的首个真实AI接入为OpenAI Responses API。Gemini列于原规格的多模型接入表中，此前Agent自行提前交付其原生Adapter。本轮围绕Responses主线，补齐既有生产Web合成验证及交接。
+
+修改限于 `scripts/ai_stream_acceptance.py` 的Windows元数据初始化及本轮交付文档。夹具使用 `sysconfig.get_platform()` 绑定架构，并以 `sys.getwindowsversion()` 提供进程内版本读取，沿用既有受管runner做法。原有外网、Parser子进程与私有数据库审计继续生效。
+
+### 原始失败及恢复
+
+- 首次 `api-r1` 在SQLAlchemy导入时触发 `platform.machine()`，标准库退回 `cmd /c ver`，被子进程审计拒绝。失败回执记录Parser子进程尝试1次、模型及来源调用0、私有存储已清理。原堆栈及 `fixture-final.json` 保留。
+- 首次重启经系统python shim执行时报告未配置版本，HTTP夹具尚未启动。随后使用项目既有Python解释器继续。
+- `api-r2` 与首个Web服务在沙箱内输出就绪，loopback HTTP访问超时，端口查询未取得可达监听。中断前确认本轮进程身份，后续确认进程消失，保存数据库副本并只清理该夹具创建的私有目录。该次有序shutdown状态待确认。
+- 改用受审执行权限后，`api-r3` 与独立Web可达，浏览器成功打开生产工作台。私有端口为8003与18002，使用新SQLite及独立构建目录。
+- 最初UI查询填写245/40尺寸，与265/40合成记录不匹配，返回 `source_schema_validation_failed` 并展示本次历史回退授权。将查询更正为夹具尺寸后得到1条精确SKU。
+- 浏览器取样中的原生dialog选择器、重绘后元素UID及失败账本计数断言先后更正。最终按 `AICompletion.state` 核对completed／failed，原操作错误及更正后结果保留于 `browser-records.json`。
+
+### 实际浏览器与数据库结果
+
+Web使用既有生产构建入口，退出0，PWA白名单19项。Provider提供合成Responses字节，经真实 `parse_response_stream`、应用服务、数据库、HTTP／SSE和React界面消费。
+
+| 场景 | 已观察及核对 |
+| --- | --- |
+| 同意与准备 | 历史证据包准备后Provider次数0，AI请求0，发送按钮在同意前禁用 |
+| held草稿 | Provider次数1、AI完成账本0行时，显示“生成中草稿”及待校验提示 |
+| 合法终态 | release后完成账本completed，600 tokens，正式事实／推断／不确定性可见，草稿移除，脚本文本按文字显示 |
+| 引用重开 | 点击核对f1，展开证据字段并将焦点放到相应品牌字段 |
+| 刷新恢复 | 重读进度、刷新页面及重开AI面板，Provider与请求仍各1次，读取原有终态 |
+| 无效引用 | 第二次合成调用落账failed，错误码 `ai_grounding_validation_failed`，answer及usage为空，草稿作废，含分析报告按钮缺席 |
+| 失败重读 | 重读进度与历史终态后Provider仍2次，2条请求、2条完成账本分别为completed和failed |
+| 证据保全 | 第二次查询后重新封存的快照／事实／原文指纹保持，真实外网、Parser、OpenAI及正常数据库使用均为0 |
+
+最终私有checkpoint完整性为ok，completed和failed各1行，两个请求Provider均为 `openai_responses`。成功用量为500输入／100输出／600总量，失败记录保留未知用量状态。合成Provider实际调用2次，同步调用0，来源夹具调用3次，365个wire字节分片及10条应用流事件。
+
+顶部模型状态区在终态后保留前次额度展示，点击“刷新记录与配置”后成功调用显示实际600 tokens。终态自动刷新可作为后续体验优化。真实模型语义、其余wire模式本轮浏览器覆盖、原生平台及完整V1继续开放。
+
+### 受管回归与资源关闭
+
+五模块回归122／122通过，runner退出0，775个输入稳定，资源关闭，失败／跳过／incomplete及非自检拒绝均为0。正常数据库启动false、真实Provider／接收端调用0、子进程0。回执为 `.artifacts/rspweb-r1/result.json`，SHA256 `41c187b0d5c1674f7114aa2a1c04384dc97f1c613a8cfa421e7ad6df8c70d8b6`。
+
+API通过专用shutdown路由关闭，实际进程退出0，checkpoint保存2707456字节，私有存储已移除。Web以SIGINT收尾、退出1。两个验证端口监听0，相关API及Web进程0。构建自动修改的next-env.d.ts按预先备份恢复，402个受管前端输入与构建前逐字节一致。
+
+最终独立核对为 `.artifacts/responses-web-20261112/verification.json`，SHA256 `59282aa246530cbcfe110a309960e95d9054d2c20d6b3ae00eb176f76f2c9df7`。该目录保留浏览器记录、各启动日志、失败回执、只读checkpoint核对和关闭证据。HANDOFF历史尾文继续为216248字节，SHA256 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。

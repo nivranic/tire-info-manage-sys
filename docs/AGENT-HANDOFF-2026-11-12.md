@@ -13,8 +13,13 @@
 - 数据库引用的归档旧后端也已在还原的015副本启动，15份原文及历史检索读取通过。迁移相关五模块受管回归154／154通过，限定证据及部署剩余项见下文。
 - 多模型网关适配及共享授权／价格／遥测已交付。首个真实接入优先OpenAI Responses。后续15模块受管回归376／376通过，三端类型检查与前端生产构建均通过，详见下文。
 - 首个真实AI接入已选OpenAI Responses API。EPREL Key当前缺失，其他工作继续独立推进。专业材料由Agent自主选取。
+- Responses生产Web合成链已验证同意、SSE草稿／终态、引用重开、刷新恢复和无效引用拒绝。两个合成调用分别落账completed与failed，相关五模块122／122回归通过，私有服务已关闭。
 - 本次材料研究核对四份候选，新增原件捕获、TestEvent、精确SKU关联和外部真人Golden均为0。旧KIT C2继续封存。
 - 发布级旧库迁移、真实模型语义、生产来源覆盖、原生平台矩阵和完整无障碍仍待验收。
+
+## AI接入决策与排期
+
+原规格的多模型接入表包含Google Gemini原生Adapter，用于大上下文／多模态备选。此前由Agent自行安排，在交付收尾时提前完成了该适配及合成回归。用户已经明确选定首个真实接入为OpenAI Responses API。当前网关的默认Provider为 `openai_responses`，后续优先推进Responses真实语义与完整应用链。其他已交付Adapter保留各自验证范围。
 
 ## 需求覆盖
 
@@ -158,10 +163,30 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 
 本机Process／User／Machine三个作用域的TI_OPENAI_MODEL及TI_OPENAI_API_KEY均缺失。禁用状态CLI实际返回ai_disabled及exit2，配置失败发生在创建适配器之前。真实OpenAI Responses语义和API→Provider→Web验收继续待凭据及用途条件。该脚本仅验证Provider回执和现行grounding，API同意、持久化、幂等与账本由既有入口分别验证。
 
+### Responses生产Web合成链收尾
+
+使用独立生产构建、私有loopback API和新SQLite夹具，经实际Web入口验证。Provider输出采用合成Responses事件字节，经过生产 `parse_response_stream`。本轮真实OpenAI调用为0。
+
+| 范围 | 当前结果 |
+| --- | --- |
+| 外发同意 | 准备历史证据时Provider调用0，未勾选同意时发送按钮禁用 |
+| SSE草稿／终态 | held阶段可见待校验草稿，终态前完成账本0行。释放后得到completed及600 tokens，草稿移除，脚本文本安全显示 |
+| 引用及恢复 | 核对f1展开并聚焦对应字段，进度重读、页面刷新及AI面板恢复均保持同一调用，Provider次数1 |
+| 无效引用 | 第二次合成调用落账failed，错误为 `ai_grounding_validation_failed`，answer和usage为空，草稿作废，含分析报告按钮缺席。重读保持Provider次数2 |
+| 证据与副作用 | 最后封存后的来源证据指纹保持。外网尝试、Parser子进程、真实Provider及正常数据库使用均为0 |
+| 相关回归 | 五模块122／122，runner退出0，775个输入稳定、资源关闭，失败／跳过／incomplete及非自检拒绝均为0 |
+| 关闭及生成文件 | API经shutdown退出0，私有存储清理。Web经SIGINT退出1，复核两个验证端口监听0、相关进程0。402个前端输入逐字节恢复 |
+
+本机回归回执为 `.artifacts/rspweb-r1/result.json`，SHA256 `41c187b0d5c1674f7114aa2a1c04384dc97f1c613a8cfa421e7ad6df8c70d8b6`。浏览器、只读checkpoint核对、失败记录及关闭信息在 `.artifacts/responses-web-20261112/`，最终核对入口为 `verification.json`。该122项为本轮独立批次，沿用各历史批次的独立范围。
+
+本轮修复 `scripts/ai_stream_acceptance.py` 的Windows元数据初始化，沿用既有runner的原生版本／架构读取，子进程审计保持启用。首次失败、沙箱内服务不可达及中断记录均保留，详见[续作记录](assurance/evidence/continuation-2026-11-12.md)。
+
+真实Responses语义、其余wire模式的本轮浏览器覆盖和Native验收继续开放。当前观察到分析终态后顶部模型额度保持先前预留展示，点击“刷新记录与配置”后可读到实际600 tokens。终态自动刷新列为后续体验优化项。
+
 ## 下一步执行顺序
 
 1. 核对HEAD、工作区、远端及本机证据是否可用，阅读本卡、原规格和拟修改模块的后续报告。依赖和S2已在本机恢复，新clone仍需安装依赖并取得可信原件。
-2. 优先推进用户选定的OpenAI Responses主线。冒烟脚本grounding与用量假通过已修复，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
+2. 优先推进用户选定的OpenAI Responses主线。冒烟grounding／用量修复及生产Web合成链已验证，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。可继续补齐其余wire模式的浏览器覆盖及终态额度自动刷新。
 3. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
 4. 推进真实Embeddings检索质量与全文RAG／reranker验收。已有47项通用PostgreSQL、pgvector独立运行与业务检查，以及204项和55项受管回归可按源码绑定分别复用。
 5. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。本轮四个候选的取舍依据均在续作记录中。
@@ -196,6 +221,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 | AI／界面／共享协议 | `apps/api/tire_api/ai*.py`、`apps/web/components/`、`packages/api-client/src/`、`packages/domain-types/src/` |
 | Gemini实现及回归 | `apps/api/tire_api/ai_gemini.py`、`apps/api/tests/test_ai_gemini_provider.py`、`docs/plans/2026-11-12-gemini-native-provider.md` |
 | Responses冒烟及回归 | `scripts/ai_real_provider_smoke.py`、`apps/api/tests/test_ai_provider_smoke.py`、`docs/plans/2026-11-12-responses-smoke-grounding.md` |
+| Responses生产Web夹具 | `scripts/ai_stream_acceptance.py`，私有API与独立Web使用显式隔离端口及本机忽略目录 |
 | 受管回归 | `scripts/run_api_worker_regression.py`及对应阶段报告 |
 
 表中省略目录的后端文件名均相对于 `apps/api/tire_api/`。
@@ -210,7 +236,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 - `d5fded1` 包含Gemini原生适配、共享协议／界面、58项新增回归及实施计划。
 - `243d72b` 包含恢复可信S2后的实际二进制外发回归。
 - `0e2eb3f` 包含Responses冒烟引用／用量校验修复、新增26项测试及实施记录。
-- 本卡所在后续文档提交包含进度、开发库演练结果、环境缺口和接手顺序。可用 `git log -1 --format=%H -- docs/AGENT-HANDOFF-2026-11-12.md` 定位。
+- `70fa218` 汇总依赖与构建恢复、S2及Responses冒烟进度。本卡最近提交追加Responses Web夹具兼容修复、合成浏览器结果及接手顺序，可用 `git log -1 --format=%H -- docs/AGENT-HANDOFF-2026-11-12.md` 定位。
 
 `bce22a4`交付的静态复核为 `.artifacts/handoff-final-20261112/validation.json`，当时774个回归输入逐字节匹配，14个本地链接有效，历史尾文SHA保持。后续恢复与Responses修复按各自新回执绑定，交付核对见 `.artifacts/responses-smoke-20261112/delivery-validation.json`。
 
@@ -236,4 +262,4 @@ git rev-parse origin/main
 
 ## 可复制给接手Agent
 
-> 继续按原需求规格推进胎迹完整V1。先读 `docs/AGENT-HANDOFF-2026-11-12.md`，核对main、HEAD、dirty及本机回执。通用PostgreSQL47项检查及204项受管回归通过。pgvector独立10项运行／12项业务检查、149张业务表恢复及55项相关回归通过。既有开发库015→032副本升级、四点失败回滚、历史API读取、完整恢复及归档旧后端启动通过，原库SHA保持一致。本机依赖及可信S2原件已恢复，三端类型／前端生产构建通过，15模块376／376回归通过，含实际Parser与二进制capsule外发拒绝链。Responses冒烟引用／用量假通过已修复，五模块122／122通过。优先继续用户选定的OpenAI Responses真实语义与API→Provider→Web主线，推进实际部署切换、真实Embeddings质量、合法专业材料、精确SKU／真人Golden、来源、生产权限与平台Gate。本机OpenAI配置及EPREL Key缺失，继续独立工作。旧KIT C2封存约束继续有效。保留原始失败、他人改动及既有安全／许可合同。所有完成声明绑定实际执行范围。
+> 继续按原需求规格推进胎迹完整V1。先读 `docs/AGENT-HANDOFF-2026-11-12.md`，核对main、HEAD、dirty及本机回执。通用PostgreSQL47项检查及204项受管回归通过。pgvector独立10项运行／12项业务检查、149张业务表恢复及55项相关回归通过。既有开发库015→032副本升级、四点失败回滚、历史API读取、完整恢复及归档旧后端启动通过，原库SHA保持一致。本机依赖及可信S2原件已恢复，三端类型／前端生产构建通过，15模块376／376回归通过，含实际Parser与二进制capsule外发拒绝链。Responses冒烟引用／用量假通过已修复，生产Web合成链覆盖同意、草稿／终态、引用与刷新恢复、无效引用拒绝。两个合成调用分别completed／failed，本轮五模块122／122回归通过，服务已关闭，402个前端输入恢复。顶部额度目前需手动刷新，其他wire模式浏览器覆盖继续补齐。优先继续用户选定的OpenAI Responses真实语义与API→Provider→Web主线，推进实际部署切换、真实Embeddings质量、合法专业材料、精确SKU／真人Golden、来源、生产权限与平台Gate。Gemini来自原规格及此前Agent排期，当前默认Provider为openai_responses。本机OpenAI配置及EPREL Key缺失，继续独立工作。旧KIT C2封存约束继续有效。保留原始失败、他人改动及既有安全／许可合同。所有完成声明绑定实际执行范围。

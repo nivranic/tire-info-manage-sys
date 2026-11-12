@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-> [2026-11-12 Agent交接卡](docs/AGENT-HANDOFF-2026-11-12.md)汇总原规格12模块与10项发布Gate、PostgreSQL／pgvector验收、开发库015→032副本升级及回退。依赖和可信S2原件已恢复，三端类型／前端构建及376项回归通过。OpenAI Responses冒烟引用／用量假通过已修复，相关122项回归通过。真实模型语义与完整V1继续验收。历史记录见[HANDOFF](docs/HANDOFF.md)。
+> [2026-11-12 Agent交接卡](docs/AGENT-HANDOFF-2026-11-12.md)汇总原规格12模块与10项发布Gate、PostgreSQL／pgvector验收、开发库015→032副本升级及回退。依赖和可信S2原件已恢复，三端类型／前端构建及376项回归通过。OpenAI Responses冒烟引用／用量假通过已修复，生产Web合成链已验证同意、SSE、引用恢复及拒绝终态，本轮相关122项回归通过。后续优先Responses真实语义及完整V1验收。历史记录见[HANDOFF](docs/HANDOFF.md)。
 
 > **第78轮历史入口：**[Webhook交付与复核](docs/assurance/evidence/round-78-webhook-delivery.md)、[使用与签名](docs/WEBHOOKS.md)、[冻结合同](docs/plans/2026-10-18-webhook-delivery.md)。受管理目标、事务内引用通知、HMAC与有限重试、人工动作、UUID恢复和三端共享面板已实现，默认不外发。自有15／独立125／补充144／SDK77及类型和三端前端build分别通过；实际React桌面／390／320各21项、owner5项、受控重试9项通过，不相加为全量。正常库022、真实接收端／Responses、专业材料完整身份、原生设备及完整V1仍未验收；当前交接见docs/HANDOFF.md。
 

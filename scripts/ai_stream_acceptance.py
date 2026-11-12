@@ -9,10 +9,12 @@ from datetime import timedelta
 import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import socket
 import sqlite3
 import sys
+import sysconfig
 import tempfile
 from uuid import uuid4
 
@@ -68,6 +70,18 @@ def serve(port, output):
             if event == 'sqlite3.connect' and str(arguments[0]) != ':memory:':
                 path = Path(str(arguments[0])).resolve()
                 require(path.is_relative_to(private) or path == checkpoint, 'private_database_required')
+
+        if sys.platform == 'win32':
+            architecture = {'win-amd64': 'AMD64', 'win-arm64': 'ARM64', 'win32': 'x86'}.get(sysconfig.get_platform())
+            require(architecture is not None, 'trusted_python_architecture_unknown')
+            os.environ.pop('PROCESSOR_ARCHITEW6432', None)
+            os.environ['PROCESSOR_ARCHITECTURE'] = architecture
+
+            def native_win32_ver(release='', version='', csd='', ptype=''):
+                native = sys.getwindowsversion()
+                return str(native.major), f'{native.major}.{native.minor}.{native.build}', native.service_pack, ptype
+
+            platform.win32_ver = native_win32_ver
         sys.addaudithook(audit)
 
         import uvicorn
