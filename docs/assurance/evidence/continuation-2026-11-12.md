@@ -1,5 +1,7 @@
 # 2026-11-12 续作记录
 
+> `ac854dc`交接后继续推进的PostgreSQL验收已通过45项检查，147张模型表恢复指纹一致，相关受管回归11／11通过。最新结果、原失败及剩余范围见本文末节。
+
 本轮从提交 `ea09acc` 的干净工作区继续原规格完整 V1 目标。代码已包含迁移032的来源地址迁移监控，旧交接卡顶部的R136状态需要结合后续报告阅读。本轮核对了新的真实材料候选，并修复来源地址迁移提醒读取损坏历史时的异常响应。
 
 ## 真实材料核对
@@ -42,7 +44,7 @@ apps/api/tests/test_monitor_conditions.py
 
 本次产品改动为后端的行解码边界与回归测试，校验了真实应用路由和合成私库。本轮没有重新执行浏览器、前端构建、全量API／Worker、Provider和原生设备验证。PostgreSQL的部分实测结果见下节。交付复核重新计算了上述结果文件SHA256，与记录一致。
 
-## PostgreSQL实测停点
+## PostgreSQL初期实测停点
 
 使用既有 `scripts/verify-postgres.ps1` 和 `scripts/postgres_acceptance.py`，在本机原生PostgreSQL 18.3上创建全新隔离集群。监听仅在loopback，应用使用非超级用户角色，输入均为合成夹具。启动环境在独立进程内移除继承的业务／模型配置，默认数据库指向内存，AI、Embeddings和遥测关闭。本次环境 `vector_available=false`。
 
@@ -68,3 +70,55 @@ apps/api/tests/test_monitor_conditions.py
 单独提取 `assert_status` 函数并使用本地构造的HTTP响应验证成功分支，以及含结构化错误码、非JSON正文、JSON数组三种失败分支。原断言均保留，诊断字段仅为上述五个键，路径不包含查询参数。该函数检查没有发起HTTP请求或导入产品应用。`git diff --check`通过。
 
 完整V1剩余工作继续按原规格推进。材料方面继续追溯原始测试出版物、保存许可与完整身份，工程方面继续推进真实Responses链路、正常部署升级与平台验收。候选来源的后续导入应使用已具备的捕获／测试事件链路，并保留本轮确认的数据出处与参测身份缺口。
+
+## PostgreSQL续作验收通过
+
+本节记录 `ac854dc` 交接后的继续实施。原始失败回执按原内容保留。
+
+### 已确认原因及修正
+
+1. 事实修订验收在匿名会话下调用管理员写入口。验证入口现在先经真实注册建立首个管理员，后续共享库阶段经真实登录复用该管理员。
+2. 旧断言直接要求live、历史回退和304复验的完整variants对象相等。现行协议在 `field_resolution` 中携带当前数据状态及复验时间。本轮复用既有 `assert_frozen_query_evidence`，完整核对事实、身份、证据、候选、指纹及允许变化的验证元数据。
+3. 隔离审核、重解析、Parser及召回Parser的持久化辅助入口各自假设首次注册。新增可选认证回调，独立调用默认注册，共享PostgreSQL验收显式登录。身份验收入口同样支持该调用方式。
+4. 真实重解析返回 `parser_isolation_unavailable`。独立诊断定位至 `parser_runtime.py` 的架构变量校验，receipt中pid为null。本次执行环境缺少两项Windows架构环境变量。PostgreSQL验证入口沿用受管runner的做法，通过 `sysconfig.get_platform()`确定当前Python架构，设置验证进程的架构元数据。
+5. 身份合并夹具缺少产品代码命名空间。两份新私库中的真实预览分别得到 `can_merge=false / stable_anchors=[]` 和 `can_merge=true / stable_anchors=['manufacturer_product_code']`。合成夹具现显式提供MSPN命名空间，与既有身份测试口径一致。
+
+架构环境修正后的独立解析器实际返回2项，子进程exit0、`windows_job_object`、`reaped=true`。该运行使用8秒墙钟、5秒CPU和384MiB限制。诊断回执分别位于 `.artifacts/pgparse-diag.json`、`.artifacts/pgparse-env.json`。命名空间对照位于 `.artifacts/pg-ident-d1/result.json`。身份辅助入口的默认注册路径另在新SQLite私库验证通过，保留3条身份事件及重启／重放检查，回执为 `.artifacts/pg-ident-r1/result.json`。
+
+### 单次完整PostgreSQL结果
+
+最终运行目录为 `.artifacts/postgres/pgverify-fb6bd9e0260748df87ae81e5d08cd691/`。`report.json` 的 `status=passed`，共45项命名检查，运行退出0。SHA256为 `c21e5a1a1d31a01644181c3a43bb2294aa27e1abc7979b0abafe963c22eb1026`。
+
+| 验证范围 | 实测结果 |
+| --- | --- |
+| 数据库 | PostgreSQL 18.3，loopback新集群，非超级用户应用角色，四进程并发空库初始化通过 |
+| 查询／治理／并发 | 证据、人工修订、一次性授权回退、304复验、隔离、车库、比较、偏好、事务回滚、API／Worker并发、调度租约、身份CAS／UUID／撤销均通过 |
+| 持久化 | 测试事件、合成AI账本、二进制对象、PostgreSQL全文检索、监控规则／草稿、报告及导出、重解析、Parser A→B→A、召回和查询筛选的重启检查通过 |
+| 真实备份／恢复 | 实际执行pg_dump和pg_restore，恢复后147张模型表逐行指纹及schema版本列表一致，备份文件674306字节 |
+| 对象备份 | 10个证据对象共40392字节，4个报告导出对象共215263字节，恢复读取使用备份对象目录 |
+| Parser归档 | 3个不同归档共7668420字节，包含召回归档2个，恢复检查实际执行归档代码 |
+| 恢复后复核 | 身份原事件／重放、监控草稿、全文引用、报告文件、重解析、Parser及召回历史／回滚、查询筛选与未消费授权均通过 |
+
+该批包含合成旧schema缺列后的001–004迁移检查。正常部署旧库的整库升级仍待独立验收。`vector_available=false`，pgvector继续待验。029–032表的初始化与归档包含在本批，相关新增业务的专门PostgreSQL场景仍待补齐。
+
+脚本输出服务停止后，另行执行当前集群的 `pg_ctl status`，得到exit3及 `no server running`，并通过完整监听列表确认端口55452的监听数为0。独立关闭凭据保存在该目录的 `closure.json`。
+
+### 兼容回归与源码核对
+
+受管批 `.artifacts/pghelp-r1/` 执行隔离审核、真实重解析、真实Parser A→B→A、召回Parser重启四个既有用例，以及Windows架构环境模块。11／11通过，runner退出0，失败／跳过／incomplete均为0，源码稳定、资源关闭、非自检拒绝及依赖探针拒绝均为0。25个managed_parser子进程全部exit0，live计数0。正常数据库启动false，真实Provider／接收端调用0。
+
+`result.json` SHA256为 `6d8d7078baea6b8a11eae91079d3cbf63135978808190c5d34dd1343b83a7d7a`。六个改动Python文件均在该批输入绑定中，交付复核的当前SHA均匹配source-after，AST解析6／6通过。PostgreSQL的45项检查和该11项pytest分别记录。
+
+### 中间失败与范围
+
+| 保留目录，均在 `.artifacts/postgres/` 下 | 当次停点 |
+| --- | --- |
+| `pgverify-ffcbc8f0dc2a4e76b71d433da0b19561` | 受限执行通道的initdb停在内存参数选择，核对两个本轮进程身份后结束，正常权限通道随后初始化成功。保留initdb日志 |
+| `pgverify-4bfc52ba17aa4213868edae9ce8cb27d` | 注册后事实修订通过，旧variants全对象相等断言失败 |
+| `pgverify-71033d7c1c66474ea7b05586432c9f30` | 20项通过，共享库重复注册失败 |
+| `pgverify-3457e3418b45434db3fe4f19986f63a2` | 28项通过，历史重解析完成状态失败 |
+| `pgverify-1b40077f965940e885bc4f46ad7a5ee8` | 28项通过，诊断确认 `parser_isolation_unavailable` |
+| `pgverify-449fb08c7ff04b7eac52fc1e08cfb67a` | 33项通过，身份管理写HTTP状态断言失败 |
+| `pgverify-464d2306fb4144ac833a3bd6952abdb6` | 33项通过，合并并发预期失败，后续预览对照定位命名空间缺口 |
+
+本轮修改覆盖六个验收／测试文件，输入为合成数据与仓库已有的录制片段。真实专业材料／真人Golden、真实Responses语义链、pgvector、029–032专门业务场景、正常部署旧库升级及六类平台／无障碍／完整V1继续开放。

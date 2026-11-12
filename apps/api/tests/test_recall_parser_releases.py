@@ -284,7 +284,7 @@ def test_reference_rejects_snapshot_binding_drift(setup, field, value):
         assert _reference_snapshot(db, db.get(RawCapture, capture)) is None
 
 
-def verify_recall_parser_persistence(url, directory):
+def verify_recall_parser_persistence(url, directory, *, authenticate=register_admin):
     """Reusable SQLite/PostgreSQL acceptance with distinct queries and own-ID checks."""
     with pytest.MonkeyPatch.context() as patcher:
         source = trusted_copy(directory, patcher)
@@ -292,7 +292,7 @@ def verify_recall_parser_persistence(url, directory):
         app = create_app(url, FixtureRegistry())
         app.state.recall_adapter = adapter
         with TestClient(app) as client:
-            register_admin(client)
+            authenticate(client)
             checkpoint = run_lifecycle(client, app.state.database, adapter, source, PERSIST_QUERIES)
             checkpoint['bundle_root'] = str(directory / 'sealed')
         assert_recall_parser_checkpoint(url, checkpoint)

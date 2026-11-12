@@ -201,7 +201,7 @@ def test_existing_inflight_or_304_query_cannot_consume_new_approval(setup, verif
     assert count(database, QuarantineApprovalUse) == 0
 
 
-def verify_concurrent_review(url):
+def verify_concurrent_review(url, *, authenticate=register_admin):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier
     from fastapi.testclient import TestClient
@@ -210,7 +210,7 @@ def verify_concurrent_review(url):
     registry = FixtureRegistry()
     app = create_app(url, registry)
     with TestClient(app) as seed:
-        register_admin(seed)
+        authenticate(seed)
         baseline_counts = {model: count(app.state.database, model)
                            for model in (QuarantineApprovalUse, QuarantineReview, Snapshot)}
         qid = rejected(seed, registry)

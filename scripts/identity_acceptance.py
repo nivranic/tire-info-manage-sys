@@ -191,12 +191,16 @@ def assert_identity_checkpoint(database_url, checkpoint):
             assert len(rows) == 3 and {row.id for row in rows} == checkpoint['event_ids']
 
 
-def verify_identity_persistence(database_url):
+def verify_identity_persistence(database_url, *, authenticate=None):
     """Synthetic PostgreSQL CAS, UUID races, withdrawal and restart acceptance."""
+    if authenticate is None:
+        from admin_support import register_admin
+        authenticate = register_admin
     from test_core import FixtureRegistry, VARIANT, success
     registry = FixtureRegistry()
     rows = [{**deepcopy(VARIANT), 'model': 'PG Identity Simulation', 'size': '245/45R19',
-             'manufacturer_product_code': 'PG-IDENTITY-' + label, 'facts': {'utqg_treadwear': value}}
+             'manufacturer_product_code': 'PG-IDENTITY-' + label,
+             'facts': {'product_code_type': 'MSPN', 'utqg_treadwear': value}}
             for label, value in [('A', 111), ('B', 222), ('C', 333)]]
     # The third synthetic row shares B's stable code but has an unknown HL flag.
     # This permits an explicitly acknowledged merge while retaining distinct IDs.
@@ -204,6 +208,7 @@ def verify_identity_persistence(database_url):
     registry.result = success('synthetic PostgreSQL identity evidence; no real product claim', rows)
     app = create_app(database_url, registry)
     with TestClient(app) as client:
+        authenticate(client)
         live = accepted(client.post('/v1/sources/fixture/live-query', json={
             'query': {'model': 'PG Identity Simulation', 'size': '245/45R19'}, 'fallback_policy': 'never'}))
         assert live['data_state'] == 'live'

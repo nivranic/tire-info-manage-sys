@@ -377,14 +377,14 @@ def test_concurrent_transitions_use_revision_and_idempotency_fences(setup, same_
         assert db.scalar(select(func.count()).select_from(ParserDeploymentRevision)) == 2
 
 
-def verify_parser_release_persistence(url, directory):
+def verify_parser_release_persistence(url, directory, *, authenticate=register_admin):
     """Shared SQLite/PostgreSQL acceptance; transport recorded, actual A/B children."""
     with pytest.MonkeyPatch.context() as patcher:
         source = trusted_copy(directory, patcher)
         adapter = RecordedRegistry()
         app = create_app(url, adapter)
         with TestClient(app) as client:
-            register_admin(client)
+            authenticate(client)
             first = live(client)
             assert first['data_state'] == 'live'
             first_id = adapter.calls[-1]['bundle_id']

@@ -18,6 +18,7 @@ import secrets
 import subprocess
 import shutil
 import sys
+import sysconfig
 from threading import Barrier
 from uuid import uuid4
 
@@ -30,6 +31,8 @@ from sqlalchemy.engine import URL
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'apps/api/tests'))
+from admin_support import ADMIN_PASSWORD, register_admin
+from query_evidence_assertions import assert_frozen_query_evidence
 from test_core import FixtureRegistry, QUERY, VARIANT, grant, live, success
 from test_vehicles import FixtureVehicleAdapter
 from tire_api.db import Base, Database, FactVersion, FallbackConsent, QueryRun, RawCapture, UserSession, utcnow
@@ -64,6 +67,13 @@ def assert_status(response, expected=200):
     return response.json()
 
 
+def login_admin(client):
+    result = assert_status(client.post('/v1/auth/login',
+        json={'username': 'admin', 'password': ADMIN_PASSWORD}))
+    assert result['authenticated'] and result['user']['is_admin']
+    return result
+
+
 def database_fingerprint(database: Database) -> dict:
     """Hash every persisted row, including evidence bodies and all audit tables."""
     result = {}
@@ -79,6 +89,11 @@ def database_fingerprint(database: Database) -> dict:
 
 def run():
     global STEP
+    if sys.platform == 'win32':
+        architecture = {'win-amd64': 'AMD64', 'win-arm64': 'ARM64', 'win32': 'x86'}.get(sysconfig.get_platform())
+        assert architecture is not None, 'Unrecognized verification Python architecture'
+        os.environ.pop('PROCESSOR_ARCHITEW6432', None)
+        os.environ['PROCESSOR_ARCHITECTURE'] = architecture
     expected_data = Path(os.environ['TIRE_PG_TEST_DATA']).resolve()
     root = (ROOT / '.artifacts/postgres').resolve()
     assert expected_data.is_relative_to(root) and expected_data.name == 'data'
@@ -122,6 +137,7 @@ def run():
     vehicle_adapter = FixtureVehicleAdapter()
     register_vehicle_routes(app, vehicle_adapter)
     with TestClient(app) as client:
+        register_admin(client)
         assert client.get('/health').json()['database'] == 'postgresql'
         result = assert_status(live(client))
         assert result['data_state'] == 'live'
@@ -145,7 +161,7 @@ def run():
         approval = assert_status(grant(client, pending['query_id']), 201)
         approved = {**QUERY, 'consent_id': approval['id']}
         local = assert_status(live(client, approved))
-        assert local['data_state'] == 'local_snapshot' and local['variants'] == result['variants']
+        assert_frozen_query_evidence(result, local, expected_state='local_snapshot')
         assert live(client, approved).status_code == 409
         record(STEP)
 
@@ -180,7 +196,7 @@ def run():
         assert rejected['reason'] == 'source_quality_quarantined' and not rejected['variants']
         registry.result = {'status': 'not_modified', 'url': evidence['source_url'], 'parser_version': 'fixture@1', 'etag': '"fixture-etag"'}
         verified = assert_status(live(client))
-        assert verified['data_state'] == 'live_verified_304' and verified['variants'] == result['variants']
+        assert_frozen_query_evidence(result, verified, expected_state='live_verified_304', reverified=True)
         assert verified['snapshot_observed_at'] == result['snapshot_observed_at']
         record(STEP)
 
@@ -464,7 +480,7 @@ def run():
 
     STEP = 'concurrent_quarantine_review_and_online_application'
     from test_quarantine_review import verify_concurrent_review
-    verify_concurrent_review(url)
+    verify_concurrent_review(url, authenticate=login_admin)
     record(STEP)
 
     STEP = 'test_event_history_restart_and_concurrent_revision'
@@ -517,12 +533,13 @@ def run():
 
     STEP = 'historical_reparse_review_and_restart'
     from test_reparse import assert_reparse_checkpoint, verify_reparse_persistence
-    reparse_checkpoint = verify_reparse_persistence(url)
+    reparse_checkpoint = verify_reparse_persistence(url, authenticate=login_admin)
     record(STEP)
 
     STEP = 'actual_parser_release_approval_a_b_a_and_restart'
     from test_parser_releases import assert_parser_release_checkpoint, verify_parser_release_persistence
-    parser_checkpoint = verify_parser_release_persistence(url, expected_data.parent / 'parser-acceptance')
+    parser_checkpoint = verify_parser_release_persistence(url, expected_data.parent / 'parser-acceptance',
+        authenticate=login_admin)
     parser_backup = expected_data.parent / 'parser-bundles.backup'
     shutil.copytree(parser_checkpoint['bundle_root'], parser_backup)
     record(STEP)
@@ -535,7 +552,8 @@ def run():
     STEP = 'recall_historical_replay_signed_code_upgrade_rollback_and_restart'
     from test_recall_parser_releases import (assert_recall_parser_checkpoint,
                                             verify_recall_parser_persistence)
-    recall_parser_checkpoint = verify_recall_parser_persistence(url, expected_data.parent / 'recall-parser-acceptance')
+    recall_parser_checkpoint = verify_recall_parser_persistence(url, expected_data.parent / 'recall-parser-acceptance',
+        authenticate=login_admin)
     # Restore the entire application against ONE archive root. Independent test
     # installs may share A's content hash; never overwrite an existing archive.
     recall_parser_root = Path(recall_parser_checkpoint['bundle_root'])
@@ -557,7 +575,7 @@ def run():
     # receipt journal. Complete both recall acceptance flows before freezing it.
     STEP = 'identity_decision_concurrent_cas_uuid_withdrawal_and_restart'
     from identity_acceptance import assert_identity_checkpoint, verify_identity_persistence
-    identity_checkpoint = verify_identity_persistence(url)
+    identity_checkpoint = verify_identity_persistence(url, authenticate=login_admin)
     record(STEP)
 
     STEP = 'dump_restore_all_evidence_and_audit_tables'
@@ -657,6 +675,12 @@ if __name__ == '__main__':
         status = 1
         REPORT.update(status='failed', failure_step=STEP, error_type=type(error).__name__,
                       sqlstate=getattr(getattr(error, 'orig', error), 'sqlstate', None))
+        if isinstance(error, AssertionError) and error.args and isinstance(error.args[0], dict):
+            result = error.args[0]
+            completion = result.get('completion')
+            REPORT['failed_result'] = {
+                'state': result.get('state'),
+                'error_code': completion.get('error_code') if isinstance(completion, dict) else None}
         import traceback
         REPORT['failure_frames'] = [{'file': Path(frame.filename).name, 'line': frame.lineno}
             for frame in traceback.extract_tb(error.__traceback__)

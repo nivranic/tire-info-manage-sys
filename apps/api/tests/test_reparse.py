@@ -419,11 +419,11 @@ def test_catalog_failure_does_not_break_normal_api_or_existing_results(setup, mo
     assert client.post('/v1/reparse/runs', json=payload, headers={'Idempotency-Key': key}).json()['id'] == result['id']
 
 
-def verify_reparse_persistence(url):
+def verify_reparse_persistence(url, *, authenticate=register_admin):
     """Real child process, recorded public excerpt, no external HTTP or synthetic parser."""
     app = create_app(url, FixtureRegistry())
     with TestClient(app) as client:
-        register_admin(client)
+        authenticate(client)
         capture_id = seed_capture(client, app.state.database, baseline=True)
         before = totals(app.state.database)
         response = create(client, capture_id)
