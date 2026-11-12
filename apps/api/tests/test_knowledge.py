@@ -232,6 +232,62 @@ def test_event_latest_revision_before_matching_revoke_and_participant_pair(setup
     assert search(client, '新标题').json()['total'] == 0
 
 
+def test_publication_roles_rank_event_candidates_before_recording_time_and_paginate(setup):
+    client, _registry, database = setup
+    records = []
+    for role in ['original_report', 'secondary_report', 'unknown', None]:
+        payload = deepcopy(PAYLOAD)
+        if role is not None:
+            payload['event']['publication'] = {'role': role, 'basis': 'Synthetic basis_token_metadata_only'}
+        records.append(create(client, payload))
+    filters = {'kind': 'test_event', 'size': '225/50R17'}
+    items = search(client, filters=filters).json()['items']
+    assert [item['reference']['event_id'] for item in items] == [records[i]['id'] for i in [0, 1, 3, 2]]
+    for item, index in zip(items[:2], [0, 1], strict=True):
+        assert item['test_publication'] == {**records[index]['event']['publication'], 'event_fingerprint': records[index]['fingerprint']}
+        assert item['verified_at'] is None and item['privacy_class'] == 'private'
+    assert 'test_publication' not in items[2]
+    assert search(client, filters=filters, limit=2, offset=1).json()['items'] == items[1:3]
+    lexical = search(client, 'Synthetic', filters=filters).json()['items']
+    assert [item['reference']['event_id'] for item in lexical] == [item['reference']['event_id'] for item in items]
+    assert search(client, 'basis_token_metadata_only', filters=filters).json()['total'] == 0
+    hybrid = client.post('/v1/knowledge/hybrid-search', json={'search': {'mode': 'history', 'text': '', 'filters': filters},
+        'allow_external_processing': True}, headers={'Idempotency-Key': str(uuid4())})
+    assert hybrid.status_code == 200 and hybrid.json()['result']['items'] == items
+    from tire_api.embedding_text import document_chunks
+    from tire_api.embedding_gateway import EmbeddingConfig
+    with database.sessions() as db:
+        document = db.scalar(select(KnowledgeDocument).where(KnowledgeDocument.id == items[0]['id']))
+        assert all('basis_token_metadata_only' not in chunk['text'] for chunk in document_chunks(
+            document, EmbeddingConfig('synthetic-publication', 3, 'synthetic-key')))
+    seed(database, [{**VARIANT, 'size': '225/50R17'}], at=utcnow() + timedelta(days=1))
+    mixed = search(client, filters={'size': '225/50R17'}).json()['items']
+    assert mixed[0]['kind'] == 'tire'
+    assert [item['reference']['event_id'] for item in mixed[1:]] == [records[i]['id'] for i in [3, 2, 1, 0]]
+
+
+def test_publication_metadata_refreshes_on_revision_and_remains_bound_to_old_history(setup):
+    client, _registry, database = setup
+    row = create(client)
+    first = search(client, filters={'kind': 'test_event'}).json()['items'][0]
+    assert 'test_publication' not in first
+    updated = deepcopy(PAYLOAD)
+    updated['event']['publication'] = {'role': 'secondary_report', 'basis': 'Synthetic citation of original test publication'}
+    response = client.put(f'/v1/test-events/{row["id"]}', json={**updated, 'expected_revision': 1})
+    assert response.status_code == 200, response.text
+    second = search(client, filters={'kind': 'test_event'}).json()['items'][0]
+    assert second['reference']['event_revision'] == 2
+    assert second['test_publication']['event_fingerprint'] == response.json()['fingerprint']
+    assert client.get(f'/v1/test-events/{row["id"]}?mode=history&revision=1').json()['event'] == row['event']
+    with database.sessions() as db:
+        state = db.get(KnowledgeIndexState, 'accepted')
+        state.version = 'accepted-heads-fts@5'
+        document = db.get(KnowledgeDocument, second['id'])
+        document.payload = {key: value for key, value in document.payload.items() if key != 'test_publication'}
+        db.commit()
+    assert search(client, filters={'kind': 'test_event'}).json()['items'][0] == second
+
+
 def test_field_authority_is_specific_conflicts_survive_and_no_model_or_network(setup):
     client, registry, database = setup
     identity = uid()

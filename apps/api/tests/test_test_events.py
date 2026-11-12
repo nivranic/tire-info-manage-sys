@@ -144,6 +144,47 @@ def test_revision_history_conflict_revoke_restore_and_immutable_records(setup):
         with pytest.raises(ValueError): db.commit()
 
 
+def test_publication_declaration_preserves_legacy_payload_and_frozen_revisions(setup):
+    from tire_api.domain import digest
+    from tire_api.test_events import EventPayload
+
+    client, _database = setup
+    old = create(client)
+    assert EventPayload.model_validate(old['event']).model_dump(mode='json') == old['event']
+    assert EventPayload.model_validate({**old['event'], 'publication': None}).model_dump(mode='json') == old['event']
+    assert old['fingerprint'] == digest(old['event'])
+    declaration = {'role': 'original_report', 'basis': 'Synthetic original publication with reported test results'}
+    payload = {**deepcopy(PAYLOAD), 'event': {**old['event'], 'publication': declaration}, 'expected_revision': 1}
+    path = f'/v1/test-events/{old["id"]}'
+    response = client.put(path, json=payload)
+    assert response.status_code == 200, response.text
+    revised = response.json()
+    assert revised['event']['publication'] == declaration and revised['fingerprint'] == digest(revised['event'])
+    assert revised['fingerprint'] != old['fingerprint'] and revised['revision'] == 2
+    assert revised['verification_status'] == 'unverified' and revised['verified_at'] is None
+    assert all(person['identity_status'] == 'participant_only' for person in revised['participants'])
+    assert client.get(path + '?mode=history&revision=1').json()['event'] == old['event']
+    assert client.put(path, json=payload).status_code == 409
+    state = {'expected_revision': 2, 'action': 'revoke', 'operator': 'Synthetic reviewer', 'reason': 'Synthetic state transition'}
+    assert client.post(path + '/state', json=state).json()['revision'] == 3
+    restored = client.post(path + '/state', json={**state, 'expected_revision': 3, 'action': 'restore'}).json()
+    assert restored['event'] == revised['event'] and restored['fingerprint'] == revised['fingerprint']
+    assert compare(client, restored).json()['event']['publication'] == declaration
+
+
+@pytest.mark.parametrize('declaration', [
+    {'role': 'verified', 'basis': 'Synthetic declaration'}, {'role': True, 'basis': 'Synthetic declaration'},
+    {'role': 'original_report', 'basis': 'tiny'}, {'role': 'original_report', 'basis': 'x' * 1001},
+    {'role': 'original_report', 'basis': 'invalid\x00basis'}, {'role': 'original_report'},
+    {'role': 'secondary_report', 'basis': 'Synthetic declaration', 'verified': True},
+], ids=['invalid-role', 'bool-role', 'short-basis', 'long-basis', 'control-basis', 'missing-basis', 'extra-claim'])
+def test_publication_declaration_rejects_invalid_claims(setup, declaration):
+    client, _database = setup
+    payload = deepcopy(PAYLOAD)
+    payload['event']['publication'] = declaration
+    assert client.post('/v1/test-events', json=payload).status_code == 422
+
+
 def verify_event_persistence(url):
     app = create_app(url)
     with TestClient(app) as client:

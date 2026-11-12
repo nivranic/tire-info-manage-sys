@@ -231,6 +231,9 @@ def region_preference(region, preferred):
 
 
 def render_ranked(candidates, filters, terms, sufficient=False, methods=None, details=None, preferred_region=None):
+    candidates = list(candidates)
+    event_scope = all(document.kind == 'test_event' for document, _score in candidates)
+    publication_order = {'original_report': 0, 'secondary_report': 1, 'unknown': 2}
     ranked = []
     for document, score in candidates:
         data = document.payload
@@ -243,6 +246,8 @@ def render_ranked(candidates, filters, terms, sufficient=False, methods=None, de
             reasons.append('尺寸按几何规格匹配，R/ZR 身份仍分别保留；不据此合并或替代 SKU')
         if data['kind'] == 'test_event':
             reasons.append('人工录入，未经外部核验；参测名称未关联到精确 SKU，成绩仅限本场')
+            if event_scope and data.get('test_publication'):
+                reasons.append('本次候选均为测试事件，按修订绑定的出版物角色声明排序：原始报道、转述、未知；声明依据仍须人工核验。')
         if data['kind'] == 'recall':
             reasons = [explanation, '正式召回历史证据；产品名称不证明实物适用性，DOT/TIN 与批次仍未评估',
                        '所有精确筛选按同一公告产品记录匹配；选择分析会包含该快照的全部公告记录',
@@ -258,7 +263,9 @@ def render_ranked(candidates, filters, terms, sufficient=False, methods=None, de
         ranked.append((tier or 999, float(score), data['observed_at'], document.id, public))
     ranked.sort(key=lambda row: row[3])
     ranked.sort(key=lambda row: row[2], reverse=True)
-    ranked.sort(key=lambda row: (row[0], region_preference(row[4]['region'], preferred_region)[1], row[1]))
+    ranked.sort(key=lambda row: (row[0],
+        publication_order.get(row[4].get('test_publication', {}).get('role'), 2) if event_scope else 2,
+        region_preference(row[4]['region'], preferred_region)[1], row[1]))
     return [row[4] for row in ranked]
 
 

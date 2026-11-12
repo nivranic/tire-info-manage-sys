@@ -51,6 +51,7 @@ function ResultCard({ item, selected, disabled, onToggle }: { item: KnowledgeSea
       <dl><Version reference={item.reference} /><dt>原始来源</dt><dd>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{item.source_url}</a> : "无可打开的来源链接"}</dd><dt>匹配方式</dt><dd>{{ fts: "关键词全文检索", structured: "结构化条件筛选", dense: "向量召回", hybrid: "关键词与向量融合" }[item.match.method]}</dd>
         {item.match.matched_terms.length ? <><dt>匹配词</dt><dd>{item.match.matched_terms.join(" · ")}</dd></> : null}
         <dt>字段来源优先级</dt><dd>{item.match.authority_tier === null ? "本项未使用字段来源优先级" : `等级 ${item.match.authority_tier}`} · {item.match.authority_rule}</dd>
+        {item.test_publication ? <><dt>出版物角色（录入声明）</dt><dd>{{ original_report: "原始报道", secondary_report: "转述", unknown: "角色未知" }[item.test_publication.role]}</dd><dt>出版物角色依据</dt><dd>{item.test_publication.basis}</dd><dt>事件内容指纹</dt><dd className="mono">{item.test_publication.event_fingerprint}</dd></> : null}
       </dl>
       <ul>{item.match.explanation.map((line, index) => <li key={index}>{line}</li>)}</ul>
     </details>

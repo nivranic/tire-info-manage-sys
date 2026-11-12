@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from pydantic import Field, StrictInt, field_validator, model_validator
+from pydantic import Field, StrictInt, field_validator, model_serializer, model_validator
 from sqlalchemy import DateTime, ForeignKey, JSON, String, UniqueConstraint, desc, event, func, select
 from sqlalchemy.orm import Mapped, Session, load_only, mapped_column
 
@@ -42,11 +42,17 @@ class Measurement(StrictModel):
     evidence_locator: DescriptionText = Field(min_length=1, max_length=300)
 
 
+class TestPublication(StrictModel):
+    role: Literal['original_report', 'secondary_report', 'unknown']
+    basis: DescriptionText = Field(min_length=5, max_length=1000)
+
+
 class EventPayload(StrictModel):
     title: DescriptionText = Field(min_length=1, max_length=200)
     organization: DescriptionText = Field(min_length=1, max_length=160)
     relationship: Literal['independent', 'manufacturer_commissioned', 'unknown']
     publication_date: date | None = None
+    publication: TestPublication | None = None
     source_url: str = Field(min_length=1, max_length=2048)
     rights_basis: DescriptionText = Field(min_length=5, max_length=1000)
     tested_size: str = Field(max_length=24)
@@ -58,6 +64,13 @@ class EventPayload(StrictModel):
     participants: list[Participant] = Field(min_length=1, max_length=60)
     metrics: list[MetricDefinition] = Field(min_length=1, max_length=24)
     measurements: list[Measurement] = Field(min_length=1, max_length=1000)
+
+    @model_serializer(mode='wrap')
+    def serialize_event(self, handler):
+        value = handler(self)
+        if self.publication is None:
+            value.pop('publication', None)
+        return value
 
     @field_validator('source_url')
     @classmethod

@@ -139,6 +139,7 @@ export interface KnowledgeSearchRequest {
   preferred_region?: string;
 }
 export interface KnowledgeSearchItem {
+  test_publication?: TestPublication & { event_fingerprint: string };
   recall?: {
     campaign_number: string; recall_revision_id: string | null; recall_revision: number | null;
     observation_kind: "records" | "empty"; record_count: number; record_key: string | null; applicability: "not_assessed";
@@ -664,9 +665,14 @@ export interface Health { status: string; mode: string; database: string }
 export interface TestParticipant { key: string; brand: string; model: string; source_designation: string }
 export interface TestMetricDefinition { key: string; label: string; unit: string; protocol: string; direction: "lower" | "higher" | "unspecified" }
 export interface TestMeasurement { participant_key: string; metric_key: string; raw_value: string; source_rank: number | null; evidence_span: string; evidence_locator: string }
+export interface TestPublication {
+  role: "original_report" | "secondary_report" | "unknown";
+  basis: string;
+}
 export interface TestEventPayload {
   title: string; organization: string; relationship: "independent" | "manufacturer_commissioned" | "unknown";
   publication_date: string | null; source_url: string; rights_basis: string; tested_size: string;
+  publication?: TestPublication;
   vehicle: string | null; surface: string | null; conditions: string;
   coverage: "selected_results" | "full_event"; reported_participants: number | null;
   participants: TestParticipant[]; metrics: TestMetricDefinition[]; measurements: TestMeasurement[];

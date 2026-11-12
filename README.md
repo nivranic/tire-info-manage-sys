@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-> PDF正文已支持冻结来源类别和地区声明，接入权威／地区排序及region硬筛选，Web展示声明依据和捕获出处。五模块211项回归、三端类型、Web55项及1440／390／320精确视口48项实际组件检查通过。隔离PG综合58项和来源专项7项分别通过，153张模型表实际备份恢复一致，集群与预览已关闭。两条人工TestEvent的manual_test排序差距、真实模型质量及完整V1继续验收。[实施与验收](docs/assurance/evidence/pdf-source-attribution-2026-11-13.md)
+> 人工测试已支持修订绑定的出版物角色声明、事件候选排序及Web录入与展示。六模块175项回归、三端类型、Web55项和实际组件60项检查通过。隔离PG综合58项与专项6项通过，153表实际备份恢复一致。两份真实转录追加声明后，13查询宏平均nDCG@1为1，原值及旧修订保留。标注由Agent给出，外部真人复核、代表性及完整V1继续验收。[实施与验收](docs/assurance/evidence/test-publication-ranking-2026-11-13.md)
 
 > 新增[离线检索质量评估](docs/assurance/evidence/retrieval-evaluation-2026-11-13.md)，提供Precision、Recall、MRR及nDCG，四模块118项回归通过。首批13个真实来源查询已记录指标及宽查询的排序差距，标注由Agent给出，外部真人复核继续待完成。[运行方式](docs/plans/2026-11-13-retrieval-evaluation.md)
 
