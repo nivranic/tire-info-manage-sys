@@ -128,6 +128,15 @@ def url_move_notification_statement():
         .outerjoin(MonitorJob, MonitorJob.id == AlertRule.job_id))
 
 
+def url_move_notification_rows(db, statement):
+    try:
+        return db.execute(statement).all()
+    except ValueError:
+        # JSON and datetime conversion happen while SQLAlchemy loads rows,
+        # before the retained-reference validators can examine their values.
+        invalid()
+
+
 def url_move_notification_views(db, rows, *, content=False):
     if any(move is None or rule is None or revision is None or job is None
            for _notice, move, rule, revision, job in rows):
@@ -155,11 +164,12 @@ def url_move_notification_views(db, rows, *, content=False):
 
 
 def require_url_move_notification(db, notification_id, *, content=False):
-    row = db.execute(url_move_notification_statement().where(
-        SourcePageUrlMoveNotification.id == notification_id)).first()
-    if row is None:
+    rows = url_move_notification_rows(db, url_move_notification_statement().where(
+        SourcePageUrlMoveNotification.id == notification_id))
+    if not rows:
         raise HTTPException(404, {'code': 'source_page_url_notification_not_found',
                                   'message': '未找到来源地址迁移站内提醒。'})
+    row = rows[0]
     return row[0], url_move_notification_views(db, [row], content=content)[0]
 
 
@@ -179,8 +189,8 @@ def register_source_page_url_routes(app: FastAPI):
         if unread:
             statement = statement.where(SourcePageUrlMoveNotification.read_at.is_(None))
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
-        rows = db.execute(statement.order_by(desc(SourcePageUrlMoveNotification.delivered_at),
-            SourcePageUrlMoveNotification.id).offset(offset).limit(limit)).all()
+        rows = url_move_notification_rows(db, statement.order_by(desc(SourcePageUrlMoveNotification.delivered_at),
+            SourcePageUrlMoveNotification.id).offset(offset).limit(limit))
         return {'scope': 'local_workspace', 'data_state': 'local_snapshot',
                 'items': url_move_notification_views(db, rows), 'total': total, 'offset': offset, 'limit': limit}
 

@@ -52,6 +52,14 @@ def record(name: str):
 
 
 def assert_status(response, expected=200):
+    if response.status_code != expected:
+        try:
+            detail = response.json().get('detail')
+        except (ValueError, AttributeError):
+            detail = None
+        REPORT['failed_http'] = {'expected': expected, 'actual': response.status_code,
+            'method': response.request.method, 'path': response.request.url.path,
+            'error_code': detail.get('code') if isinstance(detail, dict) else None}
     assert response.status_code == expected, f"Unexpected HTTP status: {response.status_code}"
     return response.json()
 

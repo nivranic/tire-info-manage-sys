@@ -9,6 +9,7 @@ from tire_api.service import QueryService
 from tire_api.source_page_models import SourcePageChange
 from tire_api.source_page_url_models import SourcePageUrlMove, SourcePageUrlMoveNotification, VERSION
 from tire_api.source_page_url_monitoring import append_url_move
+from tire_api.source_page_url_monitoring import url_move_notification_rows
 from test_core import QUERY, count, live, setup, success
 from test_source_page_monitoring import change as page_change, create as create_page_rule
 from test_source_page_monitoring import notices as page_notices
@@ -172,6 +173,56 @@ def test_not_modified_observation_bridges_a_move_as_its_before_side(setup):
     assert evidence['before']['snapshot_id'] == first['provenance'][0]['snapshot_id']
     assert evidence['before']['verified_at'] == confirmed['verified_at']
     assert evidence['after']['snapshot_id'] == after['provenance'][0]['snapshot_id']
+
+
+@pytest.mark.parametrize('damage', ['event_query_json', 'notification_timestamp'])
+@pytest.mark.parametrize('operation', ['list', 'detail', 'read'])
+def test_invalid_stored_url_history_returns_fixed_error(setup, damage, operation):
+    client, registry, database = setup
+    create_url_rule(client)
+    live(client)
+    move(client, registry, 'accepted-moved-body', NEW_URL)
+    notice = url_notices(client)['items'][0]
+    # Model guards protect ordinary writes. Simulate a damaged retained database
+    # by bypassing only the affected trigger in this test's disposable database.
+    with database.engine.begin() as connection:
+        if damage == 'event_query_json':
+            connection.exec_driver_sql('DROP TRIGGER source_page_url_moves_no_update')
+            connection.exec_driver_sql('UPDATE source_page_url_moves SET "query" = ? WHERE id = ?',
+                ('{"damaged-private-url-history":', notice['event']['id']))
+        else:
+            connection.exec_driver_sql('DROP TRIGGER source_page_url_move_notifications_read_only_update')
+            connection.exec_driver_sql(
+                'UPDATE source_page_url_move_notifications SET delivered_at = ? WHERE id = ?',
+                ('damaged-private-url-history-timestamp', notice['id']))
+    path = '/v1/source-page-url-move-notifications'
+    if operation == 'list':
+        response = client.get(path, params={'mode': 'history'})
+    elif operation == 'detail':
+        response = client.get(path + '/' + notice['id'], params={'mode': 'history'})
+    else:
+        response = client.put(path + '/' + notice['id'] + '/read', json={'read': True})
+    assert response.status_code == 503
+    assert response.json()['detail']['code'] == 'source_page_history_invalid'
+    assert 'damaged-private-url-history' not in response.text
+    with database.engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            'SELECT read_at FROM source_page_url_move_notifications WHERE id = ?',
+            (notice['id'],)).scalar_one() is None
+
+
+@pytest.mark.parametrize('error', [
+    RuntimeError('synthetic-runtime-denial'),
+    DBAPIError('synthetic-query', {}, RuntimeError('synthetic-storage-failure')),
+])
+def test_history_decode_boundary_preserves_storage_and_runtime_errors(error):
+    class FailingDatabase:
+        def execute(self, _statement):
+            raise error
+
+    with pytest.raises(type(error)) as caught:
+        url_move_notification_rows(FailingDatabase(), None)
+    assert caught.value is error
 
 
 @pytest.mark.parametrize('values', [
