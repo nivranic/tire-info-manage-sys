@@ -57,8 +57,9 @@ def index_selection(client, selected, **permission):
     assert response.status_code == 200 and response.json()['state'] == 'completed', response.text
 
 
-def ask(client, question='quiettopic', *, filters=None, preferred_region=None, key=None, consent=True):
-    search = {'mode': 'history', 'text': question, 'filters': filters or {}}
+def ask(client, question='quiettopic', *, filters=None, preferred_region=None, key=None, consent=True,
+        offset=0, limit=12):
+    search = {'mode': 'history', 'text': question, 'filters': filters or {}, 'offset': offset, 'limit': limit}
     if preferred_region is not None:
         search['preferred_region'] = preferred_region
     return client.post('/v1/knowledge/hybrid-search', headers={'Idempotency-Key': key or str(uuid4())},
@@ -140,6 +141,47 @@ def test_source_category_and_region_preference_are_explicit_ranking_dimensions(r
     assert [item['match']['authority_tier'] for item in result['items']] == [1, 1, 2]
     assert [item['match']['region_match'] for item in result['items']] == ['exact', 'different', 'different']
     assert all(item['match']['variant_match'] == 'page_scope' for item in result['items'])
+
+
+@pytest.mark.parametrize('collection', ['structured', 'original_text'])
+def test_hybrid_pages_slice_global_rankings_and_freeze_each_receipt(retrieval, collection):
+    from test_core import VARIANT
+    from test_knowledge import seed as seed_structured
+
+    client, database, provider = retrieval
+    html(retrieval, source='fixture-media')
+    html(retrieval, source='fixture')
+    html(retrieval, source='fixture-cn')
+    document, _ = indexed_document(client, pages=('acoustic quiettopic PDF page',))
+    pdf = pdf_search(client, 'quiettopic', document_id=document['id']).json()['items'][0]
+    index_selection(client, {'kind': 'document_text', 'reference': pdf['reference']})
+    rows = [{**VARIANT, 'id': str(uuid4()), 'manufacturer_product_code': f'PAGE-{index}',
+             'facts': {'description': 'quiettopic page candidate'}} for index in range(3)]
+    seed_structured(database, rows, query='hybrid-pages')
+    complete_response = ask(client, preferred_region='CN', limit=30)
+    assert complete_response.status_code == 200, complete_response.text
+    full = complete_response.json()['result']
+    expected = full if collection == 'structured' else full['original_text']
+    total = 3 if collection == 'structured' else 4
+    assert expected['total'] == total
+
+    pages = {}
+    for offset in (2, 0, total, 2000):
+        key = str(uuid4())
+        response = ask(client, preferred_region='CN', offset=offset, limit=2, key=key)
+        assert response.status_code == 200, response.text
+        value = response.json()
+        result = value['result'] if collection == 'structured' else value['result']['original_text']
+        assert result['items'] == expected['items'][offset:offset + 2]
+        assert result['offset'] == offset and result['limit'] == 2
+        assert result['total'] == total and result['has_more'] is (offset + 2 < total)
+        before = len(provider.calls)
+        assert ask(client, preferred_region='CN', offset=offset, limit=2, key=key).json() == value
+        assert len(provider.calls) == before
+        assert ask(client, preferred_region='CN', offset=offset, limit=1, key=key).status_code == 409
+        assert client.get(f"/v1/knowledge/embedding-runs/{value['id']}?mode=history").json() == value
+        pages[offset] = result['items']
+    assert pages[0] + pages[2] + pages[total] + pages[2000] == expected['items']
 
 
 def test_equal_fusion_scores_use_observation_time(retrieval, monkeypatch):
@@ -319,7 +361,7 @@ def verify_original_text_hybrid(url, *, authenticate):
             assert result['items'][0]['reference'] == cn['reference']
             assert result['items'][0]['match']['method'] == 'hybrid'
             assert result['items'][0]['match']['cosine_distance'] == 0
-            ranked = completed(ask(client, preferred_region='CN'))
+            ranked = completed(ask(client, preferred_region='CN', limit=30))
             assert ranked['items'][0]['reference'] == cn['reference']
             assert len(provider.calls) == 4 and all(call[2] == ['quiettopic'] for call in provider.calls[-2:])
             with app.state.database.sessions() as db:
@@ -327,10 +369,20 @@ def verify_original_text_hybrid(url, *, authenticate):
                 scores = original_text_retrieval.cosine_candidates(db, configured_embeddings(), materials, [1, 0, 0])
                 assert (us['reference']['chunk_id'], 0.0) in scores
                 assert cn['reference']['chunk_id'] not in dict(scores)
-            checkpoint = {'run_id': response.json()['id'], 'originals': result, 'us': us, 'cn': cn}
+            page_response = ask(client, preferred_region='CN', offset=1, limit=1)
+            page = completed(page_response)
+            assert page['items'] == ranked['items'][1:2]
+            assert page['offset'] == page['limit'] == 1
+            assert page['total'] == ranked['total'] and page['has_more'] is (ranked['total'] > 2)
+            empty_response = ask(client, preferred_region='CN', offset=2000, limit=1)
+            empty = completed(empty_response)
+            assert not empty['items'] and not empty['has_more'] and empty['total'] == ranked['total']
+            checkpoint = {'run_id': response.json()['id'], 'originals': result, 'us': us, 'cn': cn,
+                          'pages': [page_response.json(), empty_response.json()]}
         app.state.database.close()
     return {'checks': ['original_bound_postgresql_fts_and_cosine', 'derived_mirror_recovery_from_content_cache', 'hard_source_scope_before_vector_limit',
-        'region_preference_with_real_fusion', 'only_query_text_dispatched'], 'checkpoint': checkpoint}
+        'region_preference_with_real_fusion', 'only_query_text_dispatched',
+        'global_original_fusion_ranking_paginated_with_empty_page'], 'checkpoint': checkpoint}
 
 
 def assert_original_text_hybrid_checkpoint(url, checkpoint, *, authenticate):
@@ -349,6 +401,9 @@ def assert_original_text_hybrid_checkpoint(url, checkpoint, *, authenticate):
             authenticate(client)
             response = client.get(f"/v1/knowledge/embedding-runs/{checkpoint['run_id']}?mode=history")
             assert response.status_code == 200 and response.json()['result']['original_text'] == checkpoint['originals']
+            for saved in checkpoint.get('pages', []):
+                response = client.get(f"/v1/knowledge/embedding-runs/{saved['id']}?mode=history")
+                assert response.status_code == 200 and response.json() == saved
             with app.state.database.sessions() as db:
                 config = configured_embeddings()
                 materials = original_text_retrieval.current_originals(db, config, registry, {'source_id': 'fixture-cn'})

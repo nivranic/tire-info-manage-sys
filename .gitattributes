@@ -62,3 +62,9 @@
 /apps/web/components/account-dialog.tsx text eol=lf
 /apps/web/components/workbench.tsx text eol=lf
 /apps/web/tests/theme-contrast.test.ts text eol=lf
+
+# Preserve Python source bytes used by hybrid pagination verification.
+/apps/api/tire_api/dense.py text eol=lf
+/apps/api/tire_api/original_text_retrieval.py text eol=lf
+/apps/api/tests/test_embeddings.py text eol=lf
+/apps/api/tests/test_original_text_retrieval.py text eol=lf

@@ -109,11 +109,13 @@ def hybrid_result(db, config, payload, index, materials, query_vector):
     details = {key: {**ranks[key], 'rrf_score': score, 'cosine_distance': distances.get(key)} for key, score in scores.items()}
     ranked = render_ranked([(documents[key], -score) for key, score in scores.items()], filters, terms,
                            methods=methods, details=details, preferred_region=payload.preferred_region)
+    end = payload.offset + payload.limit
     return {'mode': 'history', 'data_state': 'local_snapshot', 'text': payload.text,
         **({'preferred_region': payload.preferred_region} if payload.preferred_region else {}),
         'applied_filters': filters, 'inferred_filters': inferred,
-        'items': attach_field_resolutions(db, attach_identity_contracts(db, ranked[:payload.limit])),
-        'total': len(ranked), 'total_scope': 'candidates', 'has_more': len(ranked) > payload.limit,
+        'items': attach_field_resolutions(db, attach_identity_contracts(db, ranked[payload.offset:end])),
+        'total': len(ranked), 'total_scope': 'candidates', 'has_more': len(ranked) > end,
+        'offset': payload.offset, 'limit': payload.limit,
         'external_processing': {'query_text_sent': True},
         'index': index, 'coverage': coverage(materials),
         'candidate_counts': {'fts': len(lexical), 'dense': len(dense), 'merged': len(ranked), 'limit': CANDIDATE_LIMIT},

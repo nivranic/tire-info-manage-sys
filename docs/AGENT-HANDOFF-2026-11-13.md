@@ -8,9 +8,11 @@
 
 HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式grounding、报告和导出已接通。此前正文向量、FTS／RRF融合与地区排序已有工程和隔离验证。生成主线采用用户选定的OpenAI Responses API，真实模型语义仍待验收。
 
-本轮沿既有 `main` 完成Web核心流程无障碍补修。Web55项、三端类型及生产构建通过，14份Lighthouse快照无障碍100分，22项功能与键盘检查通过。读屏、完整WCAG 2.2 AA及其余发布Gate继续开放。
+本轮沿既有 `main` 修复混合检索忽略offset导致第二页重复的问题，结构化与HTML／PDF正文均在全局排序后分页。六模块API161项、综合PG58项及153模型表恢复、独立向量业务14项及155实际表恢复、SDK9项、Web55项和三端类型通过。
 
-本轮交付前的已推送基线为 `b2d433a037f4463c2e77209c1cb34d32508e1223`。本轮最终SHA及远端一致性以交付消息和即时Git查询为准。
+此前Web核心流程无障碍补修取得14份Lighthouse无障碍100分快照、22项功能与键盘检查及生产构建通过。读屏、完整WCAG 2.2 AA及其余发布Gate继续开放。
+
+本轮交付前的已推送基线为 `bc538b5bffd6a985908fbf2097e26c81007ff5b7`。本轮最终SHA及远端一致性以交付消息和即时Git查询为准。
 
 ## 用户决定与实施选择
 
@@ -37,7 +39,25 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名及有限重试、外部Key、字段许可治理 | 真实接收端、公网生产验收、SDK产品化、完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权、审计 | 生产身份／租户／RLS、完整角色治理、灾备、发布验收 |
 
-## 本轮Web无障碍补修
+## 本轮混合检索分页
+
+核对原规格检索顺序时发现，KnowledgeSearch已支持offset，混合检索的结构化与正文集合却始终取前limit条。现已修正两个正常API结果入口，先完成当前候选的权威、地区、融合分数与时间排序，再按offset／limit取片，has_more依据分页终点计算。两组结果各自返回分页元信息，正文共享类型采用可选字段，历史完成账本继续读取其已保存结果。
+
+新增正常API回归覆盖结构化、HTML＋PDF混合正文、后续页、集合终点与offset2000空页、跨页全局顺序、幂等重放、参数冲突及历史读取。SDK核对分页参数、引用与响应元信息。真实pgvector业务补验结构化融合后的分页和重启重放，综合PG补验正文融合分页及备份恢复后的分页账本。
+
+| 范围 | 结果与本机回执 |
+| --- | --- |
+| API六模块 | 161／161，796个输入稳定，资源关闭，非自检拒绝0，`.artifacts/hybrid-page-green-r2/result.json` |
+| 综合PG／pgvector | 58项通过，153模型表实际dump／restore指纹一致，`pgverify-1573817076104d80891fed3718b520ee/report.json` |
+| 独立向量业务 | 14项通过，155实际表备份恢复指纹一致，`vectorverify-180c3fe1f4f24afda63d3eaf3bd4169a/report.json` |
+| SDK／Web／三端类型 | SDK9／9、Web55／55，Web／Desktop／Mobile类型exit0，`frontend.json` |
+| 集群关闭 | 两个集群的pg_ctl均为3，对应端口无监听，`closure-final.json` |
+
+本轮汇总位于 `.artifacts/hybrid-pagination-20261113/summary-final.json`。综合PG报告位于 `.artifacts/postgres/`，独立向量报告位于 `.artifacts/pgvector/`。独立向量验收复用已有运行时，输入及Provider为合成数据，FTS、cosine、持久化与备份恢复采用真实PG。综合PG的153模型表与独立向量的155实际表分别按各验证器的统计范围核对。
+
+原失败保留于 `.artifacts/hybrid-page-red/` 与 `hybrid-page-red-r2/`。首批两例先在缺少分页元信息处失败，调整断言顺序后，两例均在第二页内容比对处失败。修复后的正文专项33／33，最终六模块161／161。真实模型语义和代表性材料上的检索质量仍待验收。Web生产构建和浏览器结果见此前无障碍阶段记录。
+
+## 此前Web无障碍补修
 
 - 浅色次要文字和强调色调整为符合已测文字／背景组合的色值，导航小字移除透明度，输入提示文字使用完整不透明度。新增5项主题和导航对比度回归。
 - 品牌链接的可访问名称包含可见中英文名称，删除视图标题旁的装饰序号及对应样式。
@@ -45,7 +65,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 - 跳过导航沿现有主区域ID聚焦，保留当前Hash路由，车库深链接刷新后仍维持原视图。
 - AI完成态来源标题改为H3，修正隐藏分析范围后的标题跳级，字体沿用原大小。
 
-## 本轮无障碍验证
+## Web无障碍阶段验证
 
 | 范围 | 结果与回执 |
 | --- | --- |
@@ -56,7 +76,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 功能与键盘 | 22项通过，七主视图跳过导航、深链接、命令面板、账户、正文分析和报告，`browser-r4.json` |
 | 最终复核与关闭 | r5历史AI完成态无障碍100分，API／Web、两个隔离PG及端口均已关闭，`closure-final.json` |
 
-本轮回执根目录为 `.artifacts/web-a11y-20261113/`，汇总为 `summary-final.json`。首页／查询快照绑定r2，账户、知识、用途、AI准备、报告及22项功能检查绑定r4。末次标题修正后执行r5三端类型、55项Web测试、生产构建和历史AI完成态快照，保存为 `ai-result-r5.json`。报告在320、390及1440像素均无横向溢出。
+无障碍阶段回执根目录为 `.artifacts/web-a11y-20261113/`，汇总为 `summary-final.json`。首页／查询快照绑定r2，账户、知识、用途、AI准备、报告及22项功能检查绑定r4。末次标题修正后执行r5三端类型、55项Web测试、生产构建和历史AI完成态快照，保存为 `ai-result-r5.json`。报告在320、390及1440像素均无横向溢出。
 
 浏览器使用真实隔离PostgreSQL存储、合成来源及合成Responses Provider。最终1次合成调用对应1条AI请求、1条完成账本、600 tokens及1份报告。真实Provider调用和外网尝试均为0，正常数据库未打开。控制台唯一error为夹具关闭Embeddings时预览返回的503。读屏、全部业务状态、跨浏览器与原生平台仍待验收。
 
@@ -90,7 +110,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 
 ## 正文AI阶段验证
 
-以下结果绑定已推送的 `b2d433a` 正文AI阶段。本轮无障碍补修沿用这些后端实现，当前新增验证范围见上一节。
+以下结果绑定已推送的 `b2d433a` 正文AI阶段。当前分页补修的新增验证范围见本卡“本轮混合检索分页”。
 
 | 范围 | 当前结果及本机入口 |
 | --- | --- |
@@ -156,13 +176,13 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 ## 接手后的执行顺序
 
-1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。本轮API／Web及两个隔离PG已关闭。新clone需要重建本机验收依赖并取得相应原件。
+1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。本轮两个隔离PG及此前API／Web已关闭。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
 3. 建立代表性真实材料上的检索评估，核对原规格要求的权威／版本／地区／时效排序与真实Embeddings质量。现有工程包含精确条件过滤、来源及字段权威、地区偏好、RRF与时间排序。语义重排模型属于此前Agent追加的实施选项，后续可按质量评估需求选择。
 4. 继续自主核验专业材料。JRC匿名样本仍待型号映射，PERS许可已定位CC BY 3.0但真实捕获曾直连TCP超时。本阶段新增保存成功原件、TestEvent、精确SKU关联及外部真人Golden均为0。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
-原文RAG总计划见[实施计划](plans/2026-11-12-original-text-rag.md)，正文阶段见[正文AI计划](plans/2026-11-13-original-text-ai.md)与[正文融合计划](plans/2026-11-13-original-text-hybrid.md)，本轮见[Web无障碍计划](plans/2026-11-13-web-accessibility.md)。
+原文RAG总计划见[实施计划](plans/2026-11-12-original-text-rag.md)，正文阶段见[正文AI计划](plans/2026-11-13-original-text-ai.md)与[正文融合计划](plans/2026-11-13-original-text-hybrid.md)，此前见[Web无障碍计划](plans/2026-11-13-web-accessibility.md)，本轮见[混合检索分页计划](plans/2026-11-13-hybrid-pagination.md)。
 
 ## 代码及复验入口
 
@@ -176,8 +196,9 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 | 共享类型／SDK合同 | `packages/domain-types/src/index.ts`、`packages/api-client/tests/text-embeddings.mts` |
 | 正文后端回归 | `apps/api/tests/test_ai_original_text.py` |
 | PG及恢复验证 | `scripts/postgres_acceptance.py`、`scripts/verify-postgres.ps1` |
-| 本轮Web无障碍 | `apps/web/app/globals.css`、`apps/web/components/workbench.tsx`、`account-dialog.tsx`、`ai-analysis.tsx` |
+| Web无障碍 | `apps/web/app/globals.css`、`apps/web/components/workbench.tsx`、`account-dialog.tsx`、`ai-analysis.tsx` |
 | 对比度回归 | `apps/web/tests/theme-contrast.test.ts` |
+| 本轮分页回归 | `apps/api/tests/test_original_text_retrieval.py`、`apps/api/tests/test_embeddings.py` |
 
 表中省略目录的后端文件名位于 `apps/api/tire_api/`，Web组件位于 `apps/web/components/`。
 
@@ -208,4 +229,4 @@ npm run typecheck --workspace @tire/mobile
 
 ## 可复制的接手指令
 
-> 按 `docs/AGENT-HANDOFF-2026-11-13.md` 接手胎迹完整V1，先核对Git和回执。12核心模块已有实现，10项发布Gate、13项SLO和原规格待确认决策继续跟踪。正文检索、向量融合、正文证据包、用途、同意、预算、同步／流式grounding与报告已接通。正文AI阶段269项API、58项PG及153表恢复、30项生产浏览器和SDK9项通过。本轮Web55项、三端类型及构建通过，14份Lighthouse快照无障碍100分、22项功能与键盘检查通过，读屏和完整WCAG仍待验收。浏览器材料与Provider采用合成夹具，相关测试服务和PG已关闭。用户选定首个真实Provider为OpenAI Responses，启动时显式设置TI_AI_PROVIDER并核对状态接口。当前OpenAI及EPREL凭据缺失，继续独立质量工程和专业材料核验。Gemini适配由此前Agent依据规格自行提前排期。接下来推进真实语义、原规格检索与排序质量、真实精确SKU及人工审核，以及生产权限、平台与发布Gate。语义重排模型为此前Agent追加的实施选项。遵守本卡操作约束，保留失败证据，完成声明以实际验收结果为依据。
+> 按 `docs/AGENT-HANDOFF-2026-11-13.md` 接手胎迹完整V1，先核对Git和回执。12核心模块已有实现，10项发布Gate、13项SLO和原规格待确认决策继续跟踪。正文检索、向量融合、正文证据包、用途、同意、预算、同步／流式grounding与报告已接通。本轮混合分页修复取得161项API、58项综合PG及153模型表恢复、14项独立向量业务及155实际表恢复、SDK9项、Web55项和三端类型通过，两个测试集群已关闭。此前Web无障碍阶段14份Lighthouse快照100分、22项功能检查和生产构建通过，读屏和完整WCAG继续验收。材料及Provider采用合成夹具。用户选定首个真实Provider为OpenAI Responses，启动时显式设置TI_AI_PROVIDER并核对状态接口。当前OpenAI及EPREL凭据缺失，继续独立质量工程和专业材料核验。Gemini适配由此前Agent依据规格自行提前排期。接下来推进真实语义、原规格检索与排序质量、真实精确SKU及人工审核，以及生产权限、平台与发布Gate。语义重排模型为此前Agent追加的实施选项。遵守本卡操作约束，保留失败证据，完成声明以实际验收结果为依据。

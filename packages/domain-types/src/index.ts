@@ -217,6 +217,7 @@ export interface OriginalTextMatch {
 export type OriginalTextSearchItem = (SourceTextExcerpt | DocumentTextExcerpt) & { match: OriginalTextMatch };
 export interface OriginalTextSearchResult {
   items: OriginalTextSearchItem[]; total: number; has_more: boolean; coverage: OriginalTextCoverage;
+  offset?: number; limit?: number;
   preferred_region: string | null; text_contract: "original-text-semantic@1";
   candidate_counts: { fts: number; dense: number; merged: number; limit: number }; notice: string;
 }

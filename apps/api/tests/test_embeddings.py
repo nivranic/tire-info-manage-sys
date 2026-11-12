@@ -288,9 +288,10 @@ def test_concurrent_free_structured_queries_share_one_receipt(tmp_path):
             assert db.scalar(select(func.count()).select_from(EmbeddingRequest)) == 1
 
 
-def hybrid(client, value, filters=None, key=None, consent=True):
+def hybrid(client, value, filters=None, key=None, consent=True, *, offset=0, limit=12):
     return client.post('/v1/knowledge/hybrid-search', headers={'Idempotency-Key': key or str(uuid4())},
-        json={'search': {'mode': 'history', 'text': value, 'filters': filters or {}}, 'allow_external_processing': consent})
+        json={'search': {'mode': 'history', 'text': value, 'filters': filters or {},
+                         'offset': offset, 'limit': limit}, 'allow_external_processing': consent})
 
 
 def build(client, plan, key=None, consent=True):
@@ -462,6 +463,20 @@ def verify_embedding_persistence(url):
             assert 'secret-error' not in json.dumps(failed)
             model.error = None
             checks.append('provider_failure_durable_and_never_claims_hybrid_success')
+            full_page = hybrid(client, '湿地制动', {'source_id': 'fixture'}, limit=30).json()
+            assert full_page['state'] == 'completed' and full_page['result']['total'] >= 2, full_page
+            page_key = str(uuid4())
+            paginated = hybrid(client, '湿地制动', {'source_id': 'fixture'}, page_key, offset=1, limit=1).json()
+            assert paginated['state'] == 'completed', paginated
+            page = paginated['result']
+            assert page['items'] == full_page['result']['items'][1:2]
+            assert page['offset'] == page['limit'] == 1
+            assert page['total'] == full_page['result']['total']
+            assert page['has_more'] is (page['total'] > 2)
+            assert hybrid(client, '湿地制动', {'source_id': 'fixture'}, page_key, offset=0, limit=1).status_code == 409
+            empty = hybrid(client, '湿地制动', {'source_id': 'fixture'}, offset=2000, limit=1).json()
+            assert empty['state'] == 'completed' and not empty['result']['items'] and not empty['result']['has_more']
+            checks.append('global_fusion_ranking_paginated_after_fts_and_cosine')
             budget = client.get('/v1/ai/status').json()['budget']
             assert budget['requests'] == len(model.calls) and budget['accounted_tokens'] >= failed['reserved_tokens']
             monkeypatch.setenv('TI_AI_DAILY_REQUEST_LIMIT', str(budget['requests']))
@@ -477,10 +492,12 @@ def verify_embedding_persistence(url):
             client.cookies.update(cookies)
             assert build(client, plan, key).json() == run
             assert hybrid(client, '湿地制动', key=query_key).json() == found
+            assert hybrid(client, '湿地制动', {'source_id': 'fixture'}, page_key, offset=1, limit=1).json() == paginated
             assert not restarted_model.calls
             with restart.state.database.sessions() as db:
                 assert db.execute(text('SELECT count(*) FROM embedding_vectors')).scalar() == 3
                 assert db.execute(text("SELECT count(*) FROM pg_indexes WHERE tablename = 'embedding_vectors' AND indexdef LIKE '%USING hnsw%'")).scalar() >= 1
         checks.append('restart_idempotency_vector_mirror_and_hnsw_persist')
+        checks.append('restart_preserves_paginated_hybrid_receipt_without_provider_call')
     return {'provider': 'synthetic_fixed_vectors_not_live_semantic_acceptance', 'checks': checks,
             'passed': len(checks), 'business_tables': ['embedding_cache', 'embedding_plans', 'embedding_requests', 'embedding_completions']}

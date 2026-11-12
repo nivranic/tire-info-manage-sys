@@ -198,7 +198,8 @@ def hybrid_result(db, config, search, materials, query_vector):
     ordered.sort(key=lambda value: value[3], reverse=True)
     ordered.sort(key=lambda value: value[:3])
     items, pdfs = [], {}
-    for tier, _region_rank, negative_score, _observed, identity, region in ordered[:search.limit]:
+    end = search.offset + search.limit
+    for tier, _region_rank, negative_score, _observed, identity, region in ordered[search.offset:end]:
         entry = materials['entries'][identity]
         excerpt = original_excerpt(db, entry['selection'], pdfs)
         if excerpt['text'] != entry['text']:
@@ -214,7 +215,8 @@ def hybrid_result(db, config, search, materials, query_vector):
             'explanation': ['来源目录类别用于正文来源排序，具体字段和SKU身份由结构化证据核对。',
                 '地区偏好按已登记来源地区排序。',
                 'RRF融合分数及原始观察时间参与排序，PDF发布时间保留未知。']}})
-    return {'items': items, 'total': len(ordered), 'has_more': len(ordered) > search.limit,
+    return {'items': items, 'total': len(ordered), 'has_more': len(ordered) > end,
+        'offset': search.offset, 'limit': search.limit,
         'coverage': coverage(materials), 'preferred_region': search.preferred_region,
         'candidate_counts': {'fts': len(lexical), 'dense': len(dense), 'merged': len(ordered), 'limit': CANDIDATE_LIMIT},
         'text_contract': 'original-text-semantic@1',
