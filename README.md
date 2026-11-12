@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-> 人工测试已支持修订绑定的出版物角色声明、事件候选排序及Web录入与展示。六模块175项回归、三端类型、Web55项和实际组件60项检查通过。隔离PG综合58项与专项6项通过，153表实际备份恢复一致。两份真实转录追加声明后，13查询宏平均nDCG@1为1，原值及旧修订保留。标注由Agent给出，外部真人复核、代表性及完整V1继续验收。[实施与验收](docs/assurance/evidence/test-publication-ranking-2026-11-13.md)
+> 当前源码的整站生产构建通过，410输入稳定。真实HTTP与隔离SQLite完成79项Web断言、39个API成功响应和25项只读库核对。原报道补核7张照片及2张高分辨率版本，追加两车信息和墙面材料日期声明，原有20条成绩与旧修订保留。精确SKU、真人核验及完整V1继续验收。[生产Web与实拍补核](docs/assurance/evidence/publication-production-web-2026-11-13.md)
 
 > 新增[离线检索质量评估](docs/assurance/evidence/retrieval-evaluation-2026-11-13.md)，提供Precision、Recall、MRR及nDCG，四模块118项回归通过。首批13个真实来源查询已记录指标及宽查询的排序差距，标注由Agent给出，外部真人复核继续待完成。[运行方式](docs/plans/2026-11-13-retrieval-evaluation.md)
 
