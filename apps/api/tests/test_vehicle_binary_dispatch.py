@@ -6,6 +6,7 @@ human Golden acceptance. Only the managed runner may import/execute this file.
 """
 import asyncio
 from copy import deepcopy
+from dataclasses import replace
 from datetime import timedelta
 import hashlib
 import threading
@@ -345,6 +346,25 @@ def test_archived_reservation_rechecks_same_length_raw_damage_at_actual_dispatch
     completion = run_stream(ctx, reserved) if stream else run_sync(ctx, reserved)
     assert calls == [True]
     assert_denied_completion(ctx, completion, 'vehicle_raw_integrity_failed')
+
+
+@pytest.mark.parametrize('device', [False, True], ids=['ordinary', 'device'])
+@pytest.mark.parametrize('stream', [False, True], ids=['sync', 'stream'])
+@pytest.mark.parametrize('tampered', [False, True], ids=['frozen', 'changed-body'])
+def test_gemini_native_dispatch_with_actual_binary_capsule(dispatch_ctx, device, stream, tampered):
+    ctx = dispatch_ctx
+    ctx.config = replace(ctx.config, provider='gemini',
+        endpoint=f'https://generativelanguage.googleapis.com/v1beta/models/{ctx.config.model}:generateContent',
+        allowed_host='generativelanguage.googleapis.com', auth_style='x-goog-api-key',
+        response_format='json_schema', tokens_param='maxOutputTokens')
+    pack_id = archive_device_pack(ctx) if device else archive_pack(ctx)
+    reserved = archive_reservation(ctx, pack_id, stream=stream)
+    assert ai_execution._vehicle_dispatch_input(reserved.body) is not None
+    if tampered:
+        reserved.body['contents'][0]['parts'][0]['text'] = '{}'
+    completion = run_stream(ctx, reserved) if stream else run_sync(ctx, reserved)
+    assert_denied_completion(ctx, completion,
+        'vehicle_evidence_binding_failed' if tampered else 'vehicle_provider_use_not_allowed')
 
 
 @pytest.mark.parametrize('changed', ['body', 'pack'], ids=['body', 'memory-pack'])
