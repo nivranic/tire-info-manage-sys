@@ -5,6 +5,7 @@ import { tireApi } from "@tire/api-client";
 import type { EvidenceDocument, EvidenceDocumentMetadata } from "@tire/domain-types";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import SourceMaterials, { SourceMaterialDocumentReceipt } from "./source-materials";
+import DocumentTextPanel from "./document-text-panel";
 
 const empty = (): EvidenceDocumentMetadata => ({ title: "", source_url: "", operator: "", rights_basis: "" });
 const errorText = (value: unknown) => value instanceof Error ? value.message : "文档操作未完成，请重试。";
@@ -87,6 +88,7 @@ export default function EvidenceDocuments({ sessionReady }: { sessionReady: bool
       <details className="quality-technical"><summary>来源与留存说明</summary><p className="document-description">来源：{row.source_url || "未提供链接"}</p><p className="document-description">声明的保存依据：{row.rights_basis}</p></details>
       <button type="button" className="text-button" disabled={busy} onClick={() => void download(row)}>校验并下载原文</button>
       <SourceMaterialDocumentReceipt documentId={row.id} />
+      <DocumentTextPanel documentId={row.id} />
     </article>)}{records.length < total ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void more()}>加载更多文档</button> : null}</> : <p className="quality-empty">尚未留存 PDF 原文。</p>}
   </section>;
 }

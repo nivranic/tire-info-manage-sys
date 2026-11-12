@@ -1433,6 +1433,7 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
+    { name = "pypdf" },
     { name = "reportlab" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
@@ -1442,7 +1443,6 @@ dependencies = [
 dev = [
     { name = "fonttools" },
     { name = "httpx" },
-    { name = "pypdf" },
     { name = "pypdfium2" },
     { name = "pytest" },
 ]
@@ -1459,7 +1459,7 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = ">=1.45,<2" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "pypdf", marker = "extra == 'dev'", specifier = ">=6,<7" },
+    { name = "pypdf", specifier = ">=6,<7" },
     { name = "pypdfium2", marker = "extra == 'dev'", specifier = ">=4.30,<6" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<10" },
     { name = "reportlab", specifier = ">=4.4,<5" },

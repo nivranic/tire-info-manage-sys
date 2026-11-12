@@ -1015,6 +1015,7 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
 .knowledge-card-heading .tag { flex-shrink: 0; }
 .knowledge-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
 .knowledge-excerpt { white-space: pre-wrap; margin-block: 14px; }
+.document-text-page { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .knowledge-stamp { color: var(--muted); margin-bottom: 8px; }
 .knowledge-provenance { border-top: 1px solid var(--border); }
 .knowledge-provenance dl { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px 14px; font-size: 12px; line-height: 1.8; }

@@ -358,6 +358,39 @@ export interface EvidenceDocument extends EvidenceDocumentMetadata {
   id: string; raw_hash: string; byte_count: number; content_type: string; created_at: string;
   status: "unparsed_receipt"; accepted_as_facts: false;
 }
+export interface DocumentTextReference {
+  document_id: string; document_fingerprint: string; raw_hash: string; extractor_version: string;
+  page: number; start: number; end: number; chunk_id: string;
+}
+export interface DocumentTextPage {
+  page: number; text: string; text_hash: string; status: "text" | "no_extractable_text";
+}
+export interface DocumentTextIndex {
+  status: "text_available" | "partial_text" | "no_extractable_text" | "encrypted";
+  page_count: number | null; characters: number; chunks: number; raw_hash: string;
+  document_fingerprint: string; extractor_version: string; indexed_at: string;
+  parser_receipt: Record<string, unknown>;
+}
+export interface DocumentTextState {
+  mode: "history"; document: EvidenceDocument; index: DocumentTextIndex | null;
+  page: DocumentTextPage | null; notice: string;
+}
+export interface DocumentTextSearchRequest {
+  mode: "history"; text: string; document_id?: string; limit?: number; offset?: number;
+}
+export interface DocumentTextExcerpt {
+  kind: "document_text"; reference: DocumentTextReference; text: string; document: EvidenceDocument;
+  offset_unit: "unicode_codepoints"; data_state: "local_snapshot";
+  verification_status: "original_text_excerpt"; notice: string;
+}
+export interface DocumentTextSearchItem extends DocumentTextExcerpt {
+  match: { method: "fts"; matched_terms: string[]; score: number };
+}
+export interface DocumentTextSearchResult {
+  mode: "history"; data_state: "local_snapshot"; items: DocumentTextSearchItem[];
+  total: number; offset: number; limit: number; has_more: boolean; notice: string;
+  index: { engine: "sqlite_fts5" | "postgresql_fts"; extractor_version: string; documents: number };
+}
 
 export type {
   SourceMaterialRights, SourceMaterialPolicy, SourceMaterialPolicies,

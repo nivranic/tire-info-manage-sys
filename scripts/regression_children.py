@@ -26,7 +26,7 @@ class ChildDenied(PermissionError):
 # Public source bytes, never runtime arguments or credential-derived digests.
 REVIEWED = {
     'apps/api/tests/test_parser_runtime.py': 'ab6876a773acdac3d48e9dfe799d3284e55f25680741048c841b36bebec9e90b',
-    'apps/api/tests/test_parser_bundles.py': 'b61d29c4cd8373168e9532e2a79c0fe9f06652e6d37d407b4ee924b27ff6dd1c',
+    'apps/api/tests/test_parser_bundles.py': '94c8adaca76661a023b1e9a97aa373427fec10b3272116b91deecc5f9e3183b0',
     'apps/api/tests/test_adapter_import_behavior.py': 'e365639027b8fc681ce600856bf71382ddefab285130ec91eac5e5d72bc66d01',
     'apps/api/tests/test_auth_governance.py': '5a23fe46ccd753e72cfa97df7e6f274673ec60d977c5474e1e03a5430e63acb7',
     'apps/api/tests/test_auth_lifecycle.py': 'fc15caa941f3ec8fa89086ea51864fe01878552bd34319794305329a516af61a',
@@ -35,14 +35,14 @@ REVIEWED = {
     'apps/api/tests/test_raw_captures.py': '85cfcd2f6d66f453983ba3b1c5c610d4f44598df989839ce26a896b1289ff321',
     'apps/api/tests/test_device_ai_public_contract.py': '54d0bf931d0b08abdf3e8e8312d77f6ae937f6c9d0c3d35d1c6b7102e12f2312',
     'apps/api/tests/test_device_ai_routes_prepare.py': 'b2b2d8bd1dafae78307382ad9197652518908f0a524ae4eba5492488ca944c67',
-    'apps/api/tire_api/parser_child.py': '830b9f38c0504faf4c16cc2f4f7c455abab9de75ca3b73983596268ade85e788',
+    'apps/api/tire_api/parser_child.py': 'f348e4c8a3ace7e1839ee9c4928a52a94ac016e535888d89dabc2f911f76dfce',
     'apps/api/tire_api/parser_limits.py': 'af8b43d7e352e4b35126e743a3e63e16c5c54fcb9ac3e8e7853dc8bc1cc1adf6',
-    'apps/api/tire_api/parser_runtime.py': '3258853b27d2c4348717fa2b54ff057b136cf5e1fe751a5eadf2daf0e5e7e566',
+    'apps/api/tire_api/parser_runtime.py': '54efc6c3ba1ec0f0b8c500e863484ecce1303181cd33a8ea11ae4d6ff2f41744',
     'apps/api/tire_api/manage.py': '78d8598a3ce35e07b682415fb250a8c21583ddd363248c95ab8bd817c2c71bfd',
     'scripts/identity_contract.py': 'd518bf77981005c7808279119326f9c05eb77643a10cdb9e4e26b3939623ea05',
     'packages/api-client/tests/device-ai/json-esm-hook.mjs': 'f4327b15575b1f82f5bbc48469f84990a6b9127f6eb17ff4973b7a7fa6e5404d',
     'packages/api-client/tests/device-ai/no-artifacts-hook.mjs': '787b64dd38915cd78b17812271b22be8bac93cd4d952fe9e9edeb6b2363587cc',
-    'packages/api-client/package.json': 'ca087de18cf4a391f1c9824a6eba0fb1ed7bfc1e971357751b088e232753f462',
+    'packages/api-client/package.json': 'ed57b283ff2b019edd3a9c6a501e5f38ea72b106d675b3671e97b145273b8d8b',
     'apps/api/tests/test_raw_evidence_v2_sdk.py': 'f62e6f5dd1db7b62bbbde7777c69c90b242d96ed9dfab2f899d7258622c64268',
     'packages/api-client/tests/raw-evidence-v2.mts': 'db7bf5e993a89f226feae671a72cbb8c2385563441eb612e0cd8a644377d527c',
 }

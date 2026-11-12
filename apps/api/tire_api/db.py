@@ -520,6 +520,7 @@ class Database:
         from . import source_material_models  # noqa: F401
         from . import source_page_url_models  # noqa: F401
         from . import source_text_models  # noqa: F401
+        from . import document_text_models  # noqa: F401
         from . import candidate_ai_models  # noqa: F401
         from . import webhook_models  # noqa: F401
         from . import external_api_models  # noqa: F401
@@ -546,6 +547,7 @@ class Database:
         from .knowledge_models import initialize_search
         from .embedding_models import initialize_vectors
         from .source_text_models import initialize_source_text_search
+        from .document_text_models import initialize_document_text_search
         # create_all(checkfirst=True) is not atomic across processes. Hold one
         # transaction-scoped lock before schema inspection, table creation and
         # additive upgrades, using the same connection throughout.
@@ -561,6 +563,7 @@ class Database:
             initialize_search(connection)
             initialize_vectors(connection)
             initialize_source_text_search(connection)
+            initialize_document_text_search(connection)
 
     def close(self) -> None:
         self.engine.dispose()

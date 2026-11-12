@@ -139,6 +139,7 @@ def main():
         if (not isinstance(query, dict) or set(query) - allowed
                 or any(not isinstance(value, str) or len(value) > 256 for value in query.values())
                 or descriptor['target_kind'] == 'vehicle' and not query.get('vehicle_id')
+                or descriptor['target_kind'] == 'document' and (set(query) != allowed or not query.get('document_id'))
                 or descriptor['target_kind'] == 'recall' and set(query) != allowed):
             return 78
         if request['input_hash'] != host.input_hash(request, body_bytes):
@@ -146,9 +147,19 @@ def main():
         source_id = request['source_id']
         first_generation_pdf = (source_id == 'xiaomi-cn-vehicles'
             and query == {'vehicle_id': 'xiaomi-su7-first-generation'})
-        if not first_generation_pdf:
+        document_pdf = source_id == 'workspace-pdf-text'
+        if not first_generation_pdf and not document_pdf:
             body = body_bytes.decode('utf-8', errors='strict')
-        if source_id.startswith('michelin-'):
+        if document_pdf:
+            from tire_api.document_pdf import DocumentPDFError, parse_document_pdf
+            _check_imports(package_root)
+            try:
+                payload = parse_document_pdf(body_bytes, query['document_id'])
+            except DocumentPDFError as error:
+                if type(error.code) is str and error.code in host.PDF_ERROR_CODES:
+                    raise host.ParserRunError(error.code) from None
+                raise ValueError('parser_pdf_error_not_allowed') from None
+        elif source_id.startswith('michelin-'):
             from tire_api.adapters.michelin import parse_michelin_html
             _check_imports(package_root)
             region = {'michelin-us': 'US', 'michelin-uk': 'UK', 'michelin-fr': 'FR', 'michelin-de': 'DE', 'michelin-cn': 'CN'}[source_id]

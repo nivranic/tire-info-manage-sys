@@ -6,3 +6,25 @@
 /docs/requirements/2026-09-26-tire-intelligence-original.md -text
 
 /apps/api/tests/fixtures/vehicle_binary_023/* -text
+
+# Preserve the exact source bytes reviewed by the regression child launcher.
+/apps/api/tests/test_parser_runtime.py text eol=lf
+/apps/api/tests/test_parser_bundles.py text eol=lf
+/apps/api/tests/test_adapter_import_behavior.py text eol=lf
+/apps/api/tests/test_auth_governance.py text eol=lf
+/apps/api/tests/test_auth_lifecycle.py text eol=crlf
+/apps/api/tests/test_identity_migration.py text eol=lf
+/apps/api/tests/test_fitment_relations.py text eol=lf
+/apps/api/tests/test_raw_captures.py text eol=lf
+/apps/api/tests/test_device_ai_public_contract.py text eol=lf
+/apps/api/tests/test_device_ai_routes_prepare.py text eol=lf
+/apps/api/tire_api/parser_child.py text eol=lf
+/apps/api/tire_api/parser_limits.py text eol=lf
+/apps/api/tire_api/parser_runtime.py text eol=lf
+/apps/api/tire_api/manage.py text eol=crlf
+/scripts/identity_contract.py text eol=lf
+/packages/api-client/tests/device-ai/json-esm-hook.mjs text eol=lf
+/packages/api-client/tests/device-ai/no-artifacts-hook.mjs text eol=lf
+/packages/api-client/package.json text eol=lf
+/apps/api/tests/test_raw_evidence_v2_sdk.py text eol=lf
+/packages/api-client/tests/raw-evidence-v2.mts text eol=lf

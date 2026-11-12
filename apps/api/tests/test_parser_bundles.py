@@ -114,8 +114,8 @@ def historical_install(source, count):
     value = path.read_text(encoding='utf-8')
     value = value.replace("_NHTSA_SOURCES = {**_LEGACY_SOURCES, 'nhtsa-us-recalls': 'recall'}\n_SOURCES = {**_NHTSA_SOURCES, 'pirelli-us': 'tire'}",
                           "_SOURCES = {**_LEGACY_SOURCES, 'nhtsa-us-recalls': 'recall'}" if count == 9 else '_SOURCES = _LEGACY_SOURCES.copy()')
-    value = value.replace('(set(_LEGACY_SOURCES), set(_NHTSA_SOURCES), set(_SOURCES))',
-                          '(set(_LEGACY_SOURCES), set(_SOURCES))')
+    value = value.replace('(set(_LEGACY_SOURCES), set(_NHTSA_SOURCES), set(_SOURCES), set(_DOCUMENT_SOURCES))',
+                          '(set(_LEGACY_SOURCES), set(_SOURCES), set(_DOCUMENT_SOURCES))')
     value = value.replace("        if 'pirelli-us' in parsers:\n            required.add('adapters/pirelli.py')\n", '')
     if count == 8:
         value = value.replace("        if 'nhtsa-us-recalls' in parsers:\n            required.add('adapters/nhtsa.py')\n", '')
@@ -221,8 +221,8 @@ def test_manifest_rejects_noncanonical_paths(path):
         bundles._checked_relative(path)
 
 
-@pytest.mark.parametrize('catalog', [bundles._LEGACY_SOURCES, bundles._NHTSA_SOURCES, bundles._SOURCES],
-                         ids=['legacy-eight', 'nhtsa-nine', 'current-ten'])
+@pytest.mark.parametrize('catalog', [bundles._LEGACY_SOURCES, bundles._NHTSA_SOURCES, bundles._SOURCES, bundles._DOCUMENT_SOURCES],
+                         ids=['legacy-eight', 'nhtsa-nine', 'tire-ten', 'document-eleven'])
 def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, catalog):
     trusted_copy(tmp_path, monkeypatch)
     manifest = bundles.seal_deployed_bundle()
@@ -271,7 +271,7 @@ def test_reconstructed_eight_source_eager_bundle_runs_tire_and_rejects_new_sourc
     source = trusted_copy(tmp_path, monkeypatch)
     mark_parser(source, 222)
     current = bundles.seal_deployed_bundle()
-    assert set(current['parsers']) == set(bundles._SOURCES)
+    assert set(current['parsers']) == set(bundles._DOCUMENT_SOURCES)
     original_command = runtime._command
     monkeypatch.setattr(runtime, '_command', lambda: [*original_command(), str(source.parent)])
     replay = asyncio.run(execute_bundle(old))
@@ -312,7 +312,7 @@ def test_real_nine_source_archive_runs_saved_tire_and_recall_and_rejects_pirelli
     new = bundles.seal_deployed_bundle()
     old_package = bundles.verify_bundle(old)['package_root']
     assert set(old['parsers']) == set(bundles._NHTSA_SOURCES)
-    assert set(new['parsers']) == set(bundles._SOURCES)
+    assert set(new['parsers']) == set(bundles._DOCUMENT_SOURCES)
     assert (old_package / 'adapters/__init__.py').read_text(encoding='utf-8') == EAGER_ADAPTER_INIT
     assert 'adapters/pirelli.py' not in old['files'] and not (old_package / 'adapters/pirelli.py').exists()
     assert 'pirelli' not in (old_package / 'adapters/registry.py').read_text(encoding='utf-8')
@@ -342,7 +342,10 @@ def test_reconstructed_eager_ten_bundle_keeps_own_code_with_current_lazy_install
     source = trusted_copy(tmp_path, monkeypatch)
     (source / 'adapters/__init__.py').write_text(EAGER_ADAPTER_INIT, encoding='utf-8')
     mark_parser(source, 111, adapter='pirelli')
-    old = bundles.seal_deployed_bundle()
+    old_catalog = {key: value for key, value in runtime.source_catalog().items() if key in bundles._SOURCES}
+    with monkeypatch.context() as patcher:
+        patcher.setattr(runtime, 'source_catalog', lambda: old_catalog)
+        old = bundles.seal_deployed_bundle()
     original = deepcopy(old)
     old_descriptor = bundles.bundle_descriptor(old, 'pirelli-us')
     old_package = bundles.verify_bundle(old)['package_root']
@@ -354,7 +357,10 @@ def test_reconstructed_eager_ten_bundle_keeps_own_code_with_current_lazy_install
     mark_parser(source, 222, adapter='pirelli')
     current = bundles.seal_deployed_bundle()
     current_descriptor = bundles.bundle_descriptor(current, 'pirelli-us')
-    assert old['parsers'] == current['parsers'] and old['bundle_id'] != current['bundle_id']
+    current_tire_catalog = {key: value for key, value in current['parsers'].items() if key in bundles._SOURCES}
+    assert old['parsers'] == current_tire_catalog
+    assert set(current['parsers']) == set(bundles._DOCUMENT_SOURCES)
+    assert old['bundle_id'] != current['bundle_id']
     original_command = runtime._command
     monkeypatch.setattr(runtime, '_command', lambda: [*original_command(), str(source.parent)])
     raw = (Path(__file__).parent / 'fixtures/brand_sources/pirelli-pz4-265-40-r20-excerpt.html').read_text(encoding='utf-8')

@@ -24,7 +24,8 @@ from .parser_limits import CPU_SECONDS, MEMORY_BYTES, WindowsJob, apply_parent_l
 from . import parser_bundles as bundles
 
 PROTOCOL = 'parser-json@2'
-PDF_ERROR_CODES = frozenset({'vehicle_pdf_invalid', 'vehicle_pdf_revision_unreviewed'})
+PDF_ERROR_CODES = frozenset({'vehicle_pdf_invalid', 'vehicle_pdf_revision_unreviewed',
+    'document_pdf_invalid', 'document_pdf_too_many_pages', 'document_pdf_text_too_large'})
 MAX_BODY_BYTES = 8 * 1024 * 1024
 MAX_PROTOCOL_BYTES = 12 * 1024 * 1024
 MAX_OUTPUT_BYTES = 4 * 1024 * 1024
@@ -75,6 +76,8 @@ def _specs():
         values[adapter.SOURCE_CONFIG['id']] = (adapter.PARSER_VERSION, 'tire', [f'adapters/{adapter.__name__.rsplit(".", 1)[1]}.py', 'adapters/registry.py'])
     values[xiaomi.SOURCE_ID] = (xiaomi.PARSER_VERSION, 'vehicle', ['adapters/xiaomi.py', 'adapters/xiaomi_first_generation_pdf.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py', 'db.py'])
     values[nhtsa.SOURCE_ID] = (nhtsa.PARSER_VERSION, 'recall', ['adapters/nhtsa.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py'])
+    from .document_pdf import PARSER_VERSION, SOURCE_ID
+    values[SOURCE_ID] = (PARSER_VERSION, 'document', ['document_pdf.py'])
     return values
 
 
@@ -85,6 +88,8 @@ def limits():
 
 
 def query_fields(target_kind, query):
+    if target_kind == 'document':
+        return {'document_id'}
     if target_kind == 'vehicle':
         return {'vehicle_id'}
     if target_kind == 'recall':
@@ -293,7 +298,7 @@ def _run_sync(request, descriptor, cancelled, execution):
                                  'input_hash', 'execution_digest', 'deployment_revision'):
                         if response[name] != receipt[name]:
                             raise ValueError('invalid_response_identity')
-                    expected = dict if descriptor['target_kind'] == 'vehicle' or descriptor['target_kind'] == 'recall' and 'search' in request['query'] else list
+                    expected = dict if descriptor['target_kind'] in {'vehicle', 'document'} or descriptor['target_kind'] == 'recall' and 'search' in request['query'] else list
                     if not isinstance(response['payload'], expected):
                         raise ValueError('invalid_payload_type')
                     bundles.verify_tree(package_root, request['manifest'])
@@ -374,6 +379,7 @@ async def parse_isolated(source_id, body, query, parser_version, parser_digest, 
     allowed = query_fields(descriptor['target_kind'], query)
     if (not isinstance(query, dict) or set(query) - allowed or any(not isinstance(value, str) or len(value) > 256 for value in query.values())
             or descriptor['target_kind'] == 'vehicle' and not query.get('vehicle_id')
+            or descriptor['target_kind'] == 'document' and (set(query) != allowed or not query.get('document_id'))
             or descriptor['target_kind'] == 'recall' and set(query) != allowed):
         raise ParserRunError('parser_input_invalid')
     request = {'protocol': PROTOCOL, 'run_id': uuid4().hex, 'source_id': source_id, 'parser_version': parser_version,

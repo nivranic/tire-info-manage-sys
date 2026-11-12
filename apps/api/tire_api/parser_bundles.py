@@ -22,6 +22,7 @@ _LEGACY_SOURCES = {'michelin-us': 'tire', 'michelin-uk': 'tire', 'michelin-fr': 
             'hankook-us': 'tire', 'xiaomi-cn-vehicles': 'vehicle'}
 _NHTSA_SOURCES = {**_LEGACY_SOURCES, 'nhtsa-us-recalls': 'recall'}
 _SOURCES = {**_NHTSA_SOURCES, 'pirelli-us': 'tire'}
+_DOCUMENT_SOURCES = {**_SOURCES, 'workspace-pdf-text': 'document'}
 # Exact reviewed capability versions; file presence alone never enables PDF.
 XIAOMI_PDF_PARSER_VERSIONS = frozenset({'xiaomi-param-comparison@1.1.0'})
 XIAOMI_PDF_MAPPING_FILE = 'adapters/xiaomi_first_generation_pdf.py'
@@ -163,7 +164,7 @@ def checked_manifest(manifest, *, protocol, limits, environment=True):
         # Existing sealed eight/nine-source packages remain executable. Accept only
         # reviewed complete catalogs, never arbitrary subsets or unknown sources.
         if (not isinstance(files, dict) or not 1 <= len(files) <= MAX_FILES or not isinstance(parsers, dict)
-                or set(parsers) not in (set(_LEGACY_SOURCES), set(_NHTSA_SOURCES), set(_SOURCES))):
+                or set(parsers) not in (set(_LEGACY_SOURCES), set(_NHTSA_SOURCES), set(_SOURCES), set(_DOCUMENT_SOURCES))):
             raise BundleError('parser_bundle_manifest_invalid')
         total, folded = 0, set()
         for name, item in files.items():
@@ -183,14 +184,19 @@ def checked_manifest(manifest, *, protocol, limits, environment=True):
             required.add('adapters/nhtsa.py')
         if 'pirelli-us' in parsers:
             required.add('adapters/pirelli.py')
+        if 'workspace-pdf-text' in parsers:
+            required.add('document_pdf.py')
         if not required <= set(files) or total > MAX_TOTAL_BYTES:
             raise BundleError('parser_bundle_manifest_invalid')
         for source, item in parsers.items():
             if (not isinstance(item, dict) or set(item) != {'parser_version', 'target_kind'}
-                    or item['target_kind'] != _SOURCES[source]
+                    or item['target_kind'] != _DOCUMENT_SOURCES[source]
                     or not isinstance(item['parser_version'], str)
                     or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._@+-]{0,99}', item['parser_version'])):
                 raise BundleError('parser_bundle_manifest_invalid')
+        if ('workspace-pdf-text' in parsers
+                and parsers['workspace-pdf-text']['parser_version'] != 'workspace-pdf-text@1'):
+            raise BundleError('parser_bundle_manifest_invalid')
         if (parsers['xiaomi-cn-vehicles']['parser_version'] in XIAOMI_PDF_PARSER_VERSIONS
                 and XIAOMI_PDF_MAPPING_FILE not in files):
             raise BundleError('parser_bundle_manifest_invalid')
