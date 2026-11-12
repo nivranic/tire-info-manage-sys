@@ -37,6 +37,6 @@ apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.p
 
 生产浏览器30项检查通过，覆盖HTML＋PDF选择、三用途窗口、许可修订、单次外发同意、Responses SSE、grounding、原件恢复、600 tokens、报告HTML下载校验、撤销导出后拒绝已有文件复用、冻结报告读取、关闭后迟到响应及320／390／1440像素报告布局。浏览器仅发生1次合成模型调用，真实Provider及外网尝试0。API、Web、四个本轮隔离PG集群及端口关闭已独立核对。
 
-原始失败、中断和测试驱动修正保留在本机 `.artifacts/otai-r1` 至 `otai-r6` 及 `.artifacts/original-text-ai-20261113/`。交付范围、具体回执和继续顺序见[当前交接卡](../AGENT-HANDOFF-2026-11-13.md)。真实模型语义、语义reranker、代表性专业材料和完整V1 Gate继续开放。
+原始失败、中断和测试驱动修正保留在本机 `.artifacts/otai-r1` 至 `otai-r6` 及 `.artifacts/original-text-ai-20261113/`。交付范围、具体回执和继续顺序见[当前交接卡](../AGENT-HANDOFF-2026-11-13.md)。真实模型语义、检索与排序质量、代表性专业材料和完整V1 Gate继续开放。
 
 末次交付统一PG验收脚本换行为LF并固定本轮源码Git属性，按最终字节执行r6与PG r3全批复验，结果分别为269／269和58项通过。

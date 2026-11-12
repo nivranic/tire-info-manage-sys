@@ -56,3 +56,9 @@
 /packages/domain-types/src/index.ts text eol=crlf
 /scripts/postgres_acceptance.py text eol=lf
 /scripts/run_api_worker_regression.py text eol=lf
+
+# Preserve source bytes used by Web accessibility verification.
+/apps/web/app/globals.css text eol=lf
+/apps/web/components/account-dialog.tsx text eol=lf
+/apps/web/components/workbench.tsx text eol=lf
+/apps/web/tests/theme-contrast.test.ts text eol=lf

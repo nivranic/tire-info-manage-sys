@@ -228,7 +228,7 @@ export default function AccountDialog({ onClose }: { onClose: () => void }) {
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
         <button type="button" className="secondary-button" disabled={busy} onClick={() => void signOut()}>{busy ? "正在退出…" : "退出登录"}</button>
       </> : <>
-        <div className="account-form-switch" role="tablist" aria-label="账户操作">
+        <div className="account-form-switch" role="group" aria-label="账户操作">
           <button type="button" className="text-button" aria-pressed={mode === "login"} disabled={busy} onClick={() => switchMode("login")}>登录</button>
           <button type="button" className="text-button" aria-pressed={mode === "register"} disabled={busy} onClick={() => switchMode("register")}>注册新账户</button>
         </div>
