@@ -53,7 +53,7 @@ try {
     foreach ($part in @('bin', 'lib', 'share', 'include')) {
         Copy-Item -LiteralPath (Join-Path $sourceRoot $part) -Destination (Join-Path $runtime $part) -Recurse
     }
-    Invoke-WebRequest -Uri $sourceUrl -OutFile $archive -TimeoutSec 90
+    Invoke-WebRequest -Uri $sourceUrl -OutFile $archive -TimeoutSec 90 -NoProxy
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $archiveSha256) {
         throw 'Official pinned source archive checksum mismatch; do not build unverified input.'
     }
