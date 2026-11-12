@@ -493,3 +493,15 @@ held场景中，浏览器先取得26008 tokens预留响应，再刻意延迟向�
 本机最终核对为 `.artifacts/responses-terminal-20261112/verification.json`，SHA256 `56f12e06b351eacf5be979457ba6c86fe71b7d6ba9cc148283157b45168bff42`。产品文件SHA256为 `6ac582fc0c299704a425fb7990e320961594395411eda6ee621b1308aa55993d`。浏览器原始记录、数据库checkpoint、构建／类型／测试日志及资源关闭信息保留于同目录。
 
 真实Responses语义、额度读取失败注入、原生运行及完整V1 Gate继续待验。后续优先推进用户选定的Responses主线及原规格剩余能力。
+
+## 交付停点及Gemini排期复核
+
+用户追问Gemini的来源。原规格第710行列有Google Gemini原生Adapter，其提前开发排期由此前Agent自行决定，正式实现提交为 `d5fded1`。用户选定的首个真实接入为OpenAI Responses API，当前网关配置对象及环境读取默认值均为 `openai_responses`。交接卡已将该选择、排期来源及后续Responses优先顺序写明。
+
+交付前额度读取故障夹具已启动私有API并返回ready，浏览器故障注入尚未执行，生产Web尚未启动。读取夹具状态确认Provider未活动、来源／Provider调用均为0后，经既有shutdown入口关闭。原执行会话退出0，`fixture-final.json` 为stopped、私有存储清理成功。只读checkpoint完整性ok，8003及18002均无监听。关闭回执为本机 `.artifacts/responses-status-fault-20261112/closure.json`。该槽保留启动及关闭记录，额度读取故障验收继续待执行。
+
+前序材料研究新增JRC作者论文候选《Wear of Passenger Car C1 Tyres Under Regulatory On-Road Testing Conditions》，DOI为 `10.3390/vehicles7030091`。该线索需继续复核原件、许可和试验条件。样本采用匿名代号，当前尚无可核对的品牌型号映射，捕获／TestEvent／SKU关联均为0。接手可沿既有材料捕获链继续研究。[出版页](https://www.mdpi.com/2624-8921/7/3/91)
+
+本次变更为交接说明，产品源码沿用b1c3acb。已重新核对Process／User／Machine三个作用域，OpenAI模型／Key、Gemini模型／Key及EPREL Key均为空。后续验证优先为终态额度读取失败后的结果及错误展示、手动刷新恢复、过期错误仲裁和终态读取期间关闭取消。实际Responses语义、真实材料身份、生产部署及完整V1 Gate继续开放。
+
+静态复核确认最新终态回执及9项关联文件哈希匹配，775个后端回归输入逐字节一致，15个本地文档链接有效。HANDOFF历史尾文保持216248字节及SHA256 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。新增行个人路径／高置信度凭据模式检查零命中，差异检查通过。本机回执为 `.artifacts/handoff-review-20261112/validation.json`，执行范围为文档、已有回执及资源关闭复核。
