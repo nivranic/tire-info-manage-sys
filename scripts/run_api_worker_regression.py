@@ -45,10 +45,11 @@ GUARD_DENIAL_CATEGORIES = frozenset({
     'network_listen', 'sqlite_unreviewed_factory', 'sqlite_connection_identity_mismatch',
     'filesystem_untrusted_dir_fd',
 })
-# Explicit 180 API + 2 Worker module manifest. Never substitute discovery for it.
+# Explicit 190 API + 2 Worker module manifest. Never substitute discovery for it.
 TEST_MODULES = (
     'apps/api/tests/test_ai_original_text.py',
     'apps/api/tests/test_original_text_retrieval.py',
+    'apps/api/tests/test_retrieval_evaluation.py',
     'apps/api/tests/test_text_embeddings.py',
     'apps/api/tests/test_document_pdf.py',
     'apps/api/tests/test_document_text.py',
@@ -714,7 +715,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--phase', required=True, choices=('selfcheck', 'collect', 'run'))
     parser.add_argument('--output-root', type=Path, default=None)
-    parser.add_argument('--targets', nargs='+', help='Only registered file paths or nodeids; default explicit 182 modules')
+    parser.add_argument('--targets', nargs='+', help='Only registered file paths or nodeids; default explicit 192 modules')
     parser.add_argument('--actual-dir', type=Path, help='One existing explicit r76-* actual run, never latest')
     options = parser.parse_args(argv)
     targets = selected_targets(options.targets)

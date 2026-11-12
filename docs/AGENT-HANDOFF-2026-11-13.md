@@ -12,14 +12,17 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 
 最新材料阶段已直连取得论文引用的汽车之家原报道及3张成绩图，核对20条数值与10条载速信息，识别万力与耐克森的源名差异。原始报道事件的隔离API批次12项通过，真实页面核对20条成绩，390／320像素均无页面横向溢出。原始PDF字节、完整复用许可、精确SKU关联和真人审核继续待完成。详细范围与回执见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 
+最新工程新增离线检索质量评估命令，四模块受管回归118／118。两份真实来源转录的13个查询取得首批指标，同尺寸宽查询中转述优先的排序差距已记录。标注由Agent依据来源给出，外部真人复核和代表性质量验收继续待完成。详见[评估工程与实测](assurance/evidence/retrieval-evaluation-2026-11-13.md)。
+
 此前Web核心流程无障碍补修取得14份Lighthouse无障碍100分快照、22项功能与键盘检查及生产构建通过。读屏、完整WCAG 2.2 AA及其余发布Gate继续开放。
 
-本次原始报道追溯前的已推送基线为 `b7b56f00936095a93ee782b5acb1d744e287467d`。本次产品源码沿用既有实现，材料研究及隔离数据库位于Git忽略目录。文档交付最终SHA及远端一致性以交付消息和即时Git查询为准。
+本次评估工程前的已推送基线为 `19f3486fdb75a18d254d58ef9f3e7c2106590b6b`。材料研究、评估输入和隔离数据库位于Git忽略目录。交付最终SHA及远端一致性以交付消息和即时Git查询为准。
 
 ## 用户决定与实施选择
 
 - 首个真实AI接入为OpenAI Responses API，网关配置对象及环境读取的默认Provider为 `openai_responses`。启动进程显式设置 `TI_AI_PROVIDER=openai_responses`，并核对 `GET /v1/ai/status` 的实际Provider，环境覆盖会影响运行时选择。
 - Gemini来自原规格第710行的多模型备选表，原生Adapter由此前Agent自行提前排期并以 `d5fded1` 交付。该排期属于Agent的实施选择。已有合成回归，真实Google调用待验证。首个真实Provider的实施与验收顺序依据用户选定的OpenAI Responses执行。
+- 本次离线检索评估使用冻结的本地API结果，真实Provider调用为0。运行环境可能覆盖Provider选择，已观察到用户级 `TI_AI_PROVIDER=anthropic`，OpenAI验收进程须显式设置 `TI_AI_PROVIDER=openai_responses` 并核对实际Provider。
 - 专业测试材料由Agent自主选择，并核对原始出版物、许可和可证明的SKU身份。
 - 当前没有EPREL Key，继续独立工作。OpenAI模型／Key及EPREL Key本轮在Process／User／Machine三个作用域复核为空，凭据条件具备后再执行真实接口验收。
 - 当前授权包含复核优化、总结进度、提交并push全部改动、编写Agent交接文档。
@@ -37,7 +40,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 7 传统CRUD | 来源、规则、偏好、测试、修订、账户、Provider、Key、费用规划切片 | 全实体覆盖、生产权限、BYOK、真实账单 |
 | 8 证据浏览 | 快照、哈希、解析版本、冲突、二进制原件、HTML／PDF正文及引用恢复、停止采纳 | 实际部署旧库切换、全域许可治理、正式再采纳、生产对象存储 |
 | 9 个性化 | 车库、关注、七维偏好、保存比较、非SKU兴趣、账户生命周期处理 | 真实推荐质量、跨设备与长期运行 |
-| 10 AI研究 | grounding、流式、报告、多模型适配、正文索引／混合检索、正文证据包及独立AI／导出用途、Web | 真实Responses语义与Embeddings质量、检索与重排质量、专业性能解释、模型治理 |
+| 10 AI研究 | grounding、流式、报告、多模型适配、正文索引／混合检索、正文证据包及独立AI／导出用途、离线检索质量评估、Web | 真实Responses语义与Embeddings质量、代表性检索与重排质量、专业性能解释、模型治理 |
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名及有限重试、外部Key、字段许可治理 | 真实接收端、公网生产验收、SDK产品化、完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权、审计 | 生产身份／租户／RLS、完整角色治理、灾备、发布验收 |
 
@@ -51,6 +54,14 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 - PERS新批次的幂等UUID为 `90276487-1cea-4f6c-953a-648268d5d61f`，HTTP 201，业务终态failed／source_material_timeout，document与receipt为空。JRC书目页可访问，测试编号到型号的映射待核。
 
 来源、许可、转录解释及后续核验顺序见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。隔离库中的转录记录及其回执保存在本机Git忽略目录。
+
+## 最新检索评估工程
+
+新增 `scripts/evaluate_knowledge_retrieval.py`，输入独立标注与冻结的正常API结果，计算Precision、Recall、MRR和nDCG，并检查空结果及声明的排序。完整引用用于版本匹配，输入字节SHA256和指纹进入报告，历史正文分页元信息保持可读。
+
+最终四模块118／118，799输入稳定、资源关闭、非自检拒绝0，回执为 `.artifacts/re5/result.json`。首批真实样本包含两份来源转录的13个查询，9个相关案例、4个空结果案例。宏平均nDCG@1为0.904762，Recall@1为0.944444，空结果准确率1。宽查询中原报道等级3、论文转述等级1属于Agent标注，该例nDCG@1为0.142857。真实向量语义及外部真人标注继续待验。
+
+用法见[实施计划](plans/2026-11-13-retrieval-evaluation.md)，范围、原始失败与指标见[实测报告](assurance/evidence/retrieval-evaluation-2026-11-13.md)。
 
 ## 混合检索分页工程
 
@@ -191,7 +202,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。本轮两个隔离PG及此前API／Web已关闭。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
-3. 建立代表性真实材料上的检索评估，核对原规格要求的权威／版本／地区／时效排序与真实Embeddings质量。现有工程包含精确条件过滤、来源及字段权威、地区偏好、RRF与时间排序。语义重排模型属于此前Agent追加的实施选项，后续可按质量评估需求选择。
+3. 复用新增离线评估命令，扩充独立标注的P0来源、精确版本、地区及时间案例。核对宽查询中原始报道与转述的来源角色，再按产品规则推进排序改进。首批13查询覆盖2份转录，代表性与真人审核继续待验。真实Embeddings质量按凭据条件推进，语义重排模型属于此前Agent追加的实施选项。
 4. 原始报道已定位测试执行主体、载速和成绩。接下来核对参测版本的GTIN／产品代码／侧壁标识，处理万力与耐克森的源名差异，取得完整复用许可和可留存原件，推进精确SKU与外部真人Golden。JRC匿名样本待型号映射，PERS本次生产捕获超时失败。详见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
@@ -213,6 +224,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 | 对比度回归 | `apps/web/tests/theme-contrast.test.ts` |
 | 本轮分页回归 | `apps/api/tests/test_original_text_retrieval.py`、`apps/api/tests/test_embeddings.py` |
 | 专业材料核验 | `docs/assurance/evidence/material-review-2026-11-13.md`、`apps/api/tire_api/test_events.py` |
+| 检索质量评估 | `scripts/evaluate_knowledge_retrieval.py`、`apps/api/tire_api/retrieval_evaluation.py`、`apps/api/tests/test_retrieval_evaluation.py` |
 
 表中省略目录的后端文件名位于 `apps/api/tire_api/`，Web组件位于 `apps/web/components/`。
 
@@ -221,6 +233,7 @@ git status --short --branch
 git log -4 --oneline
 git rev-parse HEAD
 git rev-parse origin/main
+apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/retrieval-evaluation-next --targets apps/api/tests/test_retrieval_evaluation.py apps/api/tests/test_knowledge.py apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_embeddings.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/otai-next --targets apps/api/tests/test_ai_original_text.py apps/api/tests/test_ai.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_reports.py apps/api/tests/test_report_rendering.py apps/api/tests/test_ai_stream_execution.py apps/api/tests/test_ai_stream_api.py apps/api/tests/test_ai_stream_parser.py apps/api/tests/test_recall_reports.py apps/api/tests/test_test_ai_reports.py
 npm run test:text-embeddings --workspace @tire/api-client
 npm run test --workspace @tire/web
@@ -242,5 +255,7 @@ npm run typecheck --workspace @tire/mobile
 - `docs/HANDOFF.md`从2026-10-26入口起的本机历史尾文保留216248字节，SHA256为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。仓库沿用现有Git文本换行规约，同一尾文的Git blob为215776字节，SHA256为 `55e7f298d159af75eefa0bb4230a9f1193b2938223e51cf2a41c1f9c79d43bab`，新clone按blob核对。
 
 ## 可复制的接手指令
+
+> 最新工程已新增离线检索质量评估命令，先阅读检索评估报告及实施计划。四模块118项回归通过，首批两份来源转录的13查询已冻结标注和实际结果。宽查询中论文转述排在原报道前，Agent相关性标注下该例nDCG@1为0.142857，后续核对来源角色、扩大独立标注并继续验收排序质量。真实向量语义和外部真人复核仍待完成。
 
 > 按 `docs/AGENT-HANDOFF-2026-11-13.md` 接手胎迹完整V1，先核对Git和回执。12核心模块已有实现，10项发布Gate、13项SLO和原规格待确认决策继续跟踪。正文检索、向量融合、正文证据包、用途、同意、预算、同步／流式grounding与报告已接通。分页及PG恢复结果见本卡。最新材料阶段已直连取得汽车之家原报道两页HTML及3张图，核对10款载速和20条成绩，原始报道事件12项API检查及真实Web桌面／390／320页面通过。原始报道万力HARMONICH220与论文MARMONIC M220、耐克森N’FERASU4与论文N’FEAR SU4存在差异，保留双侧出处，精确SKU待证。原件、完整复用许可与真人审核继续待完成，下一步核对参测产品代码／GTIN／侧壁。隔离库、截图和回执位于Git忽略目录，API／Web及端口已关闭，细节见材料核验记录。用户选定首个真实Provider为OpenAI Responses，启动时显式设置TI_AI_PROVIDER并核对状态接口。当前OpenAI及EPREL凭据缺失，继续独立质量工程和材料核验。Gemini适配及语义重排模型属于此前Agent的实施选择。继续推进真实语义、检索与排序质量、生产权限、平台、读屏及发布Gate，完成声明以实际验收结果为依据。
