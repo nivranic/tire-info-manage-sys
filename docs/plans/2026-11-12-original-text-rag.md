@@ -62,3 +62,20 @@ API退出0，Web经SIGINT退出1，验证页面已关闭，8003及18002均无监
 PDF知识检索与原件引用已接通，生产浏览器PDF35项、HTML／PDF兼容5项及三个视口通过。103项API、SDK16项、Web50项、三端类型与构建通过，真实PostgreSQL51项及152张模型表实际备份恢复通过。资源已关闭，合成材料的工程与验收记录见[PDF计划](2026-11-12-pdf-page-text.md)及[交接卡](../AGENT-HANDOFF-2026-11-12.md)。
 
 后续进入本计划第4–5步，实施正文向量计划、缓存、融合／重排、正文证据包和Responses链路，并继续真实模型及材料质量验收。
+
+## 正文向量接入预查
+
+以下为代码合同的只读核对结果。正文向量设计、迁移、API及实现尚待执行，接手先据此细化第4步。
+
+| 已核对的现状 | 接手实现需覆盖的行为 |
+| --- | --- |
+| `embedding_text.py` 的 `tire-structured-semantic@1` 从KnowledgeDocument生成语义文本，过滤body、URL及身份等字段 | 明确HTML／PDF正文独立文本合同及原件引用绑定，保留既有结构化缓存读取 |
+| 缓存ID绑定Provider、model、dimensions、text_contract、privacy_class与text_hash，`embedding_service.py` 的save_vectors仍写入固定结构化合同 | 贯通正文计划、缓存生成与写入、模型空间及当前投影核验，覆盖旧缓存及损坏绑定 |
+| prepare_plan、validate_plan与 `dense.py` 的current_materials从结构化文档读取，外发前check_embedding_dispatch仅接收index／hybrid及严格payload | 明确正文请求合同，通过现行持久计划、同意、预算、幂等、只追加账本和外发前新会话复核完成正常入口 |
+| `material_source_policy.py` 的canonical_policy要求provider_use与export均为false，共享类型 `source-materials.ts` 也使用false字面量 | 结合实际许可依据设计明确的正文用途授权，贯通后端、共享类型、SDK及界面，保全旧false权限及冻结凭证 |
+| 普通PDF的DocumentMetadata.rights_basis记录原件保存依据，candidate_ai_contract绑定车辆候选dependency及Provider | 继续核对通用HTML／PDF的用途机制，按具体材料及接收方绑定允许用途，旧材料权限保全纳入兼容验证 |
+| HTML checked_snapshot及PDF checked_document／checked_projection已核对原件与抽取投影 | 复用原件哈希、抽取版本、Unicode码点区间及PDF页码／元信息指纹，覆盖引用过期、损坏及重建 |
+
+沿用现行每块6000个UTF-8字节、单批32块／100KB的Embeddings输入边界，并在具体设计中核对正文分块的映射。索引与查询分别使用显式外发确认。随后实现融合与权威／地区／时效重排，将所选原件引用冻结进证据包，贯通Responses、流式、grounding及报告。
+
+首个真实生成接口继续采用用户选定的OpenAI Responses API。接手运行时核对进程中的TI_AI_PROVIDER，代码默认值为openai_responses。真实Embeddings／Responses质量、专业材料质量及完整V1继续按各自实际结果验收。

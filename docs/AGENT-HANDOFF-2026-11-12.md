@@ -10,6 +10,8 @@
 
 用户选定OpenAI Responses API作为首个真实AI接入，默认Provider为 `openai_responses`。本机OpenAI配置及EPREL Key此前核对缺失，独立工程可继续执行。Gemini适配属于此前Agent依据规格自行提前安排的工程，详细来源见下文AI接入决策。
 
+本次交接复核起点为 `a1c6da619a0172b97761517c8d44e68261a9e570`，当时本地HEAD、跟踪引用与实时远端main一致，工作区干净。应用工程基线为 `5a29f39`。正文向量已完成合同预查，设计、数据库／API扩展与实现仍待执行。接手首批工作应覆盖正文用途许可、独立文本合同和正常外发路径，具体发现见[原文RAG预查](plans/2026-11-12-original-text-rag.md#正文向量接入预查)。本次追加交接文档后的SHA通过Git记录及即时远端查询核对。
+
 ## 已交付工程与验证摘要
 
 - 需求依据为仓库内[原始规格](requirements/2026-09-26-tire-intelligence-original.md)，包括12个核心功能模块、10项发布Gate、13项SLO目标和15项产品／技术决策。现有报告没有支持整体完成百分比的统一验收口径。
@@ -30,6 +32,7 @@
 ## AI接入决策与排期
 
 - 用户已明确选择OpenAI Responses API作为首个真实接入。`apps/api/tire_api/ai_gateway.py` 的配置读取及配置对象默认值均为 `openai_responses`。
+- `TI_AI_PROVIDER` 可以覆盖代码默认值。接手启动本次Responses验收进程时，在该进程环境显式选择 `openai_responses`，再核对AI状态接口返回的Provider。模型与专用Key由服务端环境提供，凭据齐备及实际调用结果分别记录。
 - Gemini来自原规格第710行的多模型接入表，用途为大上下文／多模态备选。此前Agent自行决定提前开发，正式提交为 `d5fded1`。该排期属于Agent的实施选择。已有适配器及合成回归，真实Google调用仍待验证。[原始规格](requirements/2026-09-26-tire-intelligence-original.md)
 - 后续优先推进Responses真实语义与API→Provider→Web链路，额度读取故障的合成浏览器验收已完成。真实调用需要本机配置及符合材料用途的输入。材料选择已授权Agent自主决定，可继续核对公开出版许可并记录实际允许的用途。
 
@@ -308,7 +311,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 ## 下一步执行顺序
 
 1. 核对HEAD、工作区、远端及本机证据是否可用，阅读本卡、原规格和拟修改模块的后续报告。依赖和S2已在本机恢复，新clone仍需安装依赖并取得可信原件。
-2. 继续原文RAG第4–5步。PDF检索界面及034已完成本卡所列合成材料、真实PostgreSQL与生产浏览器验收。接下来为正文接通向量计划／缓存、融合及重排，再冻结正文引用进入AI证据包，贯通现行同意、预算、流式、grounding与报告。真实Embeddings质量、真实Responses语义及完整RAG仍待验收。
+2. 继续原文RAG第4–5步，先处理该计划的正文向量预查发现。PDF检索界面及034已完成本卡所列合成材料、真实PostgreSQL与生产浏览器验收。接下来为正文接通向量计划／缓存、融合及重排，再冻结正文引用进入AI证据包，贯通现行同意、预算、流式、grounding与报告。真实Embeddings质量、真实Responses语义及完整RAG仍待验收。
 3. 沿用用户选定的OpenAI Responses主线。冒烟grounding／用量修复、8种流式模式、终态额度、额度读取故障及关闭恢复已通过合成验收。继续真实Provider接入准备，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
 4. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
 5. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。此前四个候选及新增JRC／PERS研究线索、PERS真实捕获timeout均在续作记录中。匿名样本需先取得可核对的型号映射再建立SKU关联。
@@ -407,3 +410,5 @@ git rev-parse origin/main
 > PostgreSQL47项、pgvector10项运行／12项业务、开发库015→032副本升级／恢复／回退及各批相关回归已有独立范围的回执。继续实际部署、全文RAG／reranker、真实Embeddings质量、合法专业材料、精确SKU／外部真人Golden、生产权限、平台及无障碍验收。
 >
 > Gemini适配由此前Agent依据原规格提前排期，当前默认Provider为openai_responses。材料由Agent自主选择，JRC匿名样本映射待核对，PERS原件CC BY 3.0已定位但直连TCP超时，新增保存成功原件及TestEvent均为0。旧KIT C2封存约束继续有效。保留失败记录、他人改动及现有证据／许可合同，完成声明绑定实际执行范围。
+>
+> 最新正文向量合同预查见RAG计划。现有向量合同仅覆盖结构化KnowledgeDocument，正文需明确独立文本合同与用途凭证，并贯通计划、缓存、只追加账本和外发前持久化复核。材料策略及共享类型目前把provider_use、export限定为false，普通PDF保存依据也需补充实际用途核对。先完成具体设计与相关兼容反例，再实施第4步。启动Responses验收进程时显式核对TI_AI_PROVIDER，环境值可以覆盖代码默认值。

@@ -598,3 +598,13 @@ PDF生产浏览器35项最终检查通过，覆盖实际文档表单上传、索
 浏览器第一次来源可见性断言尚未展开details，展开后通过。一次批量翻页动作遇到上一状态读取中的禁用按钮，原始请求记录确认未发出第二页请求，待就绪后复验通过。关闭回执首次将空端口列表序列化为null项，修正后为空数组，原记录保留。最终35项检查及所有已记录尝试分别保存。
 
 两个私有API退出0，两次生产Web经SIGINT退出1，两页隔离浏览器关闭，8003／18002／55464均无监听。来源抓取、真实Provider、外网尝试与正常数据库使用均为0。当前汇总入口为 `.artifacts/pdf-search-20261112/verification.json`，下一步按原文RAG计划第4–5步实施正文向量、融合／重排和正文证据包，真实材料、模型、平台及生产发布继续各自验收。
+
+## 交接复核与正文向量预查补充
+
+本次复核起点为 `a1c6da619a0172b97761517c8d44e68261a9e570`，本地HEAD、origin/main与实时远端main一致，工作区干净。沙箱内SSH查询因MSYS进程启动返回0xC0000022，升级执行权限后通过官方SSH 443直连取得远端SHA，SSH显式禁用ProxyCommand及ProxyJump。
+
+用户追问Gemini来源，已核对原始规格第710行、正式提交d5fded1及网关默认值。Gemini提前开发由此前Agent自主排期，用户选定的首个真实生成接口继续为OpenAI Responses API。代码配置对象及环境读取默认openai_responses，进程环境中的TI_AI_PROVIDER可覆盖该默认值。交接卡补充显式选择及状态接口核对步骤。真实Google及OpenAI模型语义仍待验证。
+
+正文向量预查发现，现有Embeddings计划、缓存及dense投影绑定结构化KnowledgeDocument和tire-structured-semantic@1。save_vectors固定写入该合同，外发前复核仅支持index／hybrid及严格payload。材料canonical_policy与共享类型均把provider_use、export限定为false，普通PDF的保存依据及车辆候选dependency授权也需要按通用正文用途继续核对。具体入口和接手行为已补充到[原文RAG计划](../../plans/2026-11-12-original-text-rag.md#正文向量接入预查)，正文向量的具体设计及实现继续待执行。
+
+本轮执行文档链接、源码绑定、既有回执哈希、增量隐私及差异检查。787个API与629个前端输入逐字节匹配，三份关键回执SHA256匹配，77个本地文档链接有效。HANDOFF历史尾文保持216248字节及既有SHA256，新增行个人路径／高置信度凭据模式零命中。复核回执位于本机 `.artifacts/handoff-closeout-20261112-r1/validation.json`。103项API、51项PostgreSQL及152表恢复、35项PDF浏览器及5项兼容结果沿用已绑定的历史执行范围。完整V1、真实材料、模型、平台与生产发布继续验收。
