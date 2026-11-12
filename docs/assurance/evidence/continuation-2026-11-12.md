@@ -1,6 +1,6 @@
 # 2026-11-12 续作记录
 
-> 最新PostgreSQL完整运行47项检查通过，补齐029–032对应业务的事务、历史、并发停止及恢复验证。147张模型表恢复指纹一致，七模块受管回归204／204通过。前次45项与11项回归保留历史范围。最新结果、原失败及剩余范围见本文末节。
+> 最新通用PostgreSQL完整运行47项检查及204项受管回归通过。后续pgvector独立10项运行／12项业务检查通过，149张业务表恢复指纹一致，相关回归55／55通过。既有开发库015→032副本升级、恢复及回退演练也已通过。前次记录保留历史范围，最新结果、原失败及剩余范围见本文末节。
 
 本轮从提交 `ea09acc` 的干净工作区继续原规格完整 V1 目标。代码已包含迁移032的来源地址迁移监控，旧交接卡顶部的R136状态需要结合后续报告阅读。本轮核对了新的真实材料候选，并修复来源地址迁移提醒读取损坏历史时的异常响应。
 
@@ -179,3 +179,162 @@ apps/api/tests/test_source_material_stop_migration.py
 本次交付沿用上述已绑定源码的实际执行结果，交付复核重新核对回执SHA、源码绑定、AST和文档链接。浏览器、前端构建、完整API／Worker、真实模型和设备的本次新增结果仍待取得。私有回执与隔离数据沿用Git忽略规则，接手时按本机可用性检查或在新槽复验。
 
 交付复核确认七模块回归绑定的772个输入文件均保持原字节，两个改动脚本AST通过，11个本地文档链接均存在。`docs/HANDOFF.md` 历史尾文保留216248字节，SHA256为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。新增行的机器路径及高置信度凭据模式检查通过。本机复核回执为 `.artifacts/handoff-pghist-20261112/validation.json` 及 `tail-validation.json`。
+
+## pgvector真实运行与业务验收完成
+
+`a6d2d07` 推送后按原目标继续执行。复用既有 `scripts/verify-pgvector.ps1` 及 `scripts/pgvector_acceptance.py`，从已有PostgreSQL发行版复制运行副本，在项目忽略目录内编译固定官方pgvector 0.8.1源码。下载入口新增 `-NoProxy`，确保本次网络使用直连。
+
+源码提交为 `778dacf20c07caf904557a88705142631818d8cb`，归档SHA256为 `5badef2cdfed828d93b7f70ae6ad38236e36954420bb24001aa5508e61bf2d7c`，本次DLL的SHA256为 `ad472932aba82b6a5b664432eba2955297c8cef14433bd4abbe866d88fecf92b`。构建日志及来源凭据位于本机运行目录内。原PostgreSQL安装中vector.dll及vector.control均保持缺席。
+
+### 实际数据库结果
+
+运行目录为 `.artifacts/pgvector/vectorverify-a7627452e5e649b7902891f21f8843a7/`。`report.json` 为 `status=passed`，进程退出0，SHA256为 `a7fcc09f9d06109f2544f32919ef23929774ae022389229adc8aa38a713e6f13`。
+
+| 范围 | 结果 |
+| --- | --- |
+| 数据库与扩展 | PostgreSQL 18.3，pgvector 0.8.1，loopback新集群，业务使用非超级用户角色 |
+| 向量原生操作 | 写入1006个固定合成向量，拒绝维度错误及NaN／Infinity，验证余弦距离、命名空间／状态／隐私筛选 |
+| HNSW | EXPLAIN实际使用cosine索引，ef_search=100、iterative_scan=strict_order，固定语料Recall@2为1.0 |
+| 重启与恢复 | 实际数据库重启及pg_dump／pg_restore后，1006行向量指纹、精确查询结果、扩展版本及HNSW索引保持。备份21973字节 |
+| 业务API | 12项检查通过，覆盖计划、显式同意、并发幂等、预算预留、cosine／RRF、相同硬筛选、304／同事实缓存复用、模型／维度／隐私隔离、撤回排除、增量更新、失败固化、共享预算及应用重启 |
+| 业务恢复 | 149张业务表逐行指纹一致，保留3条embedding_vectors和1个HNSW索引，实际备份525118字节 |
+
+报告顶层10项检查与嵌套12项业务检查分别记录。业务检索执行筛选后精确cosine扫描，HNSW执行计划来自独立合成向量场景。真实模型检索质量、生产规模召回和语义reranker继续待验。
+
+### 回归与资源
+
+受管批 `.artifacts/vector-r1/` 实际执行 `test_embeddings.py` 及 `test_knowledge.py`，55／55通过，runner退出0，失败／跳过／incomplete均为0。源码稳定、资源关闭，非自检拒绝、已知探针拒绝及其他拒绝均为0。正常数据库启动false，真实Provider／接收端调用0，子进程0。结果SHA256为 `0be2e2f88c0a7c9b31fc437a8bc01b6c2e1387453ef07e681bcd853c57a63c89`。
+
+脚本输出server stopped后，独立核对该集群的pg_ctl status为exit3、端口55453监听数0，保存同目录 `closure.json`。首个受限通道的CIM监听查询被拒绝，随后通过正常权限的只读查询完成核验。PowerShell改动脚本AST解析通过，语法错误0，`git diff --check`通过。
+
+### 下一步
+
+正常部署旧库029–032的备份、显式迁移、恢复与回退继续开放。本轮仅读取正常库文件元数据，确认本机有既有开发库及备份工具。后续应复用 `scripts/backup_dev.py` 的数据库／原文对象／Parser归档备份逻辑，并在明确副本中演练迁移。
+
+真实Responses／Embeddings语义、专业材料及精确SKU／真人Golden、全文RAG／reranker、生产权限、长期监控、六类平台／无障碍与完整V1仍按原规格推进。
+
+## 既有开发库015→032副本演练完成
+
+### 输入及只读备份
+
+通过现有 `scripts/backup_dev.py` 的SQLite backup API读取既有开发库，并将数据库、对象目录和Parser归档保存到 `.artifacts/upgrade-rehearsal-20261112/backups/backup-20261112T063834Z/`。数据库27996160字节，迁移账本为001–015，共113张SQLite物理表。PRAGMA integrity_check返回ok，foreign_key_check无违规。Parser归档1179个文件，对象文件和证据对象引用均为0。
+
+备份前后及全部演练结束时，原开发库SHA256一致。原库仅经只读备份入口访问，升级和恢复操作使用新副本。原始盘点保存在 `source-inventory.json`，源文件核对保存在 `source-backup-check.json`，二者位于本轮本机目录。
+
+### 显式升级及原数据保全
+
+复用 `vehicle_binary_migration.private_rehearsal`，在停止写入的独立副本执行024车型原文存储迁移，再调用当前 `Database.initialize` 完成至032的后续迁移。升级后32个版本、154张SQLite物理表。所有113张原表的原有列及原有值保持一致，新增版本另行核对。
+
+升级结果为 `.artifacts/upgrade-rehearsal-20261112/rehearsal-r1/report.json`，status=passed、进程退出0，SHA256 `27261c8ade9ec60d68494dfda183d2e3b1b70401f3a517d0d9cd487048b15041`。原函数返回的 `normal_upgrade_ready=false` 继续保留其范围，本轮后续资产及恢复检查独立记录。
+
+### 失败原证据及定位
+
+| 回执 | 实际原因与处理 |
+| --- | --- |
+| `recovery-result-r1.json` | Parser归档核对返回parser_bundle_environment_incompatible。比较环境后确认唯一差异为machine，归档为amd64而验证进程为空。Python版本与全部依赖一致。工装按sysconfig.get_platform设置实际Python架构环境变量后，原校验通过 |
+| `recovery-result-r2.json` | 工装请求知识检索时使用limit=100，真实路由返回422，既有协议上限30。随后复核输入还要求有效文本或筛选条件，工装修正为kind=tire、每页30条，使用既有has_more／total分页 |
+
+两份红批及工装版本按原内容保留。环境差异见 `parser-environment-diff.json`，422原始诊断的安全字段见 `knowledge-diagnostic.json`。Parser及检索产品合同沿用现有实现。
+
+### 最终恢复运行
+
+最终 `.artifacts/upgrade-rehearsal-20261112/recovery-result-r3.json` 为status=passed，进程退出0，SHA256 `db558fb47658a7176f8dc763de7b3323726da21d0fa0c75b9bbc823a207fad45`。
+
+| 检查 | 结果 |
+| --- | --- |
+| 资产及引用 | 1179个Parser资产文件的相对路径／哈希映射一致，数据库实际引用的1个Parser归档通过既有verify_bundle完整校验。证据对象引用为0 |
+| 四点失败回滚 | 在after_copy、after_replace、before_version、before_commit注入故障。每次失败后，完整schema、行数据、版本列表、完整性及外键均与原始备份一致 |
+| 升级后API | 真实应用路由读取13份轮胎原文及2份车型原文，body和raw_hash均匹配。完整分页取得97条轮胎历史检索结果，三个新通知列表为空 |
+| 升级后备份恢复 | 复用既有backup_database及copy_tree，将升级库和资产恢复到新目录。数据库完整状态及资产哈希映射一致，重新执行相同API读取，得到相同统计 |
+| 完整原备份回退 | 文本回退屏障通过后，将原始整库备份及资产恢复到另一个新目录。015版本、schema、行数据及资产均一致，Parser引用归档再次通过校验 |
+| 来源与原库 | 两次API检查的来源fetch调用均为0，全过程结束后原开发库SHA保持一致 |
+
+### 归档旧后端实际启动
+
+数据库引用的可信Parser归档包含当时的旧后端main.py及migrations.py，共105个源码文件。逐文件校验后，在独立进程从该归档加载旧后端，确认实际加载的main路径属于该归档，并在新的015恢复副本经TestClient完成真实应用启动、历史读取与关闭。
+
+13份轮胎原文、2份车型原文及30条历史检索首页读取通过，body／raw_hash匹配，完整性和外键检查通过，版本列表保持015，来源fetch调用0，原开发库SHA保持一致。回执为 `.artifacts/upgrade-rehearsal-20261112/rollback-runtime-result.json`，status=passed、进程退出0，SHA256 `32d2bc74c0a7a96a185fe24fc481ef89a9af3afd797c756163cbe06b9a87f78b`。
+
+### 迁移相关受管回归
+
+受管批 `.artifacts/umig-r1/` 实际执行以下五模块，154／154通过，runner退出0，失败／跳过／incomplete均为0。
+
+```text
+apps/api/tests/test_vehicle_binary_migration.py
+apps/api/tests/test_source_page_migration.py
+apps/api/tests/test_source_quality_interest_migration.py
+apps/api/tests/test_source_material_stop_migration.py
+apps/api/tests/test_source_page_url_moves.py
+```
+
+源码稳定、资源关闭，非自检拒绝、已知探针拒绝及其他拒绝均为0。正常数据库启动false，真实Provider／接收端调用0，子进程0。结果SHA256为 `81bede3fbc32e0ac5d5e86661f91da969c008c54658fbc7588d775987818764a`。受管回归使用合成私库，既有开发库副本与归档旧后端为上述独立运行。
+
+实际部署目标切换、对应发布包完整回退、含二进制对象的部署库恢复及生产PostgreSQL旧库升级继续开放。已有通用PostgreSQL及pgvector报告另有二进制对象／向量恢复的限定证据。本轮结果供具体部署方案复用。
+
+交付复核确认154项回归绑定的772个输入字节一致，5个本机验收脚本AST通过，11个本地文档链接有效，HANDOFF历史尾文SHA保持。原开发库及源资产树与备份核对一致，新增行机器路径／高置信度凭据模式检查通过，`git diff --check`通过。复核回执为本机 `.artifacts/upgrade-rehearsal-20261112/delivery-validation.json`。
+
+## Gemini适配收尾与本次交接
+
+用户要求汇总进度、push全部改动并形成Agent交接文档。本次在既有main上收尾此前进行中的Gemini适配，文档入口为[Agent交接卡](../../AGENT-HANDOFF-2026-11-12.md)。完整V1目标及各项发布Gate继续开放。
+
+### 已完成范围
+
+- 新增 `ai_gemini.py`，采用Google原生generateContent及streamGenerateContent SSE，固定官方v1beta模型端点和x-goog-api-key请求头。配置使用TI_GEMINI_MODEL、TI_GEMINI_API_KEY及TI_AI_PROVIDER=gemini。
+- 复用共享证据封装、结构化输出schema、单次同意、预算预留、请求账本、引用恢复和失败终态。usage包含thought tokens，推理正文及签名在响应投影阶段过滤。
+- 共享网关支持原生systemInstruction／contents／generationConfig，车型最终外发检查读取原生contents信封。候选接收方授权、人工价格类型、低基数遥测、共享TypeScript类型及Web选项均贯通。
+- 新增58项配置、协议、HTTP、流式、真实应用路由、候选授权／撤销、价格／遥测和合成车型最终外发用例。SDK增加Gemini价格透传回归。用户选定的首个真实Provider继续为OpenAI Responses。
+
+### 原始失败及处理
+
+| 运行 | 原结果与后续处理 |
+| --- | --- |
+| `gem-r1` | 实现前红批，47项中7通过、40失败。缺功能证据保留，SHA256为 `4bc8a31671b9ddbf8fadfbe6368aabdde5c06f99d4553082c33ecf548d160e94` |
+| `gem-r2` | 首批实现后47／47通过，SHA256为 `a4bf6c1b0613a6bfb2d5b239352a8d68fa7291d6a157f56889f79574e9a62110`，仅覆盖该阶段源码 |
+| `gem-r3` | 扩展后58项中49通过、9失败。一个测试错误读取推荐结果顶层provider，修正为preparation.provider.provider。其余8项setup失败，追溯到历史S2原件缺失，API返回vehicle_source_fetch_failed且provenance为空。新增用例改用明确的合成capsule边界，真实S2集成继续待原件 |
+| `gem-r4` | 14模块366项中359通过、7失败。四个合成设备用例在object_store.put的原子硬链接失败，两项既有遥测捕获未取得live结果，另有30ms生产者时限断言失败。原回执SHA256为 `ce5ed3c171bd6e85098b12893bdefe70bddc92e5f8312d41ff874517d7c52d80` |
+| `gemdiag-r1` | 相同源码的9项目标复跑，生产者时限通过，4个设备用例仍在object_store.py失败。单独最小硬链接探针确认PermissionError、errno13、WinError5。探针只使用忽略目录内合成字节，源和链接已清理 |
+| `gem-r5` | 保持同一源码和受管守卫，改用正常OS权限串行运行完整14模块，366／366通过，零失败／跳过／incomplete。对象写入与上述既有用例均通过 |
+
+原S2文件当前缺失，预期为3240150字节及SHA256 `0ab998099f84760224071ba9fbefee9c61650d44b994fc82979bed76e086c60f`，路径为 `.artifacts/r81-source-and-regression-1e21a0bd37e447c39c7b934ead5a299f/xiaomi-first-generation-2.pdf`。新增车型夹具对capsule读取作合成替身，持久化请求／材料、正文绑定、普通／设备分支及同步／流式执行仍使用现行实现，用途拒绝使用实际规则。真实原文、Parser与二进制capsule资格链需要恢复原件后另行验收。
+
+### 最终受管回归
+
+最终命令使用新槽并取得终态。
+
+```powershell
+apps/api/.venv/Scripts/python.exe scripts/run_api_worker_regression.py --phase run --output-root .artifacts/gem-r5 --targets apps/api/tests/test_ai_gemini_provider.py apps/api/tests/test_ai.py apps/api/tests/test_ai_chat_provider.py apps/api/tests/test_ai_anthropic_provider.py apps/api/tests/test_ai_stream_api.py apps/api/tests/test_ai_stream_execution.py apps/api/tests/test_ai_stream_parser.py apps/api/tests/test_candidate_ai.py apps/api/tests/test_candidate_ai_review.py apps/api/tests/test_ai_pricing.py apps/api/tests/test_ai_pricing_migration.py apps/api/tests/test_telemetry.py apps/api/tests/test_telemetry_api.py apps/api/tests/test_telemetry_domain.py
+```
+
+`.artifacts/gem-r5/result.json` SHA256为 `e17aeda2e5dfda4fce9a50d3b0e73a259f9643fb7588c1f0204fa36a4c4e211b`，runner退出0，366／366通过。774个输入源码稳定，资源关闭，非自检拒绝、已知探针拒绝和其他拒绝均为0，正常数据库启动false，真实Provider／接收端调用0，子进程及存活子进程均为0。上游使用本次测试专有的合成HTTP响应。
+
+### TypeScript及交付复核
+
+| 检查 | 实际结果 |
+| --- | --- |
+| SDK价格规划合同类型 | `tsc -p packages/api-client/tests/tsconfig.ai-price-planning.json --noEmit --incremental false`，exit0 |
+| SDK候选合同类型 | `tsc -p packages/api-client/tests/tsconfig.candidate-ai-contract.json --noEmit --incremental false`，exit0 |
+| Node运行 | Web的四个test.ts文件、SDK价格规划及候选脚本合并运行56／56通过，零失败／跳过。候选脚本包含59项wire／transport断言 |
+| Web完整类型 | exit2。现有Next包缺少dist，Metadata、Viewport、MetadataRoute和NextConfig导出无法解析，安装包内Next指南同样缺失 |
+| Desktop完整类型 | exit2。Vite和@vitejs/plugin-react无法解析 |
+| Mobile完整类型 | exit2。Vite、@vitejs/plugin-react和@capacitor/cli无法解析 |
+| Python与PowerShell语法 | 本次八个改动Python文件AST通过，verify-pgvector.ps1语法错误0 |
+| 历史验收回执 | 八份PostgreSQL／pgvector／开发库演练权威回执均存在，SHA与原记录一致，保持各自执行时点与覆盖范围 |
+| 凭据现状 | 只核对配置布尔值，OpenAI及Gemini模型／Key、EPREL Key当前均缺失 |
+
+Node实际命令如下。
+
+```powershell
+node --test --experimental-strip-types --import ./packages/api-client/tests/device-ai/json-esm-hook.mjs ./packages/api-client/tests/ai-price-planning.mts ./packages/api-client/tests/candidate-ai.mts ./apps/web/tests/*.test.ts
+```
+
+三端完整类型检查使用各自tsconfig及 `--noEmit --incremental false`。前端构建、浏览器、设备、真实Google／Responses／Embeddings语义继续待本轮验收。后续先恢复锁定依赖及可信S2材料，再继续生产部署切换、真实专业材料／精确SKU／真人Golden、来源、权限、平台和无障碍Gate。
+
+### Git交付
+
+推送前通过GitHub官方SSH 443直连核对原仓库，远端为 `a6d2d07f2d72e5fc5d7f5a3ce8b136464eb61254`，同步后与本地基线一致，既有待推送提交数0。HTTPS直连曾低速超时，沙箱内Git SSH因MSYS命名对象权限拒绝而无法启动，正常权限SSH查询和同步成功。全过程沿用直连。
+
+本次正式提交包括pgvector下载参数、Gemini适配及共享协议／回归，以及开发库演练和交接记录。最终提交与远端一致性由实际push后查询核对，详见交付消息及接手时Git核对。忽略目录内的数据库、私有回执、依赖与构建产物按现有规则保留在本机。
+
+工程提交为 `4ea023f`（pgvector直连参数）及 `d5fded1`（Gemini原生适配与回归），随后交付进度与交接文档提交。全部提交均为本次范围内的正式提交，既有历史保留。
+
+最终静态复核保存在 `.artifacts/handoff-final-20261112/validation.json`。774个输入与绿色批source-after逐字节匹配，14个本地文档链接有效，HANDOFF历史尾文216248字节及SHA保持。新增行机器路径／高置信度凭据模式检查零命中，`git diff --check`通过。
