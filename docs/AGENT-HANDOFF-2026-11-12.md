@@ -2,12 +2,20 @@
 
 更新于2026-11-12。用户本次要求汇总当前进度、推送所有改动并形成Agent交接文档。完整V1目标持续开放。
 
-## 接手摘要
+## 当前停点
+
+完整需求共12个核心模块、10项发布Gate、13项SLO和15项产品／技术决策。各模块已有工程实现，10项发布Gate均保留待验收项，当前仍在补齐完整V1。
+
+最新工程提交为 `675f968`，完成原文RAG计划第1步后端。接手后的首个可执行任务是第2步的共享类型、SDK及Web正文检索／引用查看，在现有历史知识检索入口消费以下API。后续按PDF逐页抽取、正文向量／融合／重排、证据包和Responses链路的顺序推进。[实施计划](plans/2026-11-12-original-text-rag.md)
+
+用户选定OpenAI Responses API作为首个真实AI接入，默认Provider为 `openai_responses`。本机OpenAI配置及EPREL Key此前核对缺失，独立工程可继续执行。Gemini适配属于此前Agent依据规格自行提前安排的工程，详细来源见下文AI接入决策。
+
+## 已交付工程与验证摘要
 
 - 需求依据为仓库内[原始规格](requirements/2026-09-26-tire-intelligence-original.md)，包括12个核心功能模块、10项发布Gate、13项SLO目标和15项产品／技术决策。现有报告没有支持整体完成百分比的统一验收口径。
 - 迁移029–032及来源地址迁移的后端、共享协议、SDK和Web界面已交付。此前完成pgvector直连参数、开发库演练及原规格中的多模型适配。本轮继续Responses生产Web终态额度及流式验收，提交序列见下文与Git历史。
 - 来源地址迁移提醒的损坏历史读取已修复。四模块受管批127／127通过，包含六个端点损坏反例及两个异常传播反例。
-- 最新真实PostgreSQL完整运行47项检查通过，新增029–032对应业务的事务回滚、历史冻结、并发停止、原生写保护及恢复验证，覆盖实际dump／restore和147张模型表恢复指纹。七模块受管回归204／204通过。前次45项及11项兼容回归保留各自历史范围。隔离集群已停止，验证端口55452复核为空闲。
+- 此前真实PostgreSQL运行47项检查通过，新增029–032对应业务的事务回滚、历史冻结、并发停止、原生写保护及恢复验证，覆盖实际dump／restore和147张模型表恢复指纹。七模块受管回归204／204通过。前次45项及11项兼容回归保留各自历史范围。隔离集群已停止，验证端口55452复核为空闲。
 - 随后独立构建pgvector 0.8.1并在PostgreSQL 18.3上完成10项运行检查及12项业务检查，149张业务表备份恢复指纹一致。Embeddings／知识检索受管回归55／55通过。固定合成向量场景的Recall@2为1.0，真实模型语义质量继续待验。
 - 既有开发库经只读备份后，在副本完成015→032升级，113张原表的历史列和值保全。四个迁移故障点完整回滚，升级副本与恢复副本均通过15份原文及97条历史检索结果读取，整库备份回退恢复015。原开发库SHA保持一致。
 - 数据库引用的归档旧后端也已在还原的015副本启动，15份原文及历史检索读取通过。迁移相关五模块受管回归154／154通过，限定证据及部署剩余项见下文。
@@ -15,6 +23,7 @@
 - 首个真实AI接入已选OpenAI Responses API。EPREL Key当前缺失，其他工作继续独立推进。专业材料由Agent自主选取。
 - Responses终态额度自动刷新及旧响应仲裁已修复。8种流式模式与关闭恢复通过生产Web合成验收，9次合成调用落账4个completed、4个failed、1个outcome_unknown。本轮50项Web测试、三端类型及Web生产构建通过，私有服务已关闭。
 - 后续额度故障浏览器验收通过，覆盖终态503、手动刷新恢复、过期错误、关闭取消及迟到成功／错误。4次明确提交对应4次合成调用，最终2400 tokens。生产构建复用，402个前端及775个后端回归输入保持原字节，私有服务已关闭。
+- 最新工程提交为 `675f968`，新增033正文派生索引及正式HTML／文本快照的FTS搜索、哈希绑定引用恢复API。五模块204／204及真实PostgreSQL49项检查通过，149张模型表实际备份恢复指纹一致。共享SDK／Web、PDF逐页抽取、正文向量与AI证据包继续实施。
 - 前次材料研究核对四份候选，后续新增JRC及PERS论文线索。PERS许可已定位至原件的CC BY 3.0，生产捕获明确落账timeout，直连15秒诊断仍在TCP连接前超时。新增保存成功的原件、TestEvent、精确SKU关联和外部真人Golden均为0。旧KIT C2继续封存。
 - 发布级旧库迁移、真实模型语义、生产来源覆盖、原生平台矩阵和完整无障碍仍待验收。
 
@@ -23,6 +32,20 @@
 - 用户已明确选择OpenAI Responses API作为首个真实接入。`apps/api/tire_api/ai_gateway.py` 的配置读取及配置对象默认值均为 `openai_responses`。
 - Gemini来自原规格第710行的多模型接入表，用途为大上下文／多模态备选。此前Agent自行决定提前开发，正式提交为 `d5fded1`。该排期属于Agent的实施选择。已有适配器及合成回归，真实Google调用仍待验证。[原始规格](requirements/2026-09-26-tire-intelligence-original.md)
 - 后续优先推进Responses真实语义与API→Provider→Web链路，额度读取故障的合成浏览器验收已完成。真实调用需要本机配置及符合材料用途的输入。材料选择已授权Agent自主决定，可继续核对公开出版许可并记录实际允许的用途。
+
+## 最新正文检索工程
+
+`675f968` 完成本地原文RAG的首步后端。现行两个入口为 `POST /v1/knowledge/source-text/search` 和 `POST /v1/knowledge/source-text/resolve`，请求显式指定 `mode=history`。搜索支持文本、source_id及分页，范围为轮胎查询中各查询最新正式核验的HTML／文本快照。引用恢复支持旧正式快照，按原始SHA256、抽取版本和Unicode码点区间重新读取原文，即使派生投影已清空，也能恢复原摘录。
+
+- 033新增两张派生模型表，SQLite采用FTS5，PostgreSQL采用GIN／tsvector。部分分块或FTS行丢失后可从原文重建。
+- 1200字符分块、120字符重叠。抽取排除脚本、样式、模板、注释及显式hidden／aria-hidden内容，正文文本以来源摘录表达。
+- 引用字段为 `snapshot_id`、`raw_hash`、`extractor_version`、`start`、`end`、`chunk_id`，当前抽取版本为 `source-html-text@1`。返回的 `offset_unit` 为 `unicode_codepoints`，区间采用左闭右开。Web接入需按Unicode码点处理，JS字符串索引使用UTF-16代码单元，显示摘录可直接采用服务端恢复的 `text`。
+- 引用核对正式快照、查询核验、原件哈希及已保留的对象引用。原件或对象损坏明确报错，派生命中的文本再次与原件绑定。
+- 最终五模块受管批204／204，包含41项新模块用例，778个输入稳定、资源关闭、非自检拒绝0。真实PostgreSQL18.3的49项检查包括正文全文检索、重启、引用恢复及实际dump／restore，149张模型表指纹一致。
+
+本机回归回执为 `.artifacts/srctxt-r5/result.json`，SHA256 `421915de17394261a562a3b02d477bc960b9729f7262d8397adf6072f513f5db`。PostgreSQL报告为 `.artifacts/postgres/pgverify-6d362e0ab1fb475698d0f237c2608f4b/report.json`，SHA256 `db4789c47a314582d2e0e38ad642e1eea45b17b6e5f9fedbf0e2dfff17860d59`。集群已停止，pg_ctl独立状态exit3，55462无监听，关闭回执在 `.artifacts/source-text-pg-20261112/`。
+
+本轮新执行范围为合成原文上的生产API、SQLite及真实PostgreSQL。浏览器、前端构建、原生设备与真实Provider仍按各自现有验收范围记录。下一步接入共享SDK／Web，再推进PDF、正文向量与融合、证据包及真实Responses链路。完整实施顺序见[原文RAG计划](plans/2026-11-12-original-text-rag.md)。
 
 ## 最新额度故障验收
 
@@ -68,7 +91,7 @@
 | 7 传统CRUD | 来源、规则、偏好、测试、修订、账户、Provider、外部Key及费用规划切片 | 全实体覆盖、生产权限、BYOK与真实账单 |
 | 8 证据浏览 | 快照、哈希、解析版本、冲突、文本与二进制原文、未确认请求停止采纳，开发库副本升级／恢复 | 实际部署旧库切换、全域许可治理、正式再采纳及生产对象存储 |
 | 9 个性化 | 车库、关注、七维偏好、保存比较、非SKU兴趣与账户生命周期处理 | 真实推荐质量、跨设备与长期运行 |
-| 10 AI研究 | grounding、引用、流式解释与报告、规则草稿、Responses／Chat／Anthropic／Gemini适配，pgvector缓存／cosine／RRF及HNSW工程实测 | 优先Responses真实语义与Embeddings质量、全文RAG／reranker、专业性能解释及模型治理，其余Provider实网验收 |
+| 10 AI研究 | grounding、引用、流式解释与报告、多模型适配及向量检索工程，新增HTML／文本正文FTS与引用恢复后端 | 正文SDK／Web、PDF抽取、正文向量／融合／重排及证据包，Responses真实语义与Embeddings质量、专业性能解释及模型治理 |
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名与有限重试、Key及字段许可治理 | 真实接收端、公网生产验收、SDK产品化与完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权与审计 | 生产身份／租户／RLS、完整角色治理、灾备及发布验收 |
 
@@ -232,9 +255,9 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 ## 下一步执行顺序
 
 1. 核对HEAD、工作区、远端及本机证据是否可用，阅读本卡、原规格和拟修改模块的后续报告。依赖和S2已在本机恢复，新clone仍需安装依赖并取得可信原件。
-2. 优先推进用户选定的OpenAI Responses主线。冒烟grounding／用量修复、8种流式模式、终态额度、额度读取故障及关闭恢复已通过合成验收。继续真实Provider接入准备，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
-3. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
-4. 推进真实Embeddings检索质量与全文RAG／reranker验收。已有47项通用PostgreSQL、pgvector独立运行与业务检查，以及204项和55项受管回归可按源码绑定分别复用。
+2. 继续原文RAG计划第2–5步。当前可直接实施共享类型、SDK与Web历史知识检索的正文路径及引用查看，按上述Unicode区间合同对接两个API，再推进PDF逐页抽取、正文向量与融合／重排、证据包和模型链。首步后端及033迁移已有204项受管回归、49项真实PostgreSQL及149张模型表恢复证据。真实Embeddings检索质量及原规格完整RAG继续待验。
+3. 沿用用户选定的OpenAI Responses主线。冒烟grounding／用量修复、8种流式模式、终态额度、额度读取故障及关闭恢复已通过合成验收。继续真实Provider接入准备，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
+4. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
 5. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。此前四个候选及新增JRC／PERS研究线索、PERS真实捕获timeout均在续作记录中。匿名样本需先取得可核对的型号映射再建立SKU关联。
 6. 扩充P0来源、SU7官方OE／精确SKU、监控长周期、全文RAG／reranker与专业性能解释。继续实现原规格剩余能力，并逐项形成可复核证据。
 7. 收敛安静窗口全量回归、六类平台、生产身份／租户权限、无障碍、安全、性能、灾备与分发，逐项验收下列10个Gate。
@@ -268,6 +291,7 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 | Gemini实现及回归 | `apps/api/tire_api/ai_gemini.py`、`apps/api/tests/test_ai_gemini_provider.py`、`docs/plans/2026-11-12-gemini-native-provider.md` |
 | Responses冒烟及回归 | `scripts/ai_real_provider_smoke.py`、`apps/api/tests/test_ai_provider_smoke.py`、`docs/plans/2026-11-12-responses-smoke-grounding.md` |
 | Responses生产Web夹具 | `scripts/ai_stream_acceptance.py`，私有API与独立Web使用显式隔离端口及本机忽略目录 |
+| 正文检索与引用 | `apps/api/tire_api/source_text.py`、`source_text_models.py`、`apps/api/tests/test_source_text.py`及原文RAG计划，迁移033 |
 | 受管回归 | `scripts/run_api_worker_regression.py`及对应阶段报告 |
 
 表中省略目录的后端文件名均相对于 `apps/api/tire_api/`。
@@ -285,8 +309,11 @@ SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56
 - `70fa218` 汇总依赖与构建恢复、S2及Responses冒烟进度。本卡最近提交追加Responses Web夹具兼容修复、合成浏览器结果及接手顺序，可用 `git log -1 --format=%H -- docs/AGENT-HANDOFF-2026-11-12.md` 定位。
 - `fcb2d2a` 包含Windows下Responses生产Web夹具兼容修复及实际合成浏览器验收记录。
 - `b1c3acb` 包含Responses终态额度自动刷新、过期响应仲裁及8种流式模式验收记录。本次交接补充作为后续正式文档提交交付，最终SHA以即时远端核对为准。
+- `675f968` 包含033正文索引、HTML／文本FTS及可恢复引用API，41项新增用例、旧库兼容及PostgreSQL原文恢复检查，完整RAG的后续步骤见本卡最新工程段。
 
 `bce22a4`交付的静态复核为 `.artifacts/handoff-final-20261112/validation.json`，当时774个回归输入逐字节匹配，14个本地链接有效，历史尾文SHA保持。后续恢复与Responses修复按各自新回执绑定，交付核对见 `.artifacts/responses-smoke-20261112/delivery-validation.json`。
+
+本次原文检索交付复核已核对204项回归与49项PostgreSQL报告的SHA256，778个受管输入逐字节匹配，10个改动Python文件AST通过，18个本地文档链接有效。HANDOFF历史尾文仍为216248字节及原SHA256，待推送新增行个人路径／高置信度凭据模式零命中，差异检查通过。本机复核入口为 `.artifacts/source-text-delivery-20261112/validation.json`。本次新增验证覆盖文档、源码绑定及既有回执，产品测试、构建与数据库运行结果沿用各自已执行批次。
 
 - 当前分支为既有 `main`。新分支／工作树须取得用户明确同意。工作区中的他人修改、历史红绿回执及证据按现有归属保留。
 - Windows使用PowerShell 7，exec显式设置工作目录。网络使用直连，代理的启动／配置／连接须先取得用户明确同意。
@@ -312,7 +339,9 @@ git rev-parse origin/main
 
 > 继续按原需求规格推进胎迹完整V1，先读 `docs/AGENT-HANDOFF-2026-11-12.md` 并核对main、HEAD、dirty及本机回执。范围为12个核心模块、10项发布Gate，整体验收持续开放。
 >
-> 最近产品代码基线为b1c3acb。Responses终态额度及8种合成流式模式、50项Web测试、三端类型及生产构建已有回执。后续额度503、手动刷新、过期错误、关闭取消及迟到成功／错误已通过生产Web合成验收，4次提交对应4次调用及2400 tokens，服务已关闭。继续用户选定的OpenAI Responses真实语义链，本机OpenAI配置及EPREL Key缺失，继续独立工程。
+> 最近工程提交为675f968。033迁移及HTML／文本正文FTS、原件哈希绑定引用恢复API已交付，五模块204／204、真实PostgreSQL49项检查及149张模型表恢复通过，集群已停止。先继续原文RAG计划的共享SDK／Web及引用查看，再推进PDF、正文向量／融合／重排和AI证据包。
+>
+> Responses终态额度及8种合成流式模式、50项Web测试、三端类型及生产构建已有回执。后续额度503、手动刷新、过期错误、关闭取消及迟到成功／错误已通过生产Web合成验收，4次提交对应4次调用及2400 tokens，服务已关闭。继续用户选定的OpenAI Responses真实语义链，本机OpenAI配置及EPREL Key缺失，继续独立工程。
 >
 > PostgreSQL47项、pgvector10项运行／12项业务、开发库015→032副本升级／恢复／回退及各批相关回归已有独立范围的回执。继续实际部署、全文RAG／reranker、真实Embeddings质量、合法专业材料、精确SKU／外部真人Golden、生产权限、平台及无障碍验收。
 >

@@ -532,3 +532,27 @@ API经shutdown退出0，Web经SIGINT退出1，8003及18002均无监听，私有�
 使用新隔离数据库，经真实管理员注册、来源策略读取、预览及捕获API执行一次直连。请求UUID为 `ea4eab2a-5ee2-47ca-894c-539f05886429`，明确落账failed及 `source_material_timeout`，document／receipt均为空。DNS仅观察到指定大学主机，子进程及真实Provider均为0。独立curl直连robots诊断的DNS用时约0.058秒，15.003秒后仍未完成TCP连接，HTTP状态为000。该源的失败证据保存在本机 `.artifacts/material-pers-2018-20261112-r1/`，原有KIT C2继续保持封存。
 
 该候选新增的保存成功原件、TestEvent及SKU关联均为0。另一个同论文大学知识库入口返回Anubis页面，当前继续按实际可访问原始来源推进。完整V1及真实材料身份验收继续开放。
+
+## 正文FTS与可恢复引用后端首步
+
+工程提交为 `675f968`，完整顺序见[原文RAG计划](../../plans/2026-11-12-original-text-rag.md)。新增033、两张派生模型表及SQLite FTS5／PostgreSQL GIN全文索引，生产入口为 `POST /v1/knowledge/source-text/search` 和 `POST /v1/knowledge/source-text/resolve`。请求显式指定history，检索范围为最新正式HTML／文本快照，引用恢复可读取旧正式版本。
+
+正文按HTML结构抽取，排除脚本／样式／模板／注释及显式隐藏元素。分块长度1200个Unicode码点、重叠120个。引用绑定快照、原始SHA256、抽取器版本及字符区间，并由同一抽取函数从原件重建。派生投影丢失后引用仍可恢复，部分分块或FTS行丢失可重建。保留对象读取失败、原文哈希或来源绑定损坏、摘录被修改均有对应反例。
+
+### 回归与原始失败
+
+首批新模块36／36。补充aria-hidden空属性及保留对象元信息损坏反例后，第二批39项中38通过、1失败，原始失败为 `source_text.py` 空属性值调用lower的AttributeError。修改为按空属性的实际值处理后通过。
+
+最终 `.artifacts/srctxt-r5/result.json` 单批五模块204／204，包含41项新模块用例，其余覆盖知识检索、对象存储、并发／失败初始化及固定023旧库升级保全。收集、实际执行均为204，失败／跳过／incomplete均为0，runner退出0，778个输入稳定、资源关闭、非自检拒绝0。正常数据库启动false，真实Provider／接收端调用0。SHA256 `421915de17394261a562a3b02d477bc960b9729f7262d8397adf6072f513f5db`。早期各批保留原源码绑定与回执。
+
+### 真实PostgreSQL及恢复
+
+使用既有二进制分发及验收入口，在新的loopback PostgreSQL18.3集群执行。新增正文GIN检索、Unicode引用恢复和重启检查，并在实际恢复库再次核对原始引用及摘录。最终49项检查通过，实际dump／restore的149张模型表指纹及schema版本一致，备份690546字节。另保留10个证据对象、4个报告对象及3个Parser归档的恢复检查。
+
+本机报告为 `.artifacts/postgres/pgverify-6d362e0ab1fb475698d0f237c2608f4b/report.json`，SHA256 `db4789c47a314582d2e0e38ad642e1eea45b17b6e5f9fedbf0e2dfff17860d59`。脚本退出0并停止集群，独立pg_ctl状态为exit3及no server running，55462无监听。关闭及源码核对回执在 `.artifacts/source-text-pg-20261112/`，778个受管输入仍逐字节一致，10个改动Python文件AST通过。
+
+当前新增验收为合成原文上的生产API和实际数据库。后续继续共享SDK／Web、PDF逐页抽取、正文向量与融合／重排、正文证据包及真实Responses语义。浏览器、前端构建、原生平台及完整V1 Gate仍按各自当前验收范围推进。
+
+### 交付前复核
+
+本次交付复核重新核对上述两份报告SHA256、778个源码输入、10个改动Python文件AST及18个本地文档链接。HANDOFF历史尾文为216248字节，SHA256仍为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。待推送新增行个人路径／高置信度凭据模式零命中，工程与文档差异检查通过。复核回执为 `.artifacts/source-text-delivery-20261112/validation.json`，本次实际执行范围为文档、源码绑定及既有回执核对。
