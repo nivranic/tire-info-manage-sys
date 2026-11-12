@@ -14,15 +14,17 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 
 最新工程新增离线检索质量评估命令，四模块受管回归118／118。两份真实来源转录的13个查询取得首批指标，同尺寸宽查询中转述优先的排序差距已记录。标注由Agent依据来源给出，外部真人复核和代表性质量验收继续待完成。详见[评估工程与实测](assurance/evidence/retrieval-evaluation-2026-11-13.md)。
 
+随后补齐PDF正文的冻结策略出版日期、时间排序和页面出处展示。四模块156／156、三端类型和Web55／55通过，实际React组件1440／390／320像素30项检查通过。隔离PG综合58项及日期专项7项分别通过，153张模型表实际备份恢复指纹一致，集群已关闭。日期明确标为策略声明，完整记录见[PDF出版日期验收](assurance/evidence/pdf-publication-ranking-2026-11-13.md)。
+
 此前Web核心流程无障碍补修取得14份Lighthouse无障碍100分快照、22项功能与键盘检查及生产构建通过。读屏、完整WCAG 2.2 AA及其余发布Gate继续开放。
 
-本次评估工程前的已推送基线为 `19f3486fdb75a18d254d58ef9f3e7c2106590b6b`。材料研究、评估输入和隔离数据库位于Git忽略目录。交付最终SHA及远端一致性以交付消息和即时Git查询为准。
+本次PDF日期补修前的已推送基线为 `0253c5097047a4e4934c2d243896fc6c7b287482`。材料研究、评估输入和隔离数据库位于Git忽略目录。交付最终SHA及远端一致性以交付消息和即时Git查询为准。
 
 ## 用户决定与实施选择
 
 - 首个真实AI接入为OpenAI Responses API，网关配置对象及环境读取的默认Provider为 `openai_responses`。启动进程显式设置 `TI_AI_PROVIDER=openai_responses`，并核对 `GET /v1/ai/status` 的实际Provider，环境覆盖会影响运行时选择。
 - Gemini来自原规格第710行的多模型备选表，原生Adapter由此前Agent自行提前排期并以 `d5fded1` 交付。该排期属于Agent的实施选择。已有合成回归，真实Google调用待验证。首个真实Provider的实施与验收顺序依据用户选定的OpenAI Responses执行。
-- 本次离线检索评估使用冻结的本地API结果，真实Provider调用为0。运行环境可能覆盖Provider选择，已观察到用户级 `TI_AI_PROVIDER=anthropic`，OpenAI验收进程须显式设置 `TI_AI_PROVIDER=openai_responses` 并核对实际Provider。
+- 离线检索评估使用冻结的本地API结果，真实Provider调用为0。运行环境可能覆盖Provider选择，OpenAI验收进程须显式设置 `TI_AI_PROVIDER=openai_responses` 并核对实际Provider。
 - 专业测试材料由Agent自主选择，并核对原始出版物、许可和可证明的SKU身份。
 - 当前没有EPREL Key，继续独立工作。OpenAI模型／Key及EPREL Key本轮在Process／User／Machine三个作用域复核为空，凭据条件具备后再执行真实接口验收。
 - 当前授权包含复核优化、总结进度、提交并push全部改动、编写Agent交接文档。
@@ -56,6 +58,8 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 来源、许可、转录解释及后续核验顺序见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。隔离库中的转录记录及其回执保存在本机Git忽略目录。
 
 ## 最新检索评估工程
+
+PDF正文已补材料策略声明的出版日期及其请求、策略指纹，供时效排序和页面核对使用。回归覆盖未知日期、原始引用恢复与历史账本读取。对应原件及捕获校验失败时，查询在派发前拒绝。四模块156项回归及三种宽度30项组件检查通过，见[实施与验收](assurance/evidence/pdf-publication-ranking-2026-11-13.md)。人工测试转录的来源优先关系继续待核对。
 
 新增 `scripts/evaluate_knowledge_retrieval.py`，输入独立标注与冻结的正常API结果，计算Precision、Recall、MRR和nDCG，并检查空结果及声明的排序。完整引用用于版本匹配，输入字节SHA256和指纹进入报告，历史正文分页元信息保持可读。
 
@@ -233,6 +237,7 @@ git status --short --branch
 git log -4 --oneline
 git rev-parse HEAD
 git rev-parse origin/main
+apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/pdf-publication-next --targets apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_document_text.py apps/api/tests/test_source_materials.py apps/api/tests/test_retrieval_evaluation.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/retrieval-evaluation-next --targets apps/api/tests/test_retrieval_evaluation.py apps/api/tests/test_knowledge.py apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_embeddings.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/otai-next --targets apps/api/tests/test_ai_original_text.py apps/api/tests/test_ai.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_reports.py apps/api/tests/test_report_rendering.py apps/api/tests/test_ai_stream_execution.py apps/api/tests/test_ai_stream_api.py apps/api/tests/test_ai_stream_parser.py apps/api/tests/test_recall_reports.py apps/api/tests/test_test_ai_reports.py
 npm run test:text-embeddings --workspace @tire/api-client
@@ -255,6 +260,8 @@ npm run typecheck --workspace @tire/mobile
 - `docs/HANDOFF.md`从2026-10-26入口起的本机历史尾文保留216248字节，SHA256为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。仓库沿用现有Git文本换行规约，同一尾文的Git blob为215776字节，SHA256为 `55e7f298d159af75eefa0bb4230a9f1193b2938223e51cf2a41c1f9c79d43bab`，新clone按blob核对。
 
 ## 可复制的接手指令
+
+> PDF正文时效排序已接入成功捕获的冻结策略出版日期，页面展示配置声明及请求、策略指纹。四模块156项回归、三端类型、Web55项及实际React组件三种宽度30项检查通过。PG综合58项和日期专项7项分别通过，153张模型表实际备份恢复一致，集群已关闭。先阅读PDF出版日期验收和最新交付消息，再按后续顺序推进来源角色、代表性质量与原规格剩余验收。
 
 > 最新工程已新增离线检索质量评估命令，先阅读检索评估报告及实施计划。四模块118项回归通过，首批两份来源转录的13查询已冻结标注和实际结果。宽查询中论文转述排在原报道前，Agent相关性标注下该例nDCG@1为0.142857，后续核对来源角色、扩大独立标注并继续验收排序质量。真实向量语义和外部真人复核仍待完成。
 

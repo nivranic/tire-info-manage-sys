@@ -1,4 +1,6 @@
 """Current original-bound text retrieval through the shared embedding ledger."""
+from datetime import datetime, timezone
+
 from fastapi import HTTPException
 from sqlalchemy import Float, String, func, select, text
 
@@ -15,6 +17,7 @@ from .service import timestamp
 from .source_text import (CHUNK_CHARACTERS, CHUNK_OVERLAP, SUPPORTED_TYPES,
     SourceTextCitation, checked_snapshot, citation, index_snapshot)
 from .source_text_models import SourceTextChunk, SourceTextIndex
+from .source_material_models import SourceMaterialOutcome, SourceMaterialRequest
 from .text_embedding_models import TextEmbeddingAuthorization
 from .text_embeddings import (PURPOSE, DocumentSelection, SourceSelection, authorization_view,
     checked_authorization, checked_caches, chunk_for_excerpt, fail, original_excerpt, recipient, scope_for)
@@ -52,15 +55,29 @@ def _html_entries(db, catalog, filters, rebuild):
                 fail('text_embedding_binding_failed')
             result[chunk.id] = {'selection': SourceSelection(kind='source_text', reference=reference),
                 'text': chunk.text, 'source_class': source.get('source_class', 'unclassified'),
-                'region': region, 'observed_at': timestamp(snapshot.observed_at),
-                'time_sort': utc(snapshot.observed_at).timestamp(), 'time_basis': 'observed_at'}
+                'region': region, 'time_sort': utc(snapshot.observed_at).timestamp(),
+                'freshness': {'time_basis': 'observed_at', 'observed_at': timestamp(snapshot.observed_at)}}
     return result
 
 
 def _pdf_entries(db):
+    from .source_materials import checked_request
+
     result = {}
     for identity in db.scalars(select(DocumentTextIndex.document_id)):
         _metadata, index, pages = checked_projection(db, identity)
+        freshness = {'time_basis': 'publication_unknown', 'observed_at': None}
+        time_sort = float('-inf')
+        request_id = db.scalar(select(SourceMaterialOutcome.request_id).where(SourceMaterialOutcome.document_id == identity))
+        if request_id is not None:
+            acquisition = db.get(SourceMaterialRequest, request_id)
+            checked_request(acquisition)
+            published_at = acquisition.policy['published_at']
+            if published_at is not None:
+                freshness = {'time_basis': 'policy_publication_date', 'observed_at': None,
+                    'publication': {'published_at': published_at, 'material_request_id': request_id,
+                                    'policy_fingerprint': acquisition.policy['policy_fingerprint']}}
+                time_sort = datetime.fromisoformat(published_at).replace(tzinfo=timezone.utc).timestamp()
         for chunk in db.scalars(select(DocumentTextChunk).where(DocumentTextChunk.document_id == identity)):
             value = reference_for(identity, index.document_fingerprint, index.raw_hash,
                                   chunk.page, chunk.start, chunk.end)
@@ -73,8 +90,8 @@ def _pdf_entries(db):
                     or chunk.tokens != ' '.join(tokens(chunk.text))):
                 fail('text_embedding_binding_failed')
             result[chunk.id] = {'selection': selection, 'text': chunk.text,
-                'source_class': 'unclassified', 'region': None, 'observed_at': None,
-                'time_sort': float('-inf'), 'time_basis': 'publication_unknown'}
+                'source_class': 'unclassified', 'region': None,
+                'time_sort': time_sort, 'freshness': freshness}
     return result
 
 
@@ -211,14 +228,14 @@ def hybrid_result(db, config, search, materials, query_vector):
             **match, 'rrf_score': -negative_score, 'cosine_distance': distances.get(identity),
             'authority_tier': None if tier == 999 else tier, 'source_class': entry['source_class'],
             'region': entry['region'], 'region_match': region, 'variant_match': 'page_scope',
-            'freshness': {'time_basis': entry['time_basis'], 'observed_at': entry['observed_at']},
+            'freshness': entry['freshness'],
             'explanation': ['来源目录类别用于正文来源排序，具体字段和SKU身份由结构化证据核对。',
                 '地区偏好按已登记来源地区排序。',
-                'RRF融合分数及原始观察时间参与排序，PDF发布时间保留未知。']}})
+                'RRF融合分数及可追溯的时间依据参与排序，材料策略日期为配置声明。']}})
     return {'items': items, 'total': len(ordered), 'has_more': len(ordered) > end,
         'offset': search.offset, 'limit': search.limit,
         'coverage': coverage(materials), 'preferred_region': search.preferred_region,
         'candidate_counts': {'fts': len(lexical), 'dense': len(dense), 'merged': len(ordered), 'limit': CANDIDATE_LIMIT},
         'text_contract': 'original-text-semantic@1',
-        'notice': '原件正文历史候选，按来源类别、地区偏好、RRF与观察时间排序。'
+        'notice': '原件正文历史候选，按来源类别、地区偏好、RRF及已注明依据的时间排序。'
                   '原件引用保留页面或文档页码范围，具体SKU适用性需要对应结构化证据。'}

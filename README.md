@@ -1,5 +1,7 @@
 # 胎迹 · 轮胎情报工作台
 
+> PDF正文已接入冻结材料策略声明的出版日期、时效排序和页面凭证展示。四模块156项回归、三端类型、Web55项及1440／390／320像素30项组件检查通过。隔离PG综合58项、日期专项7项分别通过，153张模型表实际备份恢复一致。[实施与验收](docs/assurance/evidence/pdf-publication-ranking-2026-11-13.md)
+
 > 新增[离线检索质量评估](docs/assurance/evidence/retrieval-evaluation-2026-11-13.md)，提供Precision、Recall、MRR及nDCG，四模块118项回归通过。首批13个真实来源查询已记录指标及宽查询的排序差距，标注由Agent给出，外部真人复核继续待完成。[运行方式](docs/plans/2026-11-13-retrieval-evaluation.md)
 
 > [Agent交接卡](docs/AGENT-HANDOFF-2026-11-13.md)汇总原规格12模块、10项发布Gate、13项SLO、15项决策及接手顺序。正文证据包、用途、OpenAI Responses、grounding与报告已接通。分页修复取得161项API、58项综合PG及153模型表恢复、14项独立向量业务及155实际表恢复、SDK9项、Web55项和三端类型通过。Web无障碍14份快照100分、22项功能检查及生产构建通过。上述工程验收采用合成材料与Provider。最新已追溯汽车之家原始测试报道，核对10款载速和20条成绩，识别两处型号差异。原始报道事件12项API检查及真实Web桌面／390／320页面通过，原件、精确SKU关联和真人审核继续待完成，详见[材料核验记录](docs/assurance/evidence/material-review-2026-11-13.md)。真实模型质量、生产权限、原生平台、读屏及完整V1继续验收。历史记录见[HANDOFF](docs/HANDOFF.md)。

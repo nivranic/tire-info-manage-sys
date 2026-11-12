@@ -211,7 +211,11 @@ export interface OriginalTextMatch {
   authority_tier: number | null; source_class: string; region: string | null;
   region_match: "exact" | "different" | "unknown" | "not_requested";
   variant_match: "page_scope";
-  freshness: { time_basis: "observed_at" | "publication_unknown"; observed_at: string | null };
+  freshness: {
+    time_basis: "observed_at" | "publication_unknown" | "policy_publication_date";
+    observed_at: string | null;
+    publication?: { published_at: string; material_request_id: string; policy_fingerprint: string };
+  };
   explanation: string[];
 }
 export type OriginalTextSearchItem = (SourceTextExcerpt | DocumentTextExcerpt) & { match: OriginalTextMatch };

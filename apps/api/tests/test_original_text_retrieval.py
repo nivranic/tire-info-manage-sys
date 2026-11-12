@@ -12,7 +12,8 @@ from tire_api.db import Snapshot, utcnow
 from tire_api.domain import digest
 from tire_api.embedding_models import EmbeddingRequest
 from tire_api.knowledge import KnowledgeSearch
-from test_document_text import indexed_document, search as pdf_search
+from test_document_pdf import pdf_bytes
+from test_document_text import index as index_pdf, indexed_document, search as pdf_search
 from test_text_embeddings import authorize, build, plan, selection, setup
 
 
@@ -284,6 +285,89 @@ def test_pdf_dense_result_recovers_original_page_and_preserves_unknown_publicati
     assert all(item['match']['method'] == 'dense' and item['match']['region_match'] == 'unknown'
         and item['match']['authority_tier'] is None and item['match']['freshness'] == {
             'time_basis': 'publication_unknown', 'observed_at': None} for item in result['items'])
+
+
+def captured_pdf(retrieval, monkeypatch, published_at):
+    import test_source_materials as materials
+    from tire_api.material_source_policy import PolicyCatalog, canonical_policy
+
+    client, _database, _provider = retrieval
+    policy = canonical_policy({**materials.POLICY, 'published_at': published_at})
+    client.app.state.material_policies = PolicyCatalog([policy])
+
+    async def fetch(selected):
+        result = materials.obtained(selected)
+        result['body'] = pdf_bytes(('acoustic quiettopic synthetic publication',))
+        return result
+
+    monkeypatch.setattr(client.app.state.material_transport, 'fetch', fetch)
+    response = client.post('/v1/source-materials/captures', json=materials.payload(client))
+    assert response.status_code == 201, response.text
+    captured = response.json()
+    assert captured['state'] == 'succeeded'
+    assert index_pdf(client, captured['document']['id']).status_code == 200
+    item, = pdf_search(client, 'quiettopic', document_id=captured['document']['id']).json()['items']
+    selected = {'kind': 'document_text', 'reference': item['reference']}
+    index_selection(client, selected)
+    return captured, selected
+
+
+@pytest.mark.parametrize('published_at', ['2020-06-15', None])
+def test_pdf_publication_uses_frozen_capture_policy_and_preserves_history(retrieval, monkeypatch, published_at):
+    from tire_api.material_source_policy import PolicyCatalog, canonical_policy
+    import test_source_materials as materials
+
+    client, _database, _provider = retrieval
+    captured, selected = captured_pdf(retrieval, monkeypatch, published_at)
+    client.app.state.material_policies = PolicyCatalog([
+        canonical_policy({**materials.POLICY, 'published_at': '2025-01-01'})])
+    response = ask(client)
+    item, = completed(response)['items']
+    assert item['reference'] == selected['reference']
+    assert item['match']['authority_tier'] is None
+    expected = {'time_basis': 'publication_unknown', 'observed_at': None}
+    if published_at is not None:
+        expected = {'time_basis': 'policy_publication_date', 'observed_at': None,
+            'publication': {'published_at': published_at, 'material_request_id': captured['request_id'],
+                            'policy_fingerprint': captured['policy_fingerprint']}}
+    assert item['match']['freshness'] == expected
+    restored = client.post('/v1/knowledge/document-text/resolve', json={'mode': 'history', 'reference': item['reference']})
+    assert restored.status_code == 200 and restored.json()['text'] == item['text']
+    client.app.state.material_policies = PolicyCatalog([])
+    assert client.get(f"/v1/knowledge/embedding-runs/{response.json()['id']}?mode=history").json() == response.json()
+    assert completed(ask(client))['items'][0]['match']['freshness'] == expected
+
+
+def test_equal_pdf_fusion_scores_use_declared_publication_date_before_pagination(retrieval, monkeypatch):
+    client, _database, _provider = retrieval
+    _old_capture, old = captured_pdf(retrieval, monkeypatch, '2020-06-15')
+    _new_capture, new = captured_pdf(retrieval, monkeypatch, '2024-06-15')
+    old_id, new_id = old['reference']['chunk_id'], new['reference']['chunk_id']
+    monkeypatch.setattr(original_text_retrieval, 'lexical_candidates', lambda *_: [old_id, new_id])
+    monkeypatch.setattr(original_text_retrieval, 'cosine_candidates', lambda *_: [(new_id, 0.0), (old_id, 0.0)])
+    ranked = completed(ask(client))
+    assert [item['reference'] for item in ranked['items']] == [new['reference'], old['reference']]
+    assert ranked['items'][0]['match']['rrf_score'] == ranked['items'][1]['match']['rrf_score']
+    assert ranked['items'][0]['match']['freshness']['publication']['published_at'] == '2024-06-15'
+    second_page = completed(ask(client, offset=1, limit=1))
+    assert second_page['items'] == ranked['items'][1:2]
+    assert second_page['total'] == 2 and not second_page['has_more']
+
+
+def test_pdf_publication_receipt_integrity_is_checked_before_query_dispatch(retrieval, monkeypatch):
+    from sqlalchemy import update
+    from tire_api.db import EvidenceDocument
+
+    client, database, provider = retrieval
+    captured, _selected = captured_pdf(retrieval, monkeypatch, '2020-06-15')
+    with database.sessions() as db:
+        db.execute(update(EvidenceDocument).where(EvidenceDocument.id == captured['document']['id']).values(
+            rights_basis='Corrupt synthetic receipt metadata'))
+        db.commit()
+    before = len(provider.calls)
+    response = ask(client)
+    assert response.status_code == 409 and response.json()['detail']['code'] == 'text_embedding_original_invalid'
+    assert len(provider.calls) == before
 
 
 def test_legacy_search_serialization_preserves_request_fingerprints():

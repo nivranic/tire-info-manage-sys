@@ -71,7 +71,14 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
         <dt>来源地区</dt><dd>{item.match.region || "待核对"} · {regions[item.match.region_match]}</dd>
         <dt>RRF分数</dt><dd>{item.match.rrf_score.toFixed(6)}</dd>
         <dt>余弦距离</dt><dd>{item.match.cosine_distance === null ? "本条由关键词召回" : item.match.cosine_distance.toFixed(6)}</dd>
-        <dt>时间依据</dt><dd>{item.match.freshness.time_basis === "observed_at" && item.match.freshness.observed_at ? `原件观察 ${stamp(item.match.freshness.observed_at)}` : "文档发布时间待核对"}</dd></dl>
+        <dt>时间依据</dt><dd>{item.match.freshness.time_basis === "observed_at" && item.match.freshness.observed_at
+          ? `原件观察 ${stamp(item.match.freshness.observed_at)}`
+          : item.match.freshness.time_basis === "policy_publication_date" && item.match.freshness.publication
+            ? `材料策略声明出版日期 ${item.match.freshness.publication.published_at}` : "文档发布时间待核对"}</dd>
+        {item.match.freshness.time_basis === "policy_publication_date" && item.match.freshness.publication ? <>
+          <dt>材料捕获请求</dt><dd className="mono">{item.match.freshness.publication.material_request_id}</dd>
+          <dt>材料策略指纹</dt><dd className="mono">{item.match.freshness.publication.policy_fingerprint}</dd>
+        </> : null}</dl>
       <ul>{item.match.explanation.map(line => <li key={line}>{line}</li>)}</ul>
     </details> : null}
     <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void resolve()}>{busy ? "正在恢复引用…" : "核对原文引用"}</button>
