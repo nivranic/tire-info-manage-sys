@@ -40,6 +40,7 @@ const sourceLink = (value: string) => { try { const url = new URL(value); return
 export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { target?: AITarget; onClose: () => void; onOpenReport?: (id: string) => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const operation = useRef<AbortController | null>(null);
+  const statusRead = useRef(0);
   const [status, setStatus] = useState<AIStatus | null>(null);
   const [history, setHistory] = useState<AIAnalysis[]>([]);
   const [mode, setMode] = useState<"current" | "history">(target && "variant" in target ? "current" : "history");
@@ -69,8 +70,8 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
     node?.showModal();
     const controller = new AbortController();
     const initialGeneration = viewGeneration.current;
-    void Promise.all([tireApi.aiStatus(controller.signal), tireApi.aiHistory(controller.signal)]).then(([s, h]) => {
-      if (!controller.signal.aborted) { setStatus(s); setHistory(h.items); }
+    void Promise.all([refreshStatus(controller.signal), tireApi.aiHistory(controller.signal)]).then(([, h]) => {
+      if (!controller.signal.aborted) setHistory(h.items);
     }).catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
     let pointer: AIRecoveryPointer | null = null;
     try { pointer = parseAIRecovery(sessionStorage.getItem(AI_RECOVERY_KEY)); } catch { /* Recovery can still use session history. */ }
@@ -82,6 +83,25 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
     }
     return () => { controller.abort(); operation.current?.abort(); node?.close(); if (focus?.isConnected) focus.focus({ preventScroll: true }); };
   }, []);
+
+  useEffect(() => {
+    if (!run || run.state === "pending") return;
+    const controller = new AbortController();
+    void refreshStatus(controller.signal).catch(cause => {
+      if (!controller.signal.aborted) setError(errorText(cause));
+    });
+    return () => controller.abort();
+  }, [run?.id, run?.state]);
+
+  async function refreshStatus(signal: AbortSignal) {
+    const sequence = ++statusRead.current;
+    try {
+      const next = await tireApi.aiStatus(signal);
+      if (!signal.aborted && sequence === statusRead.current) setStatus(next);
+    } catch (cause) {
+      if (!signal.aborted && sequence === statusRead.current) throw cause;
+    }
+  }
 
   function remember(pointer: AIRecoveryPointer | null) {
     setRecovery(pointer);
@@ -174,8 +194,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         }
         throw cause;
       }
-      const next = await tireApi.aiStatus(signal);
-      if (!signal.aborted) setStatus(next);
+      await refreshStatus(signal);
     });
   }
 
@@ -246,7 +265,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         {run.state === "pending" || run.state === "outcome_unknown" ? <><p>未确认完成的调用不会自动重试。请核对调用记录及供应商用量；结果未知不代表未计费。</p><button className="secondary-button" disabled={busy} onClick={() => void openRun(run.id)}>刷新这条调用记录</button></> : target ? <button className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}
       </section> : null}
       {stream && run && ["failed", "outcome_unknown"].includes(run.state) && target ? <button type="button" className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}
-      <section className="ai-history" aria-label="AI 调用记录"><div className="panel-title"><h3>本浏览器会话的最近调用</h3><button className="text-button" disabled={busy} onClick={() => void perform(async signal => { const [h, s] = await Promise.all([tireApi.aiHistory(signal), tireApi.aiStatus(signal)]); if (!signal.aborted) { setHistory(h.items); setStatus(s); } })}>刷新记录与配置</button></div>{history.length ? history.map(item => <button className="ai-history-item" type="button" key={item.id} disabled={busy} onClick={() => void openRun(item.id, item.request_contract?.delivery_mode === "stream")}><span>{item.question}</span><small>{states[item.state]} · {stamp(item.created_at)}</small></button>) : <p>暂无调用记录。准备证据不会调用模型。</p>}</section>
+      <section className="ai-history" aria-label="AI 调用记录"><div className="panel-title"><h3>本浏览器会话的最近调用</h3><button className="text-button" disabled={busy} onClick={() => void perform(async signal => { const [h] = await Promise.all([tireApi.aiHistory(signal), refreshStatus(signal)]); if (!signal.aborted) setHistory(h.items); })}>刷新记录与配置</button></div>{history.length ? history.map(item => <button className="ai-history-item" type="button" key={item.id} disabled={busy} onClick={() => void openRun(item.id, item.request_contract?.delivery_mode === "stream")}><span>{item.question}</span><small>{states[item.state]} · {stamp(item.created_at)}</small></button>) : <p>暂无调用记录。准备证据不会调用模型。</p>}</section>
     </div>
   </dialog>{reportSave ? <SaveReportDialog pack={reportSave.pack} analysis={reportSave.analysis} onClose={() => setReportSave(null)} onSaved={setSavedReport} /> : null}</>;
 }

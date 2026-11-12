@@ -451,3 +451,45 @@ Web使用既有生产构建入口，退出0，PWA白名单19项。Provider提供
 API通过专用shutdown路由关闭，实际进程退出0，checkpoint保存2707456字节，私有存储已移除。Web以SIGINT收尾、退出1。两个验证端口监听0，相关API及Web进程0。构建自动修改的next-env.d.ts按预先备份恢复，402个受管前端输入与构建前逐字节一致。
 
 最终独立核对为 `.artifacts/responses-web-20261112/verification.json`，SHA256 `59282aa246530cbcfe110a309960e95d9054d2c20d6b3ae00eb176f76f2c9df7`。该目录保留浏览器记录、各启动日志、失败回执、只读checkpoint核对和关闭证据。HANDOFF历史尾文继续为216248字节，SHA256 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。
+
+## Responses终态额度自动刷新及完整wire模式验收
+
+### 原因与实现
+
+前一阶段已观察到，分析完成且结果显示600 tokens，顶部模型状态保留受理时预留。`AIAnalysisDialog.submit` 在受理后读取额度，后续 `AIStreamProgress.onDetail` 仅更新分析记录。
+
+修改 `apps/web/components/ai-analysis.tsx`，增加终态状态读取，并将初次、受理、手动及终态额度读取统一到序号仲裁。较新读取启动后，旧响应与旧错误按序号过滤。终态读取使用独立AbortController，随分析切换及组件卸载清理。错误沿用现有展示与手动刷新入口。实现计划见[终态额度计划](../../plans/2026-11-12-responses-terminal-status.md)。
+
+### 实际页面验证
+
+使用全新隔离浏览器上下文、独立生产Web及新私有API数据库。合成Responses事件通过生产解析器、HTTP／SSE、持久化及React界面消费。
+
+held场景中，浏览器先取得26008 tokens预留响应，再刻意延迟向应用交付。释放Provider后，终态额度自动显示600 tokens。随后释放旧响应，界面继续显示600，Provider保持1次。该场景同时验证待校验草稿、终态草稿移除、脚本文本转义及外发同意门。
+
+| wire模式 | 实际终态 | 错误码／用量 |
+| --- | --- | --- |
+| held | completed | 600 tokens |
+| complete | completed | 600 tokens |
+| incomplete | failed | ai_response_incomplete，600 tokens |
+| truncated | outcome_unknown | ai_stream_interrupted，保留未知用量预留 |
+| terminal_mismatch | failed | ai_stream_protocol_error，保留未知用量预留 |
+| grounding_failure | failed | ai_grounding_validation_failed，保留未知用量预留 |
+| refusal | failed | ai_refused，600 tokens，原始拒绝文本未显示 |
+| uncertainty_only | completed | 600 tokens，claims为空，仅显示不确定性 |
+
+每个终态均核对顶部额度与实际API一致，失败分析answer为空、草稿作废、含分析报告保存入口缺席。完整或仅不确定性结果保留各自正式展示。来源证据指纹持续保持。
+
+额外执行一次held场景，在处理中关闭窗口，确认受理额度读取signal已取消。释放原Provider后，重开面板经原标识恢复completed及600 tokens，Provider累计9次、来源累计1次。该轮浏览器取样曾使用早于终态的快照定位重置按钮，工具报告元素缺失。更正为每场景先取最新快照后继续，实际AI请求数保持预期。原工具错误及后续记录保留。
+
+### 持久化、构建及关闭
+
+- 只读checkpoint完整性ok。9条AI请求、9条完成账本、9条流执行、45条应用流事件，状态分别为completed 4条、failed 4条、outcome_unknown 1条。
+- 合成Provider调用9次，其中held执行两次。同步调用0、来源夹具调用1次、1715个wire分片。真实OpenAI、外网尝试、Parser子进程及正常数据库使用均为0。
+- 最终额度81586 tokens，已知用量共3600 tokens，其余为保守预留。逐条账本核对状态、错误码、answer、usage及Provider均通过。
+- 既有Web测试50／50通过，三端完整类型检查退出0，独立Web生产构建退出0，PWA白名单19项。浏览器控制台error／warn记录0。
+- 构建后恢复next-env.d.ts，402个前端输入与构建前逐字节匹配。API经shutdown退出0、私有目录已清理，Web经SIGINT退出1。验证端口监听及相关进程均为0。
+- 前一阶段122项后端回归的775个受管输入仍逐字节匹配。本轮采用独立Web及浏览器证据，沿用各阶段回执的独立范围。
+
+本机最终核对为 `.artifacts/responses-terminal-20261112/verification.json`，SHA256 `56f12e06b351eacf5be979457ba6c86fe71b7d6ba9cc148283157b45168bff42`。产品文件SHA256为 `6ac582fc0c299704a425fb7990e320961594395411eda6ee621b1308aa55993d`。浏览器原始记录、数据库checkpoint、构建／类型／测试日志及资源关闭信息保留于同目录。
+
+真实Responses语义、额度读取失败注入、原生运行及完整V1 Gate继续待验。后续优先推进用户选定的Responses主线及原规格剩余能力。
