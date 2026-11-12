@@ -1,6 +1,8 @@
 # 胎迹 · 轮胎情报工作台
 
-> 当前源码的整站生产构建通过，410输入稳定。真实HTTP与隔离SQLite完成79项Web断言、39个API成功响应和25项只读库核对。原报道补核7张照片及2张高分辨率版本，追加两车信息和墙面材料日期声明，原有20条成绩与旧修订保留。精确SKU、真人核验及完整V1继续验收。[生产Web与实拍补核](docs/assurance/evidence/publication-production-web-2026-11-13.md)
+新增普利司通日本POTENZA S007A官方来源，75条不同PSR产品代码已完成真实API核验，正常生产Web实测304重核验和三种宽度。当前9个轮胎区域来源覆盖5个品牌，完整V1继续验收。[本轮验收](docs/assurance/evidence/bridgestone-jp-2026-11-13.md)
+
+> 此前出版物阶段的整站生产构建通过，410输入稳定。真实HTTP与隔离SQLite完成79项Web断言、39个API成功响应和25项只读库核对。原报道补核7张照片及2张高分辨率版本，追加两车信息和墙面材料日期声明，原有20条成绩与旧修订保留。精确SKU、真人核验及完整V1继续验收。[生产Web与实拍补核](docs/assurance/evidence/publication-production-web-2026-11-13.md)
 
 > 新增[离线检索质量评估](docs/assurance/evidence/retrieval-evaluation-2026-11-13.md)，提供Precision、Recall、MRR及nDCG，四模块118项回归通过。首批13个真实来源查询已记录指标及宽查询的排序差距，标注由Agent给出，外部真人复核继续待完成。[运行方式](docs/plans/2026-11-13-retrieval-evaluation.md)
 
@@ -46,12 +48,12 @@
 
 第65轮详情见[实现与验证报告](docs/assurance/evidence/round-65-test-preference-interpretation.md)及[精确合同](docs/plans/2026-10-18-test-preference-interpretation.md)。解读保留原始数值/名次，显式映射并绑定本人偏好和事件修订，展示覆盖与缺口；不产生综合排名。新纯计算20、新API50、既有偏好11分别通过；连接事件/模拟迟到响应不替代真实原生生命周期，未重跑完整API/Worker或调用真实模型/官网。下文第63/64轮数字均保持历史适用范围。
 
-移交请先读[2026-10-18交接卡](E:/Mix/project/tire-info-manage-sys/docs/HANDOFF-2026-10-18.md)，包含完整需求覆盖、精确停点、证据边界、剩余队列与接手顺序。
+移交请先读[2026-10-18交接卡](docs/HANDOFF-2026-10-18.md)，包含完整需求覆盖、精确停点、证据边界、剩余队列与接手顺序。
 
 **第64轮后续复核：**已修复TypeScript/Rust/Java Host的GET准备记录视图误要求POST专属`replayed`问题，保留POST严格校验；修正Windows checkout导致E1源码SHA漂移。SDK192＋34、隔离API/SDK合同5项、Rust23项（1项凭据测试仍ignored）、Java JVM36项、E1 73项与工作区typecheck通过。本轮未重跑第63轮完整API/Worker；当前改动仍未提交。原始规格现有仓内原字节副本和明确证据/dirty哈希清单，详见[复核报告](docs/assurance/evidence/round-64-handoff-review.md)。
 
 最新事实与未完成项见[实施计划第74轮](docs/plans/2026-09-26-tire-intelligence.md)、[v1合同裁决](docs/assurance/decisions/ADR-2026-063-device-ai-v1-contract.md)及[风险登记](docs/assurance/risk-register.yaml)。下文第49/50轮等数字属于当时的历史快照，不能用来推定当前实现缺失，也不能作为本轮重新验收的证据。来源覆盖、完整推荐、更多平台、生产安全与发布Gate继续保留在完整目标中。
-当前为 **8 个轮胎参数来源、4 个厂商品牌 + 1 个 NHTSA 召回来源**；另有独立小米车型来源，完整 Parser 目录为 10 源——这不是原规格全部 P0 来源完成，EPREL 仍为待配置入口、未接入。Pirelli 美国 P ZERO (PZ4) 的 20/21 寸真实响应包含 11 个精确 SKU，产品代码、GTIN、R/ZR、OE、PNCS/ELECT 与防爆语义分别保留；型号营销和尺寸导航不替代 SKU 事实。28 字段、最多 16 项 AND 筛选仍仅覆盖已接入型号。
+当前已有 **9 个轮胎参数来源、5 个厂商品牌 + 1 个 NHTSA 召回来源**，另有独立小米车型来源。可信 Parser 目录共12项，包含11个业务来源与1个工作区PDF正文Parser。完整P0来源及目标地区覆盖继续推进，EPREL仍待配置和接入。Pirelli 美国 P ZERO (PZ4) 的 20/21 寸真实响应包含 11 个精确 SKU，产品代码、GTIN、R/ZR、OE、PNCS/ELECT 与防爆语义分别保留；型号营销和尺寸导航不替代 SKU 事实。28 字段、最多 16 项 AND 筛选仍仅覆盖已接入型号。
 
 ### 历史阶段快照（按原迭代记录保留）
 
@@ -170,13 +172,14 @@ Windows关闭应用后的后台更新、长期周期/物理条件/设备矩阵�
 | `toyo-us` | Proxes Sport / Proxes Sport A/S 官方 JSON 规格；产品代码、EAN、逐 SKU UTQG 等 |
 | `hankook-us` | Ventus S1 evo3 / SUV / EV 官方规格卡；Material Code、UTQG、静音棉、防爆及 OEM 适用品牌；OEM 品牌名不冒充胎侧 OE 标记 |
 | `pirelli-us` | P ZERO (PZ4) 美国公开尺寸页，须填尺寸；逐 SKU 产品码/EAN、R/ZR、`(Y)`、XL、OE、PNCS/ELECT 与防爆。已核对 265/40R20 的 3 条和 265/40R21 的 8 条；不将型号营销或尺寸导航当成规格，不静默修正来源异常 UTQG |
+| `bridgestone-jp` | 日本POTENZA S007A固定尺寸表，75个不同PSR产品代码；载重速度、XL、毫米／英寸尺寸、日本滚阻与湿地等级。真实API和生产Web通过，实测304重核验，未知属性保留未知 |
 | `nhtsa-us-recalls` | 独立美国监管召回源：按品牌/型号逐页查找产品候选，再按轮胎类公告编号核验原文；支持公告历史与所选编号的变化监控，不判定精确 SKU 或实物适用性 |
 | `xiaomi-cn-vehicles` | 独立车型源：当前新一代 SU7 配置、轮毂与前后轴；精确年款、轮胎 SKU 和 OE 胎侧标记保持未确认 |
-| `eprel` | 待配置；需要 API Key、正式 Adapter 和条款核验，当前不返回数据，不计入 8 个轮胎来源 |
+| `eprel` | 待配置；需要 API Key、正式 Adapter 和条款核验，当前不返回数据，不计入 9 个轮胎来源 |
 
-八个轮胎来源覆盖四个品牌，其中五个是米其林的不同区域目录；这个数量不代表八个独立厂商。中国目录中的 `m` 混有 OE 与厂商标记，暂保留原始标记，不全部归类为 OE。
+九个轮胎来源覆盖五个品牌，其中五个为米其林区域目录，其余为东洋、韩泰、倍耐力及普利司通。中国目录中的 `m` 混有 OE 与厂商标记，暂保留原始标记，不全部归类为 OE。
 
-参数与召回按不同领域计数：**8 个轮胎参数来源 + 1 个 NHTSA 召回来源**；小米仍是独立车型来源，待配置 EPREL 不计入已接入来源。召回候选不会生成轮胎参数或自动关联精确 SKU。
+参数与召回按不同领域计数：**9 个轮胎参数来源 + 1 个 NHTSA 召回来源**；小米仍是独立车型来源，待配置 EPREL 不计入已接入来源。召回候选不会生成轮胎参数或自动关联精确 SKU。
 
 Pirelli 接入范围是美国 P ZERO (PZ4) 尺寸页合同，其他型号、地区和未核验尺寸不计为已验收；无尺寸不会请求型号导航页。官方逐行技术布尔保留真/假，缺失仍为未知。来源将 UTQG 温度声明为 `AA` 的记录保留原串、原分项和异常说明，标准三项暂不采纳；不会擅自把它换成常见顺序。官网本次返回无校验器且 `no-store`，真实重核验采用新请求，不声称已验收 304。这里只验证本机个人 PoC；US 使用条款、商业采集与再分发许可尚未核验，不把 UK 的个人摘录例外当成 US 授权。
 

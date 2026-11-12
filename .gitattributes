@@ -75,3 +75,8 @@
 /apps/api/tests/test_source_materials.py text eol=lf
 /apps/web/components/source-materials.tsx text eol=lf
 /packages/domain-types/src/source-materials.ts text eol=lf
+
+# Preserve source bytes for the reviewed Bridgestone JP parser and runner.
+/apps/api/tire_api/adapters/bridgestone.py text eol=lf
+/apps/api/tests/test_bridgestone.py text eol=lf
+/scripts/regression_children.py text eol=lf

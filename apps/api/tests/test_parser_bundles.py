@@ -31,6 +31,30 @@ def trusted_copy(tmp_path, monkeypatch):
     return source
 
 
+def pre_bridgestone_install(source):
+    """Reconstruct the trusted installation before the JP adapter was added."""
+    (source / 'adapters/bridgestone.py').unlink()
+    for name in ('adapters/registry.py', 'parser_runtime.py'):
+        path = source / name
+        value = path.read_text(encoding='utf-8').replace(', bridgestone', '')
+        path.write_text(value, encoding='utf-8')
+    path = source / 'parser_child.py'
+    value = path.read_text(encoding='utf-8').replace('''        elif source_id == 'bridgestone-jp':
+            from tire_api.adapters.bridgestone import parse_html
+            _check_imports(package_root)
+            payload = parse_html(body, query)
+''', '')
+    path.write_text(value, encoding='utf-8')
+    path = source / 'parser_bundles.py'
+    value = path.read_text(encoding='utf-8')
+    value = value.replace("_BRIDGESTONE_SOURCES = {**_DOCUMENT_SOURCES, 'bridgestone-jp': 'tire'}\n", '')
+    value = value.replace(', set(_BRIDGESTONE_SOURCES)', '')
+    value = value.replace('_BRIDGESTONE_SOURCES[source]', '_DOCUMENT_SOURCES[source]')
+    value = value.replace("        if 'bridgestone-jp' in parsers:\n            required.add('adapters/bridgestone.py')\n", '')
+    assert 'bridgestone' not in value and '_BRIDGESTONE' not in value
+    path.write_text(value, encoding='utf-8')
+
+
 def historical_install(source, count):
     """Reconstruct the reviewed pre-Pirelli/pre-recall source, not just metadata.
 
@@ -40,6 +64,7 @@ def historical_install(source, count):
     Every edit is confined to the test's temporary trusted copy before sealing.
     """
     assert count in (8, 9)
+    pre_bridgestone_install(source)
     (source / 'adapters/__init__.py').write_text(EAGER_ADAPTER_INIT, encoding='utf-8')
     (source / 'adapters/pirelli.py').unlink()
     path = source / 'adapters/registry.py'
@@ -221,8 +246,9 @@ def test_manifest_rejects_noncanonical_paths(path):
         bundles._checked_relative(path)
 
 
-@pytest.mark.parametrize('catalog', [bundles._LEGACY_SOURCES, bundles._NHTSA_SOURCES, bundles._SOURCES, bundles._DOCUMENT_SOURCES],
-                         ids=['legacy-eight', 'nhtsa-nine', 'tire-ten', 'document-eleven'])
+@pytest.mark.parametrize('catalog', [bundles._LEGACY_SOURCES, bundles._NHTSA_SOURCES, bundles._SOURCES,
+                                   bundles._DOCUMENT_SOURCES, bundles._BRIDGESTONE_SOURCES],
+                         ids=['legacy-eight', 'nhtsa-nine', 'tire-ten', 'document-eleven', 'jp-twelve'])
 def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, catalog):
     trusted_copy(tmp_path, monkeypatch)
     manifest = bundles.seal_deployed_bundle()
@@ -231,6 +257,8 @@ def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, cat
         del manifest['files']['adapters/pirelli.py']
     if 'nhtsa-us-recalls' not in catalog:
         del manifest['files']['adapters/nhtsa.py']
+    if 'bridgestone-jp' not in catalog:
+        del manifest['files']['adapters/bridgestone.py']
     manifest['bundle_id'] = bundles.digest({key: value for key, value in manifest.items() if key != 'bundle_id'})
     assert set(bundles.checked_manifest(manifest, protocol=runtime.PROTOCOL, limits=runtime.limits())['parsers']) == set(catalog)
     for mutation in ('subset', 'unknown', 'missing_required_file'):
@@ -240,7 +268,8 @@ def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, cat
         elif mutation == 'unknown':
             changed['parsers']['unreviewed-us'] = changed['parsers'].pop('hankook-us')
         else:
-            required = ('adapters/pirelli.py' if 'pirelli-us' in catalog else
+            required = ('adapters/bridgestone.py' if 'bridgestone-jp' in catalog else
+                        'adapters/pirelli.py' if 'pirelli-us' in catalog else
                         'adapters/nhtsa.py' if 'nhtsa-us-recalls' in catalog else 'adapters/hankook.py')
             del changed['files'][required]
         changed['bundle_id'] = bundles.digest({key: value for key, value in changed.items() if key != 'bundle_id'})
@@ -271,7 +300,7 @@ def test_reconstructed_eight_source_eager_bundle_runs_tire_and_rejects_new_sourc
     source = trusted_copy(tmp_path, monkeypatch)
     mark_parser(source, 222)
     current = bundles.seal_deployed_bundle()
-    assert set(current['parsers']) == set(bundles._DOCUMENT_SOURCES)
+    assert set(current['parsers']) == set(bundles._BRIDGESTONE_SOURCES)
     original_command = runtime._command
     monkeypatch.setattr(runtime, '_command', lambda: [*original_command(), str(source.parent)])
     replay = asyncio.run(execute_bundle(old))
@@ -312,7 +341,7 @@ def test_real_nine_source_archive_runs_saved_tire_and_recall_and_rejects_pirelli
     new = bundles.seal_deployed_bundle()
     old_package = bundles.verify_bundle(old)['package_root']
     assert set(old['parsers']) == set(bundles._NHTSA_SOURCES)
-    assert set(new['parsers']) == set(bundles._DOCUMENT_SOURCES)
+    assert set(new['parsers']) == set(bundles._BRIDGESTONE_SOURCES)
     assert (old_package / 'adapters/__init__.py').read_text(encoding='utf-8') == EAGER_ADAPTER_INIT
     assert 'adapters/pirelli.py' not in old['files'] and not (old_package / 'adapters/pirelli.py').exists()
     assert 'pirelli' not in (old_package / 'adapters/registry.py').read_text(encoding='utf-8')
@@ -359,7 +388,7 @@ def test_reconstructed_eager_ten_bundle_keeps_own_code_with_current_lazy_install
     current_descriptor = bundles.bundle_descriptor(current, 'pirelli-us')
     current_tire_catalog = {key: value for key, value in current['parsers'].items() if key in bundles._SOURCES}
     assert old['parsers'] == current_tire_catalog
-    assert set(current['parsers']) == set(bundles._DOCUMENT_SOURCES)
+    assert set(current['parsers']) == set(bundles._BRIDGESTONE_SOURCES)
     assert old['bundle_id'] != current['bundle_id']
     original_command = runtime._command
     monkeypatch.setattr(runtime, '_command', lambda: [*original_command(), str(source.parent)])

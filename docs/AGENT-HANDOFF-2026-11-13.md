@@ -4,19 +4,21 @@
 
 ## 接手快照
 
-- 本次复核起点为 `main` 的 `ec002830bc95acfa1c11c2b21fff8cb06e11418f`，当时工作区干净、上游跟踪分支一致、待推送提交为0。复核补充的文档提交及实时远端SHA以最终交付消息和即时Git查询为准。
+- 本轮官方来源扩展起点为 `main` 的 `eeab5c0718ceddeec1f16a599df5aefbde000ade`，当时工作区干净、上游跟踪分支一致。最新交付SHA及实时远端以交付消息和即时Git查询为准。
 - 首个真实生成Provider采用用户选择的OpenAI Responses API。Gemini适配器的提前实施属于此前Agent的排期选择，交付为 `d5fded1`。原规格的多模型表、Agent实施计划与用户的接入顺序分别保留其来源，详见[Gemini实施记录](plans/2026-11-12-gemini-native-provider.md)。
-- 当前参数来源为8个区域目录、4个厂商品牌，另有NHTSA召回和小米车型来源，完整Parser目录共10源。P0来源扩展处于方案核对阶段，当前尚未选择新增品牌、发起新一轮联网采样或编写新Adapter。
+- 当前参数来源为9个区域目录、5个厂商品牌，另有NHTSA召回和小米车型来源。可信Parser目录12项，包含11个业务来源与1个工作区PDF正文Parser。新增普利司通日本POTENZA S007A来源已完成真实API与正常生产Web验收，其他P0渠道继续推进。
 - 接手后先核对既有第40轮访问记录及当前可访问性，再选取能提供逐SKU身份与参数的官方渠道，复用固定Adapter、Parser与证据链。历史发现入口见[来源范围](../README.md#来源范围)。
 - 本次复核确认OpenAI模型／Key和EPREL凭据仍缺失。先推进P0来源、材料身份与独立质量输入，真实Responses验收依实际凭据条件执行。完整V1持续开放，10项发布Gate、13项SLO及15项决策的范围见下文。
 
 ## 当前结论
 
+普利司通日本S007A来源已接入，真实官方表解析75个不同PSR产品代码。八模块受管回归354通过／7项历史完整响应缺失跳过，交付专项52项通过，包含新来源32项、遥测20项及重建旧11项目录包执行。真实正常API23项、正常生产Web42项DOM／布局检查、Web55项、三端类型及独立生产构建通过。Web实测2次官网304，172表私库关闭后核对及原件字节检查通过，隔离服务和浏览器页面已关闭。来源扩展到9个轮胎区域目录／5个品牌，可信Parser目录12项。详见[官方来源验收](assurance/evidence/bridgestone-jp-2026-11-13.md)。
+
 完整V1持续开放。原规格包含12个核心模块、10项发布Gate、13项SLO和15项待确认决策，各核心模块已有实现，发布Gate均有待验收项。整体完成比例尚缺统一验收依据。[原始规格](requirements/2026-09-26-tire-intelligence-original.md)
 
 HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式grounding、报告和导出已接通。此前正文向量、FTS／RRF融合与地区排序已有工程和隔离验证。生成主线采用用户选定的OpenAI Responses API，真实模型语义仍待验收。
 
-本轮补齐当前源码的整站生产构建和正常Web入口。构建exit0、410输入稳定，79项交互／布局断言、39个实际API成功响应及25项只读库核对通过。两份转录由页面追加声明，原报道实拍又补出两辆高尔夫及墙面材料日期，形成修订3，论文为修订2。7张实拍和2张高分辨率版本已直连取得并目视核对，精确SKU与真人核验继续待完成。已取得320像素正常检索截图，API、Web、浏览器页面和端口已关闭，见[生产Web与实拍补核](assurance/evidence/publication-production-web-2026-11-13.md)。
+此前出版物阶段补齐当时源码的整站生产构建和正常Web入口。构建exit0、410输入稳定，79项交互／布局断言、39个实际API成功响应及25项只读库核对通过。两份转录由页面追加声明，原报道实拍又补出两辆高尔夫及墙面材料日期，形成修订3，论文为修订2。7张实拍和2张高分辨率版本已直连取得并目视核对，精确SKU与真人核验继续待完成。已取得320像素正常检索截图，API、Web、浏览器页面和端口已关闭，见[生产Web与实拍补核](assurance/evidence/publication-production-web-2026-11-13.md)。
 
 最新人工测试出版物角色已通过事件修订绑定指纹，进入测试事件候选集合排序及Web编辑／详情／检索。六模块175／175、三端类型、Web55／55及三个实际组件60项检查通过。PG综合58项和出版物专项6项通过，153表实际恢复一致。两份真实转录追加角色声明后，13查询宏平均nDCG@1为1，同尺寸宽查询原报道优先，原值与旧修订保留。Agent标注、代表性与真人核验继续待验，见[出版物角色验收](assurance/evidence/test-publication-ranking-2026-11-13.md)。
 
@@ -47,7 +49,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 
 | 模块 | 已有实现 | 主要剩余工作 |
 | --- | --- | --- |
-| 1 轮胎查询 | 在线优先、单次授权历史回退、组合筛选、来源及状态展示 | 更多P0来源、地区覆盖、长期在线稳定性 |
+| 1 轮胎查询 | 在线优先、单次授权历史回退、组合筛选、来源及状态展示，新增日本S007A真实75个SKU及304重核验 | 更多P0来源、地区覆盖、长期在线稳定性 |
 | 2 精确版本识别 | 产品代码／GTIN／OE／技术／地区身份、冲突修订、Golden工作台 | 代表性真实精确SKU、外部真人审核、错合并指标 |
 | 3 车型适配 | SU7前后轴、车库、轴位与SKU证据桥、官方PDF解析工程 | 首代官方来源online-ready、完整OE事实、更多车型、Native消费 |
 | 4 比较 | 精确SKU比较、保存、同场测试候选、条件化偏好解读 | 真实专业性能解释与推荐、完整性能候选AI辅助 |
@@ -59,6 +61,14 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 10 AI研究 | grounding、流式、报告、多模型适配、正文索引／混合检索、正文证据包及独立AI／导出用途、离线检索质量评估、Web | 真实Responses语义与Embeddings质量、代表性检索与重排质量、专业性能解释、模型治理 |
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名及有限重试、外部Key、字段许可治理 | 真实接收端、公网生产验收、SDK产品化、完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权、审计 | 生产身份／租户／RLS、完整角色治理、灾备、发布验收 |
+
+## 最新官方来源扩展
+
+日本规格按行保存载重速度、明确XL、毫米／英寸尺寸、日本滚阻与湿地等级及字段出处。实际两行等级空缺保持未知。完整表先校验再筛选，旧8至11项可信目录继续兼容，既有来源部署修订保留。逐项范围见[官方来源验收](assurance/evidence/bridgestone-jp-2026-11-13.md)。
+
+回执入口为 `.artifacts/p0-japan-20261113/`，新API私库为workspace-api-r5，Web私库为workspace-web-r1。两库均172表，WAL归并前后行指纹一致。八模块回归在 `.artifacts/bridgestone-regression-r2/`，重建旧包专项在较短输出槽 `.artifacts/bjp-r4/`，最终新来源与遥测专项为 `.artifacts/bjp-r5/`。沙箱权限、缺少架构变量、初始必填等级假设及262字符路径的失败均保留。商业复用许可、其他型号／地区和完整V1仍待验。
+
+最终交付核对140项通过，包含96处文档链接、801个后端输入和410个前端输入的最终绑定、隔离资源关闭、原始规格及历史交接尾文保留。汇总为同目录 `delivery-validation.json`。本轮真实生成与Embedding调用均为0，后续按OpenAI Responses优先顺序执行真实模型验收。
 
 ## 最新专业材料进度
 
@@ -250,7 +260,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。隔离资源关闭情况见最新生产Web验收。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
-3. 依原规格P0表继续补齐厂商与安全来源，先核对可访问的官方页面、robots、参数身份和许可范围，再复用既有固定Adapter、Parser发布和证据链验收。两份转录的角色排序及正常Web入口已有本轮结果，继续扩大来源、精确版本、地区和时间的独立标注。真实Embeddings与外部真人审核按实际条件推进，语义重排模型属于此前Agent追加的实施选项。
+3. 日本S007A已完成本轮接入，先阅读官方来源验收，再依原规格P0表继续补齐厂商与安全来源，先核对可访问的官方页面、robots、参数身份和许可范围，再复用既有固定Adapter、Parser发布和证据链验收。两份转录的角色排序及正常Web入口已有本轮结果，继续扩大来源、精确版本、地区和时间的独立标注。真实Embeddings与外部真人审核按实际条件推进，语义重排模型属于此前Agent追加的实施选项。
 4. 原始报道已核对测试主体、载速、成绩及两车照片，墙面材料日期作为声明保留，逐项执行日待核。继续核对GTIN／产品代码／完整侧壁标识，处理万力与耐克森双侧源名，取得完整复用许可和正式原件，推进精确SKU与真人Golden。JRC匿名样本待型号映射，PERS此前捕获超时失败。详见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
@@ -260,6 +270,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 | 范围 | 关键文件 |
 | --- | --- |
+| 日本官方来源 | `apps/api/tire_api/adapters/bridgestone.py`、`apps/api/tests/test_bridgestone.py`、`docs/assurance/evidence/bridgestone-jp-2026-11-13.md` |
 | 正文召回／融合 | `apps/api/tire_api/original_text_retrieval.py`、`dense.py`、`knowledge.py` |
 | 正文AI／最终外发 | `apps/api/tire_api/ai_original_text.py`、`ai_evidence.py`、`ai_execution.py`、`ai_streaming.py` |
 | 正文引用／用途Web | `apps/web/components/original-text-citation.tsx`、`text-embedding-purpose.tsx` |
@@ -283,6 +294,7 @@ git status --short --branch
 git log -4 --oneline
 git rev-parse HEAD
 git rev-parse origin/main
+apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/bjp-next --targets apps/api/tests/test_bridgestone.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/test-publication-next --targets apps/api/tests/test_test_events.py apps/api/tests/test_knowledge.py apps/api/tests/test_embeddings.py apps/api/tests/test_retrieval_evaluation.py apps/api/tests/test_test_ai_contract.py apps/api/tests/test_test_ai_reports.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/pdf-source-attribution-next --targets apps/api/tests/test_source_materials.py apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_document_text.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_retrieval_evaluation.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/pdf-publication-next --targets apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_document_text.py apps/api/tests/test_source_materials.py apps/api/tests/test_retrieval_evaluation.py
@@ -309,4 +321,4 @@ npm run typecheck --workspace @tire/mobile
 
 ## 可复制的接手指令
 
-> 接手胎迹完整V1。先读本卡、原规格及拟修改模块的计划，核对main、HEAD、dirty、实时远端和本机回执。当前12个核心模块已有实现，10项发布Gate、13项SLO及15项决策继续跟踪。最近工程已完成正文证据包、独立用途、同步／流式grounding、混合检索分页、PDF来源及出版日期、测试事件出版物角色。最新整站生产Web验收基于a916bf9，79项交互／布局断言、39个实际API成功响应、25项只读库核对通过，详细结果随ec00283交付。原报道事件为修订3，论文为修订2，旧版与原值保留。13查询排序结果来自两份真实转录与Agent标注，代表性和外部真人核验待完成。当前8个轮胎区域目录覆盖4个品牌，另有NHTSA召回与小米车型来源。下一步先读第40轮P0来源访问记录，重新核对官方渠道的可访问性、逐SKU身份与参数，再复用固定Adapter、Parser及证据链扩展来源。新一轮品牌选择、联网采样和Adapter实施仍待开始。继续核对参测产品代码／GTIN／完整侧壁、正式原件与复用许可，推进真实精确SKU和真人Golden。首个真实生成Provider按用户选择使用OpenAI Responses API，验收进程显式设置TI_AI_PROVIDER=openai_responses并核对状态接口。Gemini提前适配属于此前Agent自行排期，已有合成测试，真实Google调用待验。当前OpenAI模型／Key与EPREL凭据缺失，独立工作继续推进。随后补生产权限、读屏与完整WCAG、六类平台、性能、灾备及发布Gate。隔离材料、数据库、原始回执和截图位于Git忽略目录，新clone需重建依赖并取得对应材料。保留历史失败与KIT C2封存状态，遵循本卡操作约束，完成声明以实际验收结果为依据。
+> 接手胎迹完整V1。先读本卡、原规格及拟修改模块的计划，核对main、HEAD、dirty、实时远端和本机回执。当前12个核心模块已有实现，10项发布Gate、13项SLO及15项决策继续跟踪。最近工程已完成正文证据包、独立用途、同步／流式grounding、混合检索分页、PDF来源及出版日期、测试事件出版物角色。此前出版物阶段整站生产Web验收基于a916bf9，79项交互／布局断言、39个实际API成功响应、25项只读库核对通过，详细结果随ec00283交付。原报道事件为修订3，论文为修订2，旧版与原值保留。13查询排序结果来自两份真实转录与Agent标注，代表性和外部真人核验待完成。当前9个轮胎区域目录覆盖5个品牌，另有NHTSA召回与小米车型来源，可信Parser目录12项。新增日本POTENZA S007A的75个SKU、真实API23项、生产Web42项及2次官网304已核对，Web55项、三端类型和新构建通过。八模块354通过／7项历史完整响应缺失跳过，交付专项52项通过，包含新来源32项、遥测20项和重建旧目录包执行。先读官方来源验收与第40轮访问记录，再核对其他官方渠道的可访问性、逐SKU身份与参数，复用Adapter、Parser与证据链扩展P0覆盖。继续核对参测产品代码／GTIN／完整侧壁、正式原件与复用许可，推进真实精确SKU和真人Golden。首个真实生成Provider按用户选择使用OpenAI Responses API，验收进程显式设置TI_AI_PROVIDER=openai_responses并核对状态接口。Gemini提前适配属于此前Agent自行排期，已有合成测试，真实Google调用待验。当前OpenAI模型／Key与EPREL凭据缺失，独立工作继续推进。随后补生产权限、读屏与完整WCAG、六类平台、性能、灾备及发布Gate。隔离材料、数据库、原始回执和截图位于Git忽略目录，新clone需重建依赖并取得对应材料。保留历史失败与KIT C2封存状态，遵循本卡操作约束，完成声明以实际验收结果为依据。

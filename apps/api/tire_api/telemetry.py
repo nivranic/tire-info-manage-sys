@@ -38,7 +38,7 @@ OPERATIONS = {
     'worker.job': 'worker', 'db.ingestion_lock': 'database',
 }
 SOURCES = frozenset({'michelin-us', 'michelin-cn', 'michelin-uk', 'michelin-fr',
-    'michelin-de', 'toyo-us', 'hankook-us', 'pirelli-us', 'xiaomi-cn-vehicles', 'nhtsa-us-recalls'})
+    'michelin-de', 'toyo-us', 'hankook-us', 'pirelli-us', 'bridgestone-jp', 'xiaomi-cn-vehicles', 'nhtsa-us-recalls'})
 OUTCOMES = frozenset({'success', 'error', 'cancelled', 'unknown', 'completed', 'failed',
     'live', 'live_verified_304', 'local_snapshot', 'consent_required', 'source_unavailable',
     'unavailable', 'not_modified', 'worker_error', 'lease_lost', 'idle', 'rejected',

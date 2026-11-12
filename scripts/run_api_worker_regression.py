@@ -75,6 +75,7 @@ TEST_MODULES = (
     'apps/api/tests/test_auth_governance.py',
     'apps/api/tests/test_auth_lifecycle.py',
     'apps/api/tests/test_brand_adapters.py',
+    'apps/api/tests/test_bridgestone.py',
     'apps/api/tests/test_canary.py',
     'apps/api/tests/test_candidate_ai.py',
     'apps/api/tests/test_candidate_ai_review.py',

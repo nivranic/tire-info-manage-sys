@@ -21,14 +21,14 @@ from tire_api.parser_releases import (ParserDeploymentError, assert_selection_cu
     pin_selection, register_deployed_bundle, transition_deployment, DeploymentTransition)
 from tire_api.parser_provenance import parser_identity
 from tire_api.service import QueryService
-from test_parser_bundles import BODY, QUERY, historical_install, mark_parser, trusted_copy
+from test_parser_bundles import BODY, QUERY, historical_install, mark_parser, trusted_copy, pre_bridgestone_install
 from test_golden import evaluation_reference, fixture_expected, synthetic_set
 
 SOURCE = 'hankook-us'
 SIGNED = {'operator': 'Synthetic local reviewer', 'reason': 'Recorded fixture evaluation; not production approval'}
 
 
-def test_new_pirelli_bootstrap_seals_ten_sources_without_repinning_existing_nine_source_deployments(tmp_path, monkeypatch):
+def test_new_pirelli_bootstrap_seals_current_catalog_without_repinning_existing_nine_source_deployments(tmp_path, monkeypatch):
     source = trusted_copy(tmp_path, monkeypatch)
     catalog = runtime.source_catalog()
     historical_install(source, 9)
@@ -48,7 +48,7 @@ def test_new_pirelli_bootstrap_seals_ten_sources_without_repinning_existing_nine
             new = bootstrap_source(db, 'pirelli-us')
             new_id, new_bundle = new.id, new.bundle_id
             assert new.revision == 1 and new.state == 'active' and new.action == 'bootstrap'
-            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._SOURCES)
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._BRIDGESTONE_SOURCES)
             assert new.bundle_id != old['hankook-us'][1]
             assert bootstrap_source(db, 'pirelli-us').id == new_id
             for source_id, checkpoint in old.items():
@@ -59,6 +59,32 @@ def test_new_pirelli_bootstrap_seals_ten_sources_without_repinning_existing_nine
             assert set(old_manifest['parsers']) == set(bundles._NHTSA_SOURCES)
             assert 'adapters/pirelli.py' not in old_manifest['files']
             assert db.get(ParserBundle, new_bundle).manifest['files']['adapters/pirelli.py']['sha256']
+
+
+def test_new_jp_bootstrap_preserves_eleven_source_deployments(tmp_path, monkeypatch):
+    source = trusted_copy(tmp_path, monkeypatch)
+    catalog = runtime.source_catalog()
+    pre_bridgestone_install(source)
+    app = create_app('sqlite:///' + (tmp_path / 'jp-bootstrap.db').as_posix(), RecordedRegistry())
+    with TestClient(app):
+        with monkeypatch.context() as patcher:
+            patcher.setattr(runtime, 'source_catalog', lambda: {key: value for key, value in catalog.items()
+                                                               if key in bundles._DOCUMENT_SOURCES})
+            with app.state.database.sessions() as db:
+                old = bootstrap_source(db, 'hankook-us')
+                checkpoint = (old.id, old.bundle_id, old.revision, deepcopy(old.descriptor))
+                old_manifest = deepcopy(db.get(ParserBundle, old.bundle_id).manifest)
+        trusted_copy(tmp_path, monkeypatch)
+        with app.state.database.sessions() as db:
+            new = bootstrap_source(db, 'bridgestone-jp')
+            assert new.state == 'active' and new.revision == 1
+            assert bootstrap_source(db, 'bridgestone-jp').id == new.id
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._BRIDGESTONE_SOURCES)
+            previous = bootstrap_source(db, 'hankook-us')
+            assert (previous.id, previous.bundle_id, previous.revision, previous.descriptor) == checkpoint
+            assert db.get(ParserBundle, checkpoint[1]).manifest == old_manifest
+            assert 'adapters/bridgestone.py' not in old_manifest['files']
+            assert db.scalar(select(func.count()).select_from(ParserDeploymentRevision)) == 2
 
 
 class RecordedRegistry:
