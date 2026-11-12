@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
-import type { AIPackReference, KnowledgeFilters, KnowledgeSearchItem, KnowledgeSearchResult } from "@tire/domain-types";
+import type { AIPackReference, KnowledgeFilters, KnowledgeSearchItem, KnowledgeSearchResult, TextEmbeddingSelection } from "@tire/domain-types";
 import { IdentityContractBadge } from "./identity-contract";
 import { FieldResolutionView } from "./field-authority";
 import VectorTools from "./vector-tools";
@@ -68,6 +68,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   const [limit, setLimit] = useState(12);
   const [result, setResult] = useState<KnowledgeSearchResult | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedText, setSelectedText] = useState<TextEmbeddingSelection[]>([]);
   const [busy, setBusy] = useState(false);
   const [moreBusy, setMoreBusy] = useState(false);
   const [error, setError] = useState("");
@@ -96,13 +97,19 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
 
   function invalidate() {
     operation.current?.abort(); operation.current = null;
-    setBusy(false); setMoreBusy(false); setResult(null); setSelected([]); setError(""); setNeedsLive(false); setStatus("");
+    setBusy(false); setMoreBusy(false); setResult(null); setSelected([]); setSelectedText([]); setError(""); setNeedsLive(false); setStatus("");
     lastSearch.current = null;
   }
 
   function updateFilter(name: keyof KnowledgeFilters, value: string) {
     invalidate();
     setFilters(previous => { const next = { ...previous }; if (value) Object.assign(next, { [name]: value }); else delete next[name]; return next; });
+  }
+
+  function toggleText(selection: TextEmbeddingSelection) {
+    setSelectedText(previous => previous.some(item => item.kind === selection.kind && item.reference.chunk_id === selection.reference.chunk_id)
+      ? previous.filter(item => item.kind !== selection.kind || item.reference.chunk_id !== selection.reference.chunk_id)
+      : previous.length < 32 ? [...previous, selection] : previous);
   }
 
   async function search() {
@@ -168,7 +175,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
       </form>
       {error ? <section className="inline-error" role="alert"><p>{error}</p>{needsLive ? <><p>涉及当前状态的问题需要重新在线核验。返回查询页面后，请选择来源并发起在线查询。</p><button type="button" className="secondary-button" onClick={() => { operation.current?.abort(); liveQuery(); }}>返回在线查询</button></> : null}</section> : null}
       <p className="knowledge-status" role="status" aria-live="polite">{busy ? "正在读取本地历史证据…" : status || "输入关键词或设置条件后开始检索。"}</p>
-      <VectorTools selectedIds={selected} search={{ mode: "history", text: text.trim(), filters, limit }} onResult={value => { invalidate(); setText(value.text); setFilters(value.applied_filters); lastSearch.current = { text: value.text, filters: value.applied_filters, limit }; setResult(value); setStatus(value.total_scope === "candidates" ? `已召回 ${value.total} 条候选，展示 ${value.items.length} 条；不是全部语义匹配数。` : `结构化条件已足够，找到 ${value.total} 条历史证据；本次未发送查询文本。`); }} />
+      <VectorTools selectedIds={selected} textSelections={selectedText} search={{ mode: "history", text: text.trim(), filters, limit }} onResult={value => { invalidate(); setText(value.text); setFilters(value.applied_filters); lastSearch.current = { text: value.text, filters: value.applied_filters, limit }; setResult(value); setStatus(value.total_scope === "candidates" ? `已召回 ${value.total} 条候选，展示 ${value.items.length} 条；不是全部语义匹配数。` : `结构化条件已足够，找到 ${value.total} 条历史证据；本次未发送查询文本。`); }} />
       {result ? <section className="knowledge-results" aria-label="历史证据检索结果" aria-busy={busy}>
         <p className="review-boundary">{result.notice}</p>
         {result.coverage ? <p className="review-boundary">本次筛选范围：{result.coverage.indexed_documents} / {result.coverage.eligible_documents} 条记录有完整向量，{result.coverage.missing_documents} 条未覆盖。向量结果不保证召回全部相关证据。</p> : null}
@@ -178,8 +185,8 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   : <div className="compare-toolbar"><p>还有匹配记录未展示，可继续加载。</p><button type="button" className="secondary-button" disabled={busy || moreBusy} onClick={() => void loadMore()}>{moreBusy ? "正在加载…" : `继续加载（已展示 ${result.items.length} / ${result.total}）`}</button></div> : null}</> : <div className="knowledge-empty"><strong>没有匹配的已采纳证据</strong><p>可减少筛选条件，或先到在线查询保存所需来源记录。</p><button type="button" className="secondary-button" onClick={liveQuery}>前往在线查询</button></div>}
         <details className="knowledge-technical"><summary>检索能力与索引状态</summary><p>{result.index.engine} · {result.index.documents} 份索引文档 · {result.index.version}</p><ul>{result.stages.map((stage, index) => <li key={`${stage.name}-${index}`}><strong>{stage.name} · {stage.state === "succeeded" ? "已执行" : stage.state === "not_needed" ? "本次无需" : "尚不可用"}</strong><p>{stage.reason}</p></li>)}</ul></details>
       </section> : null}
-      {sourceTextSearch ? <SourceTextSearch key={JSON.stringify(sourceTextSearch)} search={sourceTextSearch} automatic={result?.total === 0} /> : null}
-      {documentTextSearch ? <SourceTextSearch key={`document-${JSON.stringify(documentTextSearch)}`} origin="document" search={documentTextSearch} automatic={result?.total === 0} /> : null}
+      {sourceTextSearch ? <SourceTextSearch key={JSON.stringify(sourceTextSearch)} search={sourceTextSearch} automatic={result?.total === 0} selected={selectedText} onToggle={toggleText} /> : null}
+      {documentTextSearch ? <SourceTextSearch key={`document-${JSON.stringify(documentTextSearch)}`} origin="document" search={documentTextSearch} automatic={result?.total === 0} selected={selectedText} onToggle={toggleText} /> : null}
     </div>
     <footer className="knowledge-footer"><div><strong>已选 {selectedReferences.length} 份不同证据 · AI上限6份</strong>{selectedRecallReferences ? <small>召回产品命中 {selectedProducts} 条 · 公告 / 空观察证据 {selectedRecallReferences} 份</small> : null}<small>进入下一步核对全部记录后，才能授权发送给 AI。</small></div>{onOffline ? <button className="secondary-button" disabled={!selected.length || busy || !result} type="button" onClick={() => onOffline(selectedReferences)}>预览所选设备离线资料</button> : null}<button className="primary-button" disabled={!selected.length || selectedReferences.length > 6 || busy || !result} type="button" onClick={analyze}>用所选历史证据分析</button></footer>
   </dialog>;

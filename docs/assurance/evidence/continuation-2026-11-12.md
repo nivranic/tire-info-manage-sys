@@ -634,3 +634,45 @@ SDK正文专项5、HTML9、PDF7分别通过，三端最终类型及现有Web50�
 最终报告为 `.artifacts/postgres/pgverify-0569be10ddbf4accb2421ff0628798e5/report.json`，SHA256 `c06d174362eb8aaa1aa515760d3bba994df3cc3467d540a8c6c212b01d7fefe0`。脚本退出0并停库，独立pg_ctl状态exit3、55466无监听，关闭记录在 `.artifacts/text-embeddings-20261112/closure.json`。模型使用固定合成向量，完整V1和真实语义质量继续验收。
 
 交付前重新核对792个API输入、631个前端输入和20个受审子进程来源，当前字节匹配。14个改动Python文件AST、87个本地文档链接、增量隐私和差异检查通过。HANDOFF历史尾文保持216248字节及既有SHA256。交付复核入口为 `.artifacts/text-embeddings-20261112/delivery-validation.json`，新clone需取得本机回执或在新槽复验。
+
+## 正文向量Web入口与共享执行验收
+
+2026-11-13继续原文RAG第4步，新增 `text-embedding-purpose.tsx`，在HTML／PDF正文卡接入引用选择与用途入口。知识检索窗口保存最多32段引用，分页保留选择，条件变化或重新提交知识查询时清除。卡片复用现有选中样式，提供用途说明及含页码的可访问名称。
+
+用途预览本地恢复原件，显示原文、原件哈希、Unicode区间、抽取版本、完整接收端和授权修订。管理员填写依据、公开性、可选到期时间并确认后，沿scope_hash／expected_revision登记用途。撤销复用已读scope，支持配置移除后的撤回。刷新失败使新授权等待重新核对，停止等待后可显式读取已提交结果。账户重验证重新建立窗口，旧操作的迟到成功与错误按原控制器和账户状态裁决。
+
+现行 `VectorTools` 增加正文计划动作，复用 `textEmbeddingPlan`、`runEmbedding`、调用记录和历史读取。正文与结构化计划沿各自入口准备，执行共用单次确认、固定幂等标识、预算和账本。生成Provider主线沿用用户选定的OpenAI Responses。
+
+### 验证结果
+
+| 本轮范围 | 实际结果 |
+| --- | --- |
+| 相关API | 四模块125／125，792个输入稳定、资源关闭、非自检拒绝0 |
+| SDK正文向量 | 5／5 |
+| Web现有测试 | 50／50 |
+| 三端类型 | Web／desktop／mobile最终检查均exit0 |
+| 生产构建 | 两次独立目录构建均exit0，PWA白名单19项，next-env原字节恢复 |
+| 浏览器主批 | 35项业务，加3个视口与4项已受理写／账户切换检查，共42项 |
+| 末次构建复核 | 选择说明、页码可访问名称、选中样式、正文合同／缓存、独立确认及研究员权限6项 |
+| 实际合成账本 | 2条请求、2条完成、2次合成模型调用、30 tokens及3块缓存 |
+| 资源关闭 | API exit0、Web SIGINT exit1、浏览器页关闭，独立核对8003／18002均无监听 |
+
+受管命令如下。
+
+```powershell
+apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/txweb-r1 --targets apps/api/tests/test_text_embeddings.py apps/api/tests/test_embeddings.py apps/api/tests/test_source_text.py apps/api/tests/test_document_text.py
+```
+
+API结果为 `.artifacts/txweb-r1/result.json`，SHA256 `feaf0eeac4b02566b8c8d922ca9704ea433c31fba705522341f7874d6335dbc4`。浏览器与构建、最终类型／测试、关闭回执在 `.artifacts/text-embedding-web-20261113/`。浏览器主批的35项检查在移动仿真重载前逐项观察，其后转录为 `browser-prior-checks.json`，账户／布局及最终构建的工具原始返回分别保存在对应checks文件中。
+
+浏览器使用隔离SQLite、自有合成HTML／PDF、合成Provider及模拟向量存储能力。生产API实际运行原件恢复、授权、计划、预算和账本。真实PostgreSQL／pgvector沿用前述54项独立报告。真实模型、专业材料、生产权限、原生平台与完整V1继续验收。
+
+### 原始失败与恢复
+
+原件写入先取得 `object_write_failed`，独立硬链接探针复现WinError 5，随后将隔离夹具移到宿主运行。第二槽在TestClient启动后添加中间件报错，按原始栈调整夹具为先注册路由和中间件、再启动应用，第三槽运行成功。沙箱Web就绪后宿主与浏览器均无法连接，独立核对无宿主监听，确认旧进程退出后在宿主启动同一生产构建。
+
+浏览器断言中按钮空白匹配、React提交时序及已登录会话直接注册研究员产生过失败。后续断言按实际可用控件等待，并通过现行登出／注册入口切换到研究员。管理员写已受理、研究员身份和迟到响应的独立检查通过。PDF两页执行超过初始12秒观察时限，继续读取原窗口及账本取得完成结果，执行次数保持2。全部原始失败、旧槽和日志保留。
+
+浏览器工具将直接文件输出判为工作区之外，截图通过工具图像返回检查后保存在本机忽略目录。一次大型命令触发MSIX启动器拒绝，最小PowerShell7探针正常，改用文件传递图像后保存成功。上述恢复均局限于本轮夹具和取证流程。
+
+下一步实现正文向量召回、FTS融合及权威／地区／时效重排，再冻结原件引用进入证据包，贯通Responses、grounding、流式与报告。[当前交接卡](../../AGENT-HANDOFF-2026-11-12.md)

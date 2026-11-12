@@ -2,22 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { DocumentTextExcerpt, DocumentTextSearchItem, DocumentTextSearchRequest, SourceTextExcerpt, SourceTextSearchItem, SourceTextSearchRequest, SourceTextSearchResult } from "@tire/domain-types";
+import type { DocumentTextExcerpt, DocumentTextSearchItem, DocumentTextSearchRequest, SourceTextExcerpt, SourceTextSearchItem, SourceTextSearchRequest, SourceTextSearchResult, TextEmbeddingSelection } from "@tire/domain-types";
+import TextEmbeddingPurposeDialog from "./text-embedding-purpose";
 
 type TextSearchItem = SourceTextSearchItem | DocumentTextSearchItem;
 type TextSearchResult = Omit<SourceTextSearchResult, "items" | "index"> & { items: TextSearchItem[] };
-type TextSearchProps = { automatic: boolean } & (
+type TextSearchProps = { automatic: boolean; selected: TextEmbeddingSelection[]; onToggle: (selection: TextEmbeddingSelection) => void } & (
   { origin?: "source"; search: SourceTextSearchRequest } |
   { origin: "document"; search: DocumentTextSearchRequest }
 );
 
 const stamp = (value: string) => new Date(value).toLocaleString("zh-CN");
 
-function OriginalTextCard({ item }: { item: TextSearchItem }) {
+function OriginalTextCard({ item, selected, disabled, onToggle }: {
+  item: TextSearchItem; selected: boolean; disabled: boolean; onToggle: () => void;
+}) {
   const operation = useRef<AbortController | null>(null);
   const [resolved, setResolved] = useState<SourceTextExcerpt | DocumentTextExcerpt | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [purposeOpen, setPurposeOpen] = useState(false);
   const excerpt = resolved || item;
   const source = excerpt.kind === "document_text" ? excerpt.document.source_url : excerpt.source_url;
   const sourceUrl = /^https?:\/\//i.test(source) ? source : undefined;
@@ -43,8 +47,8 @@ function OriginalTextCard({ item }: { item: TextSearchItem }) {
     }
   }
 
-  return <article className={`knowledge-card ${excerpt.kind === "document_text" ? "document-text-card" : "source-text-card"}`}>
-    <div className="knowledge-card-heading"><strong>{excerpt.kind === "document_text" ? `${excerpt.document.title} · 第 ${excerpt.reference.page} 页` : `${excerpt.source_id} · 页面正文摘录`}</strong></div>
+  return <article className={`knowledge-card ${excerpt.kind === "document_text" ? "document-text-card" : "source-text-card"}${selected ? " selected" : ""}`}>
+    <div className="knowledge-card-heading"><label className="knowledge-select"><input type="checkbox" aria-label={`选择正文向量引用 ${excerpt.kind === "document_text" ? `${excerpt.document.title} 第 ${excerpt.reference.page} 页` : excerpt.reference.snapshot_id}`} checked={selected} disabled={disabled} onChange={onToggle} /><span>{excerpt.kind === "document_text" ? `${excerpt.document.title} · 第 ${excerpt.reference.page} 页` : `${excerpt.source_id} · 页面正文摘录`}</span></label></div>
     <p className="knowledge-excerpt">{excerpt.text}</p>
     <p className="knowledge-stamp">{excerpt.kind === "document_text" ? `留存 ${stamp(excerpt.document.created_at)}` : `观察 ${stamp(excerpt.observed_at)} · 验证 ${stamp(excerpt.verified_at)}`}</p>
     <details className="knowledge-provenance"><summary>原始来源与引用位置</summary>
@@ -59,8 +63,10 @@ function OriginalTextCard({ item }: { item: TextSearchItem }) {
         <dt>匹配词</dt><dd>{item.match.matched_terms.join(" · ")}</dd></dl>
     </details>
     <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void resolve()}>{busy ? "正在恢复引用…" : "核对原文引用"}</button>
+      <button type="button" className="secondary-button" onClick={() => setPurposeOpen(true)}>核对正文向量用途</button>
       <span role="status" aria-live="polite">{resolved ? "已从保存原件恢复引用" : ""}</span></div>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}
+    {purposeOpen ? <TextEmbeddingPurposeDialog selection={item.kind === "document_text" ? { kind: "document_text", reference: item.reference } : { kind: "source_text", reference: item.reference }} onClose={() => setPurposeOpen(false)} /> : null}
   </article>;
 }
 
@@ -112,12 +118,16 @@ export default function SourceTextSearch(props: TextSearchProps) {
 
   return <section className="knowledge-results" aria-label={`${contentLabel}检索`} aria-busy={busy}>
     <h3>已保存{contentLabel}</h3>
+    <p>勾选正文后，可在“向量与混合检索”中预览所选正文的索引计划，每批最多32段。</p>
     <p>{origin === "document" ? "按关键词检索已建立索引的PDF文字层，引用记录文档页码和页内位置。具体SKU身份与适用性需要对应的结构化证据。" : `按关键词${source_id ? `及来源 ${source_id}` : ""}检索轮胎页面正文。摘录保留页面范围，具体SKU身份与适用性需要对应的结构化证据。`}</p>
     <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void load()}>{result || error ? `重新检索${contentLabel}` : `检索已保存${contentLabel}`}</button>{busy ? <button type="button" className="text-button" onClick={cancel}>取消正文检索</button> : null}</div>
     <p role="status" aria-live="polite">{busy ? "正在读取保存原件与正文索引…" : status}</p>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}
     {result ? <><p className="review-boundary">{result.notice}</p>
-      {result.items.map(item => <OriginalTextCard key={item.reference.chunk_id} item={item} />)}
+      {result.items.map(item => <OriginalTextCard key={item.reference.chunk_id} item={item}
+        selected={props.selected.some(selection => selection.kind === item.kind && selection.reference.chunk_id === item.reference.chunk_id)}
+        disabled={props.selected.length >= 32 && !props.selected.some(selection => selection.kind === item.kind && selection.reference.chunk_id === item.reference.chunk_id)}
+        onToggle={() => props.onToggle(item.kind === "document_text" ? { kind: "document_text", reference: item.reference } : { kind: "source_text", reference: item.reference })} />)}
       {result.total === 0 ? <p>{origin === "document" ? "没有匹配的PDF正文，可调整关键词或在原始文档中提取并索引正文。" : "没有匹配的已保存页面正文，可调整关键词或在线保存相关来源。"}</p> : null}
       {result.has_more && result.offset + result.limit <= 2000 ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void load(result.offset + result.limit)}>继续加载正文摘录</button> : null}
       {result.has_more && result.offset + result.limit > 2000 ? <p>已达到本次分页范围，请缩小关键词或来源范围继续检索。</p> : null}

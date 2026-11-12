@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-> [Agent交接卡](docs/AGENT-HANDOFF-2026-11-12.md)于2026-11-13更新，汇总原规格12模块、10项发布Gate及接手顺序。HTML／PDF正文检索与原件引用已接通，新增正文向量用途授权、035、计划／共享执行链及SDK。239项广批与后续60项专项、SDK5／9／7、Web50项及三端类型分别通过，真实PostgreSQL54项与153表实际恢复通过，模型使用合成向量。接下来完成正文向量Web入口、召回／融合重排与证据包，生成主线采用用户选定的OpenAI Responses。完整V1继续验收。历史记录见[HANDOFF](docs/HANDOFF.md)。
+> [Agent交接卡](docs/AGENT-HANDOFF-2026-11-12.md)于2026-11-13更新，汇总原规格12模块、10项发布Gate及接手顺序。HTML／PDF正文检索、原件引用、正文向量用途授权、035、计划／共享执行链、SDK与Web入口已接通。本轮125项API、42项浏览器检查及末次构建6项复核、SDK5项、Web50项和三端类型分别通过。浏览器采用隔离SQLite与合成向量存储，真实PostgreSQL54项及153表恢复沿用独立报告。接下来完成正文向量召回／融合重排与证据包，生成主线采用用户选定的OpenAI Responses。完整V1继续验收。历史记录见[HANDOFF](docs/HANDOFF.md)。
 
 > **第78轮历史入口：**[Webhook交付与复核](docs/assurance/evidence/round-78-webhook-delivery.md)、[使用与签名](docs/WEBHOOKS.md)、[冻结合同](docs/plans/2026-10-18-webhook-delivery.md)。受管理目标、事务内引用通知、HMAC与有限重试、人工动作、UUID恢复和三端共享面板已实现，默认不外发。自有15／独立125／补充144／SDK77及类型和三端前端build分别通过；实际React桌面／390／320各21项、owner5项、受控重试9项通过，不相加为全量。正常库022、真实接收端／Responses、专业材料完整身份、原生设备及完整V1仍未验收；当前交接见docs/HANDOFF.md。
 
