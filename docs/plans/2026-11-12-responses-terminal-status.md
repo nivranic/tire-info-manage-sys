@@ -29,3 +29,9 @@
 50项既有Web测试、三端类型及Web生产构建通过。API经shutdown退出0，Web经SIGINT退出1，端口及进程均为0，402个前端输入按字节恢复。只读checkpoint完整性ok，来源证据指纹保持，真实OpenAI调用0。
 
 核对入口为本机 `.artifacts/responses-terminal-20261112/verification.json`，SHA256 `56f12e06b351eacf5be979457ba6c86fe71b7d6ba9cc148283157b45168bff42`。真实模型语义、额度读取失败注入、原生运行及完整V1仍待各自验收。
+
+## 后续额度故障验收
+
+复用既有生产构建，在新私有API／数据库及隔离浏览器上下文完成终态额度503、手动刷新恢复、过期错误仲裁，以及终态读取期间关闭后的迟到成功／错误验证。四次明确提交产生四次合成Provider调用，全部completed，累计2400 tokens。错误期间已校验分析与引用保留，重开按原标识恢复。关闭读取的两个AbortSignal均实际取消，释放迟到响应后当前视图保持正确。
+
+本轮产品源码沿用原提交，402个前端输入及775个后端回归输入逐字节匹配。API退出0，Web经SIGINT退出1，端口及私有临时存储已关闭，checkpoint完整性ok。核对入口为 `.artifacts/responses-status-fault-20261112/verification.json`，SHA256 `6567b3c633a2287ac6ee14de2f4e300ec6765a1a577f959d3e7ea72b8a1f24e3`。真实Responses语义、原生运行及完整V1继续待验。

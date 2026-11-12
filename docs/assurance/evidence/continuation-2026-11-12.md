@@ -505,3 +505,30 @@ held场景中，浏览器先取得26008 tokens预留响应，再刻意延迟向�
 本次变更为交接说明，产品源码沿用b1c3acb。已重新核对Process／User／Machine三个作用域，OpenAI模型／Key、Gemini模型／Key及EPREL Key均为空。后续验证优先为终态额度读取失败后的结果及错误展示、手动刷新恢复、过期错误仲裁和终态读取期间关闭取消。实际Responses语义、真实材料身份、生产部署及完整V1 Gate继续开放。
 
 静态复核确认最新终态回执及9项关联文件哈希匹配，775个后端回归输入逐字节一致，15个本地文档链接有效。HANDOFF历史尾文保持216248字节及SHA256 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。新增行个人路径／高置信度凭据模式检查零命中，差异检查通过。本机回执为 `.artifacts/handoff-review-20261112/validation.json`，执行范围为文档、已有回执及资源关闭复核。
+
+## Responses额度读取故障浏览器验收
+
+在aadc48d之后继续执行，产品代码沿用b1c3acb。复用独立生产构建，在新私有API／数据库和隔离浏览器上下文完成下列验证。浏览器fetch夹具只对 `GET /api/v1/ai/status` 注入503或控制返回时序，合成Responses字节继续经过生产解析器、应用服务、数据库、HTTP／SSE及实际React入口。
+
+- 终态额度读取503时，已校验分析、引用及实际600 tokens用量保留，额度错误可见。手动刷新后错误清除，顶部额度恢复600，Provider仍为1次。
+- 第二次调用的受理额度错误暂缓返回，较新终态成功先显示1200 tokens。释放旧503后，额度与无错误状态保持，Provider仍为2次。
+- 第三次调用完成后暂缓终态额度读取。关闭窗口实际取消该读取的signal，释放迟到成功后面板保持关闭。重开按原标识恢复同一分析及1800 tokens，Provider仍为3次。
+- 第四次调用暂缓终态额度错误，关闭后重开并读到2400 tokens，再释放旧503。当前结果、额度及无错误状态保持，Provider仍为4次。
+
+最终四次明确提交对应4个completed、24条流事件、4次合成Provider及1次来源调用，实际账本累计2400 tokens。封存的来源证据指纹保持，输出脚本文本转义。14次额度读取均已返回，两个取消后的迟到响应已显式释放。控制台error／warn为0。
+
+API经shutdown退出0，Web经SIGINT退出1，8003及18002均无监听，私有临时存储已清理。只读checkpoint完整性ok。402个前端及775个后端回归输入逐字节匹配。类型、单元测试及构建沿用各自历史执行范围。本轮真实OpenAI、外网尝试、Parser子进程及正常数据库使用均为0。
+
+本机核对入口为 `.artifacts/responses-status-fault-20261112/verification.json`，SHA256 `6567b3c633a2287ac6ee14de2f4e300ec6765a1a577f959d3e7ea72b8a1f24e3`。该目录保存浏览器原始记录、注入夹具、checkpoint、日志及关闭凭据。
+
+首次私有API启动遗漏现行 `TIRE_CORS_ORIGINS` 配置，查询返回403及“不允许此请求来源”。补齐本次loopback origin后，在新槽完成验证。两条浏览器断言曾期望1200 tokens采用紧凑格式，界面实际采用分组数字1,200，修正显示断言后通过。原始失败继续保留。真实Responses语义、原生运行及完整V1 Gate继续开放。
+
+## 新专业材料PERS论文的实际捕获停点
+
+新候选为Taryma、Woźniak、Ejsmont、Mioduszewski及Ronowski的《Tire/road noise and tire rolling resistance on the prototype PERS surface》，IOP Conference Series Materials Science and Engineering 421 (2018) 022035，DOI为 `10.1088/1757-899X/421/2/022035`。作者单位为Gdańsk University of Technology，大学托管PDF的印刷第1页明确采用CC BY 3.0，要求保留作者、题名、期刊及DOI。该许可依据支持现行通道的原件保存及工作区复核。[原件入口](https://sepor.mech.pg.gda.pl/dokumenty/KONMOT%202018%20-%20Tire%20road%20noise%20and%20tire%20rolling%20resistance%20on%20the%20prototype%20PERS%20surface.pdf)
+
+论文表2列出研究胎号、厂商、型号、规格及载速标识，具有进一步身份核对线索。实验室测试条件包括ISO 18164、最大载荷的80%、210 kPa及不同速度／表面，具体数值多在图中。建立成绩及SKU关联仍需取得原件并逐项复核。
+
+使用新隔离数据库，经真实管理员注册、来源策略读取、预览及捕获API执行一次直连。请求UUID为 `ea4eab2a-5ee2-47ca-894c-539f05886429`，明确落账failed及 `source_material_timeout`，document／receipt均为空。DNS仅观察到指定大学主机，子进程及真实Provider均为0。独立curl直连robots诊断的DNS用时约0.058秒，15.003秒后仍未完成TCP连接，HTTP状态为000。该源的失败证据保存在本机 `.artifacts/material-pers-2018-20261112-r1/`，原有KIT C2继续保持封存。
+
+该候选新增的保存成功原件、TestEvent及SKU关联均为0。另一个同论文大学知识库入口返回Anubis页面，当前继续按实际可访问原始来源推进。完整V1及真实材料身份验收继续开放。
