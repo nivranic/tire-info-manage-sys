@@ -1,6 +1,8 @@
 # Gemini 原生 Provider 实施计划
 
-本计划依据原规格的 GeminiAdapter 要求，采用 brainstorming、writing-plans 与 executing-plans 的设计、实施和复核流程。用户已授权持续实施，工作使用既有main分支。
+原规格的多模型网关表列有原生 Gemini Adapter。此前Agent在持续实施授权下自行提前排期本计划，并以 `d5fded1` 交付适配器。用户明确选定的首个真实接入为OpenAI Responses API，真实接入与验收顺序依该选择执行。Gemini已完成的合成验证及真实调用待验范围见本文交付记录。
+
+本阶段采用 brainstorming、writing-plans 与 executing-plans 的设计、实施和复核流程，工作使用既有main分支。
 
 ## 目标与设计
 
