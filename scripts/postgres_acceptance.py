@@ -531,6 +531,11 @@ def run():
     report_checkpoint = verify_report_persistence(url)
     record(STEP)
 
+    STEP = 'recent_page_quality_material_stop_and_url_history'
+    from recent_history_acceptance import assert_recent_history_checkpoint, verify_recent_history_persistence
+    recent_history_checkpoint = verify_recent_history_persistence(url, authenticate=login_admin)
+    record(STEP)
+
     STEP = 'historical_reparse_review_and_restart'
     from test_reparse import assert_reparse_checkpoint, verify_reparse_persistence
     reparse_checkpoint = verify_reparse_persistence(url, authenticate=login_admin)
@@ -616,6 +621,8 @@ def run():
         assert_reparse_checkpoint(restored_url, reparse_checkpoint)
         STEP = 'restored_recall_checkpoint'
         assert_recall_checkpoint(restored_url, recall_checkpoint)
+        STEP = 'restored_recent_page_quality_material_stop_and_url_history'
+        assert_recent_history_checkpoint(restored_url, recent_history_checkpoint)
         with patch.dict(os.environ, {'TI_PARSER_BUNDLE_ROOT': str(parser_backup)}):
             STEP = 'restored_parser_release_checkpoint'
             assert_parser_release_checkpoint(restored_url, parser_checkpoint)
@@ -663,6 +670,7 @@ def run():
     record('restored_recall_campaign_discovery_raw_objects_rules_and_private_notifications')
     record('restored_recall_reparse_reviews_signed_upgrade_rollback_and_archived_code')
     record('restored_query_filters_full_snapshot_and_unconsumed_consent_scope')
+    record('restored_recent_page_quality_material_stop_and_url_history')
     admin.close()
     REPORT['status'] = 'passed'
 

@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-> [2026-11-12 Agent交接卡](docs/AGENT-HANDOFF-2026-11-12.md)汇总原规格12模块覆盖、迁移032及127项回归、PostgreSQL45项持久化／恢复验收、相关11项回归、剩余Gate与接手顺序。完整V1持续开发。历史记录见[HANDOFF](docs/HANDOFF.md)。
+> [2026-11-12 Agent交接卡](docs/AGENT-HANDOFF-2026-11-12.md)汇总原规格12模块覆盖、迁移032及127项回归、PostgreSQL47项持久化／恢复验收、029–032业务专项及204项受管回归、剩余Gate与接手顺序。完整V1持续开发。历史记录见[HANDOFF](docs/HANDOFF.md)。
 
 > **第78轮历史入口：**[Webhook交付与复核](docs/assurance/evidence/round-78-webhook-delivery.md)、[使用与签名](docs/WEBHOOKS.md)、[冻结合同](docs/plans/2026-10-18-webhook-delivery.md)。受管理目标、事务内引用通知、HMAC与有限重试、人工动作、UUID恢复和三端共享面板已实现，默认不外发。自有15／独立125／补充144／SDK77及类型和三端前端build分别通过；实际React桌面／390／320各21项、owner5项、受控重试9项通过，不相加为全量。正常库022、真实接收端／Responses、专业材料完整身份、原生设备及完整V1仍未验收；当前交接见docs/HANDOFF.md。
 

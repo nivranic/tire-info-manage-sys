@@ -5,9 +5,9 @@
 ## 接手摘要
 
 - 需求依据为仓库内[原始规格](requirements/2026-09-26-tire-intelligence-original.md)，包括12个核心功能模块、10项发布Gate、13项SLO目标和15项产品／技术决策。现有报告没有支持整体完成百分比的统一验收口径。
-- 迁移029–032及来源地址迁移的后端、共享协议、SDK和Web界面已交付。初次交接提交为 `ac854dc`，其前序工程提交为 `95fefcd`。本卡已补充此后PostgreSQL续作验收，最终HEAD以交付消息与接手核对为准。
+- 迁移029–032及来源地址迁移的后端、共享协议、SDK和Web界面已交付。初次交接提交为 `ac854dc`，其前序工程提交为 `95fefcd`。通用PostgreSQL验收修正已随 `7ae3967` 推送，本次补充029–032业务验收及交接更新，最终HEAD以交付消息与接手核对为准。
 - 最新产品修复覆盖来源地址迁移提醒的损坏历史读取。四模块受管批127／127通过，包含六个端点损坏反例及两个异常传播反例。
-- 最新真实PostgreSQL完整运行45项检查通过，覆盖持久化、并发、实际dump／restore、147张模型表恢复指纹、对象及历史Parser归档。相关受管回归11／11通过，25个Parser子进程全exit0。隔离集群已停止，验证端口55452复核为空闲。
+- 最新真实PostgreSQL完整运行47项检查通过，新增029–032对应业务的事务回滚、历史冻结、并发停止、原生写保护及恢复验证，覆盖实际dump／restore和147张模型表恢复指纹。七模块受管回归204／204通过。前次45项及11项兼容回归保留各自历史范围。隔离集群已停止，验证端口55452复核为空闲。
 - 首个真实AI接入已选OpenAI Responses API。EPREL Key当前缺失，其他工作继续独立推进。专业材料由Agent自主选取。
 - 本次材料研究核对四份候选，新增原件捕获、TestEvent、精确SKU关联和外部真人Golden均为0。旧KIT C2继续封存。
 - 发布级旧库迁移、真实模型语义、生产来源覆盖、原生平台矩阵和完整无障碍仍待验收。
@@ -66,25 +66,41 @@
 
 ### 真实PostgreSQL验收结果
 
-使用既有验证脚本、PostgreSQL 18.3和全新loopback隔离集群，输入为合成夹具。最终单次完整运行45项命名检查通过，进程退出0。实测包括147张模型表逐行指纹和schema版本列表、10个证据对象、4个报告导出对象、3个不同Parser归档及恢复后的真实代码执行。`vector_available=false`，pgvector待验。
+使用既有验证脚本、PostgreSQL 18.3和全新loopback隔离集群，输入为合成夹具。最新单次完整运行47项命名检查通过，进程退出0。实测包括147张模型表逐行指纹和schema版本列表、10个证据对象、4个报告导出对象、3个不同Parser归档及恢复后的真实代码执行。`vector_available=false`，pgvector待验。
 
 前期事实修订403 `admin_required` 已通过真实注册／登录修正。后续还修正了共享辅助入口的重复注册、验证进程缺少Windows架构元数据、旧查询全对象相等断言，以及合成身份数据缺少产品代码命名空间。四个持久化辅助入口保留独立注册默认路径，共享库由可选回调执行真实登录。身份辅助入口另已验证独立默认注册流程。
 
 - 第一份失败回执位于 `.artifacts/postgres/pgverify-43ae2a889f7443d797df1bcd2691a5e7/report.json`。
 - 第二份失败回执位于 `.artifacts/postgres/pgverify-ea650fde00f445f18ae44796ea654c1d/report.json`，SHA256 `ba4b39343292daf26780628b855df63e350980feaf23a8d23edf7489a6356c1f`。
-- 最终绿色回执位于 `.artifacts/postgres/pgverify-fb6bd9e0260748df87ae81e5d08cd691/report.json`，SHA256 `c21e5a1a1d31a01644181c3a43bb2294aa27e1abc7979b0abafe963c22eb1026`。资源独立核对见同目录 `closure.json`，`pg_ctl status`返回exit3及 `no server running`，55452监听数0。
-- 兼容回归位于 `.artifacts/pghelp-r1/result.json`，11／11，SHA256 `6d8d7078baea6b8a11eae91079d3cbf63135978808190c5d34dd1343b83a7d7a`。该批源码稳定、资源关闭、非自检拒绝0、正常数据库启动false、真实Provider／接收端调用0。
-- 其余中间失败目录及根因链见[续作记录](assurance/evidence/continuation-2026-11-12.md)。正常部署旧库升级、pgvector和029–032新增业务的专门PostgreSQL场景继续待验。
+- 最新绿色回执位于 `.artifacts/postgres/pgverify-1f9e174e87674047aaaf2bba4cf12723/report.json`，47项通过，SHA256 `34c54da3ce3cc26b06428ce49579eae966ec1f30fc44c54746b68f1bb48ebc7c`。实际备份684790字节。资源独立核对见同目录 `closure.json`，`pg_ctl status`返回exit3及 `no server running`，55452监听数0。
+- 前次45项绿色回执位于 `.artifacts/postgres/pgverify-fb6bd9e0260748df87ae81e5d08cd691/report.json`，SHA256 `c21e5a1a1d31a01644181c3a43bb2294aa27e1abc7979b0abafe963c22eb1026`。前次兼容回归位于 `.artifacts/pghelp-r1/result.json`，11／11，25个Parser子进程均exit0，SHA256 `6d8d7078baea6b8a11eae91079d3cbf63135978808190c5d34dd1343b83a7d7a`。
+- 本次七模块受管回归位于 `.artifacts/pghist-r1/result.json`，204／204通过，runner退出0，失败／跳过／incomplete均为0，SHA256 `ddb3f302310faf13e80d6d7307925a9713161be9a7eed8274038bd92a4d17546`。该批源码稳定、资源关闭，非自检拒绝、已知探针拒绝及其他拒绝均为0，正常数据库启动false、真实Provider／接收端调用0、子进程0。两个改动脚本均匹配该批source-after绑定，AST通过。
+- 其余中间失败目录及根因链见[续作记录](assurance/evidence/continuation-2026-11-12.md)。正常部署旧库029–032迁移、pgvector和真实来源长期运行继续待验。
+
+### 029–032业务专项
+
+新增 `scripts/recent_history_acceptance.py`，通过现行API、应用工厂和既有合成夹具，在主PostgreSQL验收中固定执行，并在恢复库中重新核对checkpoint。
+
+| 范围 | 已验证行为 |
+| --- | --- |
+| 029原文变化 | 冻结前后证据、已读幂等、晚建规则不补发，通知插入失败时采纳事务回滚 |
+| 030质量兴趣 | 默认false及显式true、仅通知订阅者、质量隔离保留已采纳事实，退订后历史匹配条件冻结，通知插入失败时事务回滚 |
+| 031停止采纳 | 合成捕获在物理put之后等待，两个独立应用／PG连接并发停止，分别得到stopped与already_stopped。迟到捕获保持stopped_unconfirmed，新增outcome／document／EvidenceObject均为0，原UUID重放读取既有结果 |
+| 032地址迁移 | 同正文A→B→A迁移与原文变化分别记录，事件重入去重、晚建规则不补发，通知插入失败时事务回滚 |
+| 原生历史保护 | 五张历史表的UPDATE／DELETE／TRUNCATE／重复INSERT拒绝，加上兴趣通知唯一约束，每个checkpoint共21次。应用重启及实际恢复库各执行一次，共42次 |
+| 恢复历史 | 完整通知、兴趣修订、停止决定及原UUID停止／捕获幂等重放均保持 |
+
+031场景的物理put执行1次，可能留下无引用对象。该结果沿用停止后续采纳且网络结果未知的合同。部署旧库升级、真实外部捕获及长期运行仍需各自验收。
 
 ## 下一步执行顺序
 
 1. 核对HEAD、工作区、远端及本机证据是否可用。阅读本卡、原规格和拟修改模块的后续报告。
-2. 为029–032新增业务补齐专门PostgreSQL场景，覆盖原文变化、兴趣质量隔离、停止采纳和地址迁移的实际事务与历史语义。通用持久化／恢复验收已通过45项，相关兼容回归11／11。
-3. 推进pgvector实测，为正常旧库制定备份、显式迁移、恢复与回退验收方案。现有完整回执使用新隔离集群和合成旧schema迁移。
+2. 推进pgvector实际运行与检索质量验收。已有47项真实PostgreSQL运行及204项受管回归可按源码绑定复用。
+3. 为正常部署旧库制定并执行备份、显式迁移、恢复与回退验收，重点包含029–032。现有完整回执使用新隔离集群和合成旧schema迁移。
 4. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。本轮四个候选的取舍依据均在续作记录中。
 5. 本机凭据和来源用途条件具备后，完成OpenAI Responses的API→Provider→引用恢复→Web真实语义链及预算／同意验证。凭据使用本机保密配置。
-6. 扩充P0来源、SU7官方OE／精确SKU、监控长周期、全文检索与专业性能解释。继续实现原规格剩余能力，并逐项形成可复核证据。
-7. 收敛安静窗口全量回归、六类平台、无障碍、安全、性能、灾备与分发，逐项验收下列10个Gate。
+6. 扩充P0来源、SU7官方OE／精确SKU、监控长周期、全文RAG／reranker与专业性能解释。继续实现原规格剩余能力，并逐项形成可复核证据。
+7. 收敛安静窗口全量回归、六类平台、生产身份／租户权限、无障碍、安全、性能、灾备与分发，逐项验收下列10个Gate。
 
 ## V1发布Gate
 
@@ -108,7 +124,7 @@
 | 范围 | 入口 |
 | --- | --- |
 | 本次产品与回归 | `apps/api/tire_api/source_page_url_monitoring.py`、`apps/api/tests/test_source_page_url_moves.py` |
-| PostgreSQL验证 | `scripts/verify-postgres.ps1`、`scripts/postgres_acceptance.py`、`scripts/identity_acceptance.py`、`apps/api/tests/admin_support.py`及四个持久化辅助入口 |
+| PostgreSQL验证 | `scripts/verify-postgres.ps1`、`scripts/postgres_acceptance.py`、`scripts/recent_history_acceptance.py`、`scripts/identity_acceptance.py`、`apps/api/tests/admin_support.py`及四个持久化辅助入口 |
 | API与迁移 | `apps/api/tire_api/main.py`、`service.py`、`migrations.py`、`source_page_url_models.py` |
 | 材料／Golden | `apps/api/tire_api/source_materials.py`、`test_events.py`、`test_event_golden*.py`、`professional_golden*.py` |
 | AI／界面／共享协议 | `apps/api/tire_api/ai*.py`、`apps/web/components/`、`packages/api-client/src/`、`packages/domain-types/src/` |
@@ -118,7 +134,7 @@
 
 ## 操作边界与交付检查
 
-初次交接的工程提交 `95fefcd` 及文档提交 `ac854dc` 已通过GitHub官方SSH 443直连快进推送至原仓库 `main`。HTTPS Git直连先后遇到连接重置和连接失败，API HTTPS直连及SSH 443查询成功。本次PostgreSQL续作沿同一SSH通道交付，最终提交SHA与远端一致性见交付消息及下述接手核对。
+初次交接的工程提交 `95fefcd`、文档提交 `ac854dc` 及通用PostgreSQL修正提交 `7ae3967` 已通过GitHub官方SSH 443直连快进推送至原仓库 `main`。HTTPS Git直连先后遇到连接重置和连接失败，API HTTPS直连及SSH 443查询成功。本次业务验收与交接更新沿同一SSH通道交付，最终提交SHA与远端一致性见交付消息及下述接手核对。
 
 - 当前分支为既有 `main`。新分支／工作树须取得用户明确同意。工作区中的他人修改、历史红绿回执及证据按现有归属保留。
 - Windows使用PowerShell 7，exec显式设置工作目录。网络使用直连，代理的启动／配置／连接须先取得用户明确同意。
@@ -138,8 +154,8 @@ git rev-parse HEAD
 git rev-parse origin/main
 ```
 
-远端跟踪引用的时效以最近成功同步为准，最终推送结果及远端SHA见本次交付消息。工程提交与本卡文档提交构成本次交付序列。
+远端跟踪引用的时效以最近成功同步为准，最终推送结果及远端SHA见本次交付消息。此前工程提交及本次验收／交接更新构成交付序列。
 
 ## 可复制给接手Agent
 
-> 继续按原需求规格推进胎迹完整V1。先读 `docs/AGENT-HANDOFF-2026-11-12.md`，核对main、HEAD、dirty及本机回执。URL迁移通知历史修复四模块127／127通过。通用真实PostgreSQL45项检查已通过，包括147张模型表恢复指纹、对象及Parser归档，相关受管回归11／11通过。旧403、重复注册、架构变量缺失和身份命名空间缺口已有修正及证据。下一步补029–032专门PostgreSQL业务场景、pgvector、正常旧库升级，再推进合法真实专业材料、精确SKU／真人Golden、OpenAI Responses真实语义链、更多来源及平台发布Gate。EPREL无Key，继续独立工作。旧KIT C2封存约束继续有效。保留正常／保留库、原始失败、他人改动及既有安全／许可合同。所有完成声明绑定实际执行范围。
+> 继续按原需求规格推进胎迹完整V1。先读 `docs/AGENT-HANDOFF-2026-11-12.md`，核对main、HEAD、dirty及本机回执。URL迁移通知历史修复四模块127／127通过。最新真实PostgreSQL47项检查通过，包括029–032对应业务的事务／历史／并发停止／原生保护、147张模型表恢复指纹、对象及Parser归档。七模块受管回归204／204通过，两个验收脚本已绑定源码。前次45项与11项回归保留历史范围。下一步推进pgvector实际运行与检索质量、正常旧库029–032升级，再推进合法真实专业材料、精确SKU／真人Golden、OpenAI Responses真实语义链、更多来源、生产权限及平台发布Gate。EPREL无Key，继续独立工作。旧KIT C2封存约束继续有效。保留正常／保留库、原始失败、他人改动及既有安全／许可合同。所有完成声明绑定实际执行范围。
