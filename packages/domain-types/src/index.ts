@@ -134,6 +134,7 @@ export interface KnowledgeFilters {
 }
 export interface KnowledgeSearchRequest {
   mode: "history"; text: string; filters: KnowledgeFilters; limit?: number; offset?: number;
+  preferred_region?: string;
 }
 export interface KnowledgeSearchItem {
   recall?: {
@@ -160,6 +161,8 @@ export interface KnowledgeSearchResult {
   external_processing?: { query_text_sent: boolean };
   coverage?: VectorCoverage | null;
   candidate_counts?: { fts: number; dense: number; merged: number; limit: number };
+  preferred_region?: string;
+  original_text?: OriginalTextSearchResult;
 }
 export interface SourceTextReference {
   snapshot_id: string;
@@ -201,11 +204,28 @@ export interface SourceTextSearchResult {
   index?: { engine: "sqlite_fts5" | "postgresql_fts"; extractor_version: string; snapshots: number };
   notice: string;
 }
+export interface OriginalTextCoverage { eligible_chunks: number; indexed_chunks: number; missing_chunks: number }
+export interface OriginalTextMatch {
+  method: "fts" | "dense" | "hybrid"; matched_terms: string[]; score: number;
+  fts_rank?: number; dense_rank?: number; rrf_score: number; cosine_distance: number | null;
+  authority_tier: number | null; source_class: string; region: string | null;
+  region_match: "exact" | "different" | "unknown" | "not_requested";
+  variant_match: "page_scope";
+  freshness: { time_basis: "observed_at" | "publication_unknown"; observed_at: string | null };
+  explanation: string[];
+}
+export type OriginalTextSearchItem = (SourceTextExcerpt | DocumentTextExcerpt) & { match: OriginalTextMatch };
+export interface OriginalTextSearchResult {
+  items: OriginalTextSearchItem[]; total: number; has_more: boolean; coverage: OriginalTextCoverage;
+  preferred_region: string | null; text_contract: "original-text-semantic@1";
+  candidate_counts: { fts: number; dense: number; merged: number; limit: number }; notice: string;
+}
 export interface VectorCoverage { eligible_documents: number; indexed_documents: number; missing_documents: number }
 export interface VectorStatus {
   backend: string; available: boolean; reason: string | null;
   model: { state: string; model: string | null; dimensions: number | null };
   coverage: VectorCoverage | null;
+  original_text_coverage?: OriginalTextCoverage | null;
   budget: { day_utc: string; requests: number; accounted_tokens: number; has_pending_request: boolean };
   notice: string;
 }

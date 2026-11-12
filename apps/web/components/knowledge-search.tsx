@@ -8,7 +8,7 @@ import { FieldResolutionView } from "./field-authority";
 import VectorTools from "./vector-tools";
 import { RecallKnowledgeMeta } from "./recall-evidence-meta";
 import { canSelectKnowledgeReference, selectedKnowledgeReferences } from "./recall-evidence-values";
-import SourceTextSearch from "./source-text-search";
+import SourceTextSearch, { OriginalTextResults } from "./source-text-search";
 
 const kindLabels = { tire: "轮胎规格", vehicle: "车型适配", test_event: "测试事件", recall: "正式召回公告 / 空观察" };
 const filterLabels: Record<keyof KnowledgeFilters, string> = {
@@ -65,6 +65,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   const operation = useRef<AbortController | null>(null);
   const [text, setText] = useState("");
   const [filters, setFilters] = useState<KnowledgeFilters>({});
+  const [preferredRegion, setPreferredRegion] = useState("");
   const [limit, setLimit] = useState(12);
   const [result, setResult] = useState<KnowledgeSearchResult | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -74,15 +75,15 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   const [error, setError] = useState("");
   const [needsLive, setNeedsLive] = useState(false);
   const [status, setStatus] = useState("");
-  const lastSearch = useRef<{ text: string; filters: KnowledgeFilters; limit: number } | null>(null);
+  const lastSearch = useRef<{ text: string; filters: KnowledgeFilters; limit: number; preferred_region?: string } | null>(null);
   const selectedItems = result?.items.filter(item => selected.includes(item.id)) || [];
   const selectedReferences = selectedKnowledgeReferences(result?.items || [], selected);
   const selectedProducts = selectedItems.filter(item => item.recall?.observation_kind === "records").length;
   const selectedRecallReferences = selectedReferences.filter(reference => reference.kind === "recall").length;
-  const sourceTextSearch = result && result.text.trim() && Object.entries(result.applied_filters).every(([name, value]) => name === "source_id" || (name === "kind" && value === "tire"))
+  const sourceTextSearch = result && !result.original_text && result.text.trim() && Object.entries(result.applied_filters).every(([name, value]) => name === "source_id" || (name === "kind" && value === "tire"))
     ? { mode: "history" as const, text: result.text, source_id: result.applied_filters.source_id, limit: result.limit || limit }
     : null;
-  const documentTextSearch = result && result.text.trim() && Object.keys(result.applied_filters).length === 0
+  const documentTextSearch = result && !result.original_text && result.text.trim() && Object.keys(result.applied_filters).length === 0
     ? { mode: "history" as const, text: result.text, limit: result.limit || limit }
     : null;
   const liveQuery = () => onLiveQuery(filters.kind === "recall" || filters.campaign_number ? { campaign_number: filters.campaign_number?.trim().toUpperCase() } : undefined);
@@ -117,9 +118,9 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
     const exactFilters = Object.fromEntries(Object.entries(filters).map(([key, value]) => [key, value.trim()]).filter(([, value]) => value)) as KnowledgeFilters;
     if (!text.trim() && !Object.keys(exactFilters).length) { setError("至少输入关键词或一项筛选条件。"); textInput.current?.focus({ preventScroll: true }); return; }
     const controller = new AbortController(); operation.current = controller; setBusy(true);
-    lastSearch.current = { text: text.trim(), filters: exactFilters, limit };
+    lastSearch.current = { text: text.trim(), filters: exactFilters, limit, ...(preferredRegion.trim() ? { preferred_region: preferredRegion.trim() } : {}) };
     try {
-      const value = await tireApi.searchKnowledge({ mode: "history", text: text.trim(), filters: exactFilters, limit }, controller.signal);
+      const value = await tireApi.searchKnowledge({ mode: "history", ...lastSearch.current }, controller.signal);
       if (controller.signal.aborted || operation.current !== controller) return;
       setResult(value); setStatus(`找到 ${value.total} 条历史证据，展示 ${value.items.length} 条。`);
     } catch (cause) {
@@ -137,7 +138,7 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
     const controller = new AbortController(); operation.current = controller; setMoreBusy(true);
     const offset = result.items.length;
     try {
-      const value = await tireApi.searchKnowledge({ mode: "history", text: previous.text, filters: previous.filters, limit: previous.limit, offset }, controller.signal);
+      const value = await tireApi.searchKnowledge({ mode: "history", ...previous, offset }, controller.signal);
       if (controller.signal.aborted || operation.current !== controller) return;
       setResult(merged => merged && value.items.length ? { ...value, items: [...new Map([...merged.items, ...value.items].map(item => [item.id, item])).values()], notice: merged.notice } : value);
       setStatus(`已加载 ${Math.min(offset + value.items.length, value.total)} / ${value.total} 条历史证据。`);
@@ -170,12 +171,13 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
           {textFilters.map(name => <label key={name}>{filterLabels[name]}<input maxLength={160} value={filters[name] || ""} onChange={event => updateFilter(name, event.target.value)} /></label>)}
         </div>
         <details className="knowledge-exact"><summary>按来源或精确规格 ID 筛选</summary><div className="knowledge-filter-grid">{(["source_id", "variant_id"] as const).map(name => <label key={name}>{filterLabels[name]}<input maxLength={160} value={filters[name] || ""} onChange={event => updateFilter(name, event.target.value)} /></label>)}</div></details>
-        <small>结构化条件限定版本范围；尺寸按几何规格匹配，R / ZR 分别保留版本；关键词用于检索相关字段。未选择关注字段时，不启用字段来源优先级。</small>
-        <div className="knowledge-form-actions"><label className="knowledge-limit">展示数量<select value={limit} onChange={event => { invalidate(); setLimit(Number(event.target.value)); }}><option value={12}>12 条</option><option value={24}>24 条</option><option value={30}>30 条</option></select></label><button className="primary-button" type="submit" disabled={busy}>{busy ? "正在检索…" : "检索历史证据"}</button>{busy ? <button className="text-button" type="button" onClick={cancel}>取消检索</button> : <button className="text-button" type="button" onClick={() => { invalidate(); setText(""); setFilters({}); }}>清空条件</button>}</div>
+        <label>优先地区（可选）<input maxLength={40} value={preferredRegion} onChange={event => { invalidate(); setPreferredRegion(event.target.value); }} /></label>
+        <small>地区筛选限定结果范围，优先地区参与排序。结构化条件限定版本范围，尺寸按几何规格匹配，R / ZR 分别保留版本。</small>
+        <div className="knowledge-form-actions"><label className="knowledge-limit">展示数量<select value={limit} onChange={event => { invalidate(); setLimit(Number(event.target.value)); }}><option value={12}>12 条</option><option value={24}>24 条</option><option value={30}>30 条</option></select></label><button className="primary-button" type="submit" disabled={busy}>{busy ? "正在检索…" : "检索历史证据"}</button>{busy ? <button className="text-button" type="button" onClick={cancel}>取消检索</button> : <button className="text-button" type="button" onClick={() => { invalidate(); setText(""); setFilters({}); setPreferredRegion(""); }}>清空条件</button>}</div>
       </form>
       {error ? <section className="inline-error" role="alert"><p>{error}</p>{needsLive ? <><p>涉及当前状态的问题需要重新在线核验。返回查询页面后，请选择来源并发起在线查询。</p><button type="button" className="secondary-button" onClick={() => { operation.current?.abort(); liveQuery(); }}>返回在线查询</button></> : null}</section> : null}
       <p className="knowledge-status" role="status" aria-live="polite">{busy ? "正在读取本地历史证据…" : status || "输入关键词或设置条件后开始检索。"}</p>
-      <VectorTools selectedIds={selected} textSelections={selectedText} search={{ mode: "history", text: text.trim(), filters, limit }} onResult={value => { invalidate(); setText(value.text); setFilters(value.applied_filters); lastSearch.current = { text: value.text, filters: value.applied_filters, limit }; setResult(value); setStatus(value.total_scope === "candidates" ? `已召回 ${value.total} 条候选，展示 ${value.items.length} 条；不是全部语义匹配数。` : `结构化条件已足够，找到 ${value.total} 条历史证据；本次未发送查询文本。`); }} />
+      <VectorTools selectedIds={selected} textSelections={selectedText} search={{ mode: "history", text: text.trim(), filters, limit, ...(preferredRegion.trim() ? { preferred_region: preferredRegion.trim() } : {}) }} onResult={value => { invalidate(); setText(value.text); setFilters(value.applied_filters); setPreferredRegion(value.preferred_region || ""); lastSearch.current = { text: value.text, filters: value.applied_filters, limit, ...(value.preferred_region ? { preferred_region: value.preferred_region } : {}) }; setResult(value); setStatus(value.total_scope === "candidates" ? `已召回 ${value.total} 条结构化候选${value.original_text ? `和 ${value.original_text.total} 段正文候选` : ""}。` : `找到 ${value.total} 条历史证据。`); }} />
       {result ? <section className="knowledge-results" aria-label="历史证据检索结果" aria-busy={busy}>
         <p className="review-boundary">{result.notice}</p>
         {result.coverage ? <p className="review-boundary">本次筛选范围：{result.coverage.indexed_documents} / {result.coverage.eligible_documents} 条记录有完整向量，{result.coverage.missing_documents} 条未覆盖。向量结果不保证召回全部相关证据。</p> : null}
@@ -185,8 +187,9 @@ export default function KnowledgeSearchDialog({ onClose, onAnalyze, onLiveQuery,
   : <div className="compare-toolbar"><p>还有匹配记录未展示，可继续加载。</p><button type="button" className="secondary-button" disabled={busy || moreBusy} onClick={() => void loadMore()}>{moreBusy ? "正在加载…" : `继续加载（已展示 ${result.items.length} / ${result.total}）`}</button></div> : null}</> : <div className="knowledge-empty"><strong>没有匹配的已采纳证据</strong><p>可减少筛选条件，或先到在线查询保存所需来源记录。</p><button type="button" className="secondary-button" onClick={liveQuery}>前往在线查询</button></div>}
         <details className="knowledge-technical"><summary>检索能力与索引状态</summary><p>{result.index.engine} · {result.index.documents} 份索引文档 · {result.index.version}</p><ul>{result.stages.map((stage, index) => <li key={`${stage.name}-${index}`}><strong>{stage.name} · {stage.state === "succeeded" ? "已执行" : stage.state === "not_needed" ? "本次无需" : "尚不可用"}</strong><p>{stage.reason}</p></li>)}</ul></details>
       </section> : null}
-      {sourceTextSearch ? <SourceTextSearch key={JSON.stringify(sourceTextSearch)} search={sourceTextSearch} automatic={result?.total === 0} selected={selectedText} onToggle={toggleText} /> : null}
-      {documentTextSearch ? <SourceTextSearch key={`document-${JSON.stringify(documentTextSearch)}`} origin="document" search={documentTextSearch} automatic={result?.total === 0} selected={selectedText} onToggle={toggleText} /> : null}
+      {result?.original_text ? <OriginalTextResults result={result.original_text} selected={selectedText} onToggle={toggleText} /> : null}
+      {sourceTextSearch ? <SourceTextSearch key={JSON.stringify(sourceTextSearch)} search={sourceTextSearch} automatic={result?.total === 0 && !result?.original_text} selected={selectedText} onToggle={toggleText} /> : null}
+      {documentTextSearch ? <SourceTextSearch key={`document-${JSON.stringify(documentTextSearch)}`} origin="document" search={documentTextSearch} automatic={result?.total === 0 && !result?.original_text} selected={selectedText} onToggle={toggleText} /> : null}
     </div>
     <footer className="knowledge-footer"><div><strong>已选 {selectedReferences.length} 份不同证据 · AI上限6份</strong>{selectedRecallReferences ? <small>召回产品命中 {selectedProducts} 条 · 公告 / 空观察证据 {selectedRecallReferences} 份</small> : null}<small>进入下一步核对全部记录后，才能授权发送给 AI。</small></div>{onOffline ? <button className="secondary-button" disabled={!selected.length || busy || !result} type="button" onClick={() => onOffline(selectedReferences)}>预览所选设备离线资料</button> : null}<button className="primary-button" disabled={!selected.length || selectedReferences.length > 6 || busy || !result} type="button" onClick={analyze}>用所选历史证据分析</button></footer>
   </dialog>;

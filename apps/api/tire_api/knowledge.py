@@ -3,7 +3,7 @@ import re
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException
-from pydantic import Field, StrictInt, ValidationInfo, field_validator, model_validator
+from pydantic import Field, StrictInt, ValidationInfo, field_validator, model_serializer, model_validator
 from sqlalchemy import Float, String, exists, or_, select, text
 from sqlalchemy.orm import Session
 
@@ -77,6 +77,21 @@ class KnowledgeSearch(StrictModel):
     filters: SearchFilters = Field(default_factory=SearchFilters)
     limit: StrictInt = Field(default=12, ge=1, le=30)
     offset: StrictInt = Field(default=0, ge=0, le=2000)
+    preferred_region: str | None = Field(default=None, min_length=1, max_length=40)
+
+    @field_validator('preferred_region')
+    @classmethod
+    def valid_region_preference(cls, value):
+        if value is not None and (not value.strip() or any(ord(char) < 32 for char in value)):
+            raise ValueError('地区偏好须为有界的地区名称或代码')
+        return value.strip() if value is not None else None
+
+    @model_serializer(mode='wrap')
+    def serialize_search(self, handler):
+        value = handler(self)
+        if self.preferred_region is None:
+            value.pop('preferred_region', None)
+        return value
 
     @model_validator(mode='after')
     def useful_query(self):
@@ -207,7 +222,15 @@ def lexical_candidates(db, filters, terms, sufficient=False, limit=None):
     return list(db.execute(statement, {'search_terms': query}))
 
 
-def render_ranked(candidates, filters, terms, sufficient=False, methods=None, details=None):
+def region_preference(region, preferred):
+    if not preferred:
+        return 'not_requested', 0
+    if not region:
+        return 'unknown', 1
+    return ('exact', 0) if normalized(region) == normalized(preferred) else ('different', 2)
+
+
+def render_ranked(candidates, filters, terms, sufficient=False, methods=None, details=None, preferred_region=None):
     ranked = []
     for document, score in candidates:
         data = document.payload
@@ -230,10 +253,12 @@ def render_ranked(candidates, filters, terms, sufficient=False, methods=None, de
             'matched_terms': [f'{key}={value}' for key, value in filters.items()] if sufficient else terms if method != 'dense' else [],
             'authority_tier': tier, 'authority_rule': rule, 'explanation': reasons,
             **(details.get(document.id, {}) if details else {})}
+        if preferred_region:
+            public['match']['region_match'] = region_preference(data['region'], preferred_region)[0]
         ranked.append((tier or 999, float(score), data['observed_at'], document.id, public))
     ranked.sort(key=lambda row: row[3])
     ranked.sort(key=lambda row: row[2], reverse=True)
-    ranked.sort(key=lambda row: (row[0], row[1]))
+    ranked.sort(key=lambda row: (row[0], region_preference(row[4]['region'], preferred_region)[1], row[1]))
     return [row[4] for row in ranked]
 
 
@@ -293,7 +318,8 @@ def search_history(db, registry, payload: KnowledgeSearch):
     db.refresh(state)
     index = {'engine': 'sqlite_fts5' if backend == 'sqlite' else 'postgresql_fts',
              'documents': state.documents, 'version': state.version}
-    ranked = render_ranked(lexical_candidates(db, filters, terms, sufficient), filters, terms, sufficient)
+    ranked = render_ranked(lexical_candidates(db, filters, terms, sufficient), filters, terms, sufficient,
+                           preferred_region=payload.preferred_region)
     total = len(ranked)
     end = payload.offset + payload.limit
     has_more = total > end
@@ -307,6 +333,7 @@ def search_history(db, registry, payload: KnowledgeSearch):
         {'name': 'rerank', 'state': 'succeeded', 'reason': '精确筛选后按字段权威、词法相关度与时间排序；未使用语义重排模型'},
     ]
     return {'mode': 'history', 'data_state': 'local_snapshot', 'text': payload.text,
+            **({'preferred_region': payload.preferred_region} if payload.preferred_region else {}),
             'applied_filters': filters, 'inferred_filters': inferred,
             'items': attach_field_resolutions(db, attach_identity_contracts(db, ranked[payload.offset:end])),
             'total': total, 'has_more': has_more, 'offset': payload.offset, 'limit': payload.limit,

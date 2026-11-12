@@ -588,6 +588,7 @@ def run():
     record(STEP)
 
     text_embedding_checkpoint = None
+    original_hybrid_checkpoint = None
     if REPORT['vector_available']:
         STEP = 'original_text_embedding_pgvector_permissions_and_accounting'
         with psycopg.connect(host='127.0.0.1', port=port, user='tire_verify_admin', password=password,
@@ -597,6 +598,12 @@ def run():
         text_checks = verify_text_embedding_persistence(url, authenticate=login_admin)
         text_embedding_checkpoint = text_checks.pop('checkpoint')
         REPORT['text_embeddings'] = text_checks
+        record(STEP)
+        STEP = 'original_text_hybrid_real_cosine_and_region_ranking'
+        from test_original_text_retrieval import verify_original_text_hybrid
+        hybrid_checks = verify_original_text_hybrid(url, authenticate=login_admin)
+        original_hybrid_checkpoint = hybrid_checks.pop('checkpoint')
+        REPORT['original_text_hybrid'] = hybrid_checks
         record(STEP)
     # Freeze after every source-producing flow, including text material fixtures.
     STEP = 'identity_decision_concurrent_cas_uuid_withdrawal_and_restart'
@@ -662,6 +669,11 @@ def run():
             STEP = 'restored_original_text_vectors_permissions_and_cached_run'
             from test_text_embeddings import assert_text_embedding_checkpoint
             assert_text_embedding_checkpoint(restored_url, text_embedding_checkpoint, authenticate=login_admin)
+            record(STEP)
+        if original_hybrid_checkpoint is not None:
+            STEP = 'restored_original_text_fusion_references_and_cosine'
+            from test_original_text_retrieval import assert_original_text_hybrid_checkpoint
+            assert_original_text_hybrid_checkpoint(restored_url, original_hybrid_checkpoint, authenticate=login_admin)
             record(STEP)
         STEP = 'restored_query_filter_checkpoint'
         assert_query_filter_checkpoint(restored_url, query_filter_checkpoint)

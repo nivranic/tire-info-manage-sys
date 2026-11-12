@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { DocumentTextExcerpt, DocumentTextSearchItem, DocumentTextSearchRequest, SourceTextExcerpt, SourceTextSearchItem, SourceTextSearchRequest, SourceTextSearchResult, TextEmbeddingSelection } from "@tire/domain-types";
+import type { DocumentTextExcerpt, DocumentTextSearchItem, DocumentTextSearchRequest, OriginalTextSearchItem, OriginalTextSearchResult, SourceTextExcerpt, SourceTextSearchItem, SourceTextSearchRequest, SourceTextSearchResult, TextEmbeddingSelection } from "@tire/domain-types";
 import TextEmbeddingPurposeDialog from "./text-embedding-purpose";
 
-type TextSearchItem = SourceTextSearchItem | DocumentTextSearchItem;
+type TextSearchItem = SourceTextSearchItem | DocumentTextSearchItem | OriginalTextSearchItem;
 type TextSearchResult = Omit<SourceTextSearchResult, "items" | "index"> & { items: TextSearchItem[] };
 type TextSearchProps = { automatic: boolean; selected: TextEmbeddingSelection[]; onToggle: (selection: TextEmbeddingSelection) => void } & (
   { origin?: "source"; search: SourceTextSearchRequest } |
@@ -13,6 +13,8 @@ type TextSearchProps = { automatic: boolean; selected: TextEmbeddingSelection[];
 );
 
 const stamp = (value: string) => new Date(value).toLocaleString("zh-CN");
+const methods = { fts: "关键词召回", dense: "向量召回", hybrid: "关键词与向量融合" };
+const regions = { exact: "优先地区", different: "其他已登记地区", unknown: "地区待核对", not_requested: "未设置地区偏好" };
 
 function OriginalTextCard({ item, selected, disabled, onToggle }: {
   item: TextSearchItem; selected: boolean; disabled: boolean; onToggle: () => void;
@@ -50,6 +52,7 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
   return <article className={`knowledge-card ${excerpt.kind === "document_text" ? "document-text-card" : "source-text-card"}${selected ? " selected" : ""}`}>
     <div className="knowledge-card-heading"><label className="knowledge-select"><input type="checkbox" aria-label={`选择正文向量引用 ${excerpt.kind === "document_text" ? `${excerpt.document.title} 第 ${excerpt.reference.page} 页` : excerpt.reference.snapshot_id}`} checked={selected} disabled={disabled} onChange={onToggle} /><span>{excerpt.kind === "document_text" ? `${excerpt.document.title} · 第 ${excerpt.reference.page} 页` : `${excerpt.source_id} · 页面正文摘录`}</span></label></div>
     <p className="knowledge-excerpt">{excerpt.text}</p>
+    <p className="knowledge-stamp">{methods[item.match.method]}</p>
     <p className="knowledge-stamp">{excerpt.kind === "document_text" ? `留存 ${stamp(excerpt.document.created_at)}` : `观察 ${stamp(excerpt.observed_at)} · 验证 ${stamp(excerpt.verified_at)}`}</p>
     <details className="knowledge-provenance"><summary>原始来源与引用位置</summary>
       <dl><dt>原始来源</dt><dd>{sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{source}</a> : source || "未提供链接"}</dd>
@@ -62,12 +65,36 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
         <dt>Unicode码点区间</dt><dd>[{excerpt.reference.start}, {excerpt.reference.end})</dd>
         <dt>匹配词</dt><dd>{item.match.matched_terms.join(" · ")}</dd></dl>
     </details>
+    {"rrf_score" in item.match ? <details className="knowledge-provenance"><summary>召回与排序依据</summary>
+      <dl><dt>来源类别</dt><dd>{item.match.source_class}</dd>
+        <dt>来源类别层级</dt><dd>{item.match.authority_tier ?? "待核对"}</dd>
+        <dt>来源地区</dt><dd>{item.match.region || "待核对"} · {regions[item.match.region_match]}</dd>
+        <dt>RRF分数</dt><dd>{item.match.rrf_score.toFixed(6)}</dd>
+        <dt>余弦距离</dt><dd>{item.match.cosine_distance === null ? "本条由关键词召回" : item.match.cosine_distance.toFixed(6)}</dd>
+        <dt>时间依据</dt><dd>{item.match.freshness.time_basis === "observed_at" && item.match.freshness.observed_at ? `原件观察 ${stamp(item.match.freshness.observed_at)}` : "文档发布时间待核对"}</dd></dl>
+      <ul>{item.match.explanation.map(line => <li key={line}>{line}</li>)}</ul>
+    </details> : null}
     <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void resolve()}>{busy ? "正在恢复引用…" : "核对原文引用"}</button>
       <button type="button" className="secondary-button" onClick={() => setPurposeOpen(true)}>核对正文向量用途</button>
       <span role="status" aria-live="polite">{resolved ? "已从保存原件恢复引用" : ""}</span></div>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}
     {purposeOpen ? <TextEmbeddingPurposeDialog selection={item.kind === "document_text" ? { kind: "document_text", reference: item.reference } : { kind: "source_text", reference: item.reference }} onClose={() => setPurposeOpen(false)} /> : null}
   </article>;
+}
+
+export function OriginalTextResults({ result, selected, onToggle }: {
+  result: OriginalTextSearchResult; selected: TextEmbeddingSelection[];
+  onToggle: (selection: TextEmbeddingSelection) => void;
+}) {
+  return <section className="knowledge-results" aria-label="正文混合检索结果"><h3>正文混合检索</h3>
+    <p className="review-boundary">{result.notice}</p>
+    <p>召回 {result.total} 段候选，展示 {result.items.length} 段。当前范围 {result.coverage.indexed_chunks} / {result.coverage.eligible_chunks} 段有可用向量。</p>
+    {result.items.map(item => <OriginalTextCard key={item.reference.chunk_id} item={item}
+      selected={selected.some(selection => selection.kind === item.kind && selection.reference.chunk_id === item.reference.chunk_id)}
+      disabled={selected.length >= 32 && !selected.some(selection => selection.kind === item.kind && selection.reference.chunk_id === item.reference.chunk_id)}
+      onToggle={() => onToggle(item.kind === "document_text" ? { kind: "document_text", reference: item.reference } : { kind: "source_text", reference: item.reference })} />)}
+    {result.has_more ? <p>候选中还有正文，可缩小关键词、来源或地区范围继续核对。</p> : null}
+  </section>;
 }
 
 export default function SourceTextSearch(props: TextSearchProps) {

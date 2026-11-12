@@ -20,6 +20,7 @@ from .knowledge import CURRENT_WORDS, KnowledgeSearch, interpret, lexical_candid
 from .knowledge_index import check_current_vehicle_heads, refresh_index
 from .service import QueryService
 from .text_embeddings import TEXT_CONTRACT as ORIGINAL_TEXT_CONTRACT, checked_plan_materials as checked_text_plan_materials
+from . import original_text_retrieval
 
 
 class PlanRequest(StrictModel):
@@ -65,7 +66,7 @@ async def dispatch_embedding(app, config, inputs, *, request_id, session_id):
         # This fresh-session check includes synchronous SQL and bounded PDF
         # recovery. Its parser loop must finish before the Provider is awaited.
         await asyncio.to_thread(check_embedding_dispatch, app.state.database,
-                                request_id, config, inputs, session_id)
+                                request_id, config, inputs, session_id, registry=app.state.registry)
     except HTTPException as error:
         code = error.detail.get('code') if type(error.detail) is dict else None
         if code not in LOCAL_VEHICLE_ERRORS:
@@ -110,7 +111,7 @@ def register_embedding_routes(app: FastAPI):
     def status(db: Session = Depends(get_db)):
         check_current_vehicle_heads(db)
         available, reason = capability(db)
-        model, scope = model_status(), None
+        model, scope, text_scope = model_status(), None, None
         if model['state'] != 'configured':
             reason = reason or model['state']
             available = False
@@ -120,9 +121,11 @@ def register_embedding_routes(app: FastAPI):
             refresh_index(db, app.state.registry)
             materials = current_materials(db, config)
             scope = coverage(materials)
+            originals = original_text_retrieval.current_originals(db, config, app.state.registry)
+            text_scope = original_text_retrieval.coverage(originals)
             db.commit()
         return {'backend': db.get_bind().dialect.name, 'available': available, 'reason': reason,
-                'model': model, 'coverage': scope, 'budget': budget_usage(db),
+                'model': model, 'coverage': scope, 'original_text_coverage': text_scope, 'budget': budget_usage(db),
                 'notice': '配置不表示云端连接已经验证；所配置模型须支持 dimensions 参数。'
                           '只有明确确认的建立索引或混合查询会外发；预算是 token 预留，不是金额上限。'}
 
@@ -225,11 +228,13 @@ def register_embedding_routes(app: FastAPI):
         config = require_config(db)
         refresh_index(db, app.state.registry)
         materials = current_materials(db, config, filters)
-        if not materials[3]:
+        originals = original_text_retrieval.current_originals(db, config, app.state.registry, filters, rebuild=True)
+        if not materials[3] and not originals['cache_ids']:
             raise HTTPException(409, '当前筛选范围没有完整向量索引，请先预览并建立索引；未调用外部服务')
         # Execute lexical retrieval before the paid query embedding. It is rerun
         # against the same current post-call snapshot as dense if ingestion advances.
         lexical_candidates(db, filters, terms, limit=100)
+        original_text_retrieval.lexical_candidates(db, originals, terms)
         row = reserve_request(db, config=config, session_id=request.state.session_id, key=key, kind='hybrid',
             request_hash=request_hash, payload=payload.search.model_dump(), inputs=[payload.search.text])
         def execute():
@@ -241,12 +246,19 @@ def register_embedding_routes(app: FastAPI):
                 QueryService(db, None).lock_ingestion()
                 state = refresh_index(db, app.state.registry)
                 materials = current_materials(db, config, filters)
-                if not materials[3]:
+                originals = original_text_retrieval.current_originals(db, config, app.state.registry, filters, rebuild=True)
+                if not materials[3] and not originals['cache_ids']:
                     return complete(db, row, usage=receipt['usage'], error='embeddings_result_stale')
                 mirror_cache(db, materials[2])
+                mirror_cache(db, originals['cached'])
                 result = hybrid_result(db, config, payload.search,
                     {'engine': 'postgresql_fts_pgvector', 'documents': state.documents, 'version': state.version},
                     materials, receipt['vectors'][0])
+                if originals['entries']:
+                    result['original_text'] = original_text_retrieval.hybrid_result(
+                        db, config, payload.search, originals, receipt['vectors'][0])
+                    result['stages'].append({'name': 'original_text', 'state': 'succeeded',
+                        'reason': '正文FTS与pgvector在已核对范围召回，RRF融合后按来源类别、地区偏好和观察时间排序'})
                 return complete(db, row, result=result, usage=receipt['usage'])
             except Exception as error:
                 db.rollback()

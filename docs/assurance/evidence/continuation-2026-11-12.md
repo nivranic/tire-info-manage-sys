@@ -676,3 +676,16 @@ API结果为 `.artifacts/txweb-r1/result.json`，SHA256 `feaf0eeac4b02566b8c8d92
 浏览器工具将直接文件输出判为工作区之外，截图通过工具图像返回检查后保存在本机忽略目录。一次大型命令触发MSIX启动器拒绝，最小PowerShell7探针正常，改用文件传递图像后保存成功。上述恢复均局限于本轮夹具和取证流程。
 
 下一步实现正文向量召回、FTS融合及权威／地区／时效重排，再冻结原件引用进入证据包，贯通Responses、grounding、流式与报告。[当前交接卡](../../AGENT-HANDOFF-2026-11-12.md)
+
+
+## 2026-11-13正文混合检索收尾与交接
+
+本轮交付正文向量召回、FTS／RRF融合、来源类别／地区偏好／时间排序、共享类型、SDK与Web。首个真实生成Provider沿用用户选定的OpenAI Responses。Gemini适配来自原规格，其提前排期由此前Agent自行决定，真实Google调用待验。
+
+首轮真实PG将现有镜像改为错误向量并实际读到余弦距离1.0，查询恢复断言失败。已改为从校验后的不可变缓存批量upsert派生镜像。保留原断言，修复后56项PG检查通过，153张模型表实际dump／restore指纹一致，恢复库正文引用、历史账本和余弦核对通过。原失败报告位于 `.artifacts/postgres/pgverify-0633ad90d2f7493487294dfdeeaf1f60/report.json`，通过报告位于 `.artifacts/postgres/pgverify-fbaa59d1b30c40f59c40e73e25174611/report.json`，SHA256为 `ecd91406f7db2a6a805ea732b1b71576497f5f0c7b4ef547c46a1ef3364335d7`。
+
+最终API六模块184／184，794个输入稳定，资源关闭、非自检拒绝0。回执为 `.artifacts/othyb-r3/result.json`，SHA256为 `634e483f6bb4b899c63dadde72c537eb96cf1b00f64cdf5d394e528c9d5c560c`。三端类型、SDK7项、Web50项及末次生产构建通过。浏览器首轮发现旧词法卡与融合卡重复，修正后重新构建，最终29项检查通过。窗口resize曾受Chrome最小尺寸限制，随后以精确viewport复核320、390和1440像素均无横向溢出。原失败、测量及工具选择器错误保留在本机原始回执中。
+
+浏览器采用实际PostgreSQL／pgvector及合成HTML／PDF和Provider。覆盖地区／来源筛选、精确条件准入、引用恢复、单次确认、关闭及迟到响应、历史读取和回执丢失后的同标识恢复。最终7次合成调用、7条请求及完成账本、100 tokens和4块缓存，外网尝试、来源调用、真实Provider及正常数据库使用均为0。主动精确筛选拒绝反例产生一条409控制台记录。API退出0，Web经SIGINT退出1，两个隔离PG集群、验收端口和夹具进程关闭核对通过。
+
+本轮回执根目录为 `.artifacts/original-hybrid-20261113/`，入口为 `browser-final.json`、`closure-final.json`及 `delivery-validation.json`。新的当前入口为[11月13日交接卡](../../AGENT-HANDOFF-2026-11-13.md)。下一项为正文证据包与Responses链路，完整V1、真实语义、材料、生产权限、原生平台和无障碍继续待验。

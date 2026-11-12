@@ -202,7 +202,7 @@ def _bind_index_inputs(payload, materials, inputs):
             _binding_failed()
 
 
-def check_embedding_dispatch(database, request_id, config, inputs, session_id):
+def check_embedding_dispatch(database, request_id, config, inputs, session_id, *, registry=None):
     """Fresh durable authority, closed before the caller can await a Provider."""
     from .knowledge import KnowledgeSearch, interpret
 
@@ -244,7 +244,12 @@ def check_embedding_dispatch(database, request_id, config, inputs, session_id):
                         _binding_failed()
                     # Only the user's query goes to the Provider. Document rights
                     # govern local reading, not permission to transmit this query.
-                    if not current_materials(reader, config, interpret(search)[0])[3]:
+                    from .original_text_retrieval import current_originals
+                    originals = current_originals(reader, config, registry, interpret(search)[0])
+                    if not current_materials(reader, config, interpret(search)[0])[3] and not originals['cache_ids']:
+                        if originals['entries']:
+                            from .text_embeddings import fail
+                            fail('text_embedding_use_not_allowed', 403)
                         _binding_failed()
             except (KeyError, TypeError, ValueError, AttributeError):
                 _binding_failed()

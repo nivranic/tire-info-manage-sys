@@ -47,6 +47,7 @@ GUARD_DENIAL_CATEGORIES = frozenset({
 })
 # Explicit 180 API + 2 Worker module manifest. Never substitute discovery for it.
 TEST_MODULES = (
+    'apps/api/tests/test_original_text_retrieval.py',
     'apps/api/tests/test_text_embeddings.py',
     'apps/api/tests/test_document_pdf.py',
     'apps/api/tests/test_document_text.py',

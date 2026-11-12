@@ -44,14 +44,15 @@ def mirror_cache(db, cached):
     """Recover optional pgvector projection solely from validated immutable cache."""
     if not cached:
         return
-    ids = list(cached)
-    existing = set(db.execute(text('SELECT cache_id FROM embedding_vectors WHERE cache_id = ANY(:ids)'), {'ids': ids}).scalars())
-    for key, row in cached.items():
-        if key not in existing:
-            vector = valid_vector(row.vector, row.dimensions)
-            db.execute(text('INSERT INTO embedding_vectors (cache_id, model_space, dimensions, embedding) '
-                'VALUES (:id, :space, :dimensions, CAST(:embedding AS vector)) ON CONFLICT (cache_id) DO NOTHING'),
-                {'id': key, 'space': row.model_space, 'dimensions': row.dimensions, 'embedding': stable_json(vector)})
+    for row in cached.values():
+        valid_vector(row.vector, row.dimensions)
+    db.execute(text('INSERT INTO embedding_vectors (cache_id, model_space, dimensions, embedding) '
+        'SELECT id, model_space, dimensions, CAST(CAST(vector AS text) AS vector) '
+        'FROM embedding_cache WHERE id = ANY(:ids) '
+        'ON CONFLICT (cache_id) DO UPDATE SET model_space = EXCLUDED.model_space, '
+        'dimensions = EXCLUDED.dimensions, embedding = EXCLUDED.embedding '
+        'WHERE (embedding_vectors.model_space, embedding_vectors.dimensions, embedding_vectors.embedding) '
+        'IS DISTINCT FROM (EXCLUDED.model_space, EXCLUDED.dimensions, EXCLUDED.embedding)'), {'ids': list(cached)})
 
 
 def ensure_hnsw(db, config):
@@ -107,8 +108,9 @@ def hybrid_result(db, config, payload, index, materials, query_vector):
     methods = {key: 'hybrid' if len(ranks[key]) == 2 else 'fts' if 'fts_rank' in ranks[key] else 'dense' for key in scores}
     details = {key: {**ranks[key], 'rrf_score': score, 'cosine_distance': distances.get(key)} for key, score in scores.items()}
     ranked = render_ranked([(documents[key], -score) for key, score in scores.items()], filters, terms,
-                           methods=methods, details=details)
+                           methods=methods, details=details, preferred_region=payload.preferred_region)
     return {'mode': 'history', 'data_state': 'local_snapshot', 'text': payload.text,
+        **({'preferred_region': payload.preferred_region} if payload.preferred_region else {}),
         'applied_filters': filters, 'inferred_filters': inferred,
         'items': attach_field_resolutions(db, attach_identity_contracts(db, ranked[:payload.limit])),
         'total': len(ranked), 'total_scope': 'candidates', 'has_more': len(ranked) > payload.limit,

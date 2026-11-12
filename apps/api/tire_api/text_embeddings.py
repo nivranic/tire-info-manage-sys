@@ -101,6 +101,10 @@ def original_excerpt(db, selection, pdfs):
 def authorization_head(db, scope):
     row = db.scalar(select(TextEmbeddingAuthorization).where(TextEmbeddingAuthorization.scope_hash == scope)
         .order_by(desc(TextEmbeddingAuthorization.revision)).limit(1).execution_options(populate_existing=True))
+    return checked_authorization(row)
+
+
+def checked_authorization(row):
     if row is not None:
         value = {'scope_hash': row.scope_hash, 'revision': row.revision,
                  'actor_user_id': row.actor_user_id, 'payload': row.payload}
@@ -124,6 +128,15 @@ def authorization_view(row):
         fail('text_embedding_authorization_invalid')
 
 
+def chunk_for_excerpt(value, privacy, config):
+    text_hash = digest(value)
+    return {'text': value, 'hash': text_hash, 'privacy_class': privacy, 'text_contract': TEXT_CONTRACT,
+        'cache_id': digest({'provider': 'openai_embeddings', 'model_space': config.model_space,
+            'recipient': recipient(config),
+            'model': config.model, 'dimensions': config.dimensions, 'text_contract': TEXT_CONTRACT,
+            'privacy_class': privacy, 'text_hash': text_hash})}
+
+
 def material(db, selection, config, pdfs):
     excerpt = original_excerpt(db, selection, pdfs)
     scope = scope_for(selection, config)
@@ -140,15 +153,26 @@ def material(db, selection, config, pdfs):
             fail('text_embedding_use_not_allowed', 403)
     except (KeyError, TypeError):
         fail('text_embedding_authorization_invalid')
-    text_hash = digest(excerpt['text'])
-    chunk = {'text': excerpt['text'], 'hash': text_hash, 'privacy_class': privacy, 'text_contract': TEXT_CONTRACT,
-        'cache_id': digest({'provider': 'openai_embeddings', 'model_space': config.model_space,
-            'recipient': recipient(config),
-            'model': config.model, 'dimensions': config.dimensions, 'text_contract': TEXT_CONTRACT,
-            'privacy_class': privacy, 'text_hash': text_hash})}
+    chunk = chunk_for_excerpt(excerpt['text'], privacy, config)
     label = excerpt['document']['title'] if selection.kind == 'document_text' else excerpt['source_id']
     return {'id': selection.reference.chunk_id, 'label': label, 'privacy_class': privacy,
         'selection': selection.model_dump(), 'authorization_id': authorization.id, 'chunks': [chunk]}
+
+
+def checked_caches(db, config, unique):
+    cached = {row.id: row for row in db.scalars(select(EmbeddingCache).where(EmbeddingCache.id.in_(unique)))}
+    for key, row in cached.items():
+        chunk = unique[key]
+        if (row.model_space != config.model_space or row.provider != 'openai_embeddings'
+                or row.model != config.model or row.dimensions != config.dimensions
+                or row.text_contract != TEXT_CONTRACT or row.text_hash != chunk['hash']
+                or row.privacy_class != chunk['privacy_class']):
+            fail('text_embedding_binding_failed')
+        try:
+            valid_vector(row.vector, config.dimensions)
+        except EmbeddingError:
+            fail('text_embedding_binding_failed')
+    return cached
 
 
 def text_materials(db, selections, config):
@@ -156,20 +180,10 @@ def text_materials(db, selections, config):
     documents = [material(db, selection, config, pdfs) for selection in selections]
     unique = {chunk['cache_id']: chunk for doc in documents for chunk in doc['chunks']}
     bounded_batch(list(unique.values()))
-    cached = {row.id: row for row in db.scalars(select(EmbeddingCache).where(EmbeddingCache.id.in_(unique)))}
+    cached = checked_caches(db, config, unique)
     for doc in documents:
         for chunk in doc['chunks']:
             row = cached.get(chunk['cache_id'])
-            if row is not None:
-                if (row.model_space != config.model_space or row.provider != 'openai_embeddings'
-                        or row.model != config.model or row.dimensions != config.dimensions
-                        or row.text_contract != TEXT_CONTRACT or row.text_hash != chunk['hash']
-                        or row.privacy_class != chunk['privacy_class']):
-                    fail('text_embedding_binding_failed')
-                try:
-                    valid_vector(row.vector, config.dimensions)
-                except EmbeddingError:
-                    fail('text_embedding_binding_failed')
             chunk['cached'] = row is not None
     return documents, [chunk for key, chunk in unique.items() if key not in cached]
 

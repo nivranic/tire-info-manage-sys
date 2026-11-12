@@ -405,7 +405,8 @@ def assert_text_embedding_checkpoint(url, checkpoint, *, authenticate):
             with app.state.database.sessions() as db:
                 rows = db.execute(text('SELECT c.id, c.text_contract, v.embedding::text '
                     'FROM embedding_cache c JOIN embedding_vectors v ON v.cache_id = c.id '
-                    'WHERE c.text_contract = :contract ORDER BY c.id'), {'contract': TEXT_CONTRACT}).all()
+                    'WHERE c.text_contract = :contract AND c.id = ANY(:ids) ORDER BY c.id'),
+                    {'contract': TEXT_CONTRACT, 'ids': [row[0] for row in checkpoint['vectors']]}).all()
                 assert [list(row) for row in rows] == checkpoint['vectors']
                 for statement in ('UPDATE text_embedding_authorizations SET revision = revision + 20',
                                   'DELETE FROM text_embedding_authorizations',
