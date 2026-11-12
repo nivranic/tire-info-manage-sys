@@ -2,17 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { SourceTextExcerpt, SourceTextSearchItem, SourceTextSearchRequest, SourceTextSearchResult } from "@tire/domain-types";
+import type { DocumentTextExcerpt, DocumentTextSearchItem, DocumentTextSearchRequest, SourceTextExcerpt, SourceTextSearchItem, SourceTextSearchRequest, SourceTextSearchResult } from "@tire/domain-types";
+
+type TextSearchItem = SourceTextSearchItem | DocumentTextSearchItem;
+type TextSearchResult = Omit<SourceTextSearchResult, "items" | "index"> & { items: TextSearchItem[] };
+type TextSearchProps = { automatic: boolean } & (
+  { origin?: "source"; search: SourceTextSearchRequest } |
+  { origin: "document"; search: DocumentTextSearchRequest }
+);
 
 const stamp = (value: string) => new Date(value).toLocaleString("zh-CN");
 
-function SourceTextCard({ item }: { item: SourceTextSearchItem }) {
+function OriginalTextCard({ item }: { item: TextSearchItem }) {
   const operation = useRef<AbortController | null>(null);
-  const [resolved, setResolved] = useState<SourceTextExcerpt | null>(null);
+  const [resolved, setResolved] = useState<SourceTextExcerpt | DocumentTextExcerpt | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const excerpt = resolved || item;
-  const sourceUrl = /^https?:\/\//i.test(excerpt.source_url) ? excerpt.source_url : undefined;
+  const source = excerpt.kind === "document_text" ? excerpt.document.source_url : excerpt.source_url;
+  const sourceUrl = /^https?:\/\//i.test(source) ? source : undefined;
 
   useEffect(() => () => { operation.current?.abort(); }, []);
 
@@ -22,7 +30,9 @@ function SourceTextCard({ item }: { item: SourceTextSearchItem }) {
     operation.current = controller;
     setBusy(true); setError(""); setResolved(null);
     try {
-      const value = await tireApi.resolveSourceText(item.reference, controller.signal);
+      const value = item.kind === "document_text"
+        ? await tireApi.resolveDocumentText(item.reference, controller.signal)
+        : await tireApi.resolveSourceText(item.reference, controller.signal);
       if (controller.signal.aborted || operation.current !== controller) return;
       setResolved(value);
     } catch (cause) {
@@ -33,13 +43,16 @@ function SourceTextCard({ item }: { item: SourceTextSearchItem }) {
     }
   }
 
-  return <article className="knowledge-card source-text-card">
-    <div className="knowledge-card-heading"><strong>{excerpt.source_id} · 页面正文摘录</strong></div>
+  return <article className={`knowledge-card ${excerpt.kind === "document_text" ? "document-text-card" : "source-text-card"}`}>
+    <div className="knowledge-card-heading"><strong>{excerpt.kind === "document_text" ? `${excerpt.document.title} · 第 ${excerpt.reference.page} 页` : `${excerpt.source_id} · 页面正文摘录`}</strong></div>
     <p className="knowledge-excerpt">{excerpt.text}</p>
-    <p className="knowledge-stamp">观察 {stamp(excerpt.observed_at)} · 验证 {stamp(excerpt.verified_at)}</p>
+    <p className="knowledge-stamp">{excerpt.kind === "document_text" ? `留存 ${stamp(excerpt.document.created_at)}` : `观察 ${stamp(excerpt.observed_at)} · 验证 ${stamp(excerpt.verified_at)}`}</p>
     <details className="knowledge-provenance"><summary>原始来源与引用位置</summary>
-      <dl><dt>来源页面</dt><dd>{sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{excerpt.source_url}</a> : excerpt.source_url}</dd>
-        <dt>快照 ID</dt><dd>{excerpt.reference.snapshot_id}</dd>
+      <dl><dt>原始来源</dt><dd>{sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{source}</a> : source || "未提供链接"}</dd>
+        {excerpt.kind === "document_text" ? <><dt>文档 ID</dt><dd>{excerpt.reference.document_id}</dd>
+          <dt>文档元信息指纹</dt><dd className="mono">{excerpt.reference.document_fingerprint}</dd>
+          <dt>文档页码</dt><dd>第 {excerpt.reference.page} 页</dd>
+          <dt>声明的保存依据</dt><dd>{excerpt.document.rights_basis}</dd></> : <><dt>快照 ID</dt><dd>{excerpt.reference.snapshot_id}</dd></>}
         <dt>原件 SHA256</dt><dd className="mono">{excerpt.reference.raw_hash}</dd>
         <dt>抽取版本</dt><dd>{excerpt.reference.extractor_version}</dd>
         <dt>Unicode码点区间</dt><dd>[{excerpt.reference.start}, {excerpt.reference.end})</dd>
@@ -51,13 +64,18 @@ function SourceTextCard({ item }: { item: SourceTextSearchItem }) {
   </article>;
 }
 
-export default function SourceTextSearch({ search, automatic }: { search: SourceTextSearchRequest; automatic: boolean }) {
+export default function SourceTextSearch(props: TextSearchProps) {
+  const { search, automatic } = props;
+  const origin = props.origin || "source";
+  const contentLabel = origin === "document" ? "PDF正文" : "页面正文";
+  const source_id = props.origin === "document" ? undefined : props.search.source_id;
+  const document_id = props.origin === "document" ? props.search.document_id : undefined;
   const operation = useRef<AbortController | null>(null);
-  const [result, setResult] = useState<SourceTextSearchResult | null>(null);
+  const [result, setResult] = useState<TextSearchResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  const { text, source_id, limit } = search;
+  const { text, limit } = search;
 
   const load = useCallback(async (offset = 0) => {
     operation.current?.abort();
@@ -66,7 +84,9 @@ export default function SourceTextSearch({ search, automatic }: { search: Source
     setBusy(true); setError(""); setStatus("");
     if (offset === 0) setResult(null);
     try {
-      const value = await tireApi.searchSourceText({ mode: "history", text, source_id, limit, offset }, controller.signal);
+      const value = origin === "document"
+        ? await tireApi.searchDocumentText({ mode: "history", text, document_id, limit, offset }, controller.signal)
+        : await tireApi.searchSourceText({ mode: "history", text, source_id, limit, offset }, controller.signal);
       if (controller.signal.aborted || operation.current !== controller) return;
       setResult(previous => previous && offset > 0
         ? { ...value, items: [...new Map([...previous.items, ...value.items].map(item => [item.reference.chunk_id, item])).values()] }
@@ -74,11 +94,11 @@ export default function SourceTextSearch({ search, automatic }: { search: Source
       setStatus(`找到 ${value.total} 条正文摘录，已读取 ${Math.min(offset + value.items.length, value.total)} 条。`);
     } catch (cause) {
       if (controller.signal.aborted || operation.current !== controller) return;
-      setError(cause instanceof Error ? cause.message : "页面正文检索未完成，请重试。");
+      setError(cause instanceof Error ? cause.message : `${contentLabel}检索未完成，请重试。`);
     } finally {
       if (operation.current === controller) { operation.current = null; setBusy(false); }
     }
-  }, [text, source_id, limit]);
+  }, [text, source_id, document_id, limit, origin, contentLabel]);
 
   useEffect(() => {
     if (automatic) void load();
@@ -90,15 +110,15 @@ export default function SourceTextSearch({ search, automatic }: { search: Source
     setBusy(false); setStatus("已取消正文检索。");
   }
 
-  return <section className="knowledge-results" aria-label="页面正文检索" aria-busy={busy}>
-    <h3>已保存页面正文</h3>
-    <p>按关键词{source_id ? `及来源 ${source_id}` : ""}检索轮胎页面正文。摘录保留页面范围，具体SKU身份与适用性需要对应的结构化证据。</p>
-    <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void load()}>{result || error ? "重新检索页面正文" : "检索已保存页面正文"}</button>{busy ? <button type="button" className="text-button" onClick={cancel}>取消正文检索</button> : null}</div>
+  return <section className="knowledge-results" aria-label={`${contentLabel}检索`} aria-busy={busy}>
+    <h3>已保存{contentLabel}</h3>
+    <p>{origin === "document" ? "按关键词检索已建立索引的PDF文字层，引用记录文档页码和页内位置。具体SKU身份与适用性需要对应的结构化证据。" : `按关键词${source_id ? `及来源 ${source_id}` : ""}检索轮胎页面正文。摘录保留页面范围，具体SKU身份与适用性需要对应的结构化证据。`}</p>
+    <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void load()}>{result || error ? `重新检索${contentLabel}` : `检索已保存${contentLabel}`}</button>{busy ? <button type="button" className="text-button" onClick={cancel}>取消正文检索</button> : null}</div>
     <p role="status" aria-live="polite">{busy ? "正在读取保存原件与正文索引…" : status}</p>
     {error ? <p className="inline-error" role="alert">{error}</p> : null}
     {result ? <><p className="review-boundary">{result.notice}</p>
-      {result.items.map(item => <SourceTextCard key={item.reference.chunk_id} item={item} />)}
-      {result.total === 0 ? <p>没有匹配的已保存页面正文，可调整关键词或在线保存相关来源。</p> : null}
+      {result.items.map(item => <OriginalTextCard key={item.reference.chunk_id} item={item} />)}
+      {result.total === 0 ? <p>{origin === "document" ? "没有匹配的PDF正文，可调整关键词或在原始文档中提取并索引正文。" : "没有匹配的已保存页面正文，可调整关键词或在线保存相关来源。"}</p> : null}
       {result.has_more && result.offset + result.limit <= 2000 ? <button type="button" className="secondary-button" disabled={busy} onClick={() => void load(result.offset + result.limit)}>继续加载正文摘录</button> : null}
       {result.has_more && result.offset + result.limit > 2000 ? <p>已达到本次分页范围，请缩小关键词或来源范围继续检索。</p> : null}
     </> : null}

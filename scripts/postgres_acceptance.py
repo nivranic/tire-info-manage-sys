@@ -518,6 +518,11 @@ def run():
     original_text_checkpoint = verify_original_text_persistence(url)
     record(STEP)
 
+    STEP = 'pdf_page_text_fts_citation_and_restart'
+    from test_document_text import assert_document_text_checkpoint, verify_document_text_persistence
+    document_text_checkpoint = verify_document_text_persistence(url)
+    record(STEP)
+
     STEP = 'monitor_identity_conditions_revisions_and_restart'
     from test_monitor_conditions import verify_monitor_conditions_persistence
     verify_monitor_conditions_persistence(url)
@@ -628,6 +633,9 @@ def run():
         assert_recall_checkpoint(restored_url, recall_checkpoint)
         STEP = 'restored_recent_page_quality_material_stop_and_url_history'
         assert_recent_history_checkpoint(restored_url, recent_history_checkpoint)
+        STEP = 'restored_pdf_page_text_original_and_citation'
+        with TestClient(create_app(restored_url, FixtureRegistry())) as document_client:
+            assert_document_text_checkpoint(document_client, document_text_checkpoint)
         with patch.dict(os.environ, {'TI_PARSER_BUNDLE_ROOT': str(parser_backup)}):
             STEP = 'restored_parser_release_checkpoint'
             assert_parser_release_checkpoint(restored_url, parser_checkpoint)
@@ -669,6 +677,7 @@ def run():
     record('restored_object_files_match_database_references')
     record('restored_postgres_full_text_query_preserves_references')
     record('restored_original_text_chunks_and_recoverable_citations')
+    record('restored_pdf_pages_fts_and_original_bound_citations')
     record('restored_monitor_draft_origin_and_change_evidence')
     record('restored_report_exports_use_backup_object_directory')
     record('restored_reparse_lineage_review_and_original_object')

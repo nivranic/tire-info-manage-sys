@@ -266,6 +266,9 @@ def assert_document_text_checkpoint(client, checkpoint):
     value = response.json()
     assert value['index']['engine'] == 'postgresql_fts' and value['total'] == 1
     assert value['items'][0]['reference'] == checkpoint['reference']
+    page = client.get(f"/v1/documents/{checkpoint['document_id']}/text?mode=history&page=2")
+    assert page.status_code == 200 and page.json()['page']['text'] == 'Second checkpoint page'
+    assert page.json()['index']['page_count'] == 2
     recovered = resolve(client, checkpoint['reference'])
     assert recovered.status_code == 200 and recovered.json()['text'] == checkpoint['excerpt']
 
