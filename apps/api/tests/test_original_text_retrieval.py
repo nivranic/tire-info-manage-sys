@@ -287,12 +287,15 @@ def test_pdf_dense_result_recovers_original_page_and_preserves_unknown_publicati
             'time_basis': 'publication_unknown', 'observed_at': None} for item in result['items'])
 
 
-def captured_pdf(retrieval, monkeypatch, published_at):
+def captured_pdf(retrieval, monkeypatch, published_at, *, source_attribution=None, indexed=True):
     import test_source_materials as materials
     from tire_api.material_source_policy import PolicyCatalog, canonical_policy
 
     client, _database, _provider = retrieval
-    policy = canonical_policy({**materials.POLICY, 'published_at': published_at})
+    configured = {**materials.POLICY, 'published_at': published_at}
+    if source_attribution is not None:
+        configured['source_attribution'] = source_attribution
+    policy = canonical_policy(configured)
     client.app.state.material_policies = PolicyCatalog([policy])
 
     async def fetch(selected):
@@ -308,8 +311,69 @@ def captured_pdf(retrieval, monkeypatch, published_at):
     assert index_pdf(client, captured['document']['id']).status_code == 200
     item, = pdf_search(client, 'quiettopic', document_id=captured['document']['id']).json()['items']
     selected = {'kind': 'document_text', 'reference': item['reference']}
-    index_selection(client, selected)
+    if indexed:
+        index_selection(client, selected)
     return captured, selected
+
+
+def test_pdf_source_attribution_and_region_recover_frozen_capture_and_history(retrieval, monkeypatch):
+    from tire_api.material_source_policy import PolicyCatalog, canonical_policy
+    import test_source_materials as materials
+
+    client, _database, _provider = retrieval
+    attribution = {'source_class': 'original_test_organization', 'region': 'CN',
+                   'basis': 'Project-authored original test classification'}
+    captured, selected = captured_pdf(retrieval, monkeypatch, None, source_attribution=attribution)
+    client.app.state.material_policies = PolicyCatalog([canonical_policy({**materials.POLICY,
+        'source_attribution': {**attribution, 'source_class': 'professional_media', 'region': 'US'}})])
+    response = ask(client, preferred_region='CN')
+    item, = completed(response)['items']
+    assert item['reference'] == selected['reference']
+    assert item['match']['source_class'] == 'original_test_organization' and item['match']['authority_tier'] == 1
+    assert item['match']['region'] == 'CN' and item['match']['region_match'] == 'exact'
+    assert item['match']['freshness'] == {'time_basis': 'publication_unknown', 'observed_at': None}
+    assert item['match']['source_attribution'] == {**attribution, 'material_request_id': captured['request_id'],
+        'policy_fingerprint': captured['policy_fingerprint']}
+    assert completed(ask(client, filters={'region': 'CN'}))['items'][0]['reference'] == selected['reference']
+    client.app.state.material_policies = PolicyCatalog([])
+    assert client.get(f"/v1/knowledge/embedding-runs/{response.json()['id']}?mode=history").json() == response.json()
+    assert completed(ask(client))['items'][0]['match']['source_attribution']['source_class'] == attribution['source_class']
+    resolved = client.post('/v1/knowledge/document-text/resolve', json={'mode': 'history', 'reference': selected['reference']})
+    assert resolved.status_code == 200 and resolved.json()['text'] == item['text']
+
+
+def test_pdf_source_attribution_precedes_region_and_region_filters_apply_before_candidates(retrieval, monkeypatch):
+    client, _database, _provider = retrieval
+    references = {}
+    for name, source_class, region in [('original-us', 'original_test_organization', 'US'),
+            ('original-cn', 'original_test_organization', 'CN'), ('media-cn', 'professional_media', 'CN')]:
+        _captured, selected = captured_pdf(retrieval, monkeypatch, '2020-06-15', source_attribution={
+            'source_class': source_class, 'region': region, 'basis': 'Project-authored source ordering fixture'})
+        references[name] = selected['reference']
+    _captured, unknown = captured_pdf(retrieval, monkeypatch, None)
+    expected = [references[name] for name in ['original-cn', 'original-us', 'media-cn']] + [unknown['reference']]
+    ranked = completed(ask(client, preferred_region='CN'))
+    assert [item['reference'] for item in ranked['items']] == expected
+    assert [item['match']['authority_tier'] for item in ranked['items']] == [1, 1, 2, None]
+    matching = completed(ask(client, filters={'region': 'CN'}, preferred_region='CN'))
+    assert [item['reference'] for item in matching['items']] == [references['original-cn'], references['media-cn']]
+    assert matching['coverage']['eligible_chunks'] == matching['coverage']['indexed_chunks'] == 2
+    assert matching['candidate_counts']['dense'] == matching['candidate_counts']['fts'] == 2
+    for filters in [{'region': 'EU'}, {'source_id': 'fixture'}, {'kind': 'tire', 'region': 'CN'}]:
+        assert ask(client, filters=filters).status_code == 409
+    page = completed(ask(client, preferred_region='CN', offset=1, limit=2))
+    assert [item['reference'] for item in page['items']] == expected[1:3]
+
+
+def test_pdf_source_attribution_requires_independent_embedding_authorization(retrieval, monkeypatch):
+    client, _database, provider = retrieval
+    captured, selected = captured_pdf(retrieval, monkeypatch, None, source_attribution={
+        'source_class': 'professional_media', 'region': 'CN', 'basis': 'Project-authored source declaration'}, indexed=False)
+    assert captured['policy']['rights']['provider_use'] is False
+    response = ask(client, preferred_region='CN')
+    assert response.status_code == 409 and not provider.calls
+    index_selection(client, selected)
+    assert completed(ask(client, preferred_region='CN'))['items'][0]['reference'] == selected['reference']
 
 
 @pytest.mark.parametrize('published_at', ['2020-06-15', None])

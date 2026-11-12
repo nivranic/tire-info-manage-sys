@@ -1,3 +1,5 @@
+import type { SourceMaterialAttribution } from "./source-materials";
+
 export { DEVICE_AI_WIRE_CONTRACT } from "./device-ai";
 export type {
   AIPriceProvider, AIPriceVersionCreate, AIPriceVersion, AIPriceVersionPage,
@@ -211,6 +213,7 @@ export interface OriginalTextMatch {
   authority_tier: number | null; source_class: string; region: string | null;
   region_match: "exact" | "different" | "unknown" | "not_requested";
   variant_match: "page_scope";
+  source_attribution?: SourceMaterialAttribution & { material_request_id: string; policy_fingerprint: string };
   freshness: {
     time_basis: "observed_at" | "publication_unknown" | "policy_publication_date";
     observed_at: string | null;
@@ -458,7 +461,7 @@ export interface DocumentTextSearchResult {
 }
 
 export type {
-  SourceMaterialRights, SourceMaterialPolicy, SourceMaterialPolicies,
+  SourceMaterialRights, SourceMaterialAttribution, SourceMaterialPolicy, SourceMaterialPolicies,
   SourceMaterialPreviewRequest, SourceMaterialPreview, SourceMaterialCaptureRequest,
   SourceMaterialStopRequest, SourceMaterialStop, SourceMaterialStopResult,
   SourceMaterialRedirect, SourceMaterialRobots, SourceMaterialReceipt,

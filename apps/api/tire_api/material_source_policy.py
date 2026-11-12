@@ -5,9 +5,10 @@ import json
 import os
 from pathlib import Path
 import re
+from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import ConfigDict, Field, StrictBool, field_validator
+from pydantic import ConfigDict, Field, StrictBool, field_validator, model_serializer
 
 from .domain import StrictModel, digest
 
@@ -68,6 +69,22 @@ class MaterialRights(StrictModel):
         return checked_url(value) if value is not None else None
 
 
+class MaterialSourceAttribution(StrictModel):
+    model_config = ConfigDict(extra='forbid', strict=True, str_strip_whitespace=False)
+    source_class: Literal['regulatory', 'manufacturer_official', 'oem_fitment', 'original_test_organization',
+                          'professional_media', 'commissioned_lab_report', 'high_quality_distributor',
+                          'authorized_retailer', 'official_store', 'unclassified']
+    region: str | None = Field(default=None, min_length=1, max_length=40)
+    basis: str = Field(min_length=5, max_length=1000)
+
+    _basis = field_validator('basis')(plain)
+
+    @field_validator('region')
+    @classmethod
+    def optional_region(cls, value):
+        return plain(value) if value is not None else None
+
+
 class MaterialPolicy(StrictModel):
     model_config = ConfigDict(extra='forbid', strict=True, str_strip_whitespace=False)
     policy_id: str = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$')
@@ -79,9 +96,17 @@ class MaterialPolicy(StrictModel):
     download_url: str
     redirect_urls: list[str] = Field(max_length=3)
     rights: MaterialRights
+    source_attribution: MaterialSourceAttribution | None = None
 
     _text = field_validator('title', 'publisher')(plain)
     _urls = field_validator('source_reference_url', 'download_url')(checked_url)
+
+    @model_serializer(mode='wrap')
+    def serialize_policy(self, handler):
+        value = handler(self)
+        if self.source_attribution is None:
+            value.pop('source_attribution', None)
+        return value
 
     @field_validator('edition')
     @classmethod

@@ -60,24 +60,33 @@ def _html_entries(db, catalog, filters, rebuild):
     return result
 
 
-def _pdf_entries(db):
+def _pdf_entries(db, filters):
     from .source_materials import checked_request
 
     result = {}
-    for identity in db.scalars(select(DocumentTextIndex.document_id)):
-        _metadata, index, pages = checked_projection(db, identity)
+    statement = select(DocumentTextIndex.document_id, SourceMaterialOutcome.request_id).outerjoin(
+        SourceMaterialOutcome, SourceMaterialOutcome.document_id == DocumentTextIndex.document_id)
+    for identity, request_id in db.execute(statement):
         freshness = {'time_basis': 'publication_unknown', 'observed_at': None}
         time_sort = float('-inf')
-        request_id = db.scalar(select(SourceMaterialOutcome.request_id).where(SourceMaterialOutcome.document_id == identity))
+        source_class, region, attribution = 'unclassified', None, None
         if request_id is not None:
             acquisition = db.get(SourceMaterialRequest, request_id)
             checked_request(acquisition)
+            declared_source = acquisition.policy.get('source_attribution')
+            if declared_source is not None:
+                source_class, region = declared_source['source_class'], declared_source['region']
+                attribution = {**declared_source, 'material_request_id': request_id,
+                               'policy_fingerprint': acquisition.policy['policy_fingerprint']}
             published_at = acquisition.policy['published_at']
             if published_at is not None:
                 freshness = {'time_basis': 'policy_publication_date', 'observed_at': None,
                     'publication': {'published_at': published_at, 'material_request_id': request_id,
                                     'policy_fingerprint': acquisition.policy['policy_fingerprint']}}
                 time_sort = datetime.fromisoformat(published_at).replace(tzinfo=timezone.utc).timestamp()
+        if filters.get('region') and (not region or normalized(region) != normalized(filters['region'])):
+            continue
+        _metadata, index, pages = checked_projection(db, identity)
         for chunk in db.scalars(select(DocumentTextChunk).where(DocumentTextChunk.document_id == identity)):
             value = reference_for(identity, index.document_fingerprint, index.raw_hash,
                                   chunk.page, chunk.start, chunk.end)
@@ -90,7 +99,7 @@ def _pdf_entries(db):
                     or chunk.tokens != ' '.join(tokens(chunk.text))):
                 fail('text_embedding_binding_failed')
             result[chunk.id] = {'selection': selection, 'text': chunk.text,
-                'source_class': 'unclassified', 'region': None,
+                'source_class': source_class, 'region': region, 'source_attribution': attribution,
                 'time_sort': time_sort, 'freshness': freshness}
     return result
 
@@ -129,8 +138,8 @@ def current_originals(db, config, registry=None, filters=None, *, rebuild=False)
         return result
     try:
         entries = _html_entries(db, source_catalog(registry), filters, rebuild)
-        if not filters:
-            entries.update(_pdf_entries(db))
+        if not set(filters) - {'region'}:
+            entries.update(_pdf_entries(db, filters))
         chunks = _authorized_chunks(db, config, entries)
         cached = checked_caches(db, config, {chunk['cache_id']: chunk for chunk in chunks.values()})
         return {'entries': entries, 'cached': cached,
@@ -229,7 +238,8 @@ def hybrid_result(db, config, search, materials, query_vector):
             'authority_tier': None if tier == 999 else tier, 'source_class': entry['source_class'],
             'region': entry['region'], 'region_match': region, 'variant_match': 'page_scope',
             'freshness': entry['freshness'],
-            'explanation': ['来源目录类别用于正文来源排序，具体字段和SKU身份由结构化证据核对。',
+            **({'source_attribution': entry['source_attribution']} if entry.get('source_attribution') else {}),
+            'explanation': ['已登记来源类别用于正文来源排序，具体字段和SKU身份由结构化证据核对。',
                 '地区偏好按已登记来源地区排序。',
                 'RRF融合分数及可追溯的时间依据参与排序，材料策略日期为配置声明。']}})
     return {'items': items, 'total': len(ordered), 'has_more': len(ordered) > end,

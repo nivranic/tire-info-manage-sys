@@ -94,6 +94,65 @@ def test_policy_rejects_ambiguous_or_unbounded_config(tmp_path, monkeypatch, fie
         load_policies()
 
 
+def test_legacy_policy_fingerprint_omits_absent_or_null_source_attribution():
+    from tire_api.domain import digest
+    from tire_api.material_source_policy import canonical_policy
+
+    expected = {**deepcopy(POLICY), 'policy_fingerprint': digest(POLICY)}
+    assert canonical_policy(POLICY) == expected
+    assert canonical_policy({**POLICY, 'source_attribution': None}) == expected
+
+
+@pytest.mark.parametrize('source_class', ['regulatory', 'manufacturer_official', 'oem_fitment',
+    'original_test_organization', 'professional_media', 'commissioned_lab_report',
+    'high_quality_distributor', 'authorized_retailer', 'official_store', 'unclassified'])
+def test_source_attribution_uses_closed_classes_and_frozen_policy_fingerprint(source_class):
+    from tire_api.material_source_policy import canonical_policy
+
+    attribution = {'source_class': source_class, 'region': 'CN', 'basis': 'Project-authored classification fixture'}
+    configured = canonical_policy({**POLICY, 'source_attribution': attribution})
+    assert configured['source_attribution'] == attribution
+    assert configured['policy_fingerprint'] != canonical_policy(POLICY)['policy_fingerprint']
+    assert configured['rights']['provider_use'] is False and configured['rights']['export'] is False
+
+
+@pytest.mark.parametrize('changed', [
+    {'source_class': 'unknown-role'}, {'source_class': True}, {'region': ' '}, {'region': 'C\nN'},
+    {'region': 'X' * 41}, {'basis': ' '}, {'basis': 'bad\x00basis'}, {'basis': 'X' * 1001},
+    {'verified': True}], ids=['class-unknown', 'class-bool', 'region-blank', 'region-control',
+                            'region-long', 'basis-blank', 'basis-control', 'basis-long', 'extra-claim'])
+def test_source_attribution_rejects_invalid_or_unbounded_declarations(changed):
+    from pydantic import ValidationError
+    from tire_api.material_source_policy import canonical_policy
+
+    attribution = {'source_class': 'professional_media', 'region': None,
+                   'basis': 'Project-authored classification fixture', **changed}
+    with pytest.raises(ValidationError):
+        canonical_policy({**POLICY, 'source_attribution': attribution})
+
+
+def test_source_attribution_is_server_configured_and_bound_to_capture(material_app, monkeypatch):
+    from tire_api.material_source_policy import PolicyCatalog, canonical_policy
+
+    client, app, _path = material_app
+    attribution = {'source_class': 'professional_media', 'region': 'CN', 'basis': 'Project-authored source declaration'}
+    configured = canonical_policy({**POLICY, 'source_attribution': attribution})
+    app.state.material_policies = PolicyCatalog([configured])
+    body = payload(client)
+    preview = client.post('/v1/source-materials/preview', json={name: body[name] for name in (
+        'policy_id', 'expected_policy_fingerprint')})
+    assert preview.status_code == 200 and preview.json()['policy']['source_attribution'] == attribution
+    calls = success_transport(app, monkeypatch)
+    rejected = client.post('/v1/source-materials/captures', json={**body, 'source_attribution': attribution})
+    assert rejected.status_code == 422 and not calls
+    captured = client.post('/v1/source-materials/captures', json=body)
+    assert captured.status_code == 201, captured.text
+    result = captured.json()
+    assert result['policy']['source_attribution'] == attribution
+    assert result['receipt']['policy_fingerprint'] == configured['policy_fingerprint']
+    assert result['receipt']['content_authenticity'] == 'unverified'
+
+
 def success_transport(app, monkeypatch, callback=None):
     calls = []
     async def fetch(policy):

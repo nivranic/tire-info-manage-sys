@@ -16,9 +16,11 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 
 随后补齐PDF正文的冻结策略出版日期、时间排序和页面出处展示。四模块156／156、三端类型和Web55／55通过，实际React组件1440／390／320像素30项检查通过。隔离PG综合58项及日期专项7项分别通过，153张模型表实际备份恢复指纹一致，集群已关闭。日期明确标为策略声明，完整记录见[PDF出版日期验收](assurance/evidence/pdf-publication-ranking-2026-11-13.md)。
 
+最新补齐PDF来源类别和地区声明，绑定捕获策略指纹，参与来源层级、地区偏好及region硬筛选。五模块211／211、三端类型、Web55／55及精确视口48项实际组件检查通过。隔离PG综合58项和来源专项7项分别通过，153表实际恢复一致，集群与预览已关闭。两条人工TestEvent的 `manual_test` 排序差距继续开放，见[来源声明验收](assurance/evidence/pdf-source-attribution-2026-11-13.md)。
+
 此前Web核心流程无障碍补修取得14份Lighthouse无障碍100分快照、22项功能与键盘检查及生产构建通过。读屏、完整WCAG 2.2 AA及其余发布Gate继续开放。
 
-本次PDF日期补修前的已推送基线为 `0253c5097047a4e4934c2d243896fc6c7b287482`。材料研究、评估输入和隔离数据库位于Git忽略目录。交付最终SHA及远端一致性以交付消息和即时Git查询为准。
+本次PDF来源声明补修前的已推送基线为 `6b7a96d6d5cb3ce861340f587f042fa5c1e24386`。材料研究、评估输入和隔离数据库位于Git忽略目录。交付最终SHA及远端一致性以交付消息和即时Git查询为准。
 
 ## 用户决定与实施选择
 
@@ -56,6 +58,18 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 - PERS新批次的幂等UUID为 `90276487-1cea-4f6c-953a-648268d5d61f`，HTTP 201，业务终态failed／source_material_timeout，document与receipt为空。JRC书目页可访问，测试编号到型号的映射待核。
 
 来源、许可、转录解释及后续核验顺序见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。隔离库中的转录记录及其回执保存在本机Git忽略目录。
+
+## 最新PDF来源声明工程
+
+材料策略新增可选 `source_attribution`，包含既有十类来源词表、可空地区和声明依据。声明参与策略指纹并随捕获冻结，缺省及null声明保持历史策略字节表示与指纹。客户端捕获请求使用已有策略ID和期望指纹，分类及地区由服务端启动配置提供。
+
+PDF正文查询恢复成功捕获的冻结声明，接入既有来源层级、地区偏好和分页前排序。独立region硬筛选在FTS和向量候选之前生效，结果携带声明依据、材料请求ID及策略指纹。当前目录修改或移除后，历史结果和原文引用仍从已保存记录恢复。Web材料面板和正文结果展示声明与出处，独立用途授权继续按现有合同校验。
+
+五模块受管API回归211／211，799输入稳定、资源关闭、非自检拒绝0。三端类型、Web55／55及1440／390／320精确视口下48项实际组件检查通过。本轮组件采用同源合成HTTP响应，完整站点和原生平台按各自验收记录跟踪。完整范围见[来源声明验收](assurance/evidence/pdf-source-attribution-2026-11-13.md)与[实施计划](plans/2026-11-13-pdf-source-attribution.md)。
+
+隔离PostgreSQL 18.3／pgvector综合58项和来源声明专项7项分别通过，153张模型表实际dump／restore指纹一致，备份766120字节。真实FTS与cosine核对四个PDF的来源层级、地区、分页和恢复后结果，合成Provider调用4次，恢复专项派发0次。回执根目录为 `.artifacts/pdf-source-attribution-20261113/`，PG报告在 `.artifacts/postgres/pgverify-a12a3d8fc77e403d8b710a1213914451/`。
+
+来源类别与地区的依据为操作者配置声明，外部真人复核继续待完成。原始报道和论文两条人工TestEvent仍使用 `manual_test`，它们的宽查询排序差距保留开放。真实专业来源角色、精确SKU及代表性质量需要继续建立证据。
 
 ## 最新检索评估工程
 
@@ -204,13 +218,13 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 ## 接手后的执行顺序
 
-1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。本轮两个隔离PG及此前API／Web已关闭。新clone需要重建本机验收依赖并取得相应原件。
+1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。隔离资源关闭情况见最新来源声明验收。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
-3. 复用新增离线评估命令，扩充独立标注的P0来源、精确版本、地区及时间案例。核对宽查询中原始报道与转述的来源角色，再按产品规则推进排序改进。首批13查询覆盖2份转录，代表性与真人审核继续待验。真实Embeddings质量按凭据条件推进，语义重排模型属于此前Agent追加的实施选项。
+3. PDF捕获已支持冻结来源类别和地区声明，先核对原始报道与转述的人工TestEvent来源角色及出版物依据，再沿现有权威排序和离线评估器修复该宽查询差距。扩充独立标注的P0来源、精确版本、地区及时间案例。首批13查询覆盖2份转录，代表性与真人审核继续待验。真实Embeddings质量按凭据条件推进，语义重排模型属于此前Agent追加的实施选项。
 4. 原始报道已定位测试执行主体、载速和成绩。接下来核对参测版本的GTIN／产品代码／侧壁标识，处理万力与耐克森的源名差异，取得完整复用许可和可留存原件，推进精确SKU与外部真人Golden。JRC匿名样本待型号映射，PERS本次生产捕获超时失败。详见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
-原文RAG总计划见[实施计划](plans/2026-11-12-original-text-rag.md)，正文阶段见[正文AI计划](plans/2026-11-13-original-text-ai.md)与[正文融合计划](plans/2026-11-13-original-text-hybrid.md)，此前见[Web无障碍计划](plans/2026-11-13-web-accessibility.md)，本轮见[混合检索分页计划](plans/2026-11-13-hybrid-pagination.md)。
+原文RAG总计划见[实施计划](plans/2026-11-12-original-text-rag.md)，正文阶段见[正文AI计划](plans/2026-11-13-original-text-ai.md)与[正文融合计划](plans/2026-11-13-original-text-hybrid.md)，此前见[Web无障碍计划](plans/2026-11-13-web-accessibility.md)与[混合检索分页计划](plans/2026-11-13-hybrid-pagination.md)，最新见[PDF来源声明计划](plans/2026-11-13-pdf-source-attribution.md)。
 
 ## 代码及复验入口
 
@@ -229,6 +243,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 | 本轮分页回归 | `apps/api/tests/test_original_text_retrieval.py`、`apps/api/tests/test_embeddings.py` |
 | 专业材料核验 | `docs/assurance/evidence/material-review-2026-11-13.md`、`apps/api/tire_api/test_events.py` |
 | 检索质量评估 | `scripts/evaluate_knowledge_retrieval.py`、`apps/api/tire_api/retrieval_evaluation.py`、`apps/api/tests/test_retrieval_evaluation.py` |
+| PDF来源声明 | `apps/api/tire_api/material_source_policy.py`、`apps/api/tests/test_source_materials.py`、`packages/domain-types/src/source-materials.ts`、`apps/web/components/source-materials.tsx` |
 
 表中省略目录的后端文件名位于 `apps/api/tire_api/`，Web组件位于 `apps/web/components/`。
 
@@ -237,6 +252,7 @@ git status --short --branch
 git log -4 --oneline
 git rev-parse HEAD
 git rev-parse origin/main
+apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/pdf-source-attribution-next --targets apps/api/tests/test_source_materials.py apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_document_text.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_retrieval_evaluation.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/pdf-publication-next --targets apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_document_text.py apps/api/tests/test_source_materials.py apps/api/tests/test_retrieval_evaluation.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/retrieval-evaluation-next --targets apps/api/tests/test_retrieval_evaluation.py apps/api/tests/test_knowledge.py apps/api/tests/test_original_text_retrieval.py apps/api/tests/test_embeddings.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/otai-next --targets apps/api/tests/test_ai_original_text.py apps/api/tests/test_ai.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_reports.py apps/api/tests/test_report_rendering.py apps/api/tests/test_ai_stream_execution.py apps/api/tests/test_ai_stream_api.py apps/api/tests/test_ai_stream_parser.py apps/api/tests/test_recall_reports.py apps/api/tests/test_test_ai_reports.py
@@ -260,6 +276,8 @@ npm run typecheck --workspace @tire/mobile
 - `docs/HANDOFF.md`从2026-10-26入口起的本机历史尾文保留216248字节，SHA256为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。仓库沿用现有Git文本换行规约，同一尾文的Git blob为215776字节，SHA256为 `55e7f298d159af75eefa0bb4230a9f1193b2938223e51cf2a41c1f9c79d43bab`，新clone按blob核对。
 
 ## 可复制的接手指令
+
+> 最新工程已将PDF的来源类别和地区声明绑定捕获策略指纹，参与正文权威、地区排序及region硬筛选，Web展示声明与出处。先读来源声明验收及最新交付SHA，复核211项API、55项Web、三端类型及48项组件检查的范围。两条真实人工TestEvent的manual_test排序差距、外部真人标注和真实模型语义继续开放，接手后优先核对这两条记录的来源角色及出版物依据。首个真实Provider按用户选择沿OpenAI Responses执行，显式设置进程Provider并核对状态接口。
 
 > PDF正文时效排序已接入成功捕获的冻结策略出版日期，页面展示配置声明及请求、策略指纹。四模块156项回归、三端类型、Web55项及实际React组件三种宽度30项检查通过。PG综合58项和日期专项7项分别通过，153张模型表实际备份恢复一致，集群已关闭。先阅读PDF出版日期验收和最新交付消息，再按后续顺序推进来源角色、代表性质量与原规格剩余验收。
 

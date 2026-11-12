@@ -71,3 +71,7 @@
 /apps/api/tire_api/retrieval_evaluation.py text eol=lf
 /apps/api/tests/test_retrieval_evaluation.py text eol=lf
 /scripts/evaluate_knowledge_retrieval.py text eol=lf
+/apps/api/tire_api/material_source_policy.py text eol=lf
+/apps/api/tests/test_source_materials.py text eol=lf
+/apps/web/components/source-materials.tsx text eol=lf
+/packages/domain-types/src/source-materials.ts text eol=lf

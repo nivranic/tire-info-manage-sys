@@ -12,6 +12,14 @@ export interface SourceMaterialRights {
   export: false;
 }
 
+export interface SourceMaterialAttribution {
+  source_class: "regulatory" | "manufacturer_official" | "oem_fitment" | "original_test_organization"
+    | "professional_media" | "commissioned_lab_report" | "high_quality_distributor"
+    | "authorized_retailer" | "official_store" | "unclassified";
+  region: string | null;
+  basis: string;
+}
+
 export interface SourceMaterialPolicy {
   policy_id: string;
   title: string;
@@ -23,6 +31,7 @@ export interface SourceMaterialPolicy {
   redirect_urls: string[];
   rights: SourceMaterialRights;
   policy_fingerprint: string;
+  source_attribution?: SourceMaterialAttribution;
 }
 
 export interface SourceMaterialPolicies {

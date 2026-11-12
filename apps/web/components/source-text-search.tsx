@@ -27,6 +27,8 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
   const excerpt = resolved || item;
   const source = excerpt.kind === "document_text" ? excerpt.document.source_url : excerpt.source_url;
   const sourceUrl = /^https?:\/\//i.test(source) ? source : undefined;
+  const semanticMatch = "rrf_score" in item.match ? item.match : null;
+  const material = semanticMatch?.source_attribution ?? semanticMatch?.freshness.publication;
 
   useEffect(() => () => { operation.current?.abort(); }, []);
 
@@ -75,9 +77,10 @@ function OriginalTextCard({ item, selected, disabled, onToggle }: {
           ? `原件观察 ${stamp(item.match.freshness.observed_at)}`
           : item.match.freshness.time_basis === "policy_publication_date" && item.match.freshness.publication
             ? `材料策略声明出版日期 ${item.match.freshness.publication.published_at}` : "文档发布时间待核对"}</dd>
-        {item.match.freshness.time_basis === "policy_publication_date" && item.match.freshness.publication ? <>
-          <dt>材料捕获请求</dt><dd className="mono">{item.match.freshness.publication.material_request_id}</dd>
-          <dt>材料策略指纹</dt><dd className="mono">{item.match.freshness.publication.policy_fingerprint}</dd>
+        {item.match.source_attribution ? <><dt>材料策略声明分类依据</dt><dd>{item.match.source_attribution.basis}</dd></> : null}
+        {material ? <>
+          <dt>材料捕获请求</dt><dd className="mono">{material.material_request_id}</dd>
+          <dt>材料策略指纹</dt><dd className="mono">{material.policy_fingerprint}</dd>
         </> : null}</dl>
       <ul>{item.match.explanation.map(line => <li key={line}>{line}</li>)}</ul>
     </details> : null}

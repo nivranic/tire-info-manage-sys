@@ -43,6 +43,11 @@ function assertPolicy(policy: SourceMaterialPolicy): void {
     || policy.rights.store_original !== true || policy.rights.workspace_reopen !== true
     || policy.rights.quote_identifiers !== true || policy.rights.provider_use !== false || policy.rights.export !== false)
     throw new Error("来源策略或许可边界响应不完整，未开放捕获。");
+  const attribution = policy.source_attribution;
+  if (attribution !== undefined && (!attribution || !plain(attribution.source_class, 80)
+    || attribution.region !== null && !plain(attribution.region, 40)
+    || !plain(attribution.basis, 1000) || Array.from(attribution.basis).length < 5))
+    throw new Error("材料策略的来源类别、地区或声明依据响应无效。");
 }
 
 function assertView(view: SourceMaterialRequestView, key?: string, documentId?: string): void {
@@ -98,6 +103,10 @@ function PolicyDetails({ policy }: { policy: SourceMaterialPolicy }) {
     <dl className="source-material-facts">
       <div><dt>出版者 / 材料</dt><dd>{policy.publisher} · {policy.title}</dd></div>
       <div><dt>版本 / 发布日期</dt><dd>{policy.edition ?? "版本未声明"} · {policy.published_at ?? "日期未声明"}</dd></div>
+      {policy.source_attribution ? <>
+        <div><dt>策略声明来源类别 / 地区</dt><dd>{policy.source_attribution.source_class} · {policy.source_attribution.region ?? "地区未声明"}</dd></div>
+        <div><dt>分类与地区声明依据</dt><dd>{policy.source_attribution.basis}</dd></div>
+      </> : null}
       <div><dt>配置的引用页</dt><dd><Reference value={policy.source_reference_url} /></dd></div>
       <div><dt>实际初始 PDF 地址</dt><dd><Reference value={policy.download_url} /></dd></div>
       <div><dt>许可权利人声明</dt><dd>{policy.rights.rights_holder}</dd></div>
