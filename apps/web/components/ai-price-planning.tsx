@@ -9,7 +9,7 @@ import { useWorkbenchAuth } from "./auth";
 const PAGE_SIZE = 10;
 const providerLabels: Record<AIPriceProvider, string> = {
   openai_responses: "OpenAI Responses", openai_chat: "OpenAI Chat Completions",
-  anthropic: "Anthropic Messages", openai_embeddings: "OpenAI Embeddings",
+  anthropic: "Anthropic Messages", gemini: "Google Gemini", openai_embeddings: "OpenAI Embeddings",
 };
 const ratePattern = /^(0|[1-9][0-9]{0,8})(\.[0-9]{1,8})?$/;
 const zeroRate = (value: string) => /^0(?:\.0+)?$/.test(value);

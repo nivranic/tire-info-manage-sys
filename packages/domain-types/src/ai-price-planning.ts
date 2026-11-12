@@ -1,5 +1,5 @@
 /** Manually entered prices for workload planning; never provider billing or a spending guard. */
-export type AIPriceProvider = "openai_responses" | "openai_chat" | "anthropic" | "openai_embeddings";
+export type AIPriceProvider = "openai_responses" | "openai_chat" | "anthropic" | "gemini" | "openai_embeddings";
 
 export interface AIPriceVersionCreate {
   vendor_label: string;

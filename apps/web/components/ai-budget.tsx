@@ -1,7 +1,7 @@
 "use client";
 import type { AIStatus } from "@tire/domain-types";
 
-const providerLabels: Record<string, string> = { openai_responses: "OpenAI Responses API", openai_chat: "OpenAI Chat Completions", anthropic: "Anthropic Messages API" };
+const providerLabels: Record<string, string> = { openai_responses: "OpenAI Responses API", openai_chat: "OpenAI Chat Completions", anthropic: "Anthropic Messages API", gemini: "Google Gemini API" };
 export const aiProviderLabel = (provider?: string) => providerLabels[provider || "openai_responses"] || provider || "AI Provider";
 
 const compact = (value: number) => value >= 10000 ? (value / 1000).toFixed(1).replace(/\.0$/, "") + "k" : value.toLocaleString("en-US");

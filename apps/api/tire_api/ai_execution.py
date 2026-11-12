@@ -179,7 +179,17 @@ def _vehicle_dispatch_input(body):
     """Read only the server-built user envelope; never infer authority from it."""
     if not isinstance(body, dict):
         return None
-    messages = body.get('messages', body.get('input'))
+    if 'contents' in body:
+        contents = body['contents']
+        if (not isinstance(contents, list) or len(contents) != 1 or not isinstance(contents[0], dict)
+                or contents[0].get('role') != 'user'):
+            return None
+        parts = contents[0].get('parts')
+        if not isinstance(parts, list) or len(parts) != 1 or not isinstance(parts[0], dict) or set(parts[0]) != {'text'}:
+            return None
+        messages = [{'role': 'user', 'content': parts[0]['text']}]
+    else:
+        messages = body.get('messages', body.get('input'))
     if not isinstance(messages, list):
         return None
     users = [item for item in messages if isinstance(item, dict) and item.get('role') == 'user']

@@ -19,7 +19,7 @@ ANTHROPIC_DEFAULT_BASE = 'https://api.anthropic.com'
 ANTHROPIC_ENDPOINT_SUFFIX = '/v1/messages'
 ANTHROPIC_VERSION = '2023-06-01'
 CHAT_LOOPBACK_HOSTS = frozenset({'localhost', '127.0.0.1', '::1'})
-AI_PROVIDERS = frozenset({'openai_responses', 'openai_chat', 'anthropic'})
+AI_PROVIDERS = frozenset({'openai_responses', 'openai_chat', 'anthropic', 'gemini'})
 MAX_RESPONSE_BYTES = 512 * 1024
 MAX_REQUEST_BYTES = 48_000
 PROMPT_VERSION = 'tire-grounding@1'
@@ -152,6 +152,16 @@ def configured_model() -> OpenAIConfig:
         return OpenAIConfig(model=model, api_key=key, provider='anthropic',
                             endpoint=base + ANTHROPIC_ENDPOINT_SUFFIX, allowed_host=urlsplit(base).hostname,
                             auth_style=auth_style, **_limit_settings())
+    if provider == 'gemini':
+        model, key = os.getenv('TI_GEMINI_MODEL', ''), os.getenv('TI_GEMINI_API_KEY', '')
+        if not model or not key:
+            raise GatewayError('ai_configuration_required')
+        if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,119}', model) or any(c.isspace() for c in key):
+            raise GatewayError('ai_configuration_invalid')
+        return OpenAIConfig(model=model, api_key=key, provider='gemini',
+            endpoint=f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+            allowed_host='generativelanguage.googleapis.com', auth_style='x-goog-api-key',
+            response_format='json_schema', tokens_param='maxOutputTokens', **_limit_settings())
     raise GatewayError('ai_configuration_invalid')
 
 
@@ -162,6 +172,9 @@ def configured_adapter():
         return ChatCompletionsAdapter()
     if provider == 'anthropic':
         return AnthropicAdapter()
+    if provider == 'gemini':
+        from .ai_gemini import GeminiAdapter
+        return GeminiAdapter()
     if provider == 'openai_responses':
         return OpenAIResponsesAdapter()
     raise GatewayError('ai_configuration_invalid')
@@ -180,7 +193,7 @@ def model_status() -> dict:
               'connection_verified': False, 'max_output_tokens': config.max_output_tokens,
               'daily_token_limit': config.daily_token_limit, 'daily_request_limit': config.daily_request_limit,
               'allowed_privacy_classes': ['public', 'private'] if config.allow_private else ['public']}
-    if config.provider in ('openai_chat', 'anthropic'):
+    if config.provider in ('openai_chat', 'anthropic', 'gemini'):
         status['endpoint_host'] = config.allowed_host
     return status
 
@@ -233,6 +246,11 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
     if byte_count > MAX_REQUEST_BYTES:
         raise GatewayError('ai_evidence_too_large')
     user_input = outbound_user_input(question, evidence)
+    if config.provider == 'gemini':
+        return {'systemInstruction': {'parts': [{'text': system_prompt}]},
+            'contents': [{'role': 'user', 'parts': [{'text': user_input}]}],
+            'generationConfig': {'candidateCount': 1, 'maxOutputTokens': config.max_output_tokens,
+                'responseMimeType': 'application/json', 'responseJsonSchema': output_schema}}, reserve
     if config.provider == 'openai_chat':
         body = {'model': config.model, 'stream': stream, config.tokens_param: config.max_output_tokens,
                 'messages': [{'role': 'system', 'content': system_prompt}, {'role': 'user', 'content': user_input}]}

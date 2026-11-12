@@ -61,7 +61,7 @@ class PricingRequest(StrictModel):
 
 class AIPriceVersionCreate(PricingRequest):
     vendor_label: str = Field(min_length=1, max_length=100)
-    provider: Literal['openai_responses', 'openai_chat', 'anthropic', 'openai_embeddings']
+    provider: Literal['openai_responses', 'openai_chat', 'anthropic', 'gemini', 'openai_embeddings']
     model: str = Field(min_length=1, max_length=120, pattern=r'^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$')
     currency: str = Field(min_length=3, max_length=3, pattern=r'^[A-Z]{3}$')
     input_per_million: str = Field(max_length=18)

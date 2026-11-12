@@ -63,7 +63,7 @@ class PrepareCandidateAI(Closed):
 
 class AuthorizeCandidateAI(Closed):
     dependency_id: str = Field(pattern=r'^[0-9a-f]{64}$')
-    provider: Literal['openai_responses', 'openai_chat', 'anthropic']
+    provider: Literal['openai_responses', 'openai_chat', 'anthropic', 'gemini']
     expected_revision: int = Field(ge=0)
     action: Literal['grant']
     rights_holder: str = Field(min_length=1, max_length=200)
@@ -91,7 +91,7 @@ class AuthorizeCandidateAI(Closed):
 
 class RevokeCandidateAI(Closed):
     dependency_id: str = Field(pattern=r'^[0-9a-f]{64}$')
-    provider: Literal['openai_responses', 'openai_chat', 'anthropic']
+    provider: Literal['openai_responses', 'openai_chat', 'anthropic', 'gemini']
     expected_revision: int = Field(ge=0)
     action: Literal['revoke']
     acknowledged: StrictBool

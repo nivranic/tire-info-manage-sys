@@ -68,6 +68,16 @@ test("create retains exact decimal/date strings and caller UUID across explicit 
   });
 });
 
+test("Gemini prices preserve their provider through the shared client", async () => {
+  const geminiPayload: AIPriceVersionCreate = { ...payload, provider: "gemini" };
+  const geminiVersion: AIPriceVersion = { ...version, provider: "gemini" };
+  await injected(geminiVersion, async calls => {
+    assert.deepEqual(await tireApi.aiPriceVersionCreate(geminiPayload, key), geminiVersion);
+    assert.deepEqual(JSON.parse(String(calls[0].init.body)), geminiPayload);
+    assert.equal(calls.length, 1);
+  });
+});
+
 test("planning preserves exact amounts and snapshots without an idempotency header or grand total", async () => {
   const result: AIPricePlanningResult = { planned_for: planning.planned_for, calculated_at: "2026-10-22T00:00:00Z",
     calculation_version: "standard-text-v1", scale: 6, rounding: "ROUND_HALF_UP", items: [{ item_index: 0,

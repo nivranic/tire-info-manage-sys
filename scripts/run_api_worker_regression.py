@@ -52,6 +52,7 @@ TEST_MODULES = (
     'apps/api/tests/test_ai.py',
     'apps/api/tests/test_ai_anthropic_provider.py',
     'apps/api/tests/test_ai_chat_provider.py',
+    'apps/api/tests/test_ai_gemini_provider.py',
     'apps/api/tests/test_ai_monitoring.py',
     'apps/api/tests/test_ai_pricing.py',
     'apps/api/tests/test_ai_pricing_migration.py',
