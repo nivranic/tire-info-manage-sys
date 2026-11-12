@@ -338,3 +338,72 @@ node --test --experimental-strip-types --import ./packages/api-client/tests/devi
 工程提交为 `4ea023f`（pgvector直连参数）及 `d5fded1`（Gemini原生适配与回归），随后交付进度与交接文档提交。全部提交均为本次范围内的正式提交，既有历史保留。
 
 最终静态复核保存在 `.artifacts/handoff-final-20261112/validation.json`。774个输入与绿色批source-after逐字节匹配，14个本地文档链接有效，HANDOFF历史尾文216248字节及SHA保持。新增行机器路径／高置信度凭据模式检查零命中，`git diff --check`通过。
+
+## 交付后依赖、构建与S2恢复
+
+`bce22a4`推送后按持续目标继续执行。用户已再次核对AI方向，首个真实接入及后续主线为OpenAI Responses。原规格中的其他适配能力沿用已交付范围。
+
+### 锁定依赖及三端构建
+
+核对package-lock与安装内容，发现Next、Vite、Capacitor及其依赖缺少dist文件。对44份对应锁定版本归档逐一验证SRI哈希，结果全部匹配。39个包实际补回9520个缺失文件，1226个既有文件与归档逐字节相同，既有差异0。其余5个入口省略扩展名的包归档内容完整。下载显式直连，一份归档复用已有本机内容缓存。
+
+三端 `tsc --noEmit --incremental false` 均exit0。恢复后的Next包内TypeScript、构建及部署指南已阅读。随后通过既有npm构建入口完成以下三项。
+
+| 平台 | 实际结果 |
+| --- | --- |
+| Web | Next生产构建exit0，独立 `.next-gemini-20261112` 目录，PWA白名单19项 |
+| Desktop | TypeScript及Vite生产构建exit0，输出至本机 `.artifacts/frontend-repair-20261112/desktop-dist` |
+| Mobile | TypeScript及Vite生产构建exit0，输出至本机 `.artifacts/frontend-repair-20261112/mobile-dist` |
+
+Desktop／Mobile保留大chunk告警。构建后将Next生成的next-env.d.ts恢复到预先保存的字节，623个受管前端输入与构建前完全一致。包清单和锁文件保持原字节。该批为前端编译验收，Native安装、原生运行、浏览器交互及性能SLO继续待验。
+
+本机回执位于 `.artifacts/frontend-repair-20261112/`，包括 `download-result.json`、`restore-result.json`、`build-result-r1.json`、三个构建日志和 `post-build-verification.json`。
+
+### 可信S2及实际二进制链
+
+直连小米官方PDF地址得到HTTP200、application/pdf、3240150字节，SHA256为 `0ab998099f84760224071ba9fbefee9c61650d44b994fc82979bed76e086c60f`，与既有S2常量完全一致。验证后恢复到原 `.artifacts/r81-source-and-regression-1e21a0bd37e447c39c7b934ead5a299f/xiaomi-first-generation-2.pdf` 路径。下载回执为 `s2-download-result.json`。
+
+新增8个实际S2／Parser／capsule下的原生外发检查，覆盖普通／设备、同步／流式、冻结正文／篡改正文。原Provider用途拒绝和错误终态规则保持。另运行2个同长度原文损坏用例及此前14模块，受管批 `.artifacts/gems2-r1/` 共376／376通过，runner退出0，失败／跳过／incomplete及非自检拒绝均为0。
+
+774个输入稳定、资源关闭。10个受管Parser子进程均exit0、live为0。正常数据库启动false，真实Provider／接收端调用0。该批SHA256为 `ba2b7d128fee9233f32a6e8e246e31c2e93bdb82a825a3bebff4bf28b27568df`。实际原件与Parser资格链已经执行，模型侧使用合成或禁止调用的适配器。
+
+## OpenAI Responses冒烟脚本假通过修复
+
+### 可证伪原始证据
+
+独立合成探针给既有 `scripts/ai_real_provider_smoke.py` 传入未知fact／evidence ID、自由文本fact及usage=None。原 `check_contract` 正常返回，判定通过。回执为 `.artifacts/responses-smoke-20261112/pre-fix-probe.json`，外部调用0、数据库参与0。
+
+该脚本只检查claims／uncertainty顶层形状，并明确允许usage为空。合成信封还使用evidences及facts.evidence_ids旧形状，缺少应用grounding所需的evidence、facts.evidence_id、conflicts和source_state。
+
+### 修复范围及成功条件
+
+补齐合成信封，复用应用现有 `grounded_answer` 和 `safe_usage`。事实文本从项目自有输入恢复，每次调用须至少产生一条已绑定事实及合法usage。未知引用、重复引用、自由文本事实、空答案、缺失／非法用量和流式正文不一致均拒绝。失败输出为固定错误码，成功输出为计数和规范化用量。
+
+调用入口仍为环境驱动的configured_model／configured_adapter，默认OpenAI Responses，顺序为generate后stream，首错停止。配置失败在创建适配器之前终止。该脚本验证Provider回执与应用grounding，API同意、持久化、幂等和账本沿用各自既有验收。
+
+### 受管验证及失败记录
+
+| 回执 | 实际范围与结果 |
+| --- | --- |
+| `rsp-r1` | 首个受管批在collection阶段退出，实际收集／执行0项，pytest退出3。保留原结果，未形成测试红批结论 |
+| `rsp-r2` | 相同测试导入问题仍导致collection退出，实际执行0项。两份原始回执保留 |
+| `rsp-diag`／`import-diagnostic.json` | 独立探针确认受管搜索路径内不存在scripts包命名空间。收集诊断通过仅证明该诊断入口可导入。测试改为使用runner已注册scripts目录的直接模块导入 |
+| `rsp-r3` | 新模块26项及既有AI、流解析、Chat、Anthropic五模块共122／122通过，runner退出0，零失败／跳过／incomplete |
+
+最终运行命令如下。
+
+```powershell
+apps/api/.venv/Scripts/python.exe scripts/run_api_worker_regression.py --phase run --output-root .artifacts/rsp-r3 --targets apps/api/tests/test_ai_provider_smoke.py apps/api/tests/test_ai.py apps/api/tests/test_ai_stream_parser.py apps/api/tests/test_ai_chat_provider.py apps/api/tests/test_ai_anthropic_provider.py
+```
+
+结果SHA256为 `099eac3593628081ca4f72db79b214a461237d64837f40634192ecf6f2d352b1`。775个输入稳定，包含smoke脚本，资源关闭，非自检拒绝、正常数据库启动、真实Provider／接收端调用及子进程均为0。该批与前述376项为分别执行的限定验收。
+
+另用Python优化模式执行独立探针，合法回执通过，未知引用、缺失usage和总量不一致均拒绝，回执为 `post-fix-optimized-probe.json`。禁用状态CLI实际返回ai_disabled及exit2。只核对配置布尔值，Process／User／Machine三个作用域的TI_OPENAI_MODEL及TI_OPENAI_API_KEY当前均缺失。
+
+独立冷启动CLI审计记录数据库连接0、外部网络尝试0，以及Python标准库platform.win32_ver发起的1次系统版本查询。最初工装要求全部子进程计数为0，诊断明确该查询为cmd的ver命令后，工装按实际事件分别记录，产品行为沿用。原工装回执保留，最终为 `cold-cli-audit-r2.json`，passed=true、CLI仍exit2、其他子进程0。
+
+真实OpenAI Responses语义与API→Provider→Web全链继续待凭据、用途许可及专门验收。EPREL现状及旧KIT C2封存约束保持。完整V1目标继续开放。
+
+正式工程提交为 `243d72b`（实际S2外发回归）和 `0e2eb3f`（Responses冒烟修复），其后交付本轮记录与交接更新。复核时775个最新输入逐字节匹配，623个前端构建输入保持一致。与376项批次相比，共有输入仅smoke脚本及受管runner发生变化，新增输入为smoke测试模块。
+
+四个改动Python文件AST通过，13个本地文档链接有效，HANDOFF历史尾文216248字节及SHA保持。新增行机器路径／高置信度凭据模式检查零命中，差异检查通过。回执为 `.artifacts/responses-smoke-20261112/delivery-validation.json`。

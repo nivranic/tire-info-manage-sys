@@ -11,7 +11,7 @@
 - 随后独立构建pgvector 0.8.1并在PostgreSQL 18.3上完成10项运行检查及12项业务检查，149张业务表备份恢复指纹一致。Embeddings／知识检索受管回归55／55通过。固定合成向量场景的Recall@2为1.0，真实模型语义质量继续待验。
 - 既有开发库经只读备份后，在副本完成015→032升级，113张原表的历史列和值保全。四个迁移故障点完整回滚，升级副本与恢复副本均通过15份原文及97条历史检索结果读取，整库备份回退恢复015。原开发库SHA保持一致。
 - 数据库引用的归档旧后端也已在还原的015副本启动，15份原文及历史检索读取通过。迁移相关五模块受管回归154／154通过，限定证据及部署剩余项见下文。
-- Gemini原生generateContent及streamGenerateContent已实现，包含配置、流式协议、计量、候选授权、人工价格、遥测与共享界面。14模块受管回归366／366通过，新增Gemini模块包含58项。三端完整类型检查存在依赖缺口，详见下文。
+- 多模型网关适配及共享授权／价格／遥测已交付。首个真实接入优先OpenAI Responses。后续15模块受管回归376／376通过，三端类型检查与前端生产构建均通过，详见下文。
 - 首个真实AI接入已选OpenAI Responses API。EPREL Key当前缺失，其他工作继续独立推进。专业材料由Agent自主选取。
 - 本次材料研究核对四份候选，新增原件捕获、TestEvent、精确SKU关联和外部真人Golden均为0。旧KIT C2继续封存。
 - 发布级旧库迁移、真实模型语义、生产来源覆盖、原生平台矩阵和完整无障碍仍待验收。
@@ -130,7 +130,7 @@
 
 最终 `.artifacts/gem-r5/result.json` 为366／366、runner退出0，失败／跳过／incomplete均为0，SHA256 `e17aeda2e5dfda4fce9a50d3b0e73a259f9643fb7588c1f0204fa36a4c4e211b`。14模块覆盖新增58项、既有Responses／Chat／Anthropic、流式、候选授权、价格及遥测。774个源码输入稳定，资源关闭，非自检拒绝0，正常数据库启动false，真实Provider／接收端调用0，子进程0。
 
-本次车型验证使用合成capsule边界。真实Google／Responses／Embeddings语义、真实二进制车型原件链与浏览器／原生端集成仍需各自验收。失败回执 `gem-r1`、`gem-r3`、`gem-r4` 及 `gemdiag-r1` 保留，根因和最终命令见[续作记录](assurance/evidence/continuation-2026-11-12.md)。
+上述366项中的车型验证使用合成capsule边界。随后已恢复可信S2原件并补验实际二进制capsule，见下节。真实Google／Responses／Embeddings语义、浏览器及原生端集成仍需各自验收。失败回执 `gem-r1`、`gem-r3`、`gem-r4` 及 `gemdiag-r1` 保留，根因和最终命令见[续作记录](assurance/evidence/continuation-2026-11-12.md)。
 
 ### 本次交付环境复核
 
@@ -138,17 +138,33 @@
 
 既有数据库回执沿用各批当时的源码绑定。本次Gemini修改共享AI文件，当前源码另由 `gem-r5` 绑定，通用PostgreSQL、pgvector和开发库演练沿用前述已执行范围。
 
-本轮SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56／56通过，候选客户端脚本另执行59项wire／transport断言。三端完整类型检查均exit2，Web缺少Next的dist类型导出，桌面缺少Vite及React插件，移动端还缺少Capacitor CLI。安装包内Next指南也缺失。本次Web修改为既有Provider名称与选项映射。
+SDK价格规划与候选合同类型检查均exit0。Web／SDK合并Node运行56／56通过，候选客户端脚本另执行59项wire／transport断言。交接时三端完整类型检查的依赖缺失失败记录保留，后续恢复结果如下。
 
-历史S2文件 `.artifacts/r81-source-and-regression-1e21a0bd37e447c39c7b934ead5a299f/xiaomi-first-generation-2.pdf` 当前缺失。引用该原件的真实二进制车型测试需要先恢复匹配SHA的原件。本次Gemini新增车型用例在明确的合成capsule边界运行，原始失败保存在 `gem-r3`。前端构建、浏览器、设备和真实Provider调用仍待本轮验收。
+### 依赖、构建及真实S2恢复
+
+按锁文件核对44份安装归档，完整性哈希全部匹配。39个包实际缺少文件，补回9520个文件，1226个既有文件与归档逐字节一致，既有差异0。其余5个包的入口省略扩展名，归档内容完整。三端完整类型检查均exit0，安装包内Next指南已恢复并阅读。
+
+通过既有npm构建入口完成Web／Desktop／Mobile前端生产构建，三者均exit0。Web使用独立Next构建目录，PWA白名单19项。Desktop／Mobile输出到本机忽略目录，保留大chunk告警。构建后恢复Next自动修改的next-env.d.ts，623个受管前端输入与构建前逐字节一致。本机回执为 `.artifacts/frontend-repair-20261112/` 内的归档、恢复、构建及输入核对记录。
+
+从小米官方URL直连取得S2 PDF，3240150字节、SHA256 `0ab998099f84760224071ba9fbefee9c61650d44b994fc82979bed76e086c60f` 均与历史值一致，已恢复既有忽略路径。新增8个实际二进制capsule下的原生外发用例，并复跑2个同长度原文损坏用例及此前14模块。15模块376／376通过，runner退出0，失败／跳过／incomplete及非自检拒绝均为0，774个输入稳定、资源关闭，10个受管Parser子进程均exit0且live为0。正常数据库启动false，真实Provider／接收端调用0。
+
+回执为 `.artifacts/gems2-r1/result.json`，SHA256 `ba2b7d128fee9233f32a6e8e246e31c2e93bdb82a825a3bebff4bf28b27568df`。该批证明S2原文／Parser／capsule与外发拒绝链，生产者仍使用合成或禁止调用的模型适配器。前端浏览器、原生端、真实模型语义及性能SLO继续待验。
+
+### Responses冒烟验收修复
+
+独立合成探针确认既有 `scripts/ai_real_provider_smoke.py` 可接受未知引用、自由文本事实及缺失usage。现已复用应用的 `grounded_answer` 和 `safe_usage`，补齐合成输入信封，要求每次调用至少产生一条已绑定事实及合法用量，流式分片与最终正文一致。错误输出使用固定码。脚本沿用环境配置入口，默认Provider为OpenAI Responses。
+
+新模块26项与既有AI／流解析／Chat／Anthropic五模块共122／122通过，runner退出0，零失败／跳过／incomplete，775个输入稳定、资源关闭、非自检拒绝0，正常数据库启动false、真实Provider／接收端调用0、子进程0。回执为 `.artifacts/rsp-r3/result.json`，SHA256 `099eac3593628081ca4f72db79b214a461237d64837f40634192ecf6f2d352b1`。优化模式Python的四种独立反例／正例判定也通过。
+
+本机Process／User／Machine三个作用域的TI_OPENAI_MODEL及TI_OPENAI_API_KEY均缺失。禁用状态CLI实际返回ai_disabled及exit2，配置失败发生在创建适配器之前。真实OpenAI Responses语义和API→Provider→Web验收继续待凭据及用途条件。该脚本仅验证Provider回执和现行grounding，API同意、持久化、幂等与账本由既有入口分别验证。
 
 ## 下一步执行顺序
 
-1. 核对HEAD、工作区、远端及本机证据是否可用。阅读本卡、原规格和拟修改模块的后续报告。恢复锁定版本依赖后重跑三端类型检查与相应构建，恢复可信S2原件后复跑其真实二进制车型回归。
-2. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
-3. 推进真实Embeddings检索质量与全文RAG／reranker验收。已有47项通用PostgreSQL、pgvector独立运行与业务检查，以及204项和55项受管回归可按源码绑定分别复用。
-4. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。本轮四个候选的取舍依据均在续作记录中。
-5. 本机凭据和来源用途条件具备后，完成OpenAI Responses的API→Provider→引用恢复→Web真实语义链及预算／同意验证。凭据使用本机保密配置。
+1. 核对HEAD、工作区、远端及本机证据是否可用，阅读本卡、原规格和拟修改模块的后续报告。依赖和S2已在本机恢复，新clone仍需安装依赖并取得可信原件。
+2. 优先推进用户选定的OpenAI Responses主线。冒烟脚本grounding与用量假通过已修复，凭据和用途条件具备后完成API→Provider→引用恢复→Web真实语义链及预算／同意验证。
+3. 继续实际部署目标的升级切换及对应发布包完整回退验收，覆盖二进制对象和部署向量扩展。已有开发库015→032副本演练及归档旧后端启动通过，生产PostgreSQL旧库升级继续开放。
+4. 推进真实Embeddings检索质量与全文RAG／reranker验收。已有47项通用PostgreSQL、pgvector独立运行与业务检查，以及204项和55项受管回归可按源码绑定分别复用。
+5. 继续自主追溯真实专业测试材料的原始出版物、许可、试验场次和完整SKU身份，通过既有捕获／TestEvent／身份桥导入，随后进行外部真人Golden审核。本轮四个候选的取舍依据均在续作记录中。
 6. 扩充P0来源、SU7官方OE／精确SKU、监控长周期、全文RAG／reranker与专业性能解释。继续实现原规格剩余能力，并逐项形成可复核证据。
 7. 收敛安静窗口全量回归、六类平台、生产身份／租户权限、无障碍、安全、性能、灾备与分发，逐项验收下列10个Gate。
 
@@ -179,6 +195,7 @@
 | 材料／Golden | `apps/api/tire_api/source_materials.py`、`test_events.py`、`test_event_golden*.py`、`professional_golden*.py` |
 | AI／界面／共享协议 | `apps/api/tire_api/ai*.py`、`apps/web/components/`、`packages/api-client/src/`、`packages/domain-types/src/` |
 | Gemini实现及回归 | `apps/api/tire_api/ai_gemini.py`、`apps/api/tests/test_ai_gemini_provider.py`、`docs/plans/2026-11-12-gemini-native-provider.md` |
+| Responses冒烟及回归 | `scripts/ai_real_provider_smoke.py`、`apps/api/tests/test_ai_provider_smoke.py`、`docs/plans/2026-11-12-responses-smoke-grounding.md` |
 | 受管回归 | `scripts/run_api_worker_regression.py`及对应阶段报告 |
 
 表中省略目录的后端文件名均相对于 `apps/api/tire_api/`。
@@ -187,13 +204,15 @@
 
 初次交接的工程提交 `95fefcd`、文档提交 `ac854dc` 及通用PostgreSQL修正提交 `7ae3967` 已通过GitHub官方SSH 443直连快进推送至原仓库 `main`。HTTPS Git直连先后遇到连接重置和连接失败，API HTTPS直连及SSH 443查询成功。本次业务验收与交接更新沿同一SSH通道交付，最终提交SHA与远端一致性见交付消息及下述接手核对。
 
-前次交付基线为 `a6d2d07`。本次提交覆盖pgvector直连下载、Gemini原生适配及回归、旧库副本演练结果与本卡更新。推送前已通过官方SSH 443直连同步远端，远端与基线一致，既有待推送提交数0。本卡所在文档提交随工程提交交付，接手通过下列命令及即时远端查询核对最终HEAD。
+`bce22a4`交付之前的基线为 `a6d2d07`，该序列覆盖pgvector直连下载、Gemini原生适配及回归、旧库副本演练结果与交接更新。后续恢复与Responses修复使用既有main继续实施，接手通过下列命令及即时远端查询核对最终HEAD。
 
 - `4ea023f` 包含pgvector验证下载的显式直连参数。
 - `d5fded1` 包含Gemini原生适配、共享协议／界面、58项新增回归及实施计划。
+- `243d72b` 包含恢复可信S2后的实际二进制外发回归。
+- `0e2eb3f` 包含Responses冒烟引用／用量校验修复、新增26项测试及实施记录。
 - 本卡所在后续文档提交包含进度、开发库演练结果、环境缺口和接手顺序。可用 `git log -1 --format=%H -- docs/AGENT-HANDOFF-2026-11-12.md` 定位。
 
-最终交付静态复核为 `.artifacts/handoff-final-20261112/validation.json`，774个回归输入逐字节匹配，14个本地链接有效，历史尾文SHA保持。新增行的机器路径及高置信度凭据模式检查零命中，差异检查通过。
+`bce22a4`交付的静态复核为 `.artifacts/handoff-final-20261112/validation.json`，当时774个回归输入逐字节匹配，14个本地链接有效，历史尾文SHA保持。后续恢复与Responses修复按各自新回执绑定，交付核对见 `.artifacts/responses-smoke-20261112/delivery-validation.json`。
 
 - 当前分支为既有 `main`。新分支／工作树须取得用户明确同意。工作区中的他人修改、历史红绿回执及证据按现有归属保留。
 - Windows使用PowerShell 7，exec显式设置工作目录。网络使用直连，代理的启动／配置／连接须先取得用户明确同意。
@@ -217,4 +236,4 @@ git rev-parse origin/main
 
 ## 可复制给接手Agent
 
-> 继续按原需求规格推进胎迹完整V1。先读 `docs/AGENT-HANDOFF-2026-11-12.md`，核对main、HEAD、dirty及本机回执。通用PostgreSQL47项检查及204项受管回归通过。pgvector独立10项运行／12项业务检查、149张业务表恢复及55项相关回归通过。既有开发库只读备份后，在副本完成015→032升级、四点失败回滚、历史API读取、完整恢复及归档旧后端启动，原库SHA保持一致。Gemini原生适配及共享授权／价格／遥测已收尾，14模块366／366回归通过，车型用例使用合成capsule。先修复本机Next／Vite／Capacitor依赖并重跑三端类型／构建，恢复可信S2原件后重跑真实二进制车型回归，再继续实际部署切换与旧版本程序回退、真实Embeddings检索质量、合法专业材料、精确SKU／真人Golden、OpenAI Responses真实语义链、来源、生产权限与平台Gate。EPREL无Key，继续独立工作。旧KIT C2封存约束继续有效。保留原始失败、他人改动及既有安全／许可合同。所有完成声明绑定实际执行范围。
+> 继续按原需求规格推进胎迹完整V1。先读 `docs/AGENT-HANDOFF-2026-11-12.md`，核对main、HEAD、dirty及本机回执。通用PostgreSQL47项检查及204项受管回归通过。pgvector独立10项运行／12项业务检查、149张业务表恢复及55项相关回归通过。既有开发库015→032副本升级、四点失败回滚、历史API读取、完整恢复及归档旧后端启动通过，原库SHA保持一致。本机依赖及可信S2原件已恢复，三端类型／前端生产构建通过，15模块376／376回归通过，含实际Parser与二进制capsule外发拒绝链。Responses冒烟引用／用量假通过已修复，五模块122／122通过。优先继续用户选定的OpenAI Responses真实语义与API→Provider→Web主线，推进实际部署切换、真实Embeddings质量、合法专业材料、精确SKU／真人Golden、来源、生产权限与平台Gate。本机OpenAI配置及EPREL Key缺失，继续独立工作。旧KIT C2封存约束继续有效。保留原始失败、他人改动及既有安全／许可合同。所有完成声明绑定实际执行范围。
