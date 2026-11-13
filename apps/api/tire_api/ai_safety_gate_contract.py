@@ -86,11 +86,20 @@ def require_dispatch(database, request_id, config, body, pack=None):
             outbound=_vehicle_dispatch_input(body)
             if not frozen:
                 raise ValueError('missing_dispatch_packet')
-            marked=(contains(frozen.payload) or outbound is not None and contains(outbound['untrusted_evidence_pack'])
+            admitted = request.request_contract if isinstance(request.request_contract, dict) else {}
+            # The admitted contract remains authoritative when mutable packet
+            # or dispatch-envelope markers disappear. Never downgrade that call.
+            marked=('safety_gate_policy' in admitted or 'safety_gate_prompt_version' in admitted
+                    or admitted.get('prompt_version') == PROMPT_VERSION or admitted.get('purpose') == PURPOSE
+                    or contains(frozen.payload) or outbound is not None and contains(outbound['untrusted_evidence_pack'])
                     or isinstance(pack,dict) and isinstance(pack.get('payload'),dict) and contains(pack['payload']))
             if not marked:
                 return
             if (not validate_payload(frozen.payload) or digest(frozen.payload)!=frozen.fingerprint
+                    or admitted.get('safety_gate_policy') != frozen.payload.get('safety_gate_policy')
+                    or admitted.get('safety_gate_prompt_version') != PROMPT_VERSION
+                    or admitted.get('prompt_version') != PROMPT_VERSION
+                    or admitted.get('purpose') != frozen.payload.get('purpose')
                     or frozen.actor_session_id not in session_scope(db,request.actor_session_id)
                     or request.provider!=config.provider or request.model!=config.model
                     or not isinstance(request.request_contract,dict) or request.request_contract.get('body_hash')!=digest(body)

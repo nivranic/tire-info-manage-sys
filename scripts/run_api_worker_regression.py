@@ -86,6 +86,7 @@ TEST_MODULES = (
     'apps/api/tests/test_safety_gate_external_governance.py',
     'apps/api/tests/test_safety_gate_external_api.py',
     'apps/api/tests/test_safety_gate_ai.py',
+    'apps/api/tests/test_safety_gate_ai_guards.py',
     'apps/api/tests/test_canary.py',
     'apps/api/tests/test_candidate_ai.py',
     'apps/api/tests/test_candidate_ai_review.py',

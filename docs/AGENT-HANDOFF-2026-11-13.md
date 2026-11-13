@@ -1,6 +1,6 @@
 # 胎迹 Agent 交接卡
 
-最新接手先读[简明交接卡](AGENT-HANDOFF-CURRENT.md)。本文件保留此前各阶段详情；最新已接通 Safety Gate AI 后端、共享类型／SDK／页面分析与报告流程，见[消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)和[AI 计划](plans/2026-11-13-safety-gate-ai.md)。真实模型、正式 PG、公网和 Native 仍有待验项。
+最新接手先读[简明交接卡](AGENT-HANDOFF-CURRENT.md)。本文件保留此前各阶段详情；最新已接通 Safety Gate AI 后端、共享类型／SDK／页面分析与报告流程，见[消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)和[AI 计划](plans/2026-11-13-safety-gate-ai.md)。真实模型、正式 PG、公网和 Native 仍有待验项。 最新受理合同加固和反例见[合同验收](assurance/evidence/safety-gate-ai-guards-2026-11-13.md)。
 
 更新于2026-11-13。本卡为当前交接入口，前一阶段的详细记录保留于[11月12日交接卡](AGENT-HANDOFF-2026-11-12.md)。
 
