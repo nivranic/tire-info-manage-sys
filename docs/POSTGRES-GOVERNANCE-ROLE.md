@@ -72,4 +72,4 @@ PostgreSQL 原生允许 PUBLIC UPDATE pg_settings，其语义等同于会话 SET
 
 本轮已在合成隔离 PostgreSQL 中验证无拥有者的轮胎／Safety Gate 审批、限制、撤回、旧 UUID 重放、正常 Reader／HTTP 消费、20 条越权 SQL 拒绝，以及授权不足后的原子回滚。目录／函数权限漏检及修正都保留原回执，详见[验收记录](assurance/evidence/postgres-governance-role-2026-11-14.md)。终端隐藏输入仍为模拟，非真实远端部署。
 
-下一步是 API／Worker 的迁移与运行启动分离：当前 Database.initialize 仍执行 create_all、迁移和索引 DDL，不能直接使用本操作员角色，更不能用跳过初始化冒充 schema 验证。此后继续生产 IAM／RLS、吞吐和灾备。停用账户由 DBA 明确撤销登录／权限并处理连接；业务许可撤回应走 withdraw，不能删除账本历史。
+后续已交付 [API／Worker 显式 verify 启动](POSTGRES-RUNTIME-SCHEMA.md)：源码绑定参考合同只读校验后运行，默认 migrate 仍执行 DDL。本操作员角色不能直接充当应用运行角色。下一步验证旧 PG 升级库兼容／结构归一和完整业务 DML 最小权限，再继续生产 IAM／RLS、吞吐和灾备。停用账户由 DBA 明确撤销登录／权限并处理连接；业务许可撤回应走 withdraw，不能删除账本历史。

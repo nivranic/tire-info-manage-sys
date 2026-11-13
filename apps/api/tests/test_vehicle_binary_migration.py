@@ -65,7 +65,14 @@ FTS_034_INTERNAL_TABLES = {'document_text_fts_data', 'document_text_fts_idx', 'd
                          'document_text_fts_docsize', 'document_text_fts_config'}
 TABLES_034 = {'document_text_indexes', 'document_text_pages', 'document_text_chunks', 'document_text_fts'} | FTS_034_INTERNAL_TABLES
 TABLES_035 = {'text_embedding_authorizations'}
-CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034 | TABLES_035
+# These additive tables already ship in normal startup; the fixed 023 fixture
+# predates Safety Gate. Keep an explicit list, never derive it from live metadata.
+SAFETY_GATE_TABLES = {'safety_gate_snapshots', 'safety_gate_verifications',
+    'safety_gate_alert_revisions', 'safety_gate_alert_observations', 'safety_gate_alert_changes',
+    'safety_gate_monitor_rules', 'safety_gate_rule_revisions', 'safety_gate_monitor_jobs',
+    'safety_gate_monitor_runs', 'safety_gate_monitor_checks', 'safety_gate_notifications',
+    'safety_gate_task_attempts', 'safety_gate_task_events'}
+CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034 | TABLES_035 | SAFETY_GATE_TABLES
 
 
 @pytest.fixture
@@ -414,7 +421,7 @@ def test_new_application_preflight_rejects_view_only_owned_name_without_ddl(tmp_
 
 
 def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False):
-    """025-035 add their declared tables and the 030 interest boolean."""
+    """025-035 plus additive Safety Gate tables; only 030 changes an old column."""
     after = inventory(connection)
     added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032, VERSION_033, VERSION_034, VERSION_035]
     assert after['versions'] == before['versions'] + added_versions == EXPECTED_SCHEMA_VERSIONS

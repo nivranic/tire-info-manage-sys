@@ -1,3 +1,7 @@
+## 最新 PostgreSQL 运行启动分离交付（2026-11-14）
+
+先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。显式 verify 通过源码绑定、外部摘要固定的空参考 schema 合同校验后启动 API／Worker，不执行 DDL；默认 migrate 保留。最终 141 项受管回归、22 项真实隔离 PG／TLS 验收通过，含可选 vector、非拥有者运行和结构篡改拒绝。五个集群及临时秘密／端口已清理。运行角色使用较宽 DML，旧 PG 升级库兼容、完整业务 DML 最小权限、生产部署和完整 V1 仍待完成。配置见[运行启动方案](POSTGRES-RUNTIME-SCHEMA.md)，失败与证据边界见[验收记录](assurance/evidence/postgres-runtime-schema-2026-11-14.md)。下文是此前交付时点，不代表当前仍缺显式 verify 能力。
+
 ## 最新非拥有者许可角色交付（2026-11-14）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。已交付固定授权 SQL 和只读 role-check；非拥有者许可操作员完成轮胎／Safety Gate 全流程，最终43项受管回归、9项真实PG／TLS场景通过，含20条越权SQL拒绝及部分授权回滚。显示名列UPDATE是保留原行锁的明确权限代价。目录／函数漏检、原生pg_settings权限及固定测试时钟失败均留证，见[角色验收](assurance/evidence/postgres-governance-role-2026-11-14.md)。本轮十个集群关闭、临时口令和TLS私钥移除。下一步分离API／Worker迁移与运行启动，不能跳过schema验证；生产IAM／RLS、真实终端和完整V1仍待完成。下文是此前交付时点。

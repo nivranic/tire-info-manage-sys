@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 import hashlib
+import os
 import sqlite3
 import time
 import tempfile
@@ -460,9 +461,79 @@ def protect_evidence(session: Session, _context: Any, _instances: Any) -> None:
             raise ValueError("证据、身份和事实历史只能追加，不能修改或删除")
 
 
+def register_schema_models() -> None:
+    # Worker and CLI startup must register release tables without Web routes.
+    from . import parser_release_models  # noqa: F401
+    from . import identity_models  # noqa: F401
+    from . import identity_contract_models  # noqa: F401
+    from . import fitment_relation_models  # noqa: F401
+    from . import test_events  # noqa: F401
+    from . import test_sku_link_models  # noqa: F401
+    from . import source_material_models  # noqa: F401
+    from . import source_page_url_models  # noqa: F401
+    from . import source_text_models  # noqa: F401
+    from . import document_text_models  # noqa: F401
+    from . import text_embedding_models  # noqa: F401
+    from . import candidate_ai_models  # noqa: F401
+    from . import webhook_models  # noqa: F401
+    from . import external_api_models  # noqa: F401
+    from . import external_fact_models  # noqa: F401
+    from . import query_owner_models  # noqa: F401
+    from . import golden_models  # noqa: F401
+    from . import test_event_golden_models  # noqa: F401
+    from . import ai_pricing_models  # noqa: F401
+    from . import source_page_models  # noqa: F401
+    from . import source_setting_models  # noqa: F401
+    from . import monitor_task_models  # noqa: F401
+    from . import vehicles  # noqa: F401
+    from . import recall_models  # noqa: F401
+    from . import recall_discovery  # noqa: F401
+    from . import safety_gate  # noqa: F401
+    from . import safety_gate_alerts  # noqa: F401
+    from . import safety_gate_monitor_models  # noqa: F401
+    from . import recall_discovery_monitor_models  # noqa: F401
+    from . import ai_stream_models  # noqa: F401
+    from . import offline_models  # noqa: F401
+    from . import query_fallback_policies  # noqa: F401
+    from . import device_ai_models  # noqa: F401
+    from . import interest_models  # noqa: F401
+    from . import interest_catalog_models  # noqa: F401
+    from . import interest_applicability_models  # noqa: F401
+    from . import knowledge_models, embedding_models  # noqa: F401
+    from . import ai_models, reparse_models, report_models  # noqa: F401
+
+
+def apply_schema(connection) -> None:
+    """Called only by a migration owner holding the schema transaction lock."""
+    from .migrations import upgrade
+    from .knowledge_models import initialize_search
+    from .embedding_models import initialize_vectors
+    from .source_text_models import initialize_source_text_search
+    from .document_text_models import initialize_document_text_search
+    from .vehicle_binary_migration import preflight
+    preflight(connection)
+    Base.metadata.create_all(connection)
+    upgrade(connection)
+    initialize_search(connection)
+    initialize_vectors(connection)
+    initialize_source_text_search(connection)
+    initialize_document_text_search(connection)
+
+
 class Database:
-    def __init__(self, url: str):
+    def __init__(self, url: str, *, schema_mode=None, schema_contract=None, schema_sha256=None):
         parsed = make_url(url)
+        from .postgres_schema import SchemaContractError
+        self.schema_mode = schema_mode if schema_mode is not None else os.getenv('TI_DATABASE_SCHEMA_MODE', 'migrate')
+        self.schema_contract = schema_contract if schema_contract is not None else os.getenv('TI_DATABASE_SCHEMA_CONTRACT')
+        self.schema_sha256 = schema_sha256 if schema_sha256 is not None else os.getenv('TI_DATABASE_SCHEMA_SHA256')
+        if self.schema_mode not in ('migrate', 'verify'):
+            raise SchemaContractError('schema_mode_invalid')
+        if self.schema_mode == 'verify':
+            if parsed.get_backend_name() != 'postgresql' or not self.schema_contract or not self.schema_sha256:
+                raise SchemaContractError('schema_verify_configuration_required')
+        elif self.schema_contract is not None or self.schema_sha256 is not None:
+            raise SchemaContractError('schema_mode_invalid')
         from .object_store import configured_store
         self._temporary_objects = None
         if parsed.get_backend_name() == 'sqlite' and parsed.database in (None, '', ':memory:'):
@@ -480,6 +551,10 @@ class Database:
             kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
             if parsed.database in (None, "", ":memory:"):
                 kwargs["poolclass"] = StaticPool
+        elif self.schema_mode == 'verify':
+            # Runtime SQL must resolve the same schema that startup inspected.
+            kwargs['connect_args'] = {'options': '-c search_path=pg_catalog,public'}
+            kwargs['isolation_level'] = 'READ COMMITTED'
         self.engine = create_engine(url, **kwargs)
         if parsed.get_backend_name() == "sqlite":
             @event.listens_for(self.engine, "connect")
@@ -510,48 +585,11 @@ class Database:
         self.backend = parsed.get_backend_name()
 
     def initialize(self) -> None:
-        # Worker and CLI startup must register release tables without Web routes.
-        from . import parser_release_models  # noqa: F401
-        from . import identity_models  # noqa: F401
-        from . import identity_contract_models  # noqa: F401
-        from . import fitment_relation_models  # noqa: F401
-        from . import test_events  # noqa: F401
-        from . import test_sku_link_models  # noqa: F401
-        from . import source_material_models  # noqa: F401
-        from . import source_page_url_models  # noqa: F401
-        from . import source_text_models  # noqa: F401
-        from . import document_text_models  # noqa: F401
-        from . import text_embedding_models  # noqa: F401
-        from . import candidate_ai_models  # noqa: F401
-        from . import webhook_models  # noqa: F401
-        from . import external_api_models  # noqa: F401
-        from . import external_fact_models  # noqa: F401
-        from . import query_owner_models  # noqa: F401
-        from . import golden_models  # noqa: F401
-        from . import test_event_golden_models  # noqa: F401
-        from . import ai_pricing_models  # noqa: F401
-        from . import source_page_models  # noqa: F401
-        from . import source_setting_models  # noqa: F401
-        from . import monitor_task_models  # noqa: F401
-        from . import vehicles  # noqa: F401
-        from . import recall_models  # noqa: F401
-        from . import recall_discovery  # noqa: F401
-        from . import safety_gate  # noqa: F401
-        from . import safety_gate_alerts  # noqa: F401
-        from . import safety_gate_monitor_models  # noqa: F401
-        from . import recall_discovery_monitor_models  # noqa: F401
-        from . import ai_stream_models  # noqa: F401
-        from . import offline_models  # noqa: F401
-        from . import query_fallback_policies  # noqa: F401
-        from . import device_ai_models  # noqa: F401
-        from . import interest_models  # noqa: F401
-        from . import interest_catalog_models  # noqa: F401
-        from . import interest_applicability_models  # noqa: F401
-        from .migrations import upgrade
-        from .knowledge_models import initialize_search
-        from .embedding_models import initialize_vectors
-        from .source_text_models import initialize_source_text_search
-        from .document_text_models import initialize_document_text_search
+        register_schema_models()
+        if self.schema_mode == 'verify':
+            from .postgres_schema import verify_schema
+            verify_schema(self.engine, self.schema_contract, self.schema_sha256)
+            return
         # create_all(checkfirst=True) is not atomic across processes. Hold one
         # transaction-scoped lock before schema inspection, table creation and
         # additive upgrades, using the same connection throughout.
@@ -560,14 +598,7 @@ class Database:
                 connection.exec_driver_sql("BEGIN IMMEDIATE")
             elif self.backend == "postgresql":
                 connection.exec_driver_sql("SELECT pg_advisory_xact_lock(821741906)")
-            from .vehicle_binary_migration import preflight
-            preflight(connection)
-            Base.metadata.create_all(connection)
-            upgrade(connection)
-            initialize_search(connection)
-            initialize_vectors(connection)
-            initialize_source_text_search(connection)
-            initialize_document_text_search(connection)
+            apply_schema(connection)
 
     def close(self) -> None:
         self.engine.dispose()

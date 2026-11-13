@@ -10,7 +10,8 @@
 - 已接通 **Safety Gate 外部受许可读取与 AI 共享类型／SDK／页面／报告消费**，历史卡车轮胎告警与合成 Provider 流程已验。最新增加 **PostgreSQL 轮胎单事实／分页、Safety Gate 分页与冻结归属写入**；真实模型及 Native 宿主／设备继续待验。
 - 已补齐 Parser 逐文件期限检查及 Windows 本地规范归档长路径处理；对应阶段 105 项相关回归、58 项 PG 核心综合验收（含备份恢复）全部通过。历史间歇超时根因和生产 SLO 仍未确认。
 - 最新补齐 **PostgreSQL 许可治理 CLI**：显式目标、隐藏双密码、SCRAM／TLS、审批／限制／撤回／重放及原有审计；40 项受管回归和真实 PG 6 场景通过。生产最小权限和真实终端继续待验。
-- 已增加 **非拥有者许可操作员角色方案**：固定授权 SQL、前后权限检查和只读 role-check；最终 43 项受管回归、真实 PG 9 场景通过，含 20 条越权 SQL 拒绝。API／Worker 运行角色、实际终端及生产 IAM／RLS 仍未完成。
+- 已增加 **非拥有者许可操作员角色方案**：固定授权 SQL、前后权限检查和只读 role-check；最终 43 项受管回归、真实 PG 9 场景通过，含 20 条越权 SQL 拒绝。应用完整 DML 最小权限、实际终端及生产 IAM／RLS 仍未完成。
+- 最新完成 **PG 迁移与运行启动分离**：显式 verify 以源码绑定合同只读校验，141 项受管回归、22 项真实 PG 验收通过；旧 PG 库兼容和完整 DML 最小权限仍待验。
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 
 ## 用户已确定的边界
@@ -35,10 +36,23 @@
 | 证据浏览 | 快照／哈希／Parser、原件、HTML／PDF 正文、引用恢复 | 部署旧库切换、完整许可治理、生产对象存储 |
 | 个性化 | 车库、关注、偏好、保存比较、非 SKU 兴趣 | 跨设备、长期运行与真实推荐质量 |
 | AI 研究 | grounding、流式、报告、正文证据包、FTS／向量／融合检索与评估 | 真实 Responses／Embeddings 语义、代表性检索质量与模型治理 |
-| 对外能力 | REST、SSE、SDK、Webhook、Key、SQLite／PG 受许可事实与告警读取、许可 CLI／角色检查 | API 运行角色／吞吐、公网接收端、SDK 产品化、完整 WebSocket |
+| 对外能力 | REST、SSE、SDK、Webhook、Key、SQLite／PG 受许可事实与告警读取、许可 CLI／角色检查 | 应用 DML 最小权限／吞吐、公网接收端、SDK 产品化、完整 WebSocket |
 | 管理后台 | Parser 健康／发布回滚、隔离、失败任务、纠错与审计 | 生产 IAM／租户／RLS、完整角色治理、灾备与发布验收 |
 
-## 最新交付：非拥有者许可操作员（2026-11-14）
+## 最新交付：PostgreSQL 迁移与运行启动分离（2026-11-14）
+
+基线 `19d0cf02d04de4b4bb73bd1fe57f4e9ff1108212`。API lifespan 和 Worker 正常入口共用 Database.initialize 分派：默认 migrate 保留；显式 verify 使用独立空参考库生成、经外部 SHA-256 固定且绑定 Python 源码的 schema 合同，只读校验后启动，不执行 DDL，不自动修复漂移。
+
+- 最终受管四模块 **141／141 通过**，837 输入稳定、资源关闭、非自检拒绝 0；真实隔离 PG 18.3 **22 项通过**，包括 TLS、可选 pgvector、独立新库匹配和非拥有者运行。
+- API 启动 SQL 仅 SELECT／SET；Worker 完整单次入口仅 INSERT／SELECT／SET。五种 DDL 被拒绝，结构、约束、索引、触发器、函数、版本、扩展、摘要或源码变化拒绝启动。
+- 参考包含 166 个模型表、167 个普通关系。合同拒绝 RLS、自定义类型等当前未支持结构；不从运行库签发期望，不在启动时自动计算批准摘要。
+- API 使用 ASGI TestClient，Worker 使用空队列；运行夹具授予较宽 DML，只证明非拥有者运行，不代表生产 DML 最小权限、浏览器／公网、长期监控或真实终端验收。
+- 两项历史 SQLite 迁移断言在 HEAD 原始 db.py 下也失败，已补明确的 13 张 Safety Gate 表清单；冻结 023 夹具及旧数据／结构断言保持。其他参考路径及测试装配失败均保留原回执。
+- 五个隔离 PG 集群已停止，临时口令、TLS 私钥和端口已清理。旧 PG 升级库兼容／结构归一、完整 DML 最小权限、生产 IAM／RLS、真实终端／远端及灾备继续待验。
+
+操作配置见[运行启动方案](POSTGRES-RUNTIME-SCHEMA.md)，范围、回执摘要与复跑命令见[运行 schema 验收](assurance/evidence/postgres-runtime-schema-2026-11-14.md)。本次收尾只复核已通过回执与源码绑定，不把 SQLite 回归当作旧 PG 升级兼容证明。提交与实时远端 SHA 以最终交付消息和 Git 核对结果为准。
+
+## 此前交付：非拥有者许可操作员（2026-11-14）
 
 基线 `e0310f64fa2f9b7e8a7456afb6fce5a2d09010c3`。新增生成器只输出可审查的事务 SQL，不建角色／改密码／改 PUBLIC；role-check 在只读事务核对当前连接角色的有效权限。覆盖额外 ACL、成员／所有权、SECURITY DEFINER、系统目录／函数／危险参数等；不完整 GRANT 的后检查会拒绝并回滚。
 
@@ -48,7 +62,7 @@
 - 原测试固定时钟导致 review_in_future，已证伪并仅修测试时钟。初稿目录／函数权限的三项漏检也实际复现并补齐；原生 pg_settings 权限已核对并保持，危险参数额外授权拒绝。所有失败保留。
 - 本轮十个集群均关闭，端口／临时口令／TLS 私钥清理完成。真实终端、远端部署、生产 IAM／RLS、吞吐与完整 V1 继续待验。
 
-部署步骤见[操作员方案](POSTGRES-GOVERNANCE-ROLE.md)，细节与原始回执见[角色验收](assurance/evidence/postgres-governance-role-2026-11-14.md)。下一步分离 API／Worker 的迁移与运行启动：当前 Database.initialize 仍会执行 create_all、迁移和搜索索引 DDL，不能直接换成无 DDL 角色或跳过 schema 验证。
+部署步骤见[操作员方案](POSTGRES-GOVERNANCE-ROLE.md)，细节与原始回执见[角色验收](assurance/evidence/postgres-governance-role-2026-11-14.md)。后续已完成显式 verify 启动与源码绑定 schema 校验，见上文。默认 migrate 仍执行 DDL；许可操作员不能直接充当整个应用运行角色。
 
 ## 此前交付：PostgreSQL 许可治理 CLI
 
@@ -165,8 +179,8 @@
 
 ## 接手后优先做什么
 
-1. 核对 main、HEAD、工作区与实时远端，读本卡、非拥有者角色／PG CLI 及 Windows 路径验收；新 clone 重建依赖和材料，本机私槽没有随 Git 交付。最新角色 43 项回归／9 项 PG 专项与此前 CLI、路径及 core 验收分别留证；保留历史失败，对新失败取原始证据，不重复泛化跑已通过且无变化的检查。
-2. PG 许可 CLI 和非拥有者操作员已交付。下一步分离 API／Worker 的迁移与运行启动，建立不执行 DDL 的完整 schema 校验，再验证应用运行角色；不得仅跳过初始化。继续真实终端、生产 IAM／RLS、吞吐及灾备。Reader 固定表锁名单是合同的一部分，不能仅删锁提速。
+1. 核对 main、HEAD、工作区与实时远端，读本卡、运行 schema／非拥有者角色／PG CLI 及 Windows 路径验收；新 clone 重建依赖和材料，本机私槽没有随 Git 交付。最新启动 141 项回归／22 项 PG 专项与此前角色、CLI、路径及 core 验收分别留证；保留历史失败，对新失败取原始证据，不重复泛化跑已通过且无变化的检查。
+2. PG 许可 CLI、非拥有者操作员及显式 verify 启动已交付。下一步先用历史 PG 升级库核对空参考合同的兼容／归一，再制定并验收完整业务 DML 最小权限；不得将较宽 DML 夹具当作生产角色方案，也不得重签运行库来绕过漂移。继续真实终端、生产 IAM／RLS、吞吐及灾备。Reader 固定表锁名单是合同的一部分，不能仅删锁提速。
 3. 阅读新增合同验收中的 8 项真实漏检与 2 项读取拒绝测试预期差异，保留原始失败；容量、核验状态、最终发送及完成重验、混合域已经取得专项证据，不重复做同一轮泛化回归。后续根据新的实现或失败补测。
 4. 核对实际 Native 宿主的正常桥接和轮询消费。Web 工程验收已完成，真机／宿主权限、文件保存与恢复仍需实际证据，不扩离线包域或 IPC 权限。
 5. 验证监控自然长周期、多规则、真实变化提醒和通知 lag；继续其他 P0 官方渠道、地区与 SKU 参数覆盖。模拟超时、历史回放和固定材料验证不能证明这些运行指标。
@@ -192,4 +206,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-CURRENT.md、原始规格及 postgres-governance-role 验收。最新已补 PG 非拥有者许可角色，43 项受管回归、9 项真实 PG／TLS 场景通过，含20条越权拒绝；保留系统目录漏检、原生ACL和固定测试时钟的原始失败。操作员有显示名列 UPDATE、可读 users 哈希，只适合可信工作站。API／Worker 当前仍自动执行 DDL，下一步分离迁移与运行启动并完整校验 schema，不可简单跳过初始化。继续应用运行角色／真实终端／IAM／RLS／吞吐、实际 Native、自然长周期、专业材料与真人 Golden 及其余发布 Gate。首个真实 AI 接口保持 OpenAI Responses；缺 OpenAI／EPREL 凭据时推进独立工作，不重复追问。KIT C2 封存和材料权限边界保持。12 模块／10 Gate／13 SLO／15 决策分别跟踪，完整 V1 尚未完成。沿 main 工作，不自行建分支／worktree 或使用代理；提交前验证审查，推送后独立核对远端与工作区。
+> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-CURRENT.md、原始规格及 postgres-runtime-schema 验收。最新已交付 PG 迁移与运行启动分离：141 项受管回归、22 项真实 PG／TLS 验收通过；API／Worker 显式 verify 只读校验空参考库生成、源码绑定且外部摘要固定的合同，无 DDL。默认 migrate 保留。运行夹具只有较宽 DML 的非拥有者证明，下一步做旧 PG 升级库兼容／结构归一及完整业务 DML 最小权限，不得从运行库签合同绕过差异。保留失败回执，勿把 SQLite 回归当作旧 PG 兼容验收。继续真实终端／远端、IAM／RLS／吞吐／灾备、实际 Native、自然长周期、专业材料与真人 Golden 及其余发布 Gate。首个真实 AI 接口保持 OpenAI Responses；Gemini 仅是此前 agent 提前实现的可选适配器。缺 OpenAI／EPREL 凭据时推进独立工作，不重复追问。KIT C2 封存及材料权限边界保持。12 模块／10 Gate／13 SLO／15 决策分别跟踪，完整 V1 尚未完成。沿 main 工作，不自行建分支／worktree 或使用代理；提交前验证审查，推送后独立核对远端与工作区。

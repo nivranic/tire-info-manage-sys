@@ -14,6 +14,66 @@ from tire_api.main import create_app
 from test_core import FixtureRegistry, live
 
 
+def test_runtime_schema_mode_never_silently_migrates(tmp_path, monkeypatch):
+    from tire_api.postgres_schema import SchemaContractError
+    for mode in ('skip', '', 'VERIFY'):
+        with pytest.raises(SchemaContractError):
+            Database('sqlite:///:memory:', schema_mode=mode)
+    with pytest.raises(SchemaContractError):
+        Database('sqlite:///:memory:', schema_mode='verify', schema_contract=tmp_path / 'contract.json',
+                 schema_sha256='a' * 64)
+    monkeypatch.setenv('TI_DATABASE_SCHEMA_CONTRACT', str(tmp_path / 'contract.json'))
+    with pytest.raises(SchemaContractError):
+        Database('sqlite:///:memory:')
+
+
+def test_pg_verify_dispatch_cannot_run_create_or_upgrade(tmp_path, monkeypatch):
+    from tire_api import postgres_schema
+    from tire_api.db import Base
+    monkeypatch.setenv('TI_OBJECT_STORE_ROOT', str(tmp_path / 'objects'))
+    database = Database('postgresql+psycopg://synthetic@127.0.0.1/synthetic', schema_mode='verify',
+        schema_contract=tmp_path / 'contract.json', schema_sha256='a' * 64)
+    calls = []
+    def denied(*args, **kwargs):
+        raise AssertionError('verify must never perform DDL')
+    monkeypatch.setattr(Base.metadata, 'create_all', denied)
+    monkeypatch.setattr(migrations, 'upgrade', denied)
+    monkeypatch.setattr(postgres_schema, 'verify_schema', lambda *args: calls.append(args))
+    try:
+        database.initialize()
+        assert calls == [(database.engine, tmp_path / 'contract.json', 'a' * 64)]
+    finally:
+        database.close()
+
+
+def test_contract_pin_and_closed_json_are_required_before_connection(tmp_path):
+    import hashlib
+    from tire_api.postgres_schema import SchemaContractError, load_contract
+    path = tmp_path / 'contract.json'
+    for data in (b'{"schema":1,"schema":2}', b'{"value":NaN}', b'{}'):
+        path.write_bytes(data)
+        with pytest.raises(SchemaContractError):
+            load_contract(path, hashlib.sha256(data).hexdigest())
+    with pytest.raises(SchemaContractError):
+        load_contract(path, '0' * 64)
+    with pytest.raises(SchemaContractError):
+        load_contract(path, None)
+
+
+def test_reference_cli_requires_explicit_empty_target_and_hidden_input(tmp_path, monkeypatch, capsys):
+    from tire_api import postgres_schema_cli as cli
+    from types import SimpleNamespace
+    calls = []
+    monkeypatch.setattr(cli, 'postgres_engine', lambda *args: calls.append(args))
+    args = ['--postgres-profile', str(tmp_path / 'profile.json'), '--output-file', str(tmp_path / 'contract.json')]
+    assert cli.main(args) == 1
+    assert 'request_invalid' in capsys.readouterr().out
+    monkeypatch.setattr(cli.sys, 'stdin', SimpleNamespace(isatty=lambda: False))
+    assert cli.main(args + ['--empty-reference-confirmed']) == 1
+    assert 'interactive_authentication_required' in capsys.readouterr().out
+    assert calls == []
+
+
 @pytest.mark.parametrize("attempt", range(3))
 def test_concurrent_startup_creates_one_complete_schema(tmp_path, attempt):
     url = f"sqlite:///{(tmp_path / 'shared-startup.db').as_posix()}"
