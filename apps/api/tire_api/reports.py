@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, load_only
 from .ai_analysis import grounded_answer, owned_pack
 from .auth import session_scope
 from .ai_recall_contract import is_recall_evidence, validate_recall_payload
+from . import ai_safety_gate_contract as safety_gate_contract
 from .ai_test_contract import contains_test, test_boundary, validate_test_claim
 from .ai_models import AICompletion, AIRequest
 from .db import uid
@@ -26,6 +27,7 @@ from .service import QueryService, timestamp
 
 REPORT_SCHEMA = 'research-report@3'
 TEST_REPORT_SCHEMA = 'research-report@4'
+SAFETY_GATE_REPORT_SCHEMA = 'research-report@5'
 HISTORY_NOTICE = ('本报告保存的是所选证据包与可选分析的冻结历史副本，不代表当前参数、库存或适配结论。'
                   '模型推断不是来源事实；后续来源变化、撤销或修订不会改写已保存正文。')
 FORMATS = {'markdown': ('text/markdown', 'md'), 'html': ('text/html', 'html'), 'pdf': ('application/pdf', 'pdf')}
@@ -83,6 +85,7 @@ def canonical_facts(payload, *, frozen=False):
     from .ai_original_text import original_items
     original_items(payload)
     validate_recall_payload(payload, require_purpose=not frozen, frozen=frozen)
+    safety_gate_contract.validate_payload(payload, require_purpose=not frozen, frozen=frozen)
     evidence = deepcopy(payload.get('evidence'))
     if not isinstance(evidence, list) or not evidence or len({item['id'] for item in evidence}) != len(evidence):
         raise ValueError('invalid_report_evidence')
@@ -92,7 +95,7 @@ def canonical_facts(payload, *, frozen=False):
         raise ValueError('invalid_report_facts')
     for fact in facts:
         source = by_id[fact['evidence_id']]
-        if is_recall_evidence(source):
+        if is_recall_evidence(source) or safety_gate_contract.is_evidence(source):
             # The shared pure validator reconstructs the complete records and
             # compares every field/text, including duplicate record occurrences.
             continue
@@ -152,6 +155,16 @@ def freeze_body(db, pack, analysis_id, session_id):
             for item in facts:
                 validate_test_claim(SimpleNamespace(type='fact', text='', fact_ids=[item['id']],
                     evidence_ids=[item['evidence_id']]), by_fact, by_evidence)
+        if safety_gate_contract.validate_payload(pack.payload):
+            from .safety_gate_ai_evidence import load_evidence
+            for item in evidence:
+                if safety_gate_contract.is_evidence(item):
+                    material=load_evidence(db,item['snapshot_id'],item['alert_id'],verification_id=item['verification_id'])
+                    if any(item.get(name)!=value for name,value in material.items()):
+                        raise ValueError('invalid_report_safety_gate_binding')
+            field_contract.update(schema_version=SAFETY_GATE_REPORT_SCHEMA,
+                safety_gate_policy=deepcopy(pack.payload['safety_gate_policy']),
+                safety_gate_boundary=deepcopy(pack.payload['safety_gate_boundary']))
     except (ValueError, TypeError, KeyError, AttributeError):
         raise HTTPException(409, '证据包引用结构无效，不能保存报告') from None
     ids = list({item['variant_id'] for item in evidence if item.get('variant_id')})

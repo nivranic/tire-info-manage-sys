@@ -128,6 +128,8 @@ def append_event(database, request_id, owner_token, type, payload):
             evidence_payload = db.get(AIEvidencePack, row.pack_id).payload
             validate_recall_uncertainty(payload['text'], evidence_payload)
             validate_test_uncertainty(payload['text'], evidence_payload)
+            from .ai_safety_gate_contract import validate_uncertainty
+            validate_uncertainty(payload['text'], evidence_payload)
             key = 'uncertainty'
         if _append(db, request_id, type, payload, key) is None:
             return False

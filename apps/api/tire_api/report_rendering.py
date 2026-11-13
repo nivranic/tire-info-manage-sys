@@ -18,6 +18,7 @@ from .object_store import MAX_OBJECT_BYTES
 
 RENDERER_VERSION = 'frozen-research-export@4'
 TEST_RENDERER_VERSION = 'frozen-research-export@5'
+SAFETY_GATE_RENDERER_VERSION = 'frozen-research-export@6'
 FORMATS = ('markdown', 'html', 'pdf')
 _FONT_NAME = 'TireEvidenceSC-Regular'
 _FONT_FILE = Path(__file__).resolve().parent / 'assets' / 'fonts' / 'TireEvidenceSC-Regular.ttf'
@@ -34,6 +35,8 @@ class ReportRenderError(ValueError):
 
 def renderer_version_for(document):
     """Legacy documents keep their renderer bytes; test @4 has its own version."""
+    if document.get('schema_version') == 'research-report@5':
+        return SAFETY_GATE_RENDERER_VERSION
     return TEST_RENDERER_VERSION if document.get('schema_version') == 'research-report@4' else RENDERER_VERSION
 
 
@@ -73,7 +76,7 @@ def _identifier(value):
 
 def _validate(document):
     if not isinstance(document, dict) or document.get('schema_version') not in {
-            'research-report@1', 'research-report@2', 'research-report@3', 'research-report@4'}:
+            'research-report@1', 'research-report@2', 'research-report@3', 'research-report@4', 'research-report@5'}:
         raise ReportRenderError('invalid_document')
     for key in ('report_id', 'title', 'created_at'):
         _text(document.get(key), empty=False)
@@ -114,7 +117,14 @@ def _validate(document):
         facts_by_id[key] = item
     if not isinstance(body.get('conflicts'), list):
         raise ReportRenderError('invalid_document')
-    test_report = document['schema_version'] == 'research-report@4'
+    from . import ai_safety_gate_contract as safety_gate_contract
+    try:
+        safety_gate = safety_gate_contract.validate_payload(body, require_purpose=False, frozen=True)
+        if (document['schema_version']=='research-report@5') != safety_gate or safety_gate and body.get('schema_version')!='research-report@5':
+            raise ValueError('invalid_safety_gate_schema')
+    except (ValueError, TypeError, KeyError, AttributeError):
+        raise ReportRenderError('invalid_report_safety_gate_contract') from None
+    test_report = document['schema_version'] == 'research-report@4' or safety_gate and 'test_boundary' in body
     if (body.get('schema_version') == 'research-report@4' or 'test_boundary' in body) and not test_report:
         raise ReportRenderError('invalid_report_test_contract')
     if test_report:
@@ -122,7 +132,7 @@ def _validate(document):
             from types import SimpleNamespace
             from .ai_test_contract import contains_test, test_boundary, validate_test_claim
             from .reports import canonical_facts
-            if (body.get('schema_version') != 'research-report@4' or not contains_test(body)
+            if (body.get('schema_version') not in {'research-report@4','research-report@5'} or not contains_test(body)
                     or body.get('test_boundary') != test_boundary(body)):
                 raise ValueError('invalid_report_test_boundary')
             _, canonical = canonical_facts(body, frozen=True)
@@ -136,7 +146,7 @@ def _validate(document):
     try:
         from .ai_recall_contract import validate_recall_payload
         recall = validate_recall_payload(body, require_purpose=False, frozen=True)
-        if recall and document['schema_version'] not in {'research-report@3', 'research-report@4'}:
+        if recall and document['schema_version'] not in {'research-report@3', 'research-report@4', 'research-report@5'}:
             raise ValueError('invalid_recall_schema')
     except (ValueError, TypeError, KeyError, AttributeError):
         raise ReportRenderError('invalid_report_recall_contract') from None
@@ -189,9 +199,18 @@ def _validate(document):
                     validate_test_claim(raw, facts_by_id, evidence_by_id)
                 except (ValueError, TypeError, KeyError, AttributeError):
                     raise ReportRenderError('invalid_report_test_analysis') from None
+            if safety_gate:
+                try:
+                    from types import SimpleNamespace
+                    raw=SimpleNamespace(**{**claim,'text':'' if claim['type']=='fact' else claim['text']})
+                    safety_gate_contract.validate_claim(raw,facts_by_id,evidence_by_id)
+                except (ValueError, TypeError, KeyError, AttributeError):
+                    raise ReportRenderError('invalid_report_safety_gate_analysis') from None
         _text(analysis.get('uncertainty', ''))
         if recall and analysis.get('uncertainty') != '':
             raise ReportRenderError('invalid_report_recall_analysis')
+        if safety_gate and analysis.get('uncertainty') != '':
+            raise ReportRenderError('invalid_report_safety_gate_analysis')
         if test_report:
             try:
                 from .ai_test_contract import validate_test_uncertainty
@@ -316,7 +335,9 @@ def _blocks(document, body):
         blocks += [Block('heading', '召回公告范围与实物适用性'),
                    Block('paragraph', body['recall_boundary']['notice']),
                    Block('meta', '适用性：not_assessed · 仅公告事实选择 · ' + body['recall_boundary']['policy'])]
-    if document['schema_version'] == 'research-report@4':
+    if body.get('safety_gate_boundary'):
+        blocks += [Block('heading','Safety Gate告警与适用性边界'),Block('paragraph',body['safety_gate_boundary']['notice'])]
+    if body.get('test_boundary'):
         blocks += [Block('heading', '测试事实摘录与精确身份边界'),
                    Block('paragraph', body['test_boundary']['notice'])]
         blocks += _metadata(body['test_boundary'], excluded={'notice'})
@@ -340,7 +361,7 @@ def _blocks(document, body):
     else:
         blocks += _metadata(analysis, excluded={'claims', 'uncertainty'})
         blocks.append(Block('paragraph', '以下内容仅摘录已引用字段，不进行自由推断或精确SKU性能推荐。'
-            if document['schema_version'] == 'research-report@4' else
+            if document['schema_version'] in {'research-report@4','research-report@5'} else
             '以下事实文字来自已引用字段；模型推断单独标识，仍需人工核对。引用存在不等于推断正确。'))
         for index, claim in enumerate(analysis['claims'], start=1):
             blocks += [Block('subheading', f'{index}. ' + ('引用事实' if claim['type'] == 'fact' else '模型推断 · 需核对')),
@@ -349,6 +370,8 @@ def _blocks(document, body):
                 Block('citations', '来源引用', links=tuple((key, '#evidence-' + key) for key in claim['evidence_ids']))]
         if body.get('recall_boundary'):
             blocks += [Block('subheading', '适用性未评估'), Block('paragraph', body['recall_boundary']['notice'])]
+        elif body.get('safety_gate_boundary'):
+            blocks += [Block('subheading','适用性未评估'),Block('paragraph',body['safety_gate_boundary']['notice'])]
         elif document['schema_version'] == 'research-report@4':
             blocks += [Block('subheading', '固定测试边界'), Block('paragraph', body['test_boundary']['notice'])]
         else:

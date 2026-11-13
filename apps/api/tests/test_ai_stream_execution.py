@@ -10,9 +10,10 @@ from test_ai_stream_parser import PACK, TEXT
 
 @pytest.fixture(autouse=True)
 def isolated_producer_dispatch_port(monkeypatch):
-    from tire_api import ai_execution, ai_original_text
+    from tire_api import ai_execution, ai_original_text, ai_safety_gate_contract
     monkeypatch.setattr(ai_execution, 'require_vehicle_dispatch', lambda *_args, **_kwargs: None)
     monkeypatch.setattr(ai_original_text, 'require_dispatch', lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(ai_safety_gate_contract, 'require_dispatch', lambda *_args, **_kwargs: None)
 
 
 class Store:
@@ -69,7 +70,7 @@ def test_detached_producer_emits_real_draft_before_terminal_and_starts_only_once
         assert supervisor.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
         assert not supervisor.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
         task = supervisor._tasks['run']
-        await provider.ready.wait()
+        await asyncio.wait_for(provider.ready.wait(), timeout=5)
         assert store.events[0][0] == 'claim_draft'
         assert store.events[0][1]['claim']['text'] == '宽度 245 mm'
         assert not store.finishes and not task.done()
@@ -90,7 +91,7 @@ def test_two_supervisors_cannot_dispatch_same_durable_execution_twice():
         store, provider = Store(), HeldProvider()
         first, other = AIStreamSupervisor(object(), provider, store=store), AIStreamSupervisor(object(), provider, store=store)
         first.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
-        await provider.ready.wait()
+        await asyncio.wait_for(provider.ready.wait(), timeout=5)
         other.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
         await asyncio.gather(*list(other._tasks.values()))
         assert provider.calls == 1 and not store.finishes
@@ -110,7 +111,7 @@ def test_provider_eof_records_unknown_and_never_accepts_partial_draft_as_answer(
         supervisor = AIStreamSupervisor(object(), provider, store=store)
         supervisor.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
         task = supervisor._tasks['run']
-        await provider.ready.wait()
+        await asyncio.wait_for(provider.ready.wait(), timeout=5)
         provider.release.set()
         await task
         final = store.finishes[0]
@@ -128,7 +129,7 @@ def test_shutdown_closes_producer_and_records_unknown_without_retry():
         store, provider = Store(), HeldProvider()
         supervisor = AIStreamSupervisor(object(), provider, store=store)
         supervisor.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
-        await provider.ready.wait()
+        await asyncio.wait_for(provider.ready.wait(), timeout=5)
         await supervisor.shutdown()
         assert provider.calls == provider.closed == 1
         assert store.finishes[0]['state'] == 'outcome_unknown'
@@ -173,7 +174,7 @@ def test_rejected_late_completion_retries_only_owned_unknown_finalization():
         supervisor = AIStreamSupervisor(object(), provider, store=store)
         supervisor.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
         task = supervisor._tasks['run']
-        await provider.ready.wait()
+        await asyncio.wait_for(provider.ready.wait(), timeout=5)
         provider.release.set()
         await task
         assert store.states == ['completed', 'outcome_unknown']
@@ -195,7 +196,7 @@ def test_final_database_failure_keeps_drafts_without_claiming_completion_or_retr
         supervisor = AIStreamSupervisor(object(), provider, store=store)
         supervisor.start('run', 'owner', OpenAIConfig('synthetic', 'fixture'), {}, PACK)
         task = supervisor._tasks['run']
-        await provider.ready.wait()
+        await asyncio.wait_for(provider.ready.wait(), timeout=5)
         provider.release.set()
         await task
         assert store.events and not store.finishes and provider.calls == 1

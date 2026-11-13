@@ -236,6 +236,14 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
     if contains_test(evidence):
         system_prompt = (system_prompt + '\n\n' if contains_recall(evidence) else '') + TEST_SYSTEM_PROMPT
         output_schema, schema_name = TEST_OUTPUT_SCHEMA, TEST_SCHEMA_NAME
+    from . import ai_safety_gate_contract as safety_gate
+    if safety_gate.contains(evidence):
+        try:
+            safety_gate.validate_payload(evidence)
+        except (ValueError, TypeError, KeyError, AttributeError):
+            raise GatewayError('ai_grounding_validation_failed') from None
+        system_prompt += '\n\n' + safety_gate.SYSTEM_PROMPT
+        output_schema, schema_name = safety_gate.OUTPUT_SCHEMA, safety_gate.SCHEMA_NAME
     if evidence.get('original_text_policy') is not None:
         from .ai_original_text import NOTICE, original_items
         original_items(evidence)
@@ -300,6 +308,12 @@ def analysis_contract(payload):
         if contains_recall(payload):
             contract['recall_prompt_version'] = RECALL_PROMPT_VERSION
         contract.update(prompt_version=TEST_PROMPT_VERSION, test_boundary=boundary)
+    from . import ai_safety_gate_contract as safety_gate
+    if safety_gate.contains(payload):
+        safety_gate.validate_payload(payload)
+        contract.update(safety_gate_policy=payload['safety_gate_policy'],
+                        safety_gate_prompt_version=safety_gate.PROMPT_VERSION,
+                        prompt_version=safety_gate.PROMPT_VERSION)
     return contract
 
 

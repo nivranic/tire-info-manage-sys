@@ -15,6 +15,7 @@ from .auth import session_scope
 from .ai_gateway import (GatewayError, analysis_contract, configured_adapter, configured_model, model_status,
                          request_body)
 from .ai_recall_contract import (recall_boundary, validate_recall_claim, validate_recall_payload)
+from . import ai_safety_gate_contract as safety_gate_contract
 from .ai_test_contract import contains_test, test_boundary, validate_test_claim, validate_test_uncertainty
 from .ai_models import AICompletion, AIEvidencePack, AIRequest
 from .device_ai import DeviceSubmission, question_digest
@@ -131,6 +132,8 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
         recall = False
     else:
         recall = validate_recall_payload(pack.payload)
+    safety_gate = safety_gate_contract.validate_payload(pack.payload)
+    safety_gate_contract.validate_uncertainty(raw['uncertainty'], pack.payload)
     if recall and model.uncertainty:
         raise ValueError('recall_freeform_not_allowed')
     test = contains_test(pack.payload)
@@ -139,7 +142,7 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
     validate_test_uncertainty(raw['uncertainty'], pack.payload)
     facts = {item['id']: item for item in pack.payload['facts']}
     evidence = {item['id']: item for item in pack.payload['evidence']}
-    if not recall and not test and not model.claims and not model.uncertainty:
+    if not recall and not test and not safety_gate and not model.claims and not model.uncertainty:
         raise ValueError('empty_answer')
     claims = []
     for claim, raw_claim in zip(model.claims, raw['claims']):
@@ -149,6 +152,10 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
             raise ValueError('unbound_citation')
         if recall:
             validate_recall_claim(claim, facts, evidence)
+        if safety_gate:
+            if raw_claim['text'] != '':
+                raise ValueError('safety_gate_freeform_not_allowed')
+            safety_gate_contract.validate_claim(claim, facts, evidence)
         if test:
             # Preserve the older explicit cross-event failure before the new
             # whole-package restriction; no free text passes either gate.
@@ -183,6 +190,9 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
     if test:
         result['test_boundary'] = test_boundary(pack.payload)
         result['notice'] = ((result['notice'] + '\n') if recall else '') + result['test_boundary']['notice']
+    if safety_gate:
+        result['safety_gate_boundary'] = safety_gate_contract.boundary(pack.payload)
+        result['notice'] = ((result['notice']+'\n') if recall or test else '') + result['safety_gate_boundary']['notice']
     return result
 
 
@@ -365,6 +375,11 @@ def prepare_analysis(db, payload, session_id, *, stream=False):
     except (ValueError, TypeError, KeyError, AttributeError):
         raise HTTPException(409, {'code': 'ai_recall_contract_stale',
             'message': '召回证据合同无效，请重新准备证据包'}) from None
+    try:
+        safety_gate_contract.validate_payload(pack.payload)
+    except (ValueError, TypeError, KeyError, AttributeError):
+        raise HTTPException(409, {'code':'ai_safety_gate_contract_stale',
+            'message':'Safety Gate告警证据合同无效，请重新准备证据包'}) from None
     if utc(pack.expires_at) <= utcnow():
         raise HTTPException(409, '证据包已过期，请重新核对；当前查询会再次在线验证')
     if pack.mode == 'history' and CURRENT_WORDS.search(payload.question):
@@ -417,7 +432,8 @@ def register_ai_routes(app: FastAPI):
     @app.post('/v1/ai/evidence-packs')
     async def prepare(payload: PreparePack, request: Request, db: Session = Depends(get_db)):
         return await prepare_pack(db, app.state.registry, payload, request.state.session_id,
-                                  recall_adapter=getattr(app.state, 'recall_adapter', None))
+                                  recall_adapter=getattr(app.state, 'recall_adapter', None),
+                                  safety_gate_adapter=getattr(app.state, 'safety_gate_adapter', None))
 
     @app.get('/v1/ai/evidence-packs/{pack_id}')
     def evidence(pack_id: str, request: Request, mode: Literal['history'] = Query(...), db: Session = Depends(get_db)):

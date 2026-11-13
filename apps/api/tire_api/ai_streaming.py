@@ -50,7 +50,11 @@ class AIStreamSupervisor:
     async def _dispatch_evidence(self, request_id, config, body, pack, *, original_only=False):
         from .ai_execution import require_evidence_dispatch
         from .ai_original_text import require_dispatch
-        check = require_dispatch if original_only else require_evidence_dispatch
+        def original_and_safety_gate(*args):
+            require_dispatch(*args)
+            from .ai_safety_gate_contract import require_dispatch as require_safety_gate_dispatch
+            require_safety_gate_dispatch(*args)
+        check = original_and_safety_gate if original_only else require_evidence_dispatch
         operation = asyncio.create_task(asyncio.to_thread(check,
             self.database, request_id, config, body, pack))
         try:
