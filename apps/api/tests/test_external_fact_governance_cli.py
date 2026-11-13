@@ -287,6 +287,50 @@ class GovernanceCliTests(unittest.TestCase):
                     cli.postgres_engine(params, password)
                 self.assertEqual(failure.exception.code, "postgres_authentication_required")
 
+    def test_role_check_is_postgres_only_and_requires_real_admin(self):
+        with self.assertRaises(cli.GovernanceError):
+            cli._parser().parse_args(self.base("role-check"))
+        path = self.directory / "postgres.json"
+        path.write_text(json.dumps(self.pg_profile()), encoding="utf-8")
+        args = ["role-check", "--postgres-profile", str(path), "--username", "admin"]
+        parsed = cli._parser().parse_args(args)
+        self.assertEqual(parsed.command, "role-check")
+        engine, store = Mock(), Mock()
+        store.authenticate.side_effect = cli.GovernanceError("admin_authentication_required")
+        with patch.dict(os.environ, {}, clear=True), patch.object(cli, "postgres_engine", return_value=engine), \
+             patch.object(cli, "GovernanceStore", return_value=store), patch.object(cli, "check_governance_role") as checking:
+            code, result, _ = self.run_cli(args)
+        self.assertEqual((code, result["code"]), (1, "admin_authentication_required"))
+        checking.assert_not_called()
+        engine.dispose.assert_called_once()
+
+    def test_role_check_rejection_is_nonzero_and_sanitized(self):
+        path = self.directory / "postgres.json"
+        path.write_text(json.dumps(self.pg_profile()), encoding="utf-8")
+        args = ["role-check", "--postgres-profile", str(path), "--username", "admin"]
+        with patch.dict(os.environ, {}, clear=True), patch.object(cli, "postgres_engine", return_value=Mock()), \
+             patch.object(cli, "GovernanceStore", return_value=Mock()), \
+             patch.object(cli, "check_governance_role", return_value={"ok": False,
+                 "schema": "external-fact-role-check@1", "violations": ["role_attributes"]}):
+            code, result, output = self.run_cli(args)
+        self.assertEqual(code, 1)
+        self.assertEqual(result["violations"], ["role_attributes"])
+        self.assertNotIn(str(path), output)
+
+    def test_role_plan_rejects_identifiers_and_never_grants_account_control(self):
+        from tire_api.external_fact_governance_roles import governance_role_sql
+        for value in ("", "foo;DROP ROLE bar", 'bad"name', "a" * 64, "1bad", None):
+            with self.assertRaises(cli.GovernanceError):
+                governance_role_sql(value, "synthetic_db")
+            with self.assertRaises(cli.GovernanceError):
+                governance_role_sql("synthetic_operator", value)
+        sql = governance_role_sql("synthetic_operator", "synthetic_db")
+        self.assertIn('GRANT UPDATE (display_name) ON public.users', sql)
+        for forbidden in ('GRANT ALL', 'GRANT UPDATE ON', 'ALTER DEFAULT PRIVILEGES', 'CREATE ROLE', 'REVOKE ', 'PASSWORD '):
+            self.assertNotIn(forbidden, sql)
+        self.assertTrue(sql.startswith('BEGIN;'))
+        self.assertTrue(sql.rstrip().endswith('COMMIT;'))
+
     def test_cleanup_error_never_leaks_or_reports_success(self):
         secret = "synthetic-dispose-secret"
         engine = cli.private_engine(str(self.path))

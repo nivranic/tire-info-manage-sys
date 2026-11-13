@@ -1,3 +1,7 @@
+## 最新非拥有者许可角色交付（2026-11-14）
+
+先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。已交付固定授权 SQL 和只读 role-check；非拥有者许可操作员完成轮胎／Safety Gate 全流程，最终43项受管回归、9项真实PG／TLS场景通过，含20条越权SQL拒绝及部分授权回滚。显示名列UPDATE是保留原行锁的明确权限代价。目录／函数漏检、原生pg_settings权限及固定测试时钟失败均留证，见[角色验收](assurance/evidence/postgres-governance-role-2026-11-14.md)。本轮十个集群关闭、临时口令和TLS私钥移除。下一步分离API／Worker迁移与运行启动，不能跳过schema验证；生产IAM／RLS、真实终端和完整V1仍待完成。下文是此前交付时点。
+
 ## 最新 PostgreSQL 许可 CLI 交付（2026-11-13）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。已补齐显式 PG 配置、隐藏双密码、SCRAM／TLS 和审批／限制／撤回／重放入口，复用原许可账本与审计。最终 40 项受管回归、6 项真实隔离 PG／TLS 专项通过；首轮硬链接权限失败与诊断保留。集群、端口、临时口令和 TLS 私钥已清理。生产最小权限、真实终端、吞吐与完整 V1 仍待验收，下一步推进部署角色和运维验收。操作及回执见[PG CLI 验收](assurance/evidence/postgres-governance-cli-2026-11-13.md)。下文是此前交付时点。

@@ -30,6 +30,8 @@ python -m tire_api.external_fact_governance_cli init-private --private-database 
 
 ## PostgreSQL 运维入口
 
+已增加[非拥有者操作员授权方案](POSTGRES-GOVERNANCE-ROLE.md)：可审查的 SQL 计划和只读 `role-check`，用于将许可 CLI 与数据库拥有者分离。该方案不是 API／Worker 运行角色，明确保留 UPDATE(users.display_name) 的行锁权限代价。
+
 普通命令使用 `--postgres-profile <绝对配置文件路径>`，与 `--private-database` 互斥。`init-private` 仍只接受 SQLite，PG schema 由已有迁移流程准备；不能通过此工具自动建库或安装 schema。
 
 配置使用 UTF-8 JSON，必须恰好包含以下字段。将占位符替换为本机实际值，配置保存在 Git 忽略的私有目录，不提交内部地址或账户信息。

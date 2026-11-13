@@ -401,6 +401,7 @@ class GovernanceCliCase:
         self.terms_file.write_bytes(TERMS)
         url = case.engine.url
         self.password = url.password
+        self.admin_password = PASSWORD
         self.settings = {'schema': 'external-fact-postgres@1', 'host': '127.0.0.1', 'port': url.port,
             'database': url.database, 'user': url.username, 'sslmode': 'disable', 'sslrootcert': None}
         self.profile.write_text(json.dumps(self.settings), encoding='utf-8')
@@ -412,16 +413,17 @@ class GovernanceCliCase:
             'validity': {'not_before': '2020-01-01T00:00:00Z', 'not_after': None},
             'license_reference': 'https://fixture.example/license', 'rights_reviewed': True}
 
-    def invoke(self, command, extra=(), *, username='admin', password=PASSWORD, database_password=None):
+    def invoke(self, command, extra=(), *, username='admin', password=None, database_password=None):
         output = io.StringIO()
         with patch.object(self.cli.sys, 'stdin', SimpleNamespace(isatty=lambda: True)), \
              patch.object(self.cli.getpass, 'getpass', side_effect=[
-                 self.password if database_password is None else database_password, password]), redirect_stdout(output):
+                 self.password if database_password is None else database_password,
+                 self.admin_password if password is None else password]), redirect_stdout(output):
             code = self.cli.main([command, '--postgres-profile', str(self.profile), '--username', username, *extra])
         body = output.getvalue()
         result = json.loads(body)
         assert code == (0 if result['ok'] else 1)
-        for secret in (self.password, PASSWORD, str(self.profile)):
+        for secret in (self.password, self.admin_password, str(self.profile)):
             assert secret not in body
         return result
 
@@ -454,8 +456,8 @@ class GovernanceCliCase:
                 ExternalFactGrantRevision, ExternalFactLicenseEvidence, AuditEvent))
 
 
-def cli_lifecycle_and_reader(case):
-    command = GovernanceCliCase(case)
+def cli_lifecycle_and_reader(case, command=None):
+    command = command or GovernanceCliCase(case)
     before = command.counts()
     preview = command.preview()
     assert command.counts() == before and command.current()['state'] == 'missing'
@@ -463,8 +465,15 @@ def cli_lifecycle_and_reader(case):
     approved = command.append(command.request, preview, key)
     assert approved['ok'] and approved['current']['state'] == 'approved'
     case.grant_id = command.request['grant_id']
-    case.reader = case.new_reader()
+    # The CLI stamps real wall time; the unit fixture's setup clock may now
+    # precede approval after role provisioning. This scenario uses real time.
+    case.reader = case.new_reader(clock=utcnow)
     case.credential = case.reader.capture_credential(['Bearer ' + case.issued['token']])
+    with case.store.current_policy_transaction(case.grant_id) as current:
+        reading_at = utcnow()
+        REPORT.setdefault('cli_reader_clock_checks', []).append({
+            'reader_clock': reading_at.isoformat(), 'reviewed_at': current.policy.latest.review.reviewed_at,
+            'applicability_reason': current.summary(now=reading_at)['applicability_reason']})
     case.projected()
     for action in ('restrict', 'withdraw'):
         request = {'schema': 'external-fact-governance-request@1', 'action': action,
@@ -592,6 +601,7 @@ def cli_tls_verification(case):
     command.settings.update(sslmode='verify-full', sslrootcert=os.environ['TIRE_PG_TEST_TLS_ROOT'])
     command.profile.write_text(json.dumps(command.settings), encoding='utf-8')
     assert command.current()['ok']
+
     engine = postgres_engine(postgres_connect_args(command.settings), command.password)
     try:
         with engine.connect() as connection:
@@ -604,6 +614,299 @@ def cli_tls_verification(case):
         assert command.current()['code'] == 'external_fact_governance_failed'
     command.profile.write_text(json.dumps(command.settings), encoding='utf-8')
     assert command.current()['ok']
+
+
+def apply_role_plan(case, role, *, expected_failure=False, database=None):
+    from tire_api.external_fact_governance_roles import governance_role_sql
+    url = case.engine.url
+    # Execute the exact generated DBA plan, including both guards and COMMIT.
+    with psycopg.connect(host=url.host, port=url.port, user=url.username, password=url.password,
+            dbname=url.database, autocommit=True, connect_timeout=5) as owner:
+        try:
+            cursor = owner.execute(governance_role_sql(role, database or url.database))
+            while cursor.nextset():
+                pass
+            cursor.close()
+        except psycopg.Error as error:
+            owner.execute('ROLLBACK').close()
+            if not expected_failure:
+                from tire_api.external_fact_governance_roles import _audit_sql
+                diagnostic = {'sqlstate': error.sqlstate}
+                try:
+                    with case.engine.connect() as connection:
+                        diagnostic['preflight_violations'] = list(connection.execute(
+                            text(_audit_sql(require_grants=False)), {'role': role}).scalars())
+                        if 'catalog_writes' in diagnostic['preflight_violations']:
+                            query = _audit_sql(require_grants=False).replace(
+                                'SELECT code FROM checks WHERE failed ORDER BY code', """
+                                SELECT r.nspname, r.relname, c.attname, p.priv FROM target t
+                                CROSS JOIN system_relations r
+                                JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid AND c.attnum>0 AND NOT c.attisdropped
+                                CROSS JOIN (VALUES ('INSERT'),('UPDATE'),('REFERENCES'),('SELECT WITH GRANT OPTION')) p(priv)
+                                WHERE pg_catalog.has_column_privilege(t.oid,r.oid,c.attnum,p.priv)
+                                ORDER BY r.nspname,r.relname,c.attname,p.priv LIMIT 40""")
+                            diagnostic['catalog_write_grants'] = [list(row) for row in connection.execute(text(query), {'role': role})]
+                except DBAPIError as diagnostic_error:
+                    diagnostic['audit_sqlstate'] = diagnostic_error.orig.sqlstate
+                REPORT.setdefault('role_plan_failures', []).append(diagnostic)
+            assert expected_failure and error.sqlstate == 'P0001'
+        else:
+            assert not expected_failure
+
+
+def restricted_cli(case, *, install=True):
+    command = GovernanceCliCase(case)
+    role, secret = 'governance_' + uuid4().hex[:12], secrets.token_hex(32)
+    case.cluster_admin.execute(sql.SQL('CREATE ROLE {} LOGIN NOINHERIT PASSWORD {} '
+        'NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS').format(sql.Identifier(role), sql.Literal(secret)))
+    # Shared ACL changes are an explicit fixture/DBA prerequisite, never made
+    # silently by the role plan or application. This database is disposable.
+    with case.engine.begin() as connection:
+        connection.exec_driver_sql('REVOKE TEMPORARY ON DATABASE "' + case.engine.url.database + '" FROM PUBLIC')
+        connection.exec_driver_sql('REVOKE CREATE ON SCHEMA public FROM PUBLIC')
+    if install:
+        apply_role_plan(case, role)
+    command.settings['user'], command.password = role, secret
+    if os.environ.get('TIRE_PG_TEST_TLS_ROOT'):
+        command.settings.update(sslmode='verify-full', sslrootcert=os.environ['TIRE_PG_TEST_TLS_ROOT'])
+    command.profile.write_text(json.dumps(command.settings), encoding='utf-8')
+    return command
+
+
+def cli_nonowner_lifecycle(case):
+    command = restricted_cli(case)
+    assert command.invoke('role-check') == {'ok': True, 'schema': 'external-fact-role-check@1', 'violations': []}
+    role = command.settings['user']
+    with case.engine.begin() as connection:
+        connection.exec_driver_sql('REVOKE UPDATE (display_name) ON public.users FROM "' + role + '"')
+    assert 'actor_lock_grant' in command.invoke('role-check')['violations']
+    from tire_api.external_fact_governance_postgres import postgres_connect_args, postgres_engine
+    from tire_api.external_fact_governance import GovernanceStore
+    engine = postgres_engine(postgres_connect_args(command.settings), command.password)
+    try:
+        store = GovernanceStore(engine)
+        actor = store.authenticate('admin', PASSWORD)
+        try:
+            store.current(actor, command.request['grant_id'])
+        except DBAPIError as error:
+            assert error.orig.sqlstate == '42501'
+            REPORT['select_only_actor_lock_sqlstate'] = error.orig.sqlstate
+        else:
+            raise AssertionError('select_only_role_unexpectedly_locked_user')
+    finally:
+        engine.dispose()
+    apply_role_plan(case, role)
+    apply_role_plan(case, role)  # Reapplication preserves the same effective ACL.
+    cli_lifecycle_and_reader(case, command)
+    assert command.invoke('role-check')['ok']
+
+
+def cli_nonowner_denials(case):
+    command = restricted_cli(case)
+    from tire_api.external_fact_governance_postgres import postgres_connect_args, postgres_engine
+    engine = postgres_engine(postgres_connect_args(command.settings), command.password)
+    statements = [
+        'UPDATE public.users SET is_admin=false WHERE id=\'admin\'',
+        'UPDATE public.users SET password_hash=password_hash WHERE false',
+        'UPDATE public.users SET id=id WHERE false',
+        'UPDATE public.users SET username=username WHERE false',
+        'DELETE FROM public.users WHERE false',
+        'UPDATE public.snapshots SET body=body WHERE false',
+        'INSERT INTO public.query_runs SELECT * FROM public.query_runs WHERE false',
+        'DELETE FROM public.audit_events WHERE false',
+        'UPDATE public.external_fact_grant_revisions SET reason=reason WHERE false',
+        'TRUNCATE public.external_fact_grant_revisions',
+        'ALTER TABLE public.external_fact_grant_revisions DISABLE TRIGGER ALL',
+        'DROP TABLE public.external_fact_grant_revisions',
+        'DELETE FROM public.tire_schema_versions WHERE false',
+        'SELECT * FROM public.local_sessions',
+        'CREATE TABLE public.synthetic_forbidden(id integer)',
+        'CREATE TEMP TABLE synthetic_forbidden(id integer)',
+        'CREATE SCHEMA synthetic_forbidden',
+        'CREATE ROLE synthetic_forbidden SUPERUSER',
+        'SET ROLE "' + case.engine.url.username + '"',
+        "UPDATE pg_catalog.pg_settings SET setting='replica' WHERE name='session_replication_role'",
+    ]
+    try:
+        for statement in statements:
+            with engine.connect() as connection:
+                try:
+                    connection.exec_driver_sql(statement)
+                except DBAPIError as error:
+                    assert error.orig.sqlstate == '42501'
+                else:
+                    raise AssertionError('nonowner_privilege_boundary_missing')
+                finally:
+                    connection.rollback()
+        # This exact, disclosed display-name privilege is the row-lock tradeoff.
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("UPDATE public.users SET display_name=display_name WHERE id='admin'").rowcount == 1
+            connection.rollback()
+        assert command.invoke('role-check')['ok']
+        REPORT['nonowner_denied_statements'] = len(statements)
+    finally:
+        engine.dispose()
+
+
+def cli_role_acl_drift(case):
+    command = restricted_cli(case)
+    role = '"' + command.settings['user'] + '"'
+    checks = [
+        ('GRANT UPDATE (is_admin) ON public.users TO ' + role,
+         'REVOKE UPDATE (is_admin) ON public.users FROM ' + role, 'column_privileges'),
+        ('GRANT SELECT ON public.local_sessions TO ' + role,
+         'REVOKE SELECT ON public.local_sessions FROM ' + role, 'table_privileges'),
+        ('GRANT SELECT ON public.snapshots TO ' + role + ' WITH GRANT OPTION',
+         'REVOKE GRANT OPTION FOR SELECT ON public.snapshots FROM ' + role, 'table_grant_options'),
+        ('GRANT CREATE ON SCHEMA public TO PUBLIC', 'REVOKE CREATE ON SCHEMA public FROM PUBLIC', 'schema_ddl'),
+        ('GRANT TEMPORARY ON DATABASE "' + case.engine.url.database + '" TO PUBLIC',
+         'REVOKE TEMPORARY ON DATABASE "' + case.engine.url.database + '" FROM PUBLIC', 'database_ddl'),
+        ('CREATE FUNCTION public.synthetic_definer() RETURNS integer LANGUAGE sql SECURITY DEFINER AS $$ SELECT 1 $$',
+         'DROP FUNCTION public.synthetic_definer()', 'security_definer_access'),
+        ('ALTER TABLE public.snapshots ENABLE ROW LEVEL SECURITY',
+         'ALTER TABLE public.snapshots DISABLE ROW LEVEL SECURITY', 'row_security_unsupported'),
+        ('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO ' + role,
+         'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE SELECT ON TABLES FROM ' + role, 'default_privileges'),
+    ]
+    for add, remove, code in checks:
+        with case.engine.begin() as connection:
+            connection.exec_driver_sql(add)
+        try:
+            result = command.invoke('role-check')
+            assert not result['ok'] and code in result['violations']
+            apply_role_plan(case, command.settings['user'], expected_failure=True)
+        finally:
+            with case.engine.begin() as connection:
+                connection.exec_driver_sql(remove)
+        assert command.invoke('role-check')['ok']
+
+
+def cli_role_memberships_and_target(case):
+    command = restricted_cli(case)
+    role = command.settings['user']
+    other = 'unprivileged_' + uuid4().hex[:12]
+    case.cluster_admin.execute(sql.SQL('CREATE ROLE {} NOLOGIN').format(sql.Identifier(other)))
+    for parent, member in ((other, role), (role, other)):
+        case.cluster_admin.execute(sql.SQL('GRANT {} TO {}').format(sql.Identifier(parent), sql.Identifier(member)))
+        try:
+            assert 'role_memberships' in command.invoke('role-check')['violations']
+            apply_role_plan(case, role, expected_failure=True)
+        finally:
+            case.cluster_admin.execute(sql.SQL('REVOKE {} FROM {}').format(sql.Identifier(parent), sql.Identifier(member)))
+    assert command.invoke('role-check')['ok']
+    apply_role_plan(case, role, database='wrong_synthetic_database', expected_failure=True)
+    assert command.invoke('role-check')['ok']
+    # The original owner is not an acceptable governance operator.
+    owner_command = GovernanceCliCase(case)
+    assert 'object_ownership' in owner_command.invoke('role-check')['violations']
+    apply_role_plan(case, case.engine.url.username, expected_failure=True)
+
+
+def cli_role_catalog_privileges(case):
+    command = restricted_cli(case)
+    role = '"' + command.settings['user'] + '"'
+    cases = [
+        ('GRANT SELECT ON pg_catalog.pg_authid TO ' + role,
+         'REVOKE SELECT ON pg_catalog.pg_authid FROM ' + role, 'catalog_secrets'),
+        ('GRANT UPDATE (rolsuper) ON pg_catalog.pg_authid TO ' + role,
+         'REVOKE UPDATE (rolsuper) ON pg_catalog.pg_authid FROM ' + role, 'catalog_writes'),
+        ('GRANT EXECUTE ON FUNCTION pg_catalog.pg_read_file(text) TO ' + role,
+         'REVOKE EXECUTE ON FUNCTION pg_catalog.pg_read_file(text) FROM ' + role, 'explicit_routine_privileges'),
+        ('GRANT SET ON PARAMETER session_replication_role TO ' + role,
+         'REVOKE SET ON PARAMETER session_replication_role FROM ' + role, 'parameter_privileges'),
+        ('GRANT EXECUTE ON FUNCTION pg_catalog.pg_read_file(text) TO PUBLIC',
+         'REVOKE EXECUTE ON FUNCTION pg_catalog.pg_read_file(text) FROM PUBLIC', 'server_file_routines'),
+        ('GRANT UPDATE ON pg_catalog.pg_settings TO ' + role + ' WITH GRANT OPTION',
+         'REVOKE UPDATE ON pg_catalog.pg_settings FROM ' + role, 'catalog_writes'),
+    ]
+    observed = []
+    with psycopg.connect(host='127.0.0.1', port=case.engine.url.port, user='tire_verify_admin',
+            password=os.environ['TIRE_PG_TEST_PASSWORD'], dbname=case.engine.url.database,
+            autocommit=True, connect_timeout=5) as admin:
+        for add, remove, code in cases:
+            admin.execute(add).close()
+            try:
+                outcome = command.invoke('role-check')
+                rejected = not outcome['ok'] and code in outcome.get('violations', [])
+                observed.append({'case': code, 'rejected': rejected})
+            finally:
+                admin.execute(remove).close()
+            assert command.invoke('role-check')['ok']
+    REPORT['catalog_privilege_checks'] = observed
+    assert all(item['rejected'] for item in observed)
+
+
+def cli_role_partial_grant_rollback(case):
+    from tire_api.external_fact_governance_roles import READ_TABLES, governance_role_sql
+    command = restricted_cli(case, install=False)
+    grantor, secret = 'grantor_' + uuid4().hex[:12], secrets.token_hex(32)
+    case.cluster_admin.execute(sql.SQL('CREATE ROLE {} LOGIN NOINHERIT PASSWORD {} '
+        'NOSUPERUSER NOCREATEDB NOCREATEROLE').format(sql.Identifier(grantor), sql.Literal(secret)))
+    with case.engine.begin() as connection:
+        connection.exec_driver_sql('GRANT CONNECT ON DATABASE "' + case.engine.url.database + '" TO "' + grantor + '" WITH GRANT OPTION')
+        connection.exec_driver_sql('GRANT USAGE ON SCHEMA public TO "' + grantor + '" WITH GRANT OPTION')
+        connection.exec_driver_sql('GRANT SELECT ON ' + ', '.join('public.' + name for name in READ_TABLES) + ' TO "' + grantor + '"')
+    role = command.settings['user']
+    # This installer can grant CONNECT/USAGE, but has no table grant options.
+    # PostgreSQL can warn instead of failing GRANT; the postcheck must catch it.
+    with psycopg.connect(host='127.0.0.1', port=case.engine.url.port, user=grantor, password=secret,
+            dbname=case.engine.url.database, autocommit=True, connect_timeout=5) as partial:
+        try:
+            partial.execute(governance_role_sql(role, case.engine.url.database)).close()
+        except psycopg.Error as error:
+            assert error.sqlstate == 'P0001'
+            partial.execute('ROLLBACK').close()
+            REPORT['partial_grant_postcheck_sqlstate'] = error.sqlstate
+        else:
+            raise AssertionError('incomplete_grants_were_reported_successful')
+    with case.engine.connect() as connection:
+        count = connection.execute(text("SELECT count(*) FROM pg_database d, aclexplode(d.datacl) a "
+            "WHERE d.datname=current_database() AND a.grantee=(SELECT oid FROM pg_roles WHERE rolname=:role)"),
+            {'role': role}).scalar()
+        assert count == 0
+        count = connection.execute(text("SELECT count(*) FROM pg_namespace n, aclexplode(n.nspacl) a "
+            "WHERE n.nspname='public' AND a.grantee=(SELECT oid FROM pg_roles WHERE rolname=:role)"),
+            {'role': role}).scalar()
+        assert count == 0
+    apply_role_plan(case, role)
+    assert command.invoke('role-check')['ok']
+    REPORT['partial_grant_rollback_verified'] = True
+
+
+def cli_nonowner_safety_gate(case):
+    from fastapi.testclient import TestClient
+    from admin_support import ADMIN_PASSWORD, register_admin
+    from test_safety_gate import FixtureRegistry, run as run_query
+    from test_safety_gate_external_governance import proposal
+    import test_safety_gate_external_api as sg
+    from tire_api.external_safety_gate import REQUIRED_FIELDS
+    from tire_api.main import create_app
+    app = create_app(case.new_database_url().render_as_string(hide_password=False), FixtureRegistry(),
+                     external_safety_gate_grant='synthetic-safety-grant')
+    app.state.safety_gate_adapter = sg.MultiAdapter()
+    with TestClient(app) as client:
+        register_admin(client)
+        result = run_query(client)
+        assert result['data_state'] == 'live'
+        local = SimpleNamespace(engine=app.state.database.engine, directory=case.directory,
+            cluster_admin=case.cluster_admin, selected=result['provenance'][0])
+        command = restricted_cli(local)
+        command.admin_password = ADMIN_PASSWORD
+        command.request = proposal(result, fields=sorted(REQUIRED_FIELDS | {'facts.brand'}))
+        assert command.invoke('role-check')['ok']
+        preview, key = command.preview(), str(uuid4())
+        approved = command.append(command.request, preview, key)
+        assert approved['ok']
+        token = sg.key(client)['token']
+        assert sg.read(client, token, result['query_id']).status_code == 200
+        for action in ('restrict', 'withdraw'):
+            request = {'schema': 'external-fact-governance-request@1', 'action': action,
+                'grant_id': command.request['grant_id'], 'reason': 'Synthetic nonowner ' + action}
+            assert command.append(request, command.preview(request))['ok']
+            assert sg.read(client, token, result['query_id']).status_code == 404
+        replay = command.append(command.request, preview, key)
+        assert replay['ok'] and replay['replayed'] and replay['current']['state'] == 'withdrawn'
+        assert command.invoke('role-check')['ok']
 
 
 def run():
@@ -640,6 +943,7 @@ def run():
             try:
                 case.setUp()
                 case.cluster_admin = admin
+                case.new_database_url = new_url
                 SafetyGateSnapshot.__table__.create(case.engine, checkfirst=True)
                 SafetyGateVerification.__table__.create(case.engine, checkfirst=True)
                 call(case)
@@ -662,6 +966,10 @@ def run():
             check(call.__name__, lambda call=call: fixture(call))
         if os.environ.get('TIRE_PG_TEST_TLS_ROOT'):
             check('cli_tls_verification', lambda: fixture(cli_tls_verification))
+        for call in (cli_nonowner_lifecycle, cli_nonowner_denials, cli_role_acl_drift,
+                     cli_role_memberships_and_target, cli_role_catalog_privileges,
+                     cli_role_partial_grant_rollback, cli_nonowner_safety_gate):
+            check(call.__name__, lambda call=call: fixture(call))
 
         # Exercise ordinary app startup, authenticated query creation and the
         # actual HTTP reader, not only a standalone internal projection.

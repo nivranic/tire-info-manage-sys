@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, event, inspect, text
 from .external_fact_governance import GovernanceError, GovernanceStore
 from .external_fact_models import MAX_EVIDENCE_BYTES, PRIOR_VERSION, VERSION, install_schema
 from .external_fact_governance_postgres import postgres_connect_args, postgres_engine
+from .external_fact_governance_roles import check_governance_role
 
 
 class _Parser(argparse.ArgumentParser):
@@ -125,10 +126,12 @@ def init_private(store, actor, database_path, backup_path, *, offline_confirmed)
 def _parser():
     parser = _Parser(description="Authenticated local private-database license governance")
     sub = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
-    for command in ("init-private", "current", "preview", "approve", "restrict", "withdraw"):
+    for command in ("init-private", "current", "preview", "approve", "restrict", "withdraw", "role-check"):
         item = sub.add_parser(command)
         if command == "init-private":
             item.add_argument("--private-database", required=True)
+        elif command == "role-check":
+            item.add_argument("--postgres-profile", required=True)
         else:
             target = item.add_mutually_exclusive_group(required=True)
             target.add_argument("--private-database")
@@ -139,7 +142,7 @@ def _parser():
             item.add_argument("--offline-confirmed", action="store_true")
         elif command == "current":
             item.add_argument("--grant-id", required=True)
-        else:
+        elif command != "role-check":
             item.add_argument("--request-file", required=True)
             item.add_argument("--terms-file")
             if command != "preview":
@@ -182,7 +185,9 @@ def main(argv=None):
             actor = store.authenticate(args.username, password)
         finally:
             del password
-        if args.command == "init-private":
+        if args.command == "role-check":
+            result = check_governance_role(engine)
+        elif args.command == "init-private":
             result = init_private(store, actor, args.private_database, args.backup_file,
                                   offline_confirmed=args.offline_confirmed)
         elif args.command == "current":
