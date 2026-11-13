@@ -1,3 +1,7 @@
+## 最新 PostgreSQL 许可 CLI 交付（2026-11-13）
+
+先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。已补齐显式 PG 配置、隐藏双密码、SCRAM／TLS 和审批／限制／撤回／重放入口，复用原许可账本与审计。最终 40 项受管回归、6 项真实隔离 PG／TLS 专项通过；首轮硬链接权限失败与诊断保留。集群、端口、临时口令和 TLS 私钥已清理。生产最小权限、真实终端、吞吐与完整 V1 仍待验收，下一步推进部署角色和运维验收。操作及回执见[PG CLI 验收](assurance/evidence/postgres-governance-cli-2026-11-13.md)。下文是此前交付时点。
+
 ## 最新 Windows 路径与 PG 交付（2026-11-13）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。Windows 本地规范归档长路径、等价路径门禁及消费者已完成工程验证；最终 105／105 相关回归及 58 项隔离 PG 核心流程通过，包含数据库、证据、报告和 Parser 归档恢复。历史间歇超时根因、生产治理和完整 V1 仍待完成。范围、反例与回执见[Windows 路径与 PG 验收](assurance/evidence/windows-parser-paths-2026-11-13.md)。下一工程优先补 PG 许可运维入口。

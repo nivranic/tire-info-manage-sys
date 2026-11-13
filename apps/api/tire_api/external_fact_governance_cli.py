@@ -1,4 +1,4 @@
-"""Explicit private-SQLite license management. Never initializes the application.
+"""Explicit SQLite/PostgreSQL license management. Never initializes the application.
 
 This authenticated workstation tool is not production IAM. Evidence and operator
 decisions do not authenticate the legal rights described by a supplied document.
@@ -11,12 +11,14 @@ import json
 from pathlib import Path
 import sqlite3
 import sys
+import warnings
 from urllib.parse import quote
 
 from sqlalchemy import create_engine, event, inspect, text
 
 from .external_fact_governance import GovernanceError, GovernanceStore
 from .external_fact_models import MAX_EVIDENCE_BYTES, PRIOR_VERSION, VERSION, install_schema
+from .external_fact_governance_postgres import postgres_connect_args, postgres_engine
 
 
 class _Parser(argparse.ArgumentParser):
@@ -125,7 +127,12 @@ def _parser():
     sub = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
     for command in ("init-private", "current", "preview", "approve", "restrict", "withdraw"):
         item = sub.add_parser(command)
-        item.add_argument("--private-database", required=True)
+        if command == "init-private":
+            item.add_argument("--private-database", required=True)
+        else:
+            target = item.add_mutually_exclusive_group(required=True)
+            target.add_argument("--private-database")
+            target.add_argument("--postgres-profile")
         item.add_argument("--username", required=True)
         if command == "init-private":
             item.add_argument("--backup-file", required=True)
@@ -143,17 +150,38 @@ def _parser():
     return parser
 
 
+def _password(prompt):
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            return getpass.getpass(prompt)
+    except (getpass.GetPassWarning, EOFError, KeyboardInterrupt):
+        raise GovernanceError("interactive_authentication_required") from None
+
+
 def main(argv=None):
     engine = None
+    outcome = {"ok": False, "code": "external_fact_governance_failed"}
     try:
         args = _parser().parse_args(argv)
         if not sys.stdin.isatty():
             raise GovernanceError("interactive_authentication_required")
-        password = getpass.getpass("Administrator password: ")
-        engine = private_engine(args.private_database)
+        if getattr(args, "postgres_profile", None) is not None:
+            parameters = postgres_connect_args(_request(args.postgres_profile))
+            database_password = _password("PostgreSQL password: ")
+            try:
+                password = _password("Administrator password: ")
+                engine = postgres_engine(parameters, database_password)
+            finally:
+                del database_password
+        else:
+            password = _password("Administrator password: ")
+            engine = private_engine(args.private_database)
         store = GovernanceStore(engine)
-        actor = store.authenticate(args.username, password)
-        del password
+        try:
+            actor = store.authenticate(args.username, password)
+        finally:
+            del password
         if args.command == "init-private":
             result = init_private(store, actor, args.private_database, args.backup_file,
                                   offline_confirmed=args.offline_confirmed)
@@ -171,17 +199,24 @@ def main(argv=None):
                                       expected_head=None if args.expected_head == "null" else args.expected_head,
                                       expected_preview_fingerprint=args.expected_preview_fingerprint,
                                       idempotency_key=args.idempotency_key)
-        print(json.dumps({"ok": True, **result}, sort_keys=True, separators=(",", ":"), allow_nan=False))
-        return 0
+        outcome = {"ok": True, **result}
     except GovernanceError as error:
-        print(json.dumps({"ok": False, "code": error.code}, separators=(",", ":")))
-        return 1
-    except Exception:
-        print('{"ok":false,"code":"external_fact_governance_failed"}')
-        return 1
+        outcome = {"ok": False, "code": error.code}
+    except (Exception, KeyboardInterrupt):
+        outcome = {"ok": False, "code": "external_fact_governance_failed"}
     finally:
         if engine is not None:
-            engine.dispose()
+            try:
+                engine.dispose()
+            except Exception:
+                outcome = {"ok": False, "code": "external_fact_governance_failed"}
+    try:
+        encoded = json.dumps(outcome, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (ValueError, TypeError):
+        outcome = {"ok": False, "code": "external_fact_governance_failed"}
+        encoded = json.dumps(outcome, separators=(",", ":"))
+    print(encoded)
+    return 0 if outcome["ok"] else 1
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@
 
 在已安装 API 依赖的受支持 Python 环境中，从 `apps/api` 运行模块。本文命令只用于已经由操作者确定的独立私库；示例路径和账户均为占位，不代表已执行。
 
-普通 `current/preview/approve/restrict/withdraw` 命令只打开显式绝对路径的既有 SQLite 文件，要求已有 `025_external_fact_governance`，不会自动初始化、升级或创建新库。
+普通 `current/preview/approve/restrict/withdraw` 命令可选择显式绝对路径的既有 SQLite 文件，或下文的 PostgreSQL 配置；要求已有 `025_external_fact_governance`，不会自动初始化、升级或创建新库。
 
 只有明确运行下列命令才安装 025：
 
@@ -27,6 +27,43 @@ python -m tire_api.external_fact_governance_cli init-private --private-database 
 ```
 
 操作者须先停止该私库全部写入者。入口复查管理员、024 版本与真实当前 024 结构，再以 SQLite backup API 写入全新的备份路径；两连接显式关闭，以固定 chunk 计算备份 SHA-256。随后在新事务再次复查账户/结构，只增加两表、保护和 025 版本。备份路径不可覆盖既有文件；备份完成后安装失败会保留备份并回滚本次事务。若备份本身中断，保留的文件不能视为有效备份。此备份不覆盖 object/bundle 等外部资产，也不代表正常库升级验收。
+
+## PostgreSQL 运维入口
+
+普通命令使用 `--postgres-profile <绝对配置文件路径>`，与 `--private-database` 互斥。`init-private` 仍只接受 SQLite，PG schema 由已有迁移流程准备；不能通过此工具自动建库或安装 schema。
+
+配置使用 UTF-8 JSON，必须恰好包含以下字段。将占位符替换为本机实际值，配置保存在 Git 忽略的私有目录，不提交内部地址或账户信息。
+
+```json
+{
+  "schema": "external-fact-postgres@1",
+  "host": "db.example.org",
+  "port": 5432,
+  "database": "tire_app",
+  "user": "tire_operator",
+  "sslmode": "verify-full",
+  "sslrootcert": "<absolute-ca-file>"
+}
+```
+
+- `database/user` 为 1–63 个 ASCII 字符，首字符字母或下划线，其后可用字母、数字、下划线和连字符。host 为单个 DNS 名或规范 IP；不接受多主机、Unix socket、URL、任意 libpq 参数或密码字段。
+- 远端必须 `verify-full`，CA 为显式绝对路径的现存非叶 symlink 文件；同时要求 SCRAM 和 channel binding。不支持通过此入口使用客户端证书、GSS、SSPI、trust 或 MD5 认证。
+- 隔离本机测试可用 `host: "127.0.0.1"` 或 `"::1"`、`sslmode: "disable"`、`sslrootcert: null`。DNS 名（包括 localhost）不享有关闭 TLS 的例外。
+- 必须使用支持 `sslcertmode`、`require_auth`、`gssencmode`、`channel_binding` 的 libpq；能力缺失返回 `postgres_client_unsupported`，不静默降低要求。本轮验证 psycopg 3.3.6／libpq 18.0.4／PG 18.3。
+- 非空 `PG*` 环境变量返回 `postgres_environment_unsupported`，避免服务文件、密码、目标地址或 options 隐式覆盖；工具不会修改环境。请在明确配置的干净进程中运行。其他应用的默认数据库配置不参与目标选择。
+
+```text
+python -m tire_api.external_fact_governance_cli current --postgres-profile <absolute-profile-file> --username <application-admin> --grant-id <grant-id>
+python -m tire_api.external_fact_governance_cli preview --postgres-profile <absolute-profile-file> --username <application-admin> --request-file <absolute-request-file> --terms-file <absolute-terms-file>
+```
+
+先隐藏输入 PostgreSQL 密码，再隐藏输入应用管理员密码。前者认证配置中的数据库角色，后者通过 User 账户与现有密码哈希校验，并在事务内复查角色／凭证版本。密码不接受 argv、配置或环境输入；终端不支持隐藏输入时拒绝，不回显降级。审批、限制、撤回的其余参数与 SQLite 一致，使用同一个预览／版本／幂等／审计合同。
+
+专用连接使用 NullPool、READ COMMITTED、`search_path=pg_catalog,public`，连接超时 5 秒、锁超时 2 秒、单语句超时 5 秒、事务空闲超时 15 秒。它们不是整个命令的硬实时上限，DNS 及多个地址解析也可能增加连接总耗时。当前只管理 public 中已迁移的应用表；不修改共享 Store、Reader 锁名单或部署角色权限，不自动重试或回退 SQLite。
+
+参数错误返回固定码；数据库认证、访问权限、连接、锁、语句或释放失败统一返回 `external_fact_governance_failed`，不输出原始 SQL／连接串／路径／密码。成功 JSON 在连接释放后输出。若提交已经成功而响应或释放失败，结果仍可能已落账；用原 grant 的 `current` 以及原 UUID／原提交参数核对重放，不换 UUID 重做审批。
+
+真实隔离 PG 的审批／限制／撤回／旧 UUID 重放、并发 CAS、权限拒绝、超时、Reader 消费和 TLS 握手证据见[PG CLI 验收](assurance/evidence/postgres-governance-cli-2026-11-13.md)。合成许可不代表真实权利；测试角色非 superuser，但拥有其隔离数据库，不能据此声称生产最小权限已验。
 
 ## 请求合同
 

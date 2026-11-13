@@ -8,11 +8,12 @@ import copy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from sqlalchemy import inspect, text
@@ -218,6 +219,119 @@ class GovernanceCliTests(unittest.TestCase):
                     "('external_fact_license_evidence','external_fact_grant_revisions')").fetchall(), [])
             finally:
                 db.close()
+
+    def pg_profile(self, **changes):
+        return {"schema": "external-fact-postgres@1", "host": "127.0.0.1", "port": 55432,
+                "database": "synthetic_governance", "user": "synthetic_operator",
+                "sslmode": "disable", "sslrootcert": None, **changes}
+
+    def test_pg_target_is_explicit_exclusive_and_cannot_initialize(self):
+        path = self.directory / "postgres.json"
+        path.write_text(json.dumps(self.pg_profile()), encoding="utf-8")
+        flags = ["--postgres-profile", str(path)]
+        parsed = cli._parser().parse_args(["current", *flags, "--username", "admin", "--grant-id", "g"])
+        self.assertEqual(parsed.postgres_profile, str(path))
+        for args in (self.base("current") + flags + ["--grant-id", "g"],
+                     ["init-private", *flags, "--username", "admin", "--backup-file", str(self.path),
+                      "--offline-confirmed"]):
+            self.assertEqual(self.run_cli(args)[1]["code"], "request_invalid")
+
+    def test_pg_profile_rejects_implicit_targets_credentials_and_tls_downgrades(self):
+        invalid = [self.pg_profile(**changes) for changes in (
+            {"host": "localhost"}, {"host": "127.0.0.1,example.org"}, {"host": "/tmp"},
+            {"host": "example.org"}, {"host": "127.1"}, {"port": True}, {"port": 0},
+            {"user": ""}, {"database": "postgresql://example.org/db"}, {"sslmode": "prefer"},
+            {"password": "synthetic-secret"}, {"options": "-c search_path=evil"},
+            {"sslrootcert": "relative.pem"}, {"schema": "unknown"},
+            {"host": "example.org", "sslmode": "verify-full"},
+        )]
+        invalid += [None, [], {"host": "127.0.0.1"}]
+        with patch.dict(os.environ, {}, clear=True):
+            for profile in invalid:
+                with self.subTest(profile=profile), self.assertRaises(cli.GovernanceError) as failure:
+                    cli.postgres_connect_args(profile)
+                self.assertEqual(failure.exception.code, "postgres_profile_invalid")
+            valid = cli.postgres_connect_args(self.pg_profile())
+            self.assertEqual(valid["host"], "127.0.0.1")
+            self.assertEqual(valid["require_auth"], "scram-sha-256")
+            self.assertEqual(valid["sslcertmode"], "disable")
+            self.assertEqual(valid["gssencmode"], "disable")
+            self.assertEqual(valid["connect_timeout"], 5)
+        for name in ("PGSERVICE", "PGPASSWORD", "PGOPTIONS", "PGHOSTADDR"):
+            with patch.dict(os.environ, {name: "synthetic-hidden-value"}, clear=True):
+                with self.assertRaises(cli.GovernanceError) as failure:
+                    cli.postgres_connect_args(self.pg_profile())
+                self.assertEqual(failure.exception.code, "postgres_environment_unsupported")
+
+    def test_pg_remote_profile_requires_explicit_ca_and_verified_tls(self):
+        ca = self.directory / "synthetic-ca.pem"
+        ca.write_text("synthetic configuration-only fixture", encoding="ascii")
+        with patch.dict(os.environ, {}, clear=True):
+            params = cli.postgres_connect_args(self.pg_profile(
+                host="database.example.org", sslmode="verify-full", sslrootcert=str(ca)))
+        self.assertEqual(params["sslmode"], "verify-full")
+        self.assertEqual(params["channel_binding"], "require")
+        self.assertEqual(params["sslrootcert"], str(ca))
+
+    def test_pg_requires_supported_client_and_nonempty_explicit_password(self):
+        import psycopg
+        with patch.dict(os.environ, {}, clear=True), \
+             patch.object(psycopg.pq, "Conninfo", SimpleNamespace(get_defaults=lambda: [])):
+            with self.assertRaises(cli.GovernanceError) as failure:
+                cli.postgres_connect_args(self.pg_profile())
+            self.assertEqual(failure.exception.code, "postgres_client_unsupported")
+        with patch.dict(os.environ, {}, clear=True):
+            params = cli.postgres_connect_args(self.pg_profile())
+            for password in (None, "", "x" * 1025, "synthetic\x00password"):
+                with self.assertRaises(cli.GovernanceError) as failure:
+                    cli.postgres_engine(params, password)
+                self.assertEqual(failure.exception.code, "postgres_authentication_required")
+
+    def test_cleanup_error_never_leaks_or_reports_success(self):
+        secret = "synthetic-dispose-secret"
+        engine = cli.private_engine(str(self.path))
+        try:
+            with patch.object(cli, "private_engine", return_value=engine), \
+                 patch.object(engine, "dispose", side_effect=RuntimeError(secret)):
+                code, value, output = self.run_cli(self.base("current") + ["--grant-id", "grant-1"])
+            self.assertEqual((code, value["code"]), (1, "external_fact_governance_failed"))
+            self.assertNotIn(secret, output)
+            self.assertFalse(value["ok"])
+        finally:
+            engine.dispose()
+
+    def test_hidden_input_failure_does_not_open_database(self):
+        for error in (cli.getpass.GetPassWarning("synthetic-input-secret"), EOFError(), KeyboardInterrupt()):
+            stream = io.StringIO()
+            with patch.object(cli.sys, "stdin", SimpleNamespace(isatty=lambda: True)), \
+                 patch.object(cli.getpass, "getpass", side_effect=error), \
+                 patch.object(cli, "private_engine") as opening, redirect_stdout(stream):
+                code = cli.main(self.base("current") + ["--grant-id", "grant-1"])
+            self.assertEqual(code, 1)
+            self.assertEqual(json.loads(stream.getvalue())["code"], "interactive_authentication_required")
+            opening.assert_not_called()
+
+    def test_pg_dispatch_uses_two_hidden_secrets_and_shared_store(self):
+        path = self.directory / "postgres.json"
+        path.write_text(json.dumps(self.pg_profile()), encoding="utf-8")
+        args = ["current", "--postgres-profile", str(path), "--username", "admin", "--grant-id", "grant-1"]
+        engine, store = Mock(), Mock()
+        store.current.return_value = {"state": "missing"}
+        stream = io.StringIO()
+        with patch.dict(os.environ, {}, clear=True), \
+             patch.object(cli.sys, "stdin", SimpleNamespace(isatty=lambda: True)), \
+             patch.object(cli.getpass, "getpass", side_effect=["synthetic-db-secret", PASSWORD]) as prompts, \
+             patch.object(cli, "postgres_engine", return_value=engine) as pg, \
+             patch.object(cli, "GovernanceStore", return_value=store), \
+             patch.object(cli, "private_engine") as sqlite, redirect_stdout(stream):
+            self.assertEqual(cli.main(args), 0)
+        self.assertEqual(len(prompts.call_args_list), 2)
+        self.assertEqual(pg.call_args.args[1], "synthetic-db-secret")
+        store.authenticate.assert_called_once_with("admin", PASSWORD)
+        store.current.assert_called_once_with(store.authenticate.return_value, "grant-1")
+        engine.dispose.assert_called_once()
+        sqlite.assert_not_called()
+        self.assertNotIn("synthetic-db-secret", stream.getvalue())
 
 
 if __name__ == "__main__":

@@ -6,10 +6,12 @@ no arbitrary URL, production connection, source fetch or model call is accepted.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import redirect_stdout
 from copy import deepcopy
 from datetime import timedelta
 import argparse
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -18,6 +20,8 @@ import sys
 import threading
 import time
 import traceback
+from types import SimpleNamespace
+from unittest.mock import patch
 from uuid import uuid4
 
 import psycopg
@@ -30,7 +34,7 @@ from sqlalchemy.orm import Session
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'apps/api/tests'))
 sys.path.insert(0, str(ROOT / 'apps/api'))
-from test_external_tire_fact_reader import OwnedFactReaderTests, Registry, VARIANT, SOURCE
+from test_external_tire_fact_reader import OwnedFactReaderTests, Registry, VARIANT, SOURCE, PASSWORD, TERMS, REQUIRED, FACT_FIELDS
 from tire_api.db import AuditEvent, QueryRun, Snapshot, User, UserSession, utcnow
 from tire_api.external_api import revoke_account_keys
 from tire_api.external_fact_governance import GovernanceError
@@ -386,6 +390,222 @@ def wrong_schema(case):
     case.code('reader_not_available', lambda: page(case))
 
 
+class GovernanceCliCase:
+    """Actual CLI and DB; only terminal detection/password input are simulated."""
+    def __init__(self, case):
+        from tire_api import external_fact_governance_cli as cli
+        self.cli, self.case = cli, case
+        self.profile = case.directory / 'postgres.json'
+        self.request_file = case.directory / 'request.json'
+        self.terms_file = case.directory / 'terms.txt'
+        self.terms_file.write_bytes(TERMS)
+        url = case.engine.url
+        self.password = url.password
+        self.settings = {'schema': 'external-fact-postgres@1', 'host': '127.0.0.1', 'port': url.port,
+            'database': url.database, 'user': url.username, 'sslmode': 'disable', 'sslrootcert': None}
+        self.profile.write_text(json.dumps(self.settings), encoding='utf-8')
+        self.request = {'schema': 'external-fact-governance-request@1', 'action': 'approve',
+            'grant_id': 'synthetic-cli-grant', 'reason': 'Synthetic CLI rights review only', 'source_id': SOURCE,
+            'coverage': {'observations': [{key: case.selected[key] for key in (
+                'snapshot_id', 'raw_hash', 'parser_version')}], 'field_keys': REQUIRED + FACT_FIELDS},
+            'rights': {'holder': 'Synthetic holder', 'basis': 'Synthetic fixture only'},
+            'validity': {'not_before': '2020-01-01T00:00:00Z', 'not_after': None},
+            'license_reference': 'https://fixture.example/license', 'rights_reviewed': True}
+
+    def invoke(self, command, extra=(), *, username='admin', password=PASSWORD, database_password=None):
+        output = io.StringIO()
+        with patch.object(self.cli.sys, 'stdin', SimpleNamespace(isatty=lambda: True)), \
+             patch.object(self.cli.getpass, 'getpass', side_effect=[
+                 self.password if database_password is None else database_password, password]), redirect_stdout(output):
+            code = self.cli.main([command, '--postgres-profile', str(self.profile), '--username', username, *extra])
+        body = output.getvalue()
+        result = json.loads(body)
+        assert code == (0 if result['ok'] else 1)
+        for secret in (self.password, PASSWORD, str(self.profile)):
+            assert secret not in body
+        return result
+
+    def preview(self, request=None):
+        request = self.request if request is None else request
+        self.request_file.write_text(json.dumps(request), encoding='utf-8')
+        extra = ['--request-file', str(self.request_file)]
+        if request['action'] == 'approve':
+            extra += ['--terms-file', str(self.terms_file)]
+        result = self.invoke('preview', extra)
+        assert result['ok'] and result['creates_permission'] is False
+        return result
+
+    def append(self, request, preview, key=None):
+        self.request_file.write_text(json.dumps(request), encoding='utf-8')
+        extra = ['--request-file', str(self.request_file), '--expected-revision', str(preview['expected_revision']),
+            '--expected-head', preview['expected_head'] or 'null', '--expected-preview-fingerprint', preview['fingerprint'],
+            '--idempotency-key', key or str(uuid4())]
+        if request['action'] == 'approve':
+            extra += ['--terms-file', str(self.terms_file)]
+        return self.invoke(request['action'], extra)
+
+    def current(self, **kwargs):
+        return self.invoke('current', ['--grant-id', self.request['grant_id']], **kwargs)
+
+    def counts(self):
+        from tire_api.external_fact_models import ExternalFactGrantRevision, ExternalFactLicenseEvidence
+        with self.case.engine.connect() as connection:
+            return tuple(connection.scalar(select(func.count()).select_from(model)) for model in (
+                ExternalFactGrantRevision, ExternalFactLicenseEvidence, AuditEvent))
+
+
+def cli_lifecycle_and_reader(case):
+    command = GovernanceCliCase(case)
+    before = command.counts()
+    preview = command.preview()
+    assert command.counts() == before and command.current()['state'] == 'missing'
+    key = str(uuid4())
+    approved = command.append(command.request, preview, key)
+    assert approved['ok'] and approved['current']['state'] == 'approved'
+    case.grant_id = command.request['grant_id']
+    case.reader = case.new_reader()
+    case.credential = case.reader.capture_credential(['Bearer ' + case.issued['token']])
+    case.projected()
+    for action in ('restrict', 'withdraw'):
+        request = {'schema': 'external-fact-governance-request@1', 'action': action,
+            'grant_id': case.grant_id, 'reason': 'Synthetic CLI ' + action}
+        change = command.append(request, command.preview(request))
+        assert change['ok'] and change['current']['state'] == {'restrict': 'restricted', 'withdraw': 'withdrawn'}[action]
+        case.code('reader_not_available', case.read)
+    replay = command.append(command.request, preview, key)
+    assert replay['ok'] and replay['replayed'] and replay['current']['state'] == 'withdrawn'
+    assert replay['historical_event_id'] == approved['historical_event_id']
+    assert command.current()['state'] == 'withdrawn'
+
+
+def cli_conflicts_and_role_change(case):
+    command = GovernanceCliCase(case)
+    before = command.counts()
+    preview = command.preview()
+    changed = deepcopy(command.request)
+    changed['reason'] = 'Different synthetic review'
+    assert command.append(changed, preview)['code'] == 'preview_stale'
+    assert command.counts() == before
+    approved = command.append(command.request, preview)
+    assert approved['ok']
+    assert command.append(command.request, preview)['code'] == 'revision_conflict'
+    for kwargs in ({'username': 'owner_a'}, {'password': 'incorrect-synthetic-password'},
+                   {'database_password': 'incorrect-synthetic-db-password'}):
+        outcome = command.current(**kwargs)
+        assert not outcome['ok']
+        assert outcome['code'] in ('admin_authentication_required', 'external_fact_governance_failed')
+    original = command.cli.GovernanceStore.authenticate
+    def revoke_after_auth(store, username, password):
+        actor = original(store, username, password)
+        with case.engine.begin() as connection:
+            connection.execute(User.__table__.update().where(User.id == 'admin').values(is_admin=False))
+        return actor
+    before = command.counts()
+    with patch.object(command.cli.GovernanceStore, 'authenticate', revoke_after_auth):
+        assert command.current()['code'] == 'admin_authorization_changed'
+    assert command.counts() == before
+
+
+def cli_schema_and_readonly(case):
+    command = GovernanceCliCase(case)
+    with case.engine.begin() as connection:
+        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version='025_external_fact_governance'")
+    assert command.current()['code'] == 'schema_required'
+    with case.engine.begin() as connection:
+        connection.exec_driver_sql("INSERT INTO tire_schema_versions VALUES ('025_external_fact_governance')")
+    # An independently authenticated SELECT-only role cannot lock/update actor rows.
+    role, secret = 'readonly_' + uuid4().hex[:12], secrets.token_hex(32)
+    case.cluster_admin.execute(sql.SQL('CREATE ROLE {} LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE').format(
+        sql.Identifier(role), sql.Literal(secret)))
+    with case.engine.begin() as connection:
+        connection.exec_driver_sql('GRANT USAGE ON SCHEMA public TO ' + role)
+        connection.exec_driver_sql('GRANT SELECT ON ALL TABLES IN SCHEMA public TO ' + role)
+    command.settings['user'] = role
+    command.profile.write_text(json.dumps(command.settings), encoding='utf-8')
+    before = command.counts()
+    assert command.current(database_password=secret)['code'] == 'external_fact_governance_failed'
+    assert command.counts() == before
+
+
+def cli_timeouts_and_session(case):
+    command = GovernanceCliCase(case)
+    from tire_api.external_fact_governance_postgres import postgres_connect_args, postgres_engine
+    from sqlalchemy.pool import NullPool
+    engine = postgres_engine(postgres_connect_args(command.settings), command.password)
+    try:
+        assert isinstance(engine.pool, NullPool)
+        with engine.connect() as connection:
+            expected = {'search_path': 'pg_catalog,public', 'lock_timeout': '2s', 'statement_timeout': '5s',
+                'idle_in_transaction_session_timeout': '15s', 'transaction_isolation': 'read committed', 'is_superuser': 'off'}
+            for name, value in expected.items():
+                assert connection.exec_driver_sql('SHOW ' + name).scalar() == value
+            try:
+                connection.exec_driver_sql('SELECT pg_sleep(6)')
+            except DBAPIError as error:
+                assert error.orig.sqlstate == '57014'
+            else:
+                raise AssertionError('cli_statement_timeout_missing')
+        with case.engine.connect() as writer:
+            writer.exec_driver_sql('SELECT pg_advisory_xact_lock(821741905)')
+            started = time.monotonic()
+            assert command.current()['code'] == 'external_fact_governance_failed'
+            assert 1 <= time.monotonic() - started < 8
+            writer.rollback()
+        assert command.current()['ok']
+        with case.engine.connect() as observer:
+            assert observer.execute(text("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
+                "AND application_name='tire_governance_cli'")).scalar() == 0
+    finally:
+        engine.dispose()
+
+
+def cli_concurrent_approval(case):
+    command = GovernanceCliCase(case)
+    from tire_api.external_fact_governance_postgres import postgres_connect_args, postgres_engine
+    from tire_api.external_fact_governance import GovernanceStore
+    preview = command.preview()
+    barrier = threading.Barrier(2)
+    def commit():
+        engine = postgres_engine(postgres_connect_args(command.settings), command.password)
+        try:
+            store = GovernanceStore(engine)
+            actor = store.authenticate('admin', PASSWORD)
+            barrier.wait(timeout=5)
+            try:
+                store.append(actor, command.request, terms=TERMS, expected_revision=preview['expected_revision'],
+                    expected_head=preview['expected_head'], expected_preview_fingerprint=preview['fingerprint'],
+                    idempotency_key=str(uuid4()))
+                return 'approved'
+            except GovernanceError as error:
+                return error.code
+        finally:
+            engine.dispose()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _: commit(), range(2)))
+    assert sorted(outcomes) == ['approved', 'revision_conflict']
+    assert command.current()['state'] == 'approved'
+
+
+def cli_tls_verification(case):
+    command = GovernanceCliCase(case)
+    from tire_api.external_fact_governance_postgres import postgres_connect_args, postgres_engine
+    command.settings.update(sslmode='verify-full', sslrootcert=os.environ['TIRE_PG_TEST_TLS_ROOT'])
+    command.profile.write_text(json.dumps(command.settings), encoding='utf-8')
+    assert command.current()['ok']
+    engine = postgres_engine(postgres_connect_args(command.settings), command.password)
+    try:
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql('SELECT ssl FROM pg_stat_ssl WHERE pid=pg_backend_pid()').scalar() is True
+    finally:
+        engine.dispose()
+    # The server certificate has only an IP SAN, never a localhost DNS SAN.
+    for changes in ({'host': 'localhost'}, {'sslrootcert': os.environ['TIRE_PG_TEST_TLS_WRONG_ROOT']}):
+        command.profile.write_text(json.dumps({**command.settings, **changes}), encoding='utf-8')
+        assert command.current()['code'] == 'external_fact_governance_failed'
+    command.profile.write_text(json.dumps(command.settings), encoding='utf-8')
+    assert command.current()['ok']
+
+
 def run():
     os.environ['TI_OBSERVABILITY_LOGS'] = '0'
     expected = Path(os.environ['TIRE_PG_TEST_DATA']).resolve()
@@ -419,6 +639,7 @@ def run():
             case = RealCase()
             try:
                 case.setUp()
+                case.cluster_admin = admin
                 SafetyGateSnapshot.__table__.create(case.engine, checkfirst=True)
                 SafetyGateVerification.__table__.create(case.engine, checkfirst=True)
                 call(case)
@@ -436,6 +657,11 @@ def run():
                      session_and_pool, reader_before_key_revoke, reader_before_direct_delete,
                      reader_before_direct_payload_write, committed_revoke_before_reader, lock_timeout):
             check(call.__name__, lambda call=call: fixture(call))
+        for call in (cli_lifecycle_and_reader, cli_conflicts_and_role_change, cli_schema_and_readonly,
+                     cli_timeouts_and_session, cli_concurrent_approval):
+            check(call.__name__, lambda call=call: fixture(call))
+        if os.environ.get('TIRE_PG_TEST_TLS_ROOT'):
+            check('cli_tls_verification', lambda: fixture(cli_tls_verification))
 
         # Exercise ordinary app startup, authenticated query creation and the
         # actual HTTP reader, not only a standalone internal projection.

@@ -3,10 +3,12 @@
 param(
     [Parameter(Mandatory)][string]$PostgresBin,
     [ValidateRange(1024, 65535)][int]$Port = 55432,
-    [ValidateSet('core', 'external-reader')][string]$Suite = 'core'
+    [ValidateSet('core', 'external-reader')][string]$Suite = 'core',
+    [switch]$CliTls
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this script with PowerShell 7.' }
+if ($CliTls -and $Suite -ne 'external-reader') { throw 'CliTls requires external-reader suite.' }
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $bin = (Resolve-Path -LiteralPath $PostgresBin).Path
 foreach ($program in @('initdb.exe', 'pg_ctl.exe', 'pg_dump.exe', 'pg_restore.exe')) {
@@ -30,12 +32,51 @@ $startAttempted = $false
 $stopped = $false
 $pgStartProcess = $null
 $reportPath = Join-Path $runDir 'report.json'
-$envNames = @('TIRE_PG_TEST_PASSWORD', 'TIRE_PG_TEST_PORT', 'TIRE_PG_TEST_DATA', 'TIRE_PG_BIN', 'TIRE_PG_TEST_REPORT', 'TI_OBJECT_STORE_BACKEND', 'TI_OBJECT_STORE_ROOT')
+$envNames = @('TIRE_PG_TEST_PASSWORD', 'TIRE_PG_TEST_PORT', 'TIRE_PG_TEST_DATA', 'TIRE_PG_BIN', 'TIRE_PG_TEST_REPORT', 'TIRE_PG_TEST_TLS_ROOT', 'TIRE_PG_TEST_TLS_WRONG_ROOT', 'TI_OBJECT_STORE_BACKEND', 'TI_OBJECT_STORE_ROOT')
 $previousEnvironment = @{}
 foreach ($name in $envNames) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
     & (Join-Path $bin 'initdb.exe') -D $dataDir --username=tire_verify_admin --auth=scram-sha-256 --encoding=UTF8 --locale=C --pwfile=$passwordFile *> (Join-Path $runDir 'initdb.log')
     if ($LASTEXITCODE -ne 0) { throw 'Isolated initdb failed; see the artifact initdb.log.' }
+    $env:TIRE_PG_TEST_TLS_ROOT = $null
+    $env:TIRE_PG_TEST_TLS_WRONG_ROOT = $null
+    if ($CliTls) {
+        # Disposable certificate chain for this isolated loopback cluster only.
+        # No OS trust-store modification and no external CA/key dependency.
+        $caKey = [Security.Cryptography.RSA]::Create(2048)
+        $leafKey = [Security.Cryptography.RSA]::Create(2048)
+        $wrongKey = [Security.Cryptography.RSA]::Create(2048)
+        $ca = $leaf = $wrong = $null
+        try {
+            $now = [DateTimeOffset]::UtcNow
+            $caRequest = [Security.Cryptography.X509Certificates.CertificateRequest]::new('CN=Synthetic PG CLI CA', $caKey,
+                [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            $caRequest.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509BasicConstraintsExtension]::new($true, $false, 0, $true))
+            $caRequest.CertificateExtensions.Add([Security.Cryptography.X509Certificates.X509KeyUsageExtension]::new(
+                [Security.Cryptography.X509Certificates.X509KeyUsageFlags]::KeyCertSign, $true))
+            $ca = $caRequest.CreateSelfSigned($now.AddMinutes(-5), $now.AddDays(1))
+            $leafRequest = [Security.Cryptography.X509Certificates.CertificateRequest]::new('CN=Synthetic PG CLI Server', $leafKey,
+                [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            $san = [Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder]::new()
+            $san.AddIpAddress([Net.IPAddress]::Loopback)
+            $leafRequest.CertificateExtensions.Add($san.Build())
+            $leaf = $leafRequest.Create($ca, $now.AddMinutes(-4), $now.AddHours(12), [Security.Cryptography.RandomNumberGenerator]::GetBytes(16))
+            $wrongRequest = [Security.Cryptography.X509Certificates.CertificateRequest]::new('CN=Synthetic Untrusted CA', $wrongKey,
+                [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+            $wrong = $wrongRequest.CreateSelfSigned($now.AddMinutes(-5), $now.AddDays(1))
+            [IO.File]::WriteAllText((Join-Path $dataDir 'server.crt'), $leaf.ExportCertificatePem(), [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText((Join-Path $dataDir 'server.key'), $leafKey.ExportPkcs8PrivateKeyPem(), [Text.UTF8Encoding]::new($false))
+            $env:TIRE_PG_TEST_TLS_ROOT = Join-Path $runDir 'synthetic-ca.pem'
+            $env:TIRE_PG_TEST_TLS_WRONG_ROOT = Join-Path $runDir 'synthetic-wrong-ca.pem'
+            [IO.File]::WriteAllText($env:TIRE_PG_TEST_TLS_ROOT, $ca.ExportCertificatePem(), [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllText($env:TIRE_PG_TEST_TLS_WRONG_ROOT, $wrong.ExportCertificatePem(), [Text.UTF8Encoding]::new($false))
+            [IO.File]::AppendAllText((Join-Path $dataDir 'postgresql.conf'), "`nssl=on`n", [Text.UTF8Encoding]::new($false))
+        } finally {
+            foreach ($value in @($ca, $leaf, $wrong, $caKey, $leafKey, $wrongKey)) {
+                if ($null -ne $value) { $value.Dispose() }
+            }
+        }
+    }
     # A daemon may inherit a PowerShell pipeline handle and keep its native
     # output reader open after pg_ctl exits. Wait for pg_ctl itself, not its
     # descendants, and keep startup streams outside the caller's pipeline.
@@ -77,6 +118,9 @@ try {
     if ($null -ne $pgStartProcess) { $pgStartProcess.Dispose() }
     foreach ($name in $envNames) { [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process') }
     Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
+    if ($CliTls -and (-not $startAttempted -or $stopped)) {
+        Remove-Item -LiteralPath (Join-Path $dataDir 'server.key') -Force -ErrorAction SilentlyContinue
+    }
     $secret = $null
     @{ run_directory = $runDir; report = $reportPath; server_started = $started; server_stopped = $stopped; port = $Port } |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactRoot 'latest-run.json') -Encoding utf8
