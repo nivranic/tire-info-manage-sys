@@ -29,6 +29,7 @@ _TELEMETRY_SOURCES = {
     'api.nhtsa.gov': 'nhtsa',
     'tire.bridgestone.co.jp': 'bridgestone-jp',
     'www.continental-tires.cn': 'continental-cn',
+    'www.goodyear.com.sg': 'goodyear-sg',
 }
 
 

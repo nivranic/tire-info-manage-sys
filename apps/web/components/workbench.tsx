@@ -120,7 +120,7 @@ const statusLabels: Record<string, string> = {
 };
 const isQueryableSource = (source: Source) => (!source.target_kind || source.target_kind === "tire") && (source.source_setting ? canQuerySource(source.source_setting, true) : ["ready", "available", "enabled"].includes(source.status));
 const supportsModel = (source: Source, model: string) => !source.supported_models || source.supported_models.includes(model);
-const regionLabels: Record<string, string> = { CN: "中国", US: "美国", UK: "英国", FR: "法国", DE: "德国", JP: "日本", EU: "欧盟" };
+const regionLabels: Record<string, string> = { CN: "中国", US: "美国", UK: "英国", FR: "法国", DE: "德国", JP: "日本", SG: "新加坡", EU: "欧盟" };
 const factLabels: Record<string, string> = {
   wet_grip: "湿地抓地等级", fuel_efficiency: "燃油效率等级", noise_db: "外部滚动噪音", noise_class: "噪音等级",
   treadwear: "磨耗指数", traction: "牵引力等级", temperature: "耐热等级", warranty_miles: "里程质保", weight: "重量",
@@ -138,6 +138,7 @@ const factLabels: Record<string, string> = {
   overall_diameter_mm: "外径（毫米）", overall_width_mm: "断面宽度（毫米）", standard_rim_width_in: "标准轮辋宽度（英寸）",
   jp_rolling_resistance_grade: "日本滚动阻力等级", jp_wet_grip_grade: "日本湿地抓地等级", jp_low_external_noise: "日本低车外音标记",
   rim_guard: "轮辋保护标记", source_note: "来源注记", vehicle_type: "适用车辆类别",
+  source_speed_marking: "来源速度栏原文", source_load_marking: "来源载荷栏原文",
   rim_width_range_in: "适用轮辋宽度（英寸）", recommended_rim_width_in: "推荐轮辋宽度（英寸）", sidewall_code: "胎侧标记",
   tread_construction: "胎面结构", sidewall_construction: "胎侧结构", for_sale: "来源在售状态",
   acoustic_foam: "静音泡棉", m_plus_s: "M+S 泥雪标记", three_peak_mountain_snowflake: "三峰雪花标记（3PMSF）",

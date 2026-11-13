@@ -82,3 +82,5 @@
 /scripts/regression_children.py text eol=lf
 /apps/api/tire_api/adapters/continental.py text eol=lf
 /apps/api/tests/test_continental.py text eol=lf
+/apps/api/tire_api/adapters/goodyear.py text eol=lf
+/apps/api/tests/test_goodyear.py text eol=lf

@@ -184,6 +184,10 @@ def main():
             from tire_api.adapters.continental import parse_html
             _check_imports(package_root)
             payload = parse_html(body, query)
+        elif source_id == 'goodyear-sg':
+            from tire_api.adapters.goodyear import parse_html
+            _check_imports(package_root)
+            payload = parse_html(body, query)
         elif source_id == 'xiaomi-cn-vehicles':
             from tire_api.adapters.xiaomi import PARSER_VERSION, parse_config
             _check_imports(package_root)

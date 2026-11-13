@@ -68,11 +68,11 @@ def strict_json(value):
 
 def _specs():
     from .adapters.michelin_regions import MICHELIN_REGIONS
-    from .adapters import hankook, toyo, xiaomi, nhtsa, pirelli, bridgestone, continental
+    from .adapters import hankook, toyo, xiaomi, nhtsa, pirelli, bridgestone, continental, goodyear
     values = {'michelin-us': ('michelin-us-astro@2.0.0', 'tire', ['adapters/michelin.py', 'adapters/michelin_regions.py', 'adapters/registry.py'])}
     for source, config in MICHELIN_REGIONS.items():
         values[source] = (config['parser_version'], 'tire', ['adapters/michelin.py', 'adapters/michelin_regions.py', 'adapters/registry.py'])
-    for adapter in (hankook, toyo, pirelli, bridgestone, continental):
+    for adapter in (hankook, toyo, pirelli, bridgestone, continental, goodyear):
         values[adapter.SOURCE_CONFIG['id']] = (adapter.PARSER_VERSION, 'tire', [f'adapters/{adapter.__name__.rsplit(".", 1)[1]}.py', 'adapters/registry.py'])
     values[xiaomi.SOURCE_ID] = (xiaomi.PARSER_VERSION, 'vehicle', ['adapters/xiaomi.py', 'adapters/xiaomi_first_generation_pdf.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py', 'db.py'])
     values[nhtsa.SOURCE_ID] = (nhtsa.PARSER_VERSION, 'recall', ['adapters/nhtsa.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py'])
