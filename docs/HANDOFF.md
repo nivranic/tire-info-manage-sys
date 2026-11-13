@@ -1,4 +1,8 @@
-## 最新交付入口（2026-11-13）
+## 最新 Windows 路径与 PG 交付（2026-11-13）
+
+先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。Windows 本地规范归档长路径、等价路径门禁及消费者已完成工程验证；最终 105／105 相关回归及 58 项隔离 PG 核心流程通过，包含数据库、证据、报告和 Parser 归档恢复。历史间歇超时根因、生产治理和完整 V1 仍待完成。范围、反例与回执见[Windows 路径与 PG 验收](assurance/evidence/windows-parser-paths-2026-11-13.md)。下一工程优先补 PG 许可运维入口。
+
+## 此前交付入口（2026-11-13）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。最新增加 Parser 文件操作间的期限／取消检查及结果复核检查，原始受管入口最终四模块 94／94 通过、832 输入稳定、资源关闭。原预算、完整性校验和启动权限保持。各次原始失败、观测装配错误及复跑方式见[期限检查验收](assurance/evidence/parser-deadline-checkpoints-2026-11-13.md)。完整 PG 综合、间歇耗时根因、生产长路径及完整 V1 仍待完成。
 

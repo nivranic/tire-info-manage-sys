@@ -26,7 +26,7 @@ class ChildDenied(PermissionError):
 # Public source bytes, never runtime arguments or credential-derived digests.
 REVIEWED = {
     'apps/api/tests/test_parser_runtime.py': '1fcc24347df58820f577f4fc7865f920c6981860782857063ec1752dda0de2a0',
-    'apps/api/tests/test_parser_bundles.py': '0e5f0cdb74c528b8ba31571c7ca192eea82aa1222243cfa2ee87007754076a82',
+    'apps/api/tests/test_parser_bundles.py': '7c5cedbab89767415f6da49bb2dfaef4f0bb3572e984cb953930ebeb6df20cdb',
     'apps/api/tests/test_adapter_import_behavior.py': 'e365639027b8fc681ce600856bf71382ddefab285130ec91eac5e5d72bc66d01',
     'apps/api/tests/test_auth_governance.py': '5a23fe46ccd753e72cfa97df7e6f274673ec60d977c5474e1e03a5430e63acb7',
     'apps/api/tests/test_auth_lifecycle.py': 'fc15caa941f3ec8fa89086ea51864fe01878552bd34319794305329a516af61a',

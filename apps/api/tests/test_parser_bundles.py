@@ -529,3 +529,36 @@ def test_current_ten_source_archive_executes_pirelli_with_exact_receipt(tmp_path
     assert receipt['execution_digest'] == descriptor['execution_digest']
     assert receipt['pid'] and receipt['exit_code'] == 0 and receipt['reaped']
     assert bundles.verify_bundle(manifest)['manifest'] == original
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows long sealed-store paths')
+def test_long_store_seals_executes_and_refuses_modified_archive(tmp_path, monkeypatch):
+    trusted_copy(tmp_path, monkeypatch)
+    root = tmp_path / 'long-archive'
+    while len(str(root)) < 300:
+        root /= 'nested_archive_directory'
+    monkeypatch.setenv('TI_PARSER_BUNDLE_ROOT', str(root))
+    manifest = bundles.seal_deployed_bundle()
+    assert bundles.seal_deployed_bundle() == manifest
+    checked = bundles.verify_bundle(manifest)
+    result = asyncio.run(execute_bundle(manifest, 1))
+    assert len(result['payload']) == 2
+    assert result['receipt']['bundle_id'] == manifest['bundle_id']
+    assert result['receipt']['exit_code'] == 0 and result['receipt']['reaped']
+
+    # Both configured spellings must identify exactly the same sealed object.
+    monkeypatch.setenv('TI_PARSER_BUNDLE_ROOT', '\\\\?\\' + str(root))
+    assert bundles.verify_bundle(manifest)['package_root'] == checked['package_root']
+    target = checked['package_root'] / 'adapters' / 'hankook.py'
+    target.write_bytes(target.read_bytes() + b'\n# changed sealed source\n')
+    with pytest.raises(bundles.BundleError, match='parser_bundle_integrity_failed'):
+        bundles.verify_bundle(manifest)
+
+    launches = []
+    def forbidden_launch(*args, **kwargs):
+        launches.append(True)
+        raise AssertionError('changed archive must not launch')
+    monkeypatch.setattr(runtime.subprocess, 'Popen', forbidden_launch)
+    with pytest.raises(runtime.ParserRunError, match='parser_bundle_integrity_failed'):
+        asyncio.run(execute_bundle(manifest, 2))
+    assert launches == []

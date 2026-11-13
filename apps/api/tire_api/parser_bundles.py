@@ -54,9 +54,37 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
+def _filesystem_path(path):
+    """Use long-path-capable Windows spellings without resolving ancestors.
+
+    Win32 parent, reserved-name, stream and trailing-dot/space spellings are not
+    canonical filesystem paths. Preserve those and explicit namespaces as given.
+    """
+    path = Path(path).absolute()
+    if os.name != 'nt':
+        return path
+    value = str(path)
+    if value.startswith(('\\\\?\\', '\\\\.\\')):
+        return path
+    components = list(path.parts[1:])
+    if path.drive.startswith('\\\\'):
+        components.extend(path.drive[2:].split('\\'))
+    # Python 3.13+ exposes the platform rule directly; 3.12 provides the same
+    # reserved device-name check on Windows paths. No file or device is opened.
+    is_reserved = getattr(os.path, 'isreserved', lambda part: Path(part).is_reserved())
+    if any(part == '..' or part.endswith(('.', ' ')) or ':' in part or is_reserved(part)
+           for part in components):
+        return path
+    if path.drive.startswith('\\\\'):
+        return Path('\\\\?\\UNC\\' + value[2:])
+    if len(path.drive) == 2 and path.drive[1] == ':' and path.drive[0].isascii() and path.drive[0].isalpha():
+        return Path('\\\\?\\' + value)
+    return path
+
+
 def _plain_path_info(path, *, directory=None):
     """Validate every component once, retaining the leaf's no-follow metadata."""
-    path = Path(path).absolute()
+    path = _filesystem_path(path)
     for candidate in [*reversed(path.parents), path]:
         try:
             info = candidate.lstat()
@@ -252,7 +280,7 @@ def copy_verified(package_root, manifest, destination, *, source=False, checkpoi
     values = _tree(package_root, source=source, checkpoint=checkpoint)
     if _metadata(values) != manifest['files']:
         raise BundleError('parser_bundle_integrity_failed')
-    destination = Path(destination)
+    destination = _filesystem_path(destination)
     _checkpoint(checkpoint)
     destination.mkdir(parents=True, exist_ok=False)
     _plain_path(destination, directory=True)
@@ -273,7 +301,7 @@ def copy_verified(package_root, manifest, destination, *, source=False, checkpoi
 
 
 def _store_root(*, create=False):
-    root = Path(os.getenv('TI_PARSER_BUNDLE_ROOT') or 'data/parser-bundles').absolute()
+    root = _filesystem_path(os.getenv('TI_PARSER_BUNDLE_ROOT') or 'data/parser-bundles')
     # Check existing ancestors before mkdir to reject redirected writes.
     for path in [*reversed(root.parents), root]:
         if path.exists() or path.is_symlink():

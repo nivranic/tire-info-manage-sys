@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import timedelta
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 from types import SimpleNamespace
@@ -189,6 +190,24 @@ def mapping_source(mapping):
         + 'REVIEWED_RAW_SHA256 = ' + repr(S2_SHA) + '\n'
         + 'REVIEWED_BYTE_COUNT = 3240150\n'
         + "raise RuntimeError('r86-archived-mapping-must-never-execute')\n").encode('utf-8')
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows long mapping-source path')
+def test_long_mapping_source_is_read_as_literals_without_execution(tmp_path):
+    directory = tmp_path / 'mapping-source'
+    while len(str(directory)) < 300:
+        directory /= 'nested_mapping_directory'
+    native = Path('\\\\?\\' + str(directory))
+    native.mkdir(parents=True)
+    data = mapping_source(MAPPING)
+    (native / 'mapping.py').write_bytes(data)
+    expected = {'sha256': hashlib.sha256(data).hexdigest(), 'byte_count': len(data)}
+    values = raw._mapping_literals(directory / 'mapping.py', expected)
+    assert values == {'PARSE_METHOD': METHOD, 'MAPPING_ID': MAPPING,
+                      'REVIEWED_RAW_SHA256': S2_SHA, 'REVIEWED_BYTE_COUNT': S2_SIZE}
+    # The source contains a top-level raise and must only be parsed as data.
+    (native / 'mapping.py').write_bytes(data + b'\n# changed source\n')
+    rejected(lambda: raw._mapping_literals(directory / 'mapping.py', expected))
 
 
 def seal(private, monkeypatch, mapping=MAPPING, *, installed_mapping=False):
