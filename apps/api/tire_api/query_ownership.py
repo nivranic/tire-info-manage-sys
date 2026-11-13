@@ -1,6 +1,6 @@
 """Server-issued new-query ownership, independent of mutable session bindings.
 
-This first implementation enables SQLite writes/reads only. A private issuer is
+SQLite and PostgreSQL freeze the actor through the atomic write. A private issuer is
 an accidental-misuse check, not protection against malicious trusted Python code.
 Callers still authenticate API keys and evaluate current license/field policy.
 """
@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from .db import AuditEvent, QueryRun, User, UserSession, uid, utc, utcnow
 from .domain import digest
 from .query_owner_models import QueryRunOwnerReceipt, SCHEMA
+from .external_fact_sql import postgres_boundary
 
 _ISSUER = object()
 _ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
@@ -76,7 +77,7 @@ def capture_query_actor(db, session_id, *, now=None):
     upgrade it. No password, Cookie, Bearer or request-supplied owner is accepted.
     This capture starts from a clean, fresh request Session.
     """
-    if db.get_bind().dialect.name != "sqlite":
+    if db.get_bind().dialect.name not in {"sqlite", "postgresql"}:
         return None
     _clean(db)
     if db.in_transaction() or not _id(session_id):
@@ -101,7 +102,7 @@ def _actor(db, actor, session_id, now):
             or actor.captured_at.microsecond != 0 or actor.captured_at > now):
         _fail("query_actor_invalid")
     # Column rows bypass expire_on_commit=False identity-map objects. SQLite's
-    # BEGIN IMMEDIATE serializes with the unchanged auth login/logout/delete.
+    # BEGIN IMMEDIATE / PG SHARE locks serialize with auth login/logout/delete.
     row = db.execute(select(UserSession.user_id, UserSession.expires_at)
                      .where(UserSession.id == session_id)).first()
     if (row is None or row.user_id != actor.user_id or utc(row.expires_at) <= now
@@ -157,7 +158,7 @@ def require_query_owner(db, query_id, owner_user_id, *, budget=None):
     projection must be checked by the future owned reader in this same context.
     This helper alone does not authorize external facts or expose HTTP routes.
     """
-    if db.get_bind().dialect.name != "sqlite":
+    if db.get_bind().dialect.name not in {"sqlite", "postgresql"}:
         _fail("query_owner_backend_unsupported")
     if not db.in_transaction() or db.new or db.dirty or db.deleted:
         _fail("query_owner_transaction_invalid")
@@ -182,7 +183,7 @@ def create_query_with_owner(db, run, actor, *, lock_ingestion, now=None):
     Internal same-ID replay only validates an already complete triple. It never
     retrofits old queries, changes owners or creates a second audit event.
     """
-    if db.get_bind().dialect.name != "sqlite":
+    if db.get_bind().dialect.name not in {"sqlite", "postgresql"}:
         _fail("query_owner_backend_unsupported")
     _clean(db)
     if type(run) is not QueryRun or not inspect(run).transient:
@@ -193,7 +194,14 @@ def create_query_with_owner(db, run, actor, *, lock_ingestion, now=None):
     commit_started = False
     try:
         binding = query_binding_digest(run)
-        lock_ingestion()
+        if db.get_bind().dialect.name == "postgresql":
+            # Same ingestion mutex, with bounded waits and extra table locks.
+            # A fresh READ COMMITTED transaction avoids an admission snapshot
+            # established before waiting for a concurrent logout/deletion.
+            db.commit()
+            postgres_boundary(db.connection(), owner_write=True)
+        else:
+            lock_ingestion()
         # Read the real clock after any lock wait, not before an expired actor
         # could have waited for another SQLite writer to finish.
         _actor(db, actor, run.session_id, _now(now))

@@ -1,11 +1,13 @@
-"""Explicit, cumulative allocation/work bounds for one owned SQLite page.
+"""Explicit, cumulative allocation/work bounds for one owned evidence page.
 
 All payload queries declare their model, predicates and selected columns. Length
 queries run before SQLAlchemy JSON processors. This is not an OS memory sandbox.
 """
 import math
 
-from sqlalchemy import JSON, LargeBinary, String, Text, cast, func, literal, select
+from sqlalchemy import JSON, LargeBinary, String, literal, select
+
+from .external_fact_sql import storage_bytes
 
 
 class PageCapacityError(Exception):
@@ -111,7 +113,7 @@ class PageReadBudget:
         selected = [column for column in model.__table__.columns
                     if (columns is None or column.key in columns)
                     and isinstance(column.type, (String, JSON, LargeBinary))]
-        expressions = [func.length(cast(cast(column, Text), LargeBinary)).label(column.key)
+        expressions = [storage_bytes(db, column).label(column.key)
                        for column in selected]
         remaining = self.MAX_ROWS - self.charged_rows
         statement = (select(*expressions, literal(1).label('_present')).select_from(model)
@@ -170,8 +172,10 @@ class PageReadBudget:
     def schema(self, connection):
         # Fixed SQL reads at most two short version strings, with lengths first.
         from sqlalchemy import text
+        length = ("octet_length(convert_to(version, 'UTF8'))" if connection.dialect.name == 'postgresql'
+                  else 'length(CAST(version AS BLOB))')
         lengths = list(connection.execute(text(
-            "SELECT length(CAST(version AS BLOB)) FROM tire_schema_versions WHERE version IN "
+            "SELECT " + length + " FROM tire_schema_versions WHERE version IN "
             "('025_external_fact_governance','026_query_ownership') LIMIT 3")))
         self.actual_rows += len(lengths)
         self.reserve_rows(len(lengths))

@@ -119,18 +119,22 @@ class Registry:
 
 
 class OwnedFactReaderTests(unittest.TestCase):
-    def setUp(self):
-        self.directory = scratch_root() / uuid4().hex
-        self.directory.mkdir(parents=True, exist_ok=False)
-        self.addCleanup(lambda: shutil.rmtree(self.directory) if self.directory.exists() else None)
-        self.engine = create_engine('sqlite:///' + (self.directory / 'reader.sqlite').as_posix(),
+    def make_engine(self):
+        engine = create_engine('sqlite:///' + (self.directory / 'reader.sqlite').as_posix(),
             connect_args={'timeout': 5, 'check_same_thread': False}, poolclass=NullPool)
 
-        @event.listens_for(self.engine, 'connect')
+        @event.listens_for(engine, 'connect')
         def configure(connection, _record):
             connection.execute('PRAGMA foreign_keys=ON').close()
             connection.execute('PRAGMA busy_timeout=5000').close()
 
+        return engine
+
+    def setUp(self):
+        self.directory = scratch_root() / uuid4().hex
+        self.directory.mkdir(parents=True, exist_ok=False)
+        self.addCleanup(lambda: shutil.rmtree(self.directory) if self.directory.exists() else None)
+        self.engine = self.make_engine()
         self.addCleanup(self.engine.dispose)
         # Explicit service/reader tables plus FK closure. No broad metadata.create_all.
         models = (User, UserSession, QueryRun, Snapshot, Verification, AuditEvent,
@@ -293,6 +297,7 @@ class OwnedFactReaderTests(unittest.TestCase):
             row = db.get(ApiKey, all_three['key']['id'])
             self.assertEqual(row.bearer_sha256, hashlib.sha256(all_three['token'].encode('ascii')).hexdigest())
             self.assertEqual(db.scalar(select(func.count()).select_from(ApiKeyOperation)), 2)
+            self.assertTrue(all(len(value) == 32 for value in db.scalars(select(ApiKeyOperation.id))))
             self.assertEqual(db.scalar(select(func.count()).select_from(InterestEvent)), 2)
             self.assertEqual(db.scalar(select(func.count()).select_from(QueryRunOwnerReceipt)), 1)
 
@@ -758,7 +763,7 @@ class OwnedFactReaderTests(unittest.TestCase):
             self.assertEqual(db.scalar(select(func.count()).select_from(AuditEvent)), audit_before)
         original = self.engine.dialect.name
         try:
-            self.engine.dialect.name = 'postgresql'  # Dialect stub only; no PG connection or acceptance.
+            self.engine.dialect.name = 'unsupported'  # Unknown backend gate; real PG has its own acceptance.
             self.code('reader_backend_unsupported', self.read)
         finally:
             self.engine.dialect.name = original

@@ -1,4 +1,4 @@
-"""Whole-window owned fact pagination under one fresh SQLite reader lock."""
+"""Whole-window owned fact pagination under one fresh protected read set."""
 from dataclasses import dataclass
 from datetime import datetime
 import hashlib

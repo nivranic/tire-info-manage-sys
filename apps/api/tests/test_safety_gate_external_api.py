@@ -308,12 +308,12 @@ def test_304_query_reuses_approved_snapshot_but_preserves_new_owner_receipt(exte
     assert value.json()['query_id'] == second['query_id']
 
 
-def test_postgres_reader_boundary_fails_before_connection():
+def test_unknown_reader_backend_fails_before_connection():
     from types import SimpleNamespace
     from tire_api.external_safety_gate import SafetyGateReader
     from tire_api.external_fact_reader import ReaderError
     class UnopenedEngine:
-        dialect = SimpleNamespace(name='postgresql')
+        dialect = SimpleNamespace(name='unsupported')
         def connect(self):
             pytest.fail('unsupported_reader_must_not_connect')
     reader = SafetyGateReader(UnopenedEngine())

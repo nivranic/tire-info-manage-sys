@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$PostgresBin,
-    [ValidateRange(1024, 65535)][int]$Port = 55432
+    [ValidateRange(1024, 65535)][int]$Port = 55432,
+    [ValidateSet('core', 'external-reader')][string]$Suite = 'core'
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this script with PowerShell 7.' }
@@ -64,7 +65,8 @@ try {
     $env:TI_OBJECT_STORE_ROOT = Join-Path $runDir 'objects'
     Push-Location $workspace
     try {
-        & uv run --project apps/api --extra dev python scripts/postgres_acceptance.py
+        $acceptanceScript = if ($Suite -eq 'external-reader') { 'scripts/postgres_external_reader_acceptance.py' } else { 'scripts/postgres_acceptance.py' }
+        & uv run --project apps/api --extra dev python $acceptanceScript
         if ($LASTEXITCODE -ne 0) { throw "PostgreSQL verification failed; sanitized report: $reportPath" }
     } finally { Pop-Location }
 } finally {

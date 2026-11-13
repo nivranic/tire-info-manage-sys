@@ -1,8 +1,8 @@
-"""Owned, SQLite-only internal fact read. No HTTP, acquisition or app startup.
+"""Owned internal fact read. No HTTP, acquisition or app startup.
 
 The server supplies a fixed source/grant mapping and the original Bearer header.
 Every authorization and evidence check, including pure G2a projection, finishes
-inside one fresh BEGIN IMMEDIATE transaction. Database history is not legal proof.
+inside one fresh protected transaction. Database history is not legal proof.
 """
 from dataclasses import dataclass, field
 import hashlib
@@ -10,7 +10,8 @@ import hmac
 import re
 from types import MappingProxyType
 
-from sqlalchemy import func, select
+from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError
 
 from .db import (AuditEvent, FactVersion, ManualFactRevision, QueryRun, Snapshot,
                  TireVariant, User, VariantLifecycleEvent, Verification, utc)
@@ -18,6 +19,7 @@ from .domain import VariantInput, digest, stable_json
 from .external_api import SCOPES, TOKEN_PATTERN, _valid_key
 from .external_api_models import ApiKey, ApiKeyRevocation
 from .external_fact_governance import GovernanceError, GovernanceStore, _reader_preflight
+from .external_fact_sql import json_array_length, json_valid
 from .external_tire_fact_projection import ProjectionResult, project_observation
 from .field_authority import canonical_field, known_values_differ
 from .identity_contract import IdentityContractError, _exact_current_binding, schema_version
@@ -111,9 +113,9 @@ class OwnedFactReader:
             _fail("reader_unauthorized")
         if budget is None:
             _reader_preflight(db, ApiKey, ApiKey.id == credential.key_id, limits={"scopes": 4096})
-        elif budget.scalar(db, select(func.json_valid(ApiKey.scopes)).where(ApiKey.id == credential.key_id)) == 0:
+        elif budget.scalar(db, select(json_valid(db, ApiKey.scopes)).where(ApiKey.id == credential.key_id)) == 0:
             _fail("reader_unauthorized")
-        count_statement = select(func.json_array_length(ApiKey.scopes)).where(ApiKey.id == credential.key_id)
+        count_statement = select(json_array_length(db, ApiKey.scopes)).where(ApiKey.id == credential.key_id)
         count = db.scalar(count_statement) if budget is None else budget.scalar(db, count_statement)
         if count is not None and (type(count) is not int or count > len(SCOPES)):
             _fail("reader_capacity" if budget is None else "reader_unauthorized")
@@ -169,10 +171,10 @@ class OwnedFactReader:
                 "parser_identity": 16 * 1024}, budget=budget)
             if not sizes:
                 _fail("reader_binding_invalid")
-            if budget is not None and budget.scalar(db, select(func.json_valid(Snapshot.parsed_variants))
+            if budget is not None and budget.scalar(db, select(json_valid(db, Snapshot.parsed_variants))
                                                     .where(Snapshot.id == snapshot_id)) != 1:
                 _fail("reader_binding_invalid")
-            count_statement = select(func.json_array_length(Snapshot.parsed_variants)).where(Snapshot.id == snapshot_id)
+            count_statement = select(json_array_length(db, Snapshot.parsed_variants)).where(Snapshot.id == snapshot_id)
             count = db.scalar(count_statement) if budget is None else budget.scalar(db, count_statement)
             if type(count) is not int or count > 256:
                 _fail("reader_capacity")
@@ -434,5 +436,7 @@ class OwnedFactReader:
             raise ReaderError(error.code if error.code in ERROR_CODES else "reader_policy_invalid") from None
         except IdentityContractError:
             raise ReaderError("reader_identity_invalid") from None
+        except DBAPIError:
+            raise ReaderError("reader_storage_unavailable") from None
         except Exception:
             raise ReaderError("reader_binding_invalid") from None

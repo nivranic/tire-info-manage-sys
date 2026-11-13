@@ -1,8 +1,8 @@
 ## 最新收尾交接入口（2026-11-13）
 
-先读[简明 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)，包括 12 模块、10 Gate、13 SLO、15 决策、实际进度与接手步骤。最新依据注入式反例加强 Safety Gate AI 受理合同校验，防止标记移除或合同变化后继续外发；见[合同验收](assurance/evidence/safety-gate-ai-guards-2026-11-13.md)。
+先读[简明 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)，包括 12 模块、10 Gate、13 SLO、15 决策、实际进度与接手步骤。最新接通 PostgreSQL 轮胎单事实／分页、Safety Gate 分页及冻结归属写入：41 个不同真实 PG 场景分轮通过，SQLite 248 项通过；补充普通 PG 回归的 NHTSA Parser 升级失败与未执行的备份恢复仍须核对，见[PG 验收](assurance/evidence/postgres-owned-reader-2026-11-13.md)。
 
-此前已接通 AI 共享类型／SDK／页面／报告消费，[消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)与历史失败保留。真实 OpenAI、正式 PG Reader、实际 Native、自然长周期及完整 V1 继续待验；下一工程优先项是正式 PG 外部 Reader。下文为历史阶段记录。
+此前已接通 AI 共享类型／SDK／页面／报告消费并完成受理合同加固，[消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)与历史失败保留。真实 OpenAI、PG 部署管理／吞吐、实际 Native、自然长周期及完整 V1 继续待验。下文为历史阶段记录。
 
 ## 当前交接入口（2026-11-13）
 

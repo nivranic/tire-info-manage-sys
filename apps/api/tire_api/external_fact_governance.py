@@ -13,13 +13,14 @@ import re
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from sqlalchemy import JSON, LargeBinary, String, Text, cast, func, select, text
+from sqlalchemy import JSON, LargeBinary, String, select, text
 from sqlalchemy.orm import Session
 
 from .auth import verify_password
 from .db import AuditEvent, QueryRun, Snapshot, User, Verification, uid, utc
 from .external_fact_models import ExternalFactGrantRevision as Revision, ExternalFactLicenseEvidence as Evidence, MAX_EVIDENCE_BYTES, VERSION
 from .external_fact_policy import PolicyValidationError, evaluate_applicability, validate_revision_chain
+from .external_fact_sql import json_array_length, json_valid, postgres_boundary, storage_bytes
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,80}")
 _HASH = re.compile(r"[0-9a-f]{64}")
@@ -130,7 +131,7 @@ def _audit_detail(row):
 def _reader_preflight(db, model, *where, maximum=1, limits=None, columns=None, budget=None):
     """Read lengths/counts, never JSON/text payloads, before reader materialization.
 
-    Limits are UTF-8 storage bytes on SQLite. The extra row detects overflow;
+    Limits are UTF-8 storage bytes. The extra row detects overflow;
     this is an engineering allocation bound, not process memory isolation.
     """
     if budget is not None:
@@ -139,7 +140,7 @@ def _reader_preflight(db, model, *where, maximum=1, limits=None, columns=None, b
     selected = [column for column in model.__table__.columns
                 if (columns is None or column.key in columns)
                 and isinstance(column.type, (String, JSON, LargeBinary))]
-    expressions = [func.length(cast(cast(column, Text), LargeBinary)).label(column.key)
+    expressions = [storage_bytes(db, column).label(column.key)
                    for column in selected]
     rows = list(db.execute(select(*expressions, text("1 AS _present"))
                            .select_from(model).where(*where).limit(maximum + 1)).mappings())
@@ -354,15 +355,18 @@ class GovernanceStore:
 
     @contextmanager
     def _reader_transaction(self, *, budget=None):
-        """SQLite-only owned read; keep authorization/projection under one lock.
+        """Owned read; keep authorization/projection under one frozen read set.
 
         Unlike management transactions, this never flushes/commits the Session
         and keeps clock microseconds. Only the clean owned boundary may commit.
         """
-        if self.engine.dialect.name != "sqlite":
+        if self.engine.dialect.name not in {"sqlite", "postgresql"}:
             _fail("reader_backend_unsupported")
         with self.engine.connect() as connection:
-            connection.exec_driver_sql("BEGIN IMMEDIATE")
+            if connection.dialect.name == "postgresql":
+                postgres_boundary(connection)
+            else:
+                connection.exec_driver_sql("BEGIN IMMEDIATE")
             owned_transaction = connection.get_transaction()
             db = _ReaderSession(bind=connection, autoflush=False, expire_on_commit=False)
             try:
@@ -404,16 +408,16 @@ class GovernanceStore:
         if budget is not None:
             validity = budget.load(db, Revision, Revision.grant_id == grant_id, maximum=256,
                                    columns=("id",), order=(Revision.revision,),
-                                   extra=(func.json_valid(Revision.binding_receipts),))
+                                   extra=(json_valid(db, Revision.binding_receipts),))
             if any(row[1] != 1 for row in validity):
                 _fail("reader_policy_invalid")
         anchors = (list(db.execute(select(Revision.audit_event_id, Revision.evidence_sha256,
-                                         func.json_array_length(Revision.binding_receipts))
+                                         json_array_length(db, Revision.binding_receipts))
                                   .where(Revision.grant_id == grant_id)
                                   .order_by(Revision.revision).limit(257))) if budget is None else
                    budget.load(db, Revision, Revision.grant_id == grant_id, maximum=256,
                                columns=("audit_event_id", "evidence_sha256"), order=(Revision.revision,),
-                               extra=(func.json_array_length(Revision.binding_receipts),)))
+                               extra=(json_array_length(db, Revision.binding_receipts),)))
         if any(type(row[2]) is not int or not 0 <= row[2] <= 256 for row in anchors):
             _fail("reader_capacity")
         if anchors:

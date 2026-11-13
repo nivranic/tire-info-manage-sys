@@ -7,7 +7,7 @@ import hmac
 import re
 import secrets
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -342,7 +342,7 @@ def register_external_api_routes(app: FastAPI, *, fact_reader=None, safety_gate_
         return key, request_hash, None
 
     def finish(db, request, owner, idempotency_key, action, request_hash, key, token=None):
-        operation = seal(ApiKeyOperation(id=uid(), owner_user_id=owner, idempotency_key=idempotency_key,
+        operation = seal(ApiKeyOperation(id=uuid4().hex, owner_user_id=owner, idempotency_key=idempotency_key,
             action=action, method=request.method, path=request.url.path, request_hash=request_hash,
             key_id=key.id, key_snapshot=key_view(db, key), created_at=utcnow()))
         db.add(operation)

@@ -65,13 +65,13 @@ const first = await api.sources({ limit: 20 });
 
 示例为服务器／可信本机程序。应用必须把transport固定到可信服务origin，不能让用户或远程内容选择接收凭据的目标。SDK仅发送GET，使用credentials=omit、no-store、redirect=error及no-referrer，不自动重试；来源／Webhook响应最多1MiB，轮胎事实按其专属合同限额，Safety Gate每页最多2MiB。严格校验DTO与投递正文摘要，HTTP／传输异常使用无凭据文案。
 
-023迁移的历史私库验证见[第79轮报告](assurance/evidence/round-79-external-api.md)，R80库存补修见[第80轮报告](assurance/evidence/round-80-api-key-inventory.md)。当前受管外部事实Reader仍为SQLite实现，生产TLS／IAM／RLS、分布式网关和完整外部CRUD仍待独立交付；普通业务PostgreSQL的其他验收不能替代正式外部Reader验证。
+023迁移的历史私库验证见[第79轮报告](assurance/evidence/round-79-external-api.md)，R80库存补修见[第80轮报告](assurance/evidence/round-80-api-key-inventory.md)。当前受管外部事实Reader支持SQLite与PostgreSQL；PG采用新鲜READ COMMITTED、ingestion advisory锁及固定表SHARE锁，具体并发、预算和超时边界见[独立验收](assurance/evidence/postgres-owned-reader-2026-11-13.md)。生产TLS／IAM／RLS、PG运维管理入口／吞吐、分布式网关和完整外部CRUD仍待交付，普通业务与外部Reader分别验收。
 
 ## Safety Gate受许可周报告警
 
 请求为 `GET /external/v1/safety-gate-reports/{report_id}/alerts?mode=history&query_id=…&limit=20&cursor=…`。report_id沿官方数字身份；query_id必须来自当前Key所属账户的新成功周报查询，包含正常304重核验。匿名旧查询、失败请求、索引查询与历史回退不能替代成功周报查询。limit为1–20、默认20；未知／重复参数422，缺失或无权材料统一404。
 
-需要同时满足新scope、冻结查询归属和当前受管字段许可。旧Key不自动取得scope；Key最多包含四种受支持scope。账户、Key撤销／过期、许可头与证据在每页新鲜SQLite读事务中重核；请求不抓取、不继承Cookie或持续回退授权。许可变化使旧窗口失效，仍获准的新头返回409 `external_safety_gate_window_changed`，撤回许可返回404。游标固定15分钟到期，损坏／过期或跨Key／query／report／limit复用返回422。未配置grant或许可不覆盖时统一404；不支持的Reader后端返回503。
+需要同时满足新scope、冻结查询归属和当前受管字段许可。旧Key不自动取得scope；Key最多包含四种受支持scope。账户、Key撤销／过期、许可头与证据在每页新鲜受管事务中重核，支持SQLite与PostgreSQL；请求不抓取、不继承Cookie或持续回退授权。许可变化使旧窗口失效，仍获准的新头返回409 `external_safety_gate_window_changed`，撤回许可返回404。游标固定15分钟到期，损坏／过期或跨Key／query／report／limit复用返回422。未配置grant或许可不覆盖时统一404；不支持的Reader后端返回503。
 
 服务端通过 `create_app(external_safety_gate_grant=...)` 配置固定grant ID，来源固定为eu-safety-gate；默认未配置，不能从客户端指定grant。管理员沿[许可账本流程](EXTERNAL-FACT-GOVERNANCE.md)预览并确认具体Snapshot／Parser／原件哈希与字段范围。官方CC0元信息可以作为审核材料，但不会自动批准或绕过账本；哈希本身不是权利证明。
 
