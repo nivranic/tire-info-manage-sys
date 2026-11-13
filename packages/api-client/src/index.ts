@@ -584,6 +584,11 @@ export const tireApi = {
   safetyGateQuery: (query: import("@tire/domain-types").SafetyGateQuery, options: { fallback_policy?: "ask" | "never"; consent_id?: string } = {}, signal?: AbortSignal) => post<import("@tire/domain-types").SafetyGateResult>("/v1/safety-gate/query", { query, ...options }, signal),
   safetyGateHistory: (query: import("@tire/domain-types").SafetyGateQuery, signal?: AbortSignal) => request<import("@tire/domain-types").SafetyGateResult>(`/v1/safety-gate/history?${new URLSearchParams({ ...query, mode: "history" })}`, { signal }),
   safetyGateEvidence: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").SafetyGateEvidence>(`/v1/safety-gate/evidence/${encodeURIComponent(id)}?mode=history`, { signal }),
+  safetyGateAlertHistory: (id: string, page: { offset?: number; limit?: number; through_sequence?: number } = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ mode: "history", offset: String(page.offset ?? 0), limit: String(page.limit ?? 10) });
+    if (page.through_sequence !== undefined) query.set("through_sequence", String(page.through_sequence));
+    return request<import("@tire/domain-types").SafetyGateAlertHistory>(`/v1/safety-gate/alerts/${encodeURIComponent(id)}/history?${query}`, { signal });
+  },
   liveRecall: (query: import("@tire/domain-types").RecallQuery, signal?: AbortSignal, consentId?: string) => post<import("@tire/domain-types").RecallResult>("/v1/recalls/live-query", { query, fallback_policy: "ask", ...(consentId ? { consent_id: consentId } : {}) }, signal),
   recallHistory: (campaign: string, signal?: AbortSignal) => request<import("@tire/domain-types").RecallHistory>(`/v1/recalls/${encodeURIComponent(campaign)}/history?mode=history`, { signal }),
   recallEvidence: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").RecallEvidence>(`/v1/recall-evidence/${encodeURIComponent(id)}?mode=history`, { signal }),

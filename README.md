@@ -1,6 +1,8 @@
 # 胎迹 · 轮胎情报工作台
 
-新增EU Safety Gate官方英文周报证据查询，保留原生告警身份、日期、原值与未知适用性。十一模块262项、真实API52项、生产Web60项、关闭后174表34项和旧172表副本升级9项通过。可信Parser目录15项，逐告警修订、监控、AI及Native消费继续推进，完整V1保持active。[Safety Gate验收](docs/assurance/evidence/safety-gate-2026-11-13.md)
+新增Safety Gate逐告警内容版本、跨周观察与变化事件，支持同日冲突、字段前后值和固定历史分页。十二模块287通过，811输入稳定。真实官网API31项、最终源码HTTP13项、真实历史材料Web45项、合成变化Web26项及PostgreSQL17项通过，两份177表真实材料库的228次观察分别完成逐项核对，长周期调度与通知继续实施。[逐告警验收](docs/assurance/evidence/safety-gate-alert-history-2026-11-13.md)
+
+此前EU Safety Gate官方英文周报证据查询，保留原生告警身份、日期、原值与未知适用性。十一模块262项、真实API52项、生产Web60项、关闭后174表34项和旧172表副本升级9项通过。可信Parser目录15项，长周期监控、AI及Native消费继续推进，完整V1保持active。[Safety Gate验收](docs/assurance/evidence/safety-gate-2026-11-13.md)
 
 此前固特异新加坡Eagle F1 Asymmetric 6与SUV版官方来源，三表核对共68条声明，缺失速度和原始标记分别保留。最终十九模块591通过／7项历史完整响应缺失跳过，真实API29项、生产Web50项、两库关闭后28项、Web55项、三端类型及生产构建通过。当前11个轮胎区域来源覆盖7个品牌，完整V1继续验收。[本轮验收](docs/assurance/evidence/goodyear-sg-2026-11-13.md)
 

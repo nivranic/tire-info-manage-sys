@@ -89,3 +89,5 @@
 /apps/api/tests/test_safety_gate.py text eol=lf
 /packages/domain-types/src/safety-gate.ts text eol=lf
 /apps/web/components/safety-gate.tsx text eol=lf
+/apps/api/tire_api/safety_gate_alerts.py text eol=lf
+/apps/api/tests/test_safety_gate_alerts.py text eol=lf

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { SafetyGateEvidence, SafetyGateQuery, SafetyGateReport, SafetyGateResult } from "@tire/domain-types";
+import type { SafetyGateAlertHistory, SafetyGateEvidence, SafetyGateQuery, SafetyGateReport, SafetyGateResult } from "@tire/domain-types";
 import { DataTree } from "./reparse-review";
 import { useSourceAccess } from "./source-status";
 
@@ -10,6 +10,7 @@ type Slot = "catalog" | "report";
 type Pending = { query: SafetyGateQuery; slot: Slot; queryId: string };
 const sourceId = "eu-safety-gate";
 const failure = (cause: unknown) => cause instanceof Error ? cause.message : "Safety Gate操作未完成。";
+const eventNames = { first_observed: "首次观察", content_changed: "内容变化", conflict_observed: "同日周报内容冲突", conflict_resolved: "同日周报内容恢复一致" };
 
 export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolean }) {
   const access = useSourceAccess();
@@ -20,6 +21,7 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
   const [selected, setSelected] = useState<SafetyGateReport | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [evidence, setEvidence] = useState<SafetyGateEvidence | null>(null);
+  const [alertHistory, setAlertHistory] = useState<SafetyGateAlertHistory | null>(null);
   const [filter, setFilter] = useState("tyre");
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -31,6 +33,7 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
     active.current = null;
     setPending(null);
     setEvidence(null);
+    setAlertHistory(null);
     setBusy(false);
     setError("");
   }
@@ -119,6 +122,21 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
     }
   }
 
+  async function showAlertHistory(id: string, offset = 0, throughSequence?: number) {
+    cancel();
+    const context = { controller: new AbortController(), generation };
+    active.current = context;
+    setBusy(true);
+    try {
+      const value = await tireApi.safetyGateAlertHistory(id, { offset, through_sequence: throughSequence }, context.controller.signal);
+      if (active.current === context && !context.controller.signal.aborted) setAlertHistory(value);
+    } catch (cause) {
+      if (active.current === context && !context.controller.signal.aborted) setError(failure(cause));
+    } finally {
+      if (active.current === context && !context.controller.signal.aborted) setBusy(false);
+    }
+  }
+
   const reports = catalog?.document?.reports ?? [];
   const alerts = result?.document?.alerts ?? [];
   const term = filter.trim().toLowerCase();
@@ -162,11 +180,31 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
         <DataTree label="官方风险原文" value={alert.fields.danger} />
         <DataTree label="官方措施原文" value={alert.fields.measures} />
         <DataTree label="完整官方字段与图片来源地址" value={{ ...alert.fields, pictures: alert.pictures }} />
+        <button type="button" className="text-button" disabled={busy || !sessionReady} onClick={() => void showAlertHistory(alert.alert_id)}>读取告警版本与变化</button>
         <a href={alert.source_url} target="_blank" rel="noreferrer">打开官方告警 {alert.case_number}</a>
       </article>)}
       {pages > 1 ? <div className="reparse-pages"><button type="button" className="text-button" disabled={!shownPage} onClick={() => setPage(shownPage - 1)}>上一页告警</button><button type="button" className="text-button" disabled={shownPage + 1 >= pages} onClick={() => setPage(shownPage + 1)}>下一页告警</button></div> : null}
     </> : null}
     {provenance ? <><p className="recall-help">{provenance.attribution}</p><button type="button" className="text-button" disabled={busy} onClick={() => void showEvidence(provenance.snapshot_id)}>{result?.document ? "查看所选周报原始证据" : "查看索引原始证据"}</button></> : null}
+    {alertHistory ? <section className="recall-evidence" aria-label="已保存告警版本">
+      <h4>告警 {alertHistory.alert_id} · 已保存历史</h4>
+      <p role="status">{alertHistory.state === "conflicting" ? "同日周报内容存在冲突" : "最新已观察内容"} · 适用性待核对</p>
+      <p className="recall-help">{alertHistory.notices[0]} 共 {alertHistory.total} 次观察，固定至第 {alertHistory.through_sequence} 次。</p>
+      {alertHistory.heads.map(head => <p key={head.id}>{head.report.reference} · 周报发布 {head.report.published_date} · 内容版本 {head.revision.revision}</p>)}
+      {alertHistory.observations.map(observation => <article className="recall-product" key={observation.id}>
+        <h5>{observation.report.reference} · 内容版本 {observation.revision.revision}</h5>
+        <p>周报发布 {observation.report.published_date} · 系统观察 {observation.observed_at}</p>
+        {observation.event ? <p>{eventNames[observation.event.kind]}</p> : null}
+        {observation.event && Object.keys(observation.event.changes).length ? <DataTree label="变化前后字段" value={observation.event.changes} /> : null}
+        <DataTree label="规范化告警内容与指纹" value={{ content_hash: observation.revision.content_hash, alert: observation.revision.alert }} />
+        <button type="button" className="text-button" disabled={busy} onClick={() => void showEvidence(observation.snapshot_id)}>查看此观察原件</button>
+      </article>)}
+      {alertHistory.total > alertHistory.limit ? <div className="reparse-pages">
+        <button type="button" className="text-button" disabled={busy || alertHistory.offset === 0} onClick={() => void showAlertHistory(alertHistory.alert_id, Math.max(0, alertHistory.offset - alertHistory.limit), alertHistory.through_sequence)}>上一页观察</button>
+        <button type="button" className="text-button" disabled={busy || alertHistory.offset + alertHistory.limit >= alertHistory.total} onClick={() => void showAlertHistory(alertHistory.alert_id, alertHistory.offset + alertHistory.limit, alertHistory.through_sequence)}>下一页观察</button>
+      </div> : null}
+      <button type="button" className="text-button" onClick={() => setAlertHistory(null)}>收起告警历史</button>
+    </section> : null}
     {evidence ? <section className="recall-evidence"><h4>历史XML原件</h4><p>观察时间 {evidence.observed_at} · Parser {evidence.parser_version}</p><DataTree label="原始SHA-256与许可出处" value={{ raw_hash: evidence.raw_hash, source_url: evidence.source_url, license_basis: evidence.license_basis }} /><DataTree label="完整官方XML纯文本" value={evidence.body} /><button type="button" className="text-button" onClick={() => setEvidence(null)}>收起原件</button></section> : null}
   </section>;
 }

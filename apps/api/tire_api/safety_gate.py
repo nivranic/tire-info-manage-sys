@@ -315,6 +315,9 @@ class SafetyGateService:
             status='not_modified' if result['status'] == 'not_modified' else 'ok',
             etag=result.get('etag'), last_modified=result.get('last_modified'),
             parser_identity=result.get('parser_identity'), verified_at=verified))
+        self.db.flush()
+        from .safety_gate_alerts import backfill_alert_history
+        backfill_alert_history(self.db)
         return snapshot, verified
 
     def consume_consent(self, request, session_id):
@@ -368,6 +371,9 @@ class SafetyGateService:
 
 
 def register_safety_gate_routes(app: FastAPI):
+    from .safety_gate_alerts import register_alert_history_routes
+    register_alert_history_routes(app)
+
     def get_db():
         with app.state.database.sessions() as db:
             yield db

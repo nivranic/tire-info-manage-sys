@@ -64,3 +64,42 @@ export interface SafetyGateEvidence extends SafetyGateProvenance {
   content_type: "application/xml";
   data_state: "local_snapshot";
 }
+
+export interface SafetyGateAlertObservation {
+  id: string;
+  sequence: number;
+  snapshot_id: string;
+  position: number;
+  report: SafetyGateReport;
+  observed_at: string;
+  evidence_path: string;
+  revision: {
+    id: string;
+    revision: number;
+    content_hash: string;
+    alert: SafetyGateAlert;
+    first_snapshot_id: string;
+  };
+  event: {
+    id: string;
+    kind: "first_observed" | "content_changed" | "conflict_observed" | "conflict_resolved";
+    before_revision_ids: string[];
+    after_revision_ids: string[];
+    changes: Record<string, { before: unknown; after: unknown }>;
+  } | null;
+}
+
+export interface SafetyGateAlertHistory {
+  source_id: "eu-safety-gate";
+  alert_id: string;
+  data_state: "local_snapshot";
+  applicability: "not_assessed";
+  state: "observed" | "conflicting";
+  offset: number;
+  limit: number;
+  total: number;
+  through_sequence: number;
+  heads: SafetyGateAlertObservation[];
+  observations: SafetyGateAlertObservation[];
+  notices: string[];
+}
