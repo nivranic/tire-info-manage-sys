@@ -1,17 +1,23 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { DeviceFallbackPolicy, DeviceFallbackPolicyMode, DeviceFallbackPolicyPreview, DeviceFallbackPolicyPreviewRequest, DeviceFallbackPolicyScope, DeviceFallbackQueryKind, DeviceFallbackStatus, OfflineStorage, WarehouseFallbackPolicy, WarehouseFallbackPolicyPreview } from "@tire/domain-types";
+import type { DeviceFallbackPolicy, DeviceFallbackPolicyMode, DeviceFallbackPolicyPreview, DeviceFallbackPolicyPreviewRequest, DeviceFallbackPolicyScope, DeviceFallbackQueryKind, DeviceFallbackStatus, OfflineStorage, WarehouseFallbackPolicy, WarehouseFallbackPolicyPreview, WarehouseFallbackPolicyScope, WarehouseFallbackQueryKind } from "@tire/domain-types";
 import { useSourceAccess } from "./source-status";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import { DataTree } from "./reparse-review";
 
 const modes: Record<DeviceFallbackPolicyMode, string> = { ask: "每次询问", never: "始终拒绝自动回退", session_allow: "本次会话持续允许", source_allow: "所选来源持续允许", query_allow: "此查询类型持续允许" };
-const kinds: Record<DeviceFallbackQueryKind, string> = { tire: "轮胎规格", vehicle_fitments: "车型配置", recall_campaign: "召回公告编号", recall_search: "召回名称检索页" };
+const kinds: Record<WarehouseFallbackQueryKind, string> = { tire: "轮胎规格", vehicle_fitments: "车型配置", recall_campaign: "召回公告编号", recall_search: "召回名称检索页", safety_gate_reports: "Safety Gate周报索引", safety_gate_report: "Safety Gate指定周报" };
 const detail = (cause: unknown) => cause instanceof Error ? cause.message : "策略操作未完成。";
-const sourceIdsIn = (scope: DeviceFallbackPolicyScope) => scope.kind === "source" ? [scope.source_id] : scope.sources.map(source => source.source_id);
+const sourceIdsIn = (scope: WarehouseFallbackPolicyScope) => scope.kind === "source" ? [scope.source_id] : scope.sources.map(source => source.source_id);
+const isDeviceKind = (kind: WarehouseFallbackQueryKind): kind is DeviceFallbackQueryKind => kind === "tire" || kind === "vehicle_fitments" || kind === "recall_campaign" || kind === "recall_search";
+function deviceScope(scope: WarehouseFallbackPolicyScope): DeviceFallbackPolicyScope {
+  const selectedKinds = scope.kind === "query" ? [scope.query_kind] : scope.kind === "source" ? scope.query_kinds : scope.sources.flatMap(source => source.query_kinds);
+  if (!selectedKinds.every(isDeviceKind)) throw new Error("设备历史策略尚不支持此查询类型。");
+  return scope as DeviceFallbackPolicyScope;
+}
 
-export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: { kind: DeviceFallbackQueryKind; sourceIds: string[]; sessionReady: boolean }) {
+export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: { kind: WarehouseFallbackQueryKind; sourceIds: string[]; sessionReady: boolean }) {
   const access = useSourceAccess(), platform = useWorkbenchPlatform(), storage = platform.offline;
   const [open, setOpen] = useState(false), [layer, setLayer] = useState<"warehouse" | "device">("warehouse");
   const [mode, setMode] = useState<DeviceFallbackPolicyMode>("ask"), [source, setSource] = useState("");
@@ -24,8 +30,9 @@ export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: {
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const alive = useRef(true), revision = useRef(0);
   const idsKey = [...new Set(explicitSources ?? sourceIds)].sort().join("|"), ids = idsKey ? idsKey.split("|") : [];
-  const registered = layer === "device" ? device?.authority.sources.filter(item => item.query_kinds.includes(kind)).map(item => item.source_id) || []
-    : access.items.filter(item => kind === "vehicle_fitments" ? item.target_kind === "vehicle" : kind === "recall_campaign" || kind === "recall_search" ? item.source_id === "nhtsa-us-recalls" && item.target_kind === "recall" : item.target_kind === "tire").map(item => item.source_id);
+  const supportsDevice = isDeviceKind(kind);
+  const registered = layer === "device" ? device?.authority.sources.filter(item => isDeviceKind(kind) && item.query_kinds.includes(kind)).map(item => item.source_id) || []
+    : access.items.filter(item => kind === "vehicle_fitments" ? item.target_kind === "vehicle" : kind === "recall_campaign" || kind === "recall_search" ? item.source_id === "nhtsa-us-recalls" && item.target_kind === "recall" : kind === "safety_gate_report" || kind === "safety_gate_reports" ? item.source_id === "eu-safety-gate" && item.target_kind === "recall" : item.target_kind === "tire").map(item => item.source_id);
   const selected = source && ids.includes(source) ? source : ids[0] || "";
   const isAllow = mode !== "ask" && mode !== "never";
   const binding = device?.package_bindings.find(item => item.slot_id === slotId);
@@ -37,7 +44,7 @@ export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: {
   async function load() {
     const current = ++revision.current; setError(""); setPreview(null); setConfirmed(false);
     try {
-      const [policies, status] = await Promise.allSettled([tireApi.queryFallbackPolicies(), storage?.fallbackStatus?.()]);
+      const [policies, status] = await Promise.allSettled([tireApi.queryFallbackPolicies(), supportsDevice ? storage?.fallbackStatus?.() : undefined]);
       if (!alive.current || current !== revision.current) return;
       if (policies.status === "fulfilled") setWarehouse(policies.value.items);
       else setError(`仓库策略目录暂不可用：${detail(policies.reason)}；设备元数据仍独立读取。`);
@@ -51,10 +58,10 @@ export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: {
     try { await storage.refreshFallbackAuthority(); setDevice(await storage.fallbackStatus()); setNotice("已通过固定目录接口刷新设备来源元数据；未读取设备包内容。"); }
     catch (cause) { setError(detail(cause)); } finally { if (alive.current) setBusy(false); }
   }
-  function scopeFor(): DeviceFallbackPolicyScope {
+  function scopeFor(): WarehouseFallbackPolicyScope {
     const chosen = scopeKind === "source" ? [selected] : ids;
     const pins = chosen.map(id => {
-      const row = layer === "device" ? device?.authority.sources.find(item => item.source_id === id && item.query_kinds.includes(kind)) : access.get(id);
+      const row = layer === "device" ? device?.authority.sources.find(item => item.source_id === id && isDeviceKind(kind) && item.query_kinds.includes(kind)) : access.get(id);
       if (!row) throw new Error("所选来源尚未在已注册目录中确认，请先刷新来源元数据。");
       return { source_id: id, access_generation: "access_generation" in row ? row.access_generation : row.management.access_generation };
     });
@@ -72,9 +79,10 @@ export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: {
         policy_id: editing?.schema === "query-fallback-policy@1" ? editing.id : null,
         expected_revision: editing?.schema === "query-fallback-policy@1" ? editing.revision : 0 });
       else {
+        const deviceSelection = deviceScope(scope);
         if (!storage?.previewFallbackPolicy || !device || device.authority.state !== "last_observed") throw new Error("设备冷启动后来源权限未知，请主动刷新固定来源元数据。");
         if (isAllow && !binding) throw new Error("请选择具有已保存范围元数据的设备包；旧包可先从独立历史库明确读取，再重新预览。");
-        const choice = isAllow ? { mode, scope, binding: binding!, allow_same_scope_sync_binding_advance: advance && canAdvance } : { mode, scope, binding: null, allow_same_scope_sync_binding_advance: false };
+        const choice = isAllow ? { mode, scope: deviceSelection, binding: binding!, allow_same_scope_sync_binding_advance: advance && canAdvance } : { mode, scope: deviceSelection, binding: null, allow_same_scope_sync_binding_advance: false };
         value = await storage.previewFallbackPolicy({ ...choice, expected_profile_id: device.profile_id, expected_owner_epoch: device.owner_epoch,
           authority: { runtime_session_id: device.authority.runtime_session_id, authority_revision: device.authority.authority_revision },
           policy_id: editing?.schema === "device-fallback-policy@1" ? editing.policy_id : null,
@@ -109,12 +117,13 @@ export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: {
     setPreview(null); setConfirmed(false); setAdvance(false); setError("");
   }
   function switchLayer(next: "warehouse" | "device") {
+    if (next === "device" && !supportsDevice) return;
     if (next === layer) return;
     setLayer(next); setEditing(null); setExplicitSources(null); setSource(""); setPreview(null); setConfirmed(false); setAdvance(false);
   }
   return <details className="recall-provenance" open={open} onToggle={event => { const next = event.currentTarget.open; setOpen(next); if (next && !open) void load(); }}><summary>{kinds[kind]} · 查询失败后的历史回退策略</summary>
-    <p>仓库与设备各自保存授权。每次网络中断或超时仍须产生单次消费回执；拒绝优先。手动历史视图独立保留。</p>
-    <div className="relation-modes"><button type="button" aria-pressed={layer === "warehouse"} disabled={busy} onClick={() => switchLayer("warehouse")}>仓库历史策略</button><button type="button" aria-pressed={layer === "device"} disabled={busy || !storage?.fallbackStatus} onClick={() => switchLayer("device")}>设备历史策略</button></div>
+    <p>{supportsDevice ? "仓库与设备各自保存授权。" : "此查询支持仓库历史授权。"}每次网络中断或超时仍须产生单次消费回执；拒绝优先。手动历史视图独立保留。</p>
+    <div className="relation-modes"><button type="button" aria-pressed={layer === "warehouse"} disabled={busy} onClick={() => switchLayer("warehouse")}>仓库历史策略</button>{supportsDevice ? <button type="button" aria-pressed={layer === "device"} disabled={busy || !storage?.fallbackStatus} onClick={() => switchLayer("device")}>设备历史策略</button> : null}</div>
     <p className="muted">{layer === "warehouse" ? "仅普通服务端查询；不继承为设备包许可、更新或 AI 授权。" : "仅本机所选包；不继承为仓库读取、设备更新、外发或 AI 授权。"}</p>
     {layer === "device" ? <><p role="status">来源元数据：{device?.authority.state === "last_observed" ? `最近观察 ${device.authority.observed_at}` : "冷启动未知，暂不能新增策略"}</p><button type="button" className="secondary-button" disabled={busy} onClick={() => void refreshDevice()}>主动刷新设备固定来源元数据</button></> : <button type="button" className="text-button" disabled={busy} onClick={() => void access.refresh()}>刷新仓库来源目录</button>}
     <div className="review-form"><label><span>回退偏好 / 持续权限</span><select value={mode} disabled={busy} onChange={event => setMode(event.target.value as DeviceFallbackPolicyMode)}>{Object.entries(modes).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>

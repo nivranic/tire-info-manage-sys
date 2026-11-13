@@ -1,7 +1,13 @@
-import type { DeviceFallbackPolicyMode, DeviceFallbackPolicyScope, DeviceFallbackQueryKind, DeviceFallbackSourceSelection } from "./device-fallback";
+import type { DeviceFallbackPolicyMode, DeviceFallbackQueryKind, DeviceFallbackSourcePin } from "./device-fallback";
+export type WarehouseFallbackQueryKind = DeviceFallbackQueryKind | "safety_gate_reports" | "safety_gate_report";
+export interface WarehouseFallbackSourceSelection extends DeviceFallbackSourcePin { query_kinds: WarehouseFallbackQueryKind[] }
+export type WarehouseFallbackPolicyScope =
+  | { kind: "session"; sources: WarehouseFallbackSourceSelection[] }
+  | ({ kind: "source" } & WarehouseFallbackSourceSelection)
+  | { kind: "query"; query_kind: WarehouseFallbackQueryKind; sources: DeviceFallbackSourcePin[] };
 export interface WarehouseFallbackPolicyPreviewRequest {
   mode: DeviceFallbackPolicyMode;
-  scope: DeviceFallbackPolicyScope;
+  scope: WarehouseFallbackPolicyScope;
   expires_in_seconds?: number;
   policy_id?: string | null;
   expected_revision?: number;
@@ -15,7 +21,7 @@ export interface WarehouseFallbackPolicy {
   mode: DeviceFallbackPolicyMode;
   audience: "programmatic";
   owner_scope_id: string;
-  scope: DeviceFallbackPolicyScope;
+  scope: WarehouseFallbackPolicyScope;
   approved_at: string;
   expires_at: string;
   updated_at: string;
@@ -30,7 +36,7 @@ export interface WarehouseFallbackPolicyPreview {
   expected_revision: number;
   owner_scope_id: string;
   proposed_policy: Omit<WarehouseFallbackPolicy, "fingerprint" | "approved_at" | "updated_at"> & { approved_at: null; updated_at: null };
-  source_metadata: (DeviceFallbackSourceSelection & { fingerprint: string })[];
+  source_metadata: (WarehouseFallbackSourceSelection & { fingerprint: string })[];
   notice: string;
 }
 export interface WarehouseFallbackPolicyApplyRequest { preview_id: string; expected_fingerprint: string; expected_revision: number; allow_continuous_history_fallback: true }
@@ -41,7 +47,7 @@ export interface WarehouseFallbackUse {
   policy_id: string;
   policy_revision: number;
   query_id: string;
-  query_kind: DeviceFallbackQueryKind;
+  query_kind: WarehouseFallbackQueryKind;
   audience: "programmatic";
   data_state: "local_snapshot";
   reason: "upstream_network_error" | "upstream_timeout";

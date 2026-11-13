@@ -53,7 +53,8 @@ export type {
 } from "./device-ai";
 
 export type DataState = "live" | "live_verified_304" | "consent_required" | "source_unavailable" | "local_snapshot";
-export type { WarehouseFallbackPolicyPreviewRequest, WarehouseFallbackPolicy, WarehouseFallbackPolicyPreview,
+export type { WarehouseFallbackQueryKind, WarehouseFallbackPolicyScope, WarehouseFallbackSourceSelection,
+  WarehouseFallbackPolicyPreviewRequest, WarehouseFallbackPolicy, WarehouseFallbackPolicyPreview,
   WarehouseFallbackPolicyApplyRequest, WarehouseFallbackPolicyList, WarehouseFallbackUse, WarehouseFallbackAuthorization } from "./warehouse-fallback";
 export type { OfflinePackUpdateRequest, OfflinePackUpdate, DeviceSyncConditions, DeviceSyncCapabilities, DeviceSyncPreviewRequest,
   DeviceSyncPreview, DeviceSyncApplyRequest, DeviceSyncPolicy, DeviceSyncPolicyRequest, DeviceSyncTrigger, DeviceSyncRunRequest,

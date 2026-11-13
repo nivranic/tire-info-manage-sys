@@ -103,3 +103,8 @@
 /apps/web/components/task-center-values.ts text eol=lf
 /packages/domain-types/src/monitor-tasks.ts text eol=lf
 /scripts/monitor_tasks_frontend_qa.mjs text eol=lf
+/apps/api/tests/test_safety_gate_fallback.py text eol=lf
+/apps/api/tire_api/query_fallback_policies.py text eol=lf
+/apps/web/components/query-fallback-policy.tsx text eol=lf
+/packages/domain-types/src/warehouse-fallback.ts text eol=lf
+/scripts/query_fallback_sdk_frontend_qa.mjs text eol=lf

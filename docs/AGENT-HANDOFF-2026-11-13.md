@@ -4,15 +4,17 @@
 
 ## 接手快照
 
-- 本轮监控阶段起点为 `main` 的 `68a6b0ce2efff53b0bf23b6cf0eccdd412bf302b`，发布前已直连官方接口确认远端基线一致。该提交已交付Safety Gate逐告警版本与变化历史。本次最终SHA及实时远端以交付消息和即时Git查询为准。
+- 本轮持续授权阶段起点为 `main` 的 `46885d1b5ff307ec6edb0468907608533fb65ff2`，开始时本地与跟踪分支一致且工作区干净。该提交已交付Safety Gate监控、提醒与任务状态。本次最终SHA及实时远端以交付消息和即时Git查询为准。
 - 首个真实生成Provider采用用户选择的OpenAI Responses API，已复核网关配置与Adapter选择的缺省值均为 `openai_responses`。Gemini适配器的提前实施属于此前Agent的排期选择，交付为 `d5fded1`，真实Google调用待验。原规格的多模型表、Agent实施计划与用户的接入顺序分别保留其来源，详见[Gemini实施记录](plans/2026-11-12-gemini-native-provider.md)。
-- 当前参数来源为11个区域目录、7个厂商品牌，另有NHTSA召回、EU Safety Gate与小米车型来源。可信Parser目录15项。Safety Gate已接通周报证据、逐告警内容版本、跨周观察、变化事件、冲突及固定历史分页，规则、Worker调度、应用内变化提醒与任务状态已接通；自然长周期运行继续待验。
+- 当前参数来源为11个区域目录、7个厂商品牌，另有NHTSA召回、EU Safety Gate与小米车型来源。可信Parser目录15项。Safety Gate已接通周报证据、逐告警内容版本、跨周观察、变化事件、冲突及固定历史分页，规则、Worker调度、应用内变化提醒与任务状态已接通；普通查询的持续回退授权亦已接通，自然长周期运行继续待验。
 - 其他P0渠道先核对既有第40轮访问记录及当前可访问性，选取能提供逐SKU身份与参数的官方渠道，复用固定Adapter、Parser与证据链。历史发现入口见[来源范围](../README.md#来源范围)。
 - 本次复核确认OpenAI模型／Key和EPREL凭据仍缺失。先推进P0来源、材料身份与独立质量输入，真实Responses验收依实际凭据条件执行。完整V1持续开放，10项发布Gate、13项SLO及15项决策的范围见下文。
 
 ## 当前结论
 
-Safety Gate持续监控、变化提醒与任务状态已接通正常Worker、API、共享SDK和生产Web。默认每6小时滚动核验最近4份英文周报，可配置1至12份及1至168小时。最终十模块215通过，815输入稳定、资源关闭、非自检拒绝0；Web55项、任务SDK13项、三端类型及414输入生产构建通过。真实官网与HTTP27项、PostgreSQL24项通过，SQLite旧库177→185表保留原列原行。已修复生产任务SSE缓冲，代理首块从25054ms降到212ms，页面同一任务336ms内更新完成态。自然长周期与真实新变化通知仍待验收。[监控验收](assurance/evidence/safety-gate-monitoring-2026-11-13.md)
+Safety Gate持续回退授权已接通正常查询与Web：周报索引和指定周报分开授权，支持会话、来源和查询类型范围；保持在线优先、拒绝优先、逐次持久消费及读后重核，后台监控和AI不继承。最终六模块116项、SDK7项、Web55项、三端类型、414输入生产构建、PostgreSQL34项、正常HTTP26项和生产Web45项通过。关闭后29项核对保留185表全部旧行旧列及15份原件，6份测试策略已撤销，自有资源已关闭。真实外部来源与模型调用0。[持续授权验收](assurance/evidence/safety-gate-fallback-2026-11-13.md)
+
+此前Safety Gate持续监控、变化提醒与任务状态已接通正常Worker、API、共享SDK和生产Web。默认每6小时滚动核验最近4份英文周报，可配置1至12份及1至168小时。最终十模块215通过，815输入稳定、资源关闭、非自检拒绝0；Web55项、任务SDK13项、三端类型及414输入生产构建通过。真实官网与HTTP27项、PostgreSQL24项通过，SQLite旧库177→185表保留原列原行。已修复生产任务SSE缓冲，代理首块从25054ms降到212ms，页面同一任务336ms内更新完成态。自然长周期与真实新变化通知仍待验收。[监控验收](assurance/evidence/safety-gate-monitoring-2026-11-13.md)
 
 此前Safety Gate逐告警版本与变化事件已接通正常API、共享SDK和生产Web。真实官网API31项、最终源码HTTP13项、真实历史材料Web45项、合成变化Web26项和PostgreSQL17项通过。旧库174→177表升级保持原表列与原行，两份真实材料库各16项关闭后核对通过，分别逐项核对228次观察和10份原件。Web55项、三端类型及独立构建通过，最终十二模块287通过、811输入稳定、资源关闭、非自检拒绝0。实际模型调用0，自有服务及PostgreSQL已关闭。[逐告警验收](assurance/evidence/safety-gate-alert-history-2026-11-13.md)
 
@@ -70,6 +72,16 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 10 AI研究 | grounding、流式、报告、多模型适配、正文索引／混合检索、正文证据包及独立AI／导出用途、离线检索质量评估、Web | 真实Responses语义与Embeddings质量、代表性检索与重排质量、专业性能解释、模型治理 |
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名及有限重试、外部Key、字段许可治理 | 真实接收端、公网生产验收、SDK产品化、完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权、审计 | 生产身份／租户／RLS、完整角色治理、灾备、发布验收 |
+
+## Safety Gate持续回退授权
+
+索引和指定周报分别使用safety_gate_reports／safety_gate_report范围，复用仓库策略预览、明确确认、修订、暂停撤销与只追加消费账本。只有网络中断或超时可消费持续权限，先在线、先提交消费回执、读取后再次核对；never优先，后台／AI不继承。仓库共享类型独立于设备类型，当前Safety Gate入口只支持仓库权限，Native业务仍待接通。
+
+六模块116／116、816输入稳定、资源关闭、非自检拒绝0，回执为 `.artifacts/sg-fallback-r3/result.json`。SDK7／7、Web55／55及三端类型通过。生产构建414输入稳定；隔离非超级用户PostgreSQL34项通过，166模型表加schema版本共167份指纹实际恢复一致。
+
+正常HTTP26项及生产Web45项使用真实历史材料副本和模拟超时；读取1124项索引及Report-2026-45的75条告警，核对明确确认、范围隔离、消费回执、原件哈希、撤销后询问、独立历史、迟到预览及320／390／1440布局。共模拟16次失败，真实来源／模型请求0。不能据此声称官网当时故障或真实自然长周期已通过。
+
+私库关闭29项通过：185表原列与全部旧行保留，15份原件、6份策略／12条修订／7次唯一消费逐项绑定；所有测试策略已撤销。API、Web、PG及端口关闭，浏览器工具最后一页保留about:blank。工装的路径、许可URI、选择器及预览等待失败保留；详情见[验收记录](assurance/evidence/safety-gate-fallback-2026-11-13.md)和[计划](plans/2026-11-13-safety-gate-fallback.md)。本阶段本机入口为 `.artifacts/sg-fallback-20261113/`。
 
 ## Safety Gate持续监控、提醒与任务
 
@@ -323,7 +335,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。隔离资源关闭情况见最新生产Web验收。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
-3. 日本S007A、马牌中国SC7与固特异新加坡AS6及SUV版已完成对应来源接入，先阅读各阶段验收，再依原规格P0表继续补齐厂商与安全来源。Safety Gate周报查询、逐告警版本及变化历史已通过正常API与生产Web验收，规则调度、应用内通知和任务状态已交付，下一步验证自然跨周期、多规则运行与真实变化提醒，并推进持久回退策略、外部Key权限、AI引用及Native消费；继续核对中国召回入口及其他P0渠道。Dunlop的tyre域名robots返回200／HTML找不到页面，dt域名robots有效但首页401，两组回执分别位于 `.artifacts/p0-dunlop-20261113/` 和 `.artifacts/p0-official-20261113/`。中国召回首页已取得，文章和轮胎关联待核。Yokohama美国既有条款禁止自动查询的记录继续保留，其他官方渠道依据各自公开合同核验。继续核对可访问页面、robots、参数身份和许可范围，复用固定Adapter、Parser发布和证据链。两份转录的角色排序及正常Web入口已有结果，扩大来源、精确版本、地区和时间的独立标注。真实Embeddings与外部真人审核按实际条件推进。
+3. 日本S007A、马牌中国SC7与固特异新加坡AS6及SUV版已完成对应来源接入，先阅读各阶段验收，再依原规格P0表继续补齐厂商与安全来源。Safety Gate周报查询、逐告警版本及变化历史已通过正常API与生产Web验收，规则调度、应用内通知和任务状态已交付，下一步验证自然跨周期、多规则运行与真实变化提醒，持续回退策略已接通，接下来推进外部Key权限、AI引用及Native消费；继续核对中国召回入口及其他P0渠道。Dunlop的tyre域名robots返回200／HTML找不到页面，dt域名robots有效但首页401，两组回执分别位于 `.artifacts/p0-dunlop-20261113/` 和 `.artifacts/p0-official-20261113/`。中国召回首页已取得，文章和轮胎关联待核。Yokohama美国既有条款禁止自动查询的记录继续保留，其他官方渠道依据各自公开合同核验。继续核对可访问页面、robots、参数身份和许可范围，复用固定Adapter、Parser发布和证据链。两份转录的角色排序及正常Web入口已有结果，扩大来源、精确版本、地区和时间的独立标注。真实Embeddings与外部真人审核按实际条件推进。
 4. 原始报道已核对测试主体、载速、成绩及两车照片，墙面材料日期作为声明保留，逐项执行日待核。继续核对GTIN／产品代码／完整侧壁标识，处理万力与耐克森双侧源名，取得完整复用许可和正式原件，推进精确SKU与真人Golden。JRC匿名样本待型号映射，PERS此前捕获超时失败。详见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
@@ -333,6 +345,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 | 范围 | 关键文件 |
 | --- | --- |
+| Safety Gate持续回退 | `apps/api/tire_api/query_fallback_policies.py`、`safety_gate.py`、`apps/api/tests/test_safety_gate_fallback.py`、`apps/web/components/query-fallback-policy.tsx`、`packages/domain-types/src/warehouse-fallback.ts` |
 | Safety Gate监控与提醒 | `apps/api/tire_api/safety_gate_monitoring.py`、`safety_gate_monitor_models.py`、`safety_gate_monitor_routes.py`、`apps/api/tests/test_safety_gate_monitoring.py`、`apps/web/components/safety-gate-monitoring.tsx` |
 | Safety Gate告警版本及事件 | `apps/api/tire_api/safety_gate_alerts.py`、`apps/api/tests/test_safety_gate_alerts.py`、`apps/web/components/safety-gate.tsx`、`packages/domain-types/src/safety-gate.ts` |
 | Safety Gate周报证据 | `apps/api/tire_api/adapters/safety_gate.py`、`apps/api/tire_api/safety_gate.py`、`apps/api/tests/test_safety_gate.py`、`apps/web/components/safety-gate.tsx`、`packages/domain-types/src/safety-gate.ts` |
@@ -362,6 +375,7 @@ git status --short --branch
 git log -4 --oneline
 git rev-parse HEAD
 git rev-parse origin/main
+apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/safety-gate-fallback-next --targets apps/api/tests/test_safety_gate_fallback.py apps/api/tests/test_query_fallback_policies49.py apps/api/tests/test_query_fallback_policy_boundaries49.py apps/api/tests/test_query_fallback_preferences49.py apps/api/tests/test_safety_gate.py apps/api/tests/test_safety_gate_monitoring.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/safety-gate-monitor-next --targets apps/api/tests/test_safety_gate_monitoring.py apps/api/tests/test_monitor_tasks.py apps/api/tests/test_monitor_task_execution.py apps/api/tests/test_safety_gate.py apps/api/tests/test_safety_gate_alerts.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/safety-gate-alert-next --targets apps/api/tests/test_safety_gate_alerts.py apps/api/tests/test_safety_gate.py apps/api/tests/test_parser_bundles.py apps/api/tests/test_parser_releases.py apps/api/tests/test_parser_runtime.py apps/api/tests/test_raw_captures.py apps/api/tests/test_recalls.py apps/api/tests/test_recall_discovery.py apps/api/tests/test_telemetry.py apps/api/tests/test_goodyear.py apps/api/tests/test_continental.py apps/api/tests/test_bridgestone.py
 apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/gysg-next --targets apps/api/tests/test_goodyear.py apps/api/tests/test_parser_bundles.py apps/api/tests/test_parser_releases.py apps/api/tests/test_quality.py
@@ -396,9 +410,11 @@ npm run typecheck --workspace @tire/mobile
 
 > 接手胎迹完整V1。先读本卡、原始规格和Safety Gate监控验收，核对main、HEAD、工作区及实时远端。原规格有12个核心模块、10项发布Gate、13项SLO和15项决策，完整V1尚未完成，不能把本轮工程交付等同整体验收。
 >
-> 最新阶段已接通Safety Gate规则、滚动检查、应用内提醒、运行记录和任务SSE。最终API215／215、Web55／55、SDK13／13、三端类型、生产构建、真实HTTP27项及PG24项通过；SQLite177→185表追加升级保留旧数据。真实库与合成库各19项关闭核对通过。任务流代理缓冲已定位并修复，初始失败保留。自有验收资源已关闭。
+> 最新持续授权阶段已接通索引／指定周报的独立范围和正常Web策略管理。六模块116项、SDK7项、Web55项、三端类型、构建、PG34项、HTTP26项及Web45项通过；185表原列旧行与15份原件保留，6份测试策略撤销，回执在 `.artifacts/sg-fallback-20261113/` 和 `.artifacts/sg-fallback-r3/`。材料为真实历史副本、网络失败为模拟，外部请求0。
 >
-> 默认每6小时最近4份英文周报由Agent选定且可配置。自然长周期、真实新告警通知、多规则运行与通知lag继续待验；本轮提前隔离任务到期不算这些验收。接下来推进持久回退、外部Key权限、AI引用与Native消费，继续其他P0来源、精确SKU人工Golden与代表性质量输入。
+> 此前已接通Safety Gate规则、滚动检查、应用内提醒、运行记录和任务SSE。最终API215／215、Web55／55、SDK13／13、三端类型、生产构建、真实HTTP27项及PG24项通过；SQLite177→185表追加升级保留旧数据。真实库与合成库各19项关闭核对通过。任务流代理缓冲已定位并修复，初始失败保留。自有验收资源已关闭。
+>
+> 默认每6小时最近4份英文周报由Agent选定且可配置。自然长周期、真实新告警通知、多规则运行与通知lag继续待验；本轮提前隔离任务到期不算这些验收。持续回退已接通，接下来推进外部Key权限、AI引用与Native消费，继续其他P0来源、精确SKU人工Golden与代表性质量输入。
 >
 > 首个真实生成Provider按用户选择采用OpenAI Responses API，启动时显式设置TI_AI_PROVIDER并核对状态。Gemini来自此前Agent提前实现的可选适配器，真实调用待验，不得把原规格备选表当成用户改选。OpenAI及EPREL凭据缺失时继续独立工作，不重复追问。保留材料许可与单次外发合同。
 >

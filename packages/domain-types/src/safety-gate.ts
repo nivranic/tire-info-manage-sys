@@ -50,6 +50,7 @@ export interface SafetyGateResult {
   data_state: "live" | "live_verified_304" | "local_snapshot" | "consent_required" | "source_unavailable";
   reason: string | null;
   consent_id: string | null;
+  fallback_authorization?: import("./warehouse-fallback").WarehouseFallbackAuthorization;
   verified_at: string | null;
   snapshot_observed_at: string | null;
   document: SafetyGateDocument | null;

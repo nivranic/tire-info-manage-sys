@@ -6,6 +6,7 @@ import type { SafetyGateAlertHistory, SafetyGateEvidence, SafetyGateQuery, Safet
 import { DataTree } from "./reparse-review";
 import { useSourceAccess } from "./source-status";
 import { SafetyGateMonitoring } from "./safety-gate-monitoring";
+import QueryFallbackPolicy from "./query-fallback-policy";
 import { safetyGateEventNames as eventNames } from "./safety-gate-values";
 
 type Slot = "catalog" | "report";
@@ -155,7 +156,8 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
       <button type="button" aria-pressed={history} onClick={() => { cancel(); setHistory(true); setCatalog(null); setResult(null); setSelected(null); }}>读取已保存历史</button>
     </div>
     <button type="button" className="secondary-button" disabled={!sessionReady || busy || !history && !access.canQuery(sourceId)} onClick={() => void load({ operation: "reports" }, "catalog")}>{history ? "读取索引历史" : "在线读取周报索引"}</button>
-    {catalog?.document ? <p role="status">索引状态 {catalog.data_state.toUpperCase()} · 共 {reports.length} 份周报 · 核验时间 {catalog.verified_at ?? "未知"}</p> : null}
+    {catalog?.document ? <p role="status">索引状态 {catalog.data_state.toUpperCase()} · 共 {reports.length} 份周报 · 核验时间 {catalog.verified_at ?? "未知"} · 快照观察时间 {catalog.snapshot_observed_at ?? "未知"}</p> : null}
+    {catalog?.fallback_authorization ? <section className="recall-mode-notice"><p>索引依据已确认的持续策略读取历史，当前官网未完成核验。</p><DataTree label="索引回退授权与消费回执" value={catalog.fallback_authorization} /></section> : null}
     {reports.length ? <form className="review-form" onSubmit={event => { event.preventDefault(); querySelected(); }}>
       <label>官方周报<select value={selected?.report_id ?? ""} onChange={event => { cancel(); setSelected(reports.find(report => report.report_id === event.target.value) ?? null); setResult(null); }}>
         {reports.map(report => <option key={report.report_id} value={report.report_id}>{report.reference} · {report.published_date}</option>)}
@@ -170,7 +172,8 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
     </div></section> : null}
     {result?.document?.report ? <>
       <h4>{result.document.report.reference} · {result.data_state.toUpperCase()}</h4>
-      <p>周报发布日期 {result.document.report.published_date} · 本周报共 {alerts.length} 条告警 · 最近核验 {result.verified_at ?? "未知"}</p>
+      <p>周报发布日期 {result.document.report.published_date} · 本周报共 {alerts.length} 条告警 · 最近核验 {result.verified_at ?? "未知"} · 快照观察时间 {result.snapshot_observed_at ?? "未知"}</p>
+      {result.fallback_authorization ? <section className="recall-mode-notice"><p>周报依据已确认的持续策略读取历史，当前官网未完成核验。</p><DataTree label="周报回退授权与消费回执" value={result.fallback_authorization} /></section> : null}
       {result.document.report.addendum_raw ? <DataTree label="周报补充声明原文" value={result.document.report.addendum_raw} /> : null}
       <label className="field-caption">在当前周报原文中筛选<input value={filter} maxLength={120} onChange={event => { setFilter(event.target.value); setPage(0); }} /></label>
       <p className="recall-help">当前匹配 {filtered.length} 条，显示第 {shownPage + 1} / {pages} 页。覆盖所选周报中的英文声明，具体SKU及实物适用性待核对。</p>
@@ -187,6 +190,11 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
       {pages > 1 ? <div className="reparse-pages"><button type="button" className="text-button" disabled={!shownPage} onClick={() => setPage(shownPage - 1)}>上一页告警</button><button type="button" className="text-button" disabled={shownPage + 1 >= pages} onClick={() => setPage(shownPage + 1)}>下一页告警</button></div> : null}
     </> : null}
     {provenance ? <><p className="recall-help">{provenance.attribution}</p><button type="button" className="text-button" disabled={busy} onClick={() => void showEvidence(provenance.snapshot_id)}>{result?.document ? "查看所选周报原始证据" : "查看索引原始证据"}</button></> : null}
+    <p className="recall-help">持续回退分别授权周报索引与指定周报查询；指定周报策略适用于此来源的周报查询，不限当前编号。保存后从下一次普通查询生效，监控任务不继承该权限。</p>
+    {sessionReady ? <>
+      <QueryFallbackPolicy kind="safety_gate_reports" sourceIds={[sourceId]} sessionReady={sessionReady} />
+      <QueryFallbackPolicy kind="safety_gate_report" sourceIds={[sourceId]} sessionReady={sessionReady} />
+    </> : null}
     <SafetyGateMonitoring sessionReady={sessionReady} onEvidence={id => void showEvidence(id)} />
     {alertHistory ? <section className="recall-evidence" aria-label="已保存告警版本">
       <h4>告警 {alertHistory.alert_id} · 已保存历史</h4>

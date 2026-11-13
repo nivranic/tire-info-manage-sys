@@ -194,18 +194,18 @@ class SafetyGateService:
         self.shared.block_source_access(run, error)
         return self.response(query, run.state, query_id=run.id, reason=run.reason)
 
-    async def execute(self, request, session_id):
+    async def execute(self, request, session_id, *, audience='internal'):
         from .telemetry import observe
         with observe('source.query', component='crawler', source=source.SOURCE_ID) as operation:
-            result = await self._execute(request, session_id)
+            result = await self._execute(request, session_id, audience=audience)
             operation.finish(result['data_state'])
             return result
 
-    async def _execute(self, request, session_id):
+    async def _execute(self, request, session_id, *, audience='internal'):
         query = request.query.canonical()
         key = digest(query)
         if request.consent_id:
-            return self.consume_consent(request, session_id)
+            return self.consume_consent(request, session_id, audience=audience)
         run = QueryRun(id=uid(), session_id=session_id, source_id=source.SOURCE_ID, query=query,
             query_key=key, fallback_policy=request.fallback_policy)
         self.db.add(run)
@@ -290,6 +290,15 @@ class SafetyGateService:
         run.reason = str(result.get('reason') or 'safety_gate_unavailable')[:200]
         self.shared.audit(session_id, 'safety_gate_online_failed', run.id, reason=run.reason)
         self.db.commit()
+        from .query_fallback_policies import claim_policy_use, authorized_result
+        use = claim_policy_use(self.db, self.shared.registry, run, 'safety_gate_' + query['operation'], audience)
+        if use is not None:
+            snapshot = self.latest(key)
+            self.shared.audit(session_id, 'policy_safety_gate_snapshot_read', run.id, use_id=use.id,
+                snapshot_id=snapshot.id if snapshot else None)
+            response = self.response(query, 'local_snapshot', snapshot, run.id,
+                reason=run.reason if snapshot else 'no_matching_safety_gate_snapshot')
+            return authorized_result(self.db, self.shared.registry, run, use, response)
         return self.response(query, run.state, query_id=run.id, reason=run.reason)
 
     def persist(self, run, result, document, cache, selection):
@@ -327,7 +336,7 @@ class SafetyGateService:
         backfill_alert_history(self.db)
         return snapshot, verified
 
-    def consume_consent(self, request, session_id):
+    def consume_consent(self, request, session_id, *, audience='internal'):
         self.shared.lock_ingestion()
         query = request.query.canonical()
         consent = self.db.get(FallbackConsent, request.consent_id)
@@ -343,6 +352,8 @@ class SafetyGateService:
             self.shared.assert_source_access(run)
         except SourceAccessBlocked as error:
             return self.blocked(query, run, error)
+        from .query_fallback_policies import assert_once_policy
+        assert_once_policy(self.db, self.shared.registry, run, 'safety_gate_' + query['operation'], audience)
         now = utcnow()
         if utc(consent.expires_at) <= now or utc(run.created_at) + CONSENT_TTL <= now:
             raise HTTPException(410, '离线授权已过期')
@@ -388,7 +399,8 @@ def register_safety_gate_routes(app: FastAPI):
     @app.post('/v1/safety-gate/query')
     async def query(payload: SafetyGateRequest, request: Request, db: Session = Depends(get_db)):
         adapter = getattr(app.state, 'safety_gate_adapter', None) or source
-        return await SafetyGateService(db, adapter, app.state.registry).execute(payload, request.state.session_id)
+        return await SafetyGateService(db, adapter, app.state.registry).execute(payload, request.state.session_id,
+            audience='programmatic')
 
     @app.get('/v1/safety-gate/history')
     def history(request: Request, operation: Literal['reports', 'report'], mode: Literal['history'],

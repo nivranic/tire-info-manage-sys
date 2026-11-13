@@ -18,7 +18,8 @@ from .db import Base, FallbackConsent, QueryRun, UserSession, uid, utc, utcnow
 from .domain import StrictModel, digest
 from .source_settings import SourceAccessBlocked, SourceSettingError, assert_source_run_access, source_setting
 
-QueryKind = Literal['tire', 'vehicle_fitments', 'recall_campaign', 'recall_search']
+QueryKind = Literal['tire', 'vehicle_fitments', 'recall_campaign', 'recall_search',
+                    'safety_gate_reports', 'safety_gate_report']
 QueryAudience = Literal['programmatic', 'ai_current', 'background_monitor', 'internal']
 PolicyMode = Literal['ask', 'never', 'session_allow', 'source_allow', 'query_allow']
 ALLOW_MODES = frozenset({'session_allow', 'source_allow', 'query_allow'})
@@ -50,7 +51,7 @@ class SourceBinding(StrictModel):
 
 
 class SourceKindsBinding(SourceBinding):
-    query_kinds: list[QueryKind] = Field(min_length=1, max_length=4)
+    query_kinds: list[QueryKind] = Field(min_length=1, max_length=6)
 
     @field_validator('query_kinds')
     @classmethod
@@ -255,7 +256,9 @@ def scope_metadata(db, registry, scope, *, require_fetch=True):
             fail('query_fallback_source_changed')
         kinds = ({'vehicle_fitments'} if source['target_kind'] == 'vehicle' else
                  {'recall_campaign', 'recall_search'} if binding['source_id'] == 'nhtsa-us-recalls'
-                 and source['target_kind'] == 'recall' else {'tire'} if source['target_kind'] == 'tire' else set())
+                 and source['target_kind'] == 'recall' else {'safety_gate_reports', 'safety_gate_report'}
+                 if binding['source_id'] == 'eu-safety-gate' and source['target_kind'] == 'recall'
+                 else {'tire'} if source['target_kind'] == 'tire' else set())
         if not set(binding['query_kinds']).issubset(kinds):
             fail('query_fallback_source_kind_mismatch', 422)
         result.append({'source_id': binding['source_id'], 'access_generation': binding['access_generation'],

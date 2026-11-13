@@ -1,8 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadOfflineTypeScript } from "./load_offline_typescript.mjs";
-const sdk = await loadOfflineTypeScript("../packages/api-client/src/index.ts", import.meta.url);
+import { loadTypeScript } from "../packages/native-client/tests/load-typescript.mjs";
+const sdk = await loadTypeScript("../packages/api-client/src/index.ts", import.meta.url);
 const id = "00000000-0000-4000-8000-000000000049";
+for (const operation of ["reports", "report"]) test(`Safety Gate ${operation} preserves warehouse scope and consumed authorization`, async () => {
+  const calls = [];
+  const query = operation === "reports" ? { operation } : { operation, report_id: "900001", reference: "Report-2026-19" };
+  const authorization = { type: "policy_once", use: { policy_id: id, policy_revision: 2, query_kind: `safety_gate_${operation}`, reason: "upstream_timeout" } };
+  const restore = sdk.setApiTransport(async (path, init) => {
+    calls.push({ path, body: JSON.parse(init.body), signal: init.signal });
+    return new Response(JSON.stringify({ data_state: "local_snapshot", fallback_authorization: authorization, query }));
+  });
+  const controller = new AbortController();
+  try {
+    const scope = { kind: "query", query_kind: `safety_gate_${operation}`, sources: [{ source_id: "eu-safety-gate", access_generation: 2 }] };
+    await sdk.tireApi.previewQueryFallbackPolicy({ mode: "query_allow", scope }, controller.signal);
+    const value = await sdk.tireApi.safetyGateQuery(query, {}, controller.signal);
+    assert.deepEqual(calls[0].body.scope, scope);
+    assert.deepEqual(calls[1].body, { query }); // Server supplies the existing ask default.
+    assert.equal(calls[1].path, "/v1/safety-gate/query");
+    assert.equal(calls[1].signal, controller.signal);
+    assert.deepEqual(value.fallback_authorization, authorization);
+    assert.equal(value.data_state, "local_snapshot");
+    await sdk.tireApi.safetyGateQuery(query, { fallback_policy: "never" }, controller.signal);
+    assert.deepEqual(calls[2].body, { query, fallback_policy: "never" });
+  } finally { restore(); }
+});
 test("warehouse policy methods preserve fixed routes, exact bodies and mutation idempotency", async () => {
   const calls = [], restore = sdk.setApiTransport(async (path, init) => { calls.push({ path, body: JSON.parse(init.body || "null"), method: init.method || "GET", key: init.headers.get("Idempotency-Key") }); return new Response("{}"); });
   try {

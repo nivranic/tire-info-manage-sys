@@ -81,6 +81,7 @@ TEST_MODULES = (
     'apps/api/tests/test_safety_gate.py',
     'apps/api/tests/test_safety_gate_alerts.py',
     'apps/api/tests/test_safety_gate_monitoring.py',
+    'apps/api/tests/test_safety_gate_fallback.py',
     'apps/api/tests/test_canary.py',
     'apps/api/tests/test_candidate_ai.py',
     'apps/api/tests/test_candidate_ai_review.py',
