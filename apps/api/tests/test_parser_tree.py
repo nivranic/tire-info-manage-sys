@@ -105,3 +105,37 @@ def test_source_changes_during_copy_are_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(bundles, 'verify_tree', mutate_source)
     with pytest.raises(bundles.BundleError, match='parser_bundle_integrity_failed'):
         bundles.copy_verified(root, manifest, destination)
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows namespace and junction containment')
+def test_regression_guard_keeps_resolved_namespace_and_handle_boundaries(tmp_path):
+    import _winapi
+    from regression_guard import RegressionGuard
+
+    output = tmp_path / '.artifacts' / 'scope'
+    private = output / 'private'
+    private.mkdir(parents=True)
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    guard = RegressionGuard(tmp_path, private, output)
+
+    def extended(path):
+        return Path('\\\\?\\' + str(path))
+
+    inside_file, outside_file = private / 'inside.py', outside / 'outside.py'
+    assert guard._inside(inside_file) and guard._inside(extended(inside_file))
+    assert not guard._inside(outside_file) and not guard._inside(extended(outside_file))
+    assert not guard._inside(extended(private / '..' / '..' / '..' / 'outside' / 'outside.py'))
+    for path, expected in ((inside_file, True), (outside_file, False)):
+        with path.open('wb') as stream:
+            assert guard._inside(stream.fileno()) is expected
+
+    link = private / 'escape'
+    _winapi.CreateJunction(str(outside), str(link))
+    try:
+        assert not guard._inside(link / 'outside.py')
+        assert not guard._inside(extended(link / 'outside.py'))
+    finally:
+        # Remove only the junction created here, never its target directory.
+        link.rmdir()
+    assert outside_file.is_file()

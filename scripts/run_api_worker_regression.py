@@ -594,6 +594,17 @@ def selfcheck(guard, children, out: Path) -> dict:
     denied('custom SQLite factory before callback', lambda: sqlite3.connect(':memory:', factory=untrusted_factory))
     assert not factory_calls
     denied('nonprivate write', lambda: forbidden_file.write_text('must-not-write', encoding='utf-8'))
+    if os.name == 'nt':
+        # Extended spellings may identify the same approved local filesystem
+        # object. They must never turn an outside target into an approved one.
+        extended_forbidden = Path('\\\\?\\' + str(forbidden_file))
+        denied('nonprivate extended write', lambda: extended_forbidden.write_bytes(b'must-not-write'))
+        denied('nonprivate extended mkdir', lambda: extended_forbidden.mkdir())
+        extended_private = Path('\\\\?\\' + str(out / 'private' / 'namespace-selfcheck.txt'))
+        extended_private.write_bytes(b'private-only')
+        assert extended_private.read_bytes() == b'private-only'
+        extended_private.unlink()
+        checks.append({'name': 'equivalent private extended path', 'passed': True, 'expected_denial': False})
     with sqlite3.connect(':memory:') as memory:
         denied('nonprivate ATTACH', lambda: memory.execute('ATTACH DATABASE ? AS forbidden', (str(forbidden_db),)), (sqlite3.DatabaseError,))
     assert not forbidden_db.exists() and not forbidden_file.exists()

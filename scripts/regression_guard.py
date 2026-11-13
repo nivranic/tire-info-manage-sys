@@ -24,6 +24,18 @@ from urllib.parse import parse_qs, unquote, urlsplit
 TRUSTED_PATH_RESOLVE = Path.resolve
 
 
+def comparable_path(path):
+    """Compare equivalent filesystem spellings only after resolving targets."""
+    if os.name == 'nt':
+        value = str(path)
+        if value.startswith('\\\\?\\UNC\\'):
+            return Path('\\\\' + value[8:])
+        if (value.startswith('\\\\?\\') and len(value) >= 7
+                and value[4].isascii() and value[4].isalpha() and value[5:7] == ':\\'):
+            return Path(value[4:])
+    return path
+
+
 METRICS_NODEID = 'apps/api/tests/test_telemetry.py::test_explicit_worker_http_export_is_loopback_guarded_and_closes'
 
 
@@ -33,9 +45,9 @@ class GuardDenied(PermissionError):
 
 class RegressionGuard:
     def __init__(self, repo_root, private_root, output_root, child_policy=None):
-        self.repo_root = TRUSTED_PATH_RESOLVE(Path(repo_root), strict=True)
-        self.output_root = TRUSTED_PATH_RESOLVE(Path(output_root), strict=True)
-        self.private_root = TRUSTED_PATH_RESOLVE(Path(private_root), strict=True)
+        self.repo_root = comparable_path(TRUSTED_PATH_RESOLVE(Path(repo_root), strict=True))
+        self.output_root = comparable_path(TRUSTED_PATH_RESOLVE(Path(output_root), strict=True))
+        self.private_root = comparable_path(TRUSTED_PATH_RESOLVE(Path(private_root), strict=True))
         if (not self.output_root.is_relative_to(self.repo_root / '.artifacts')
                 or self.output_root == self.repo_root / '.artifacts'
                 or not self.private_root.is_relative_to(self.output_root)):
@@ -112,11 +124,13 @@ class RegressionGuard:
             target = self._descriptor_path(path)
             if target is None or not target.is_absolute():
                 return False
-            boundary = root or self.output_root
+            target = comparable_path(target)
+            boundary = comparable_path(root or self.output_root)
             if sys.platform == 'win32' and target.drive.casefold() != boundary.drive.casefold():
                 return False
             try:
-                allowed = TRUSTED_PATH_RESOLVE(target).is_relative_to(boundary)
+                resolved = comparable_path(TRUSTED_PATH_RESOLVE(target))
+                allowed = '..' not in resolved.parts and resolved.is_relative_to(boundary)
             except (OSError, ValueError):
                 return False
             if allowed:
@@ -124,7 +138,9 @@ class RegressionGuard:
                 self._bump('allowed.resolved_private_descriptor')
             return allowed
         try:
-            return TRUSTED_PATH_RESOLVE(Path(os.fsdecode(path))).is_relative_to(root or self.output_root)
+            resolved = comparable_path(TRUSTED_PATH_RESOLVE(Path(os.fsdecode(path))))
+            return ('..' not in resolved.parts
+                    and resolved.is_relative_to(comparable_path(root or self.output_root)))
         except (TypeError, ValueError, OSError):
             return False
 
