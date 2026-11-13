@@ -19,7 +19,8 @@ from .db import (
 from .domain import ConsentRequest, LiveQueryRequest, VariantInput, digest
 from .query_filters import canonical_filters, select_variants
 from .identity_contract import IdentityContractError, resolve_variant, schema_version
-from .quality import QUALITY_REASON, SourceQualityQuarantined, assess_quality, metrics
+from .quality import (QUALITY_REASON, SourceQualityQuarantined, assess_quality, assess_records,
+                      metrics, row_fields, stable_key)
 from .captures import before_parse_recorder, retain_rejected_response
 from .parser_provenance import check_result_identity, execution_outcome, verified_observation_recorder
 from .source_settings import SourceAccessBlocked, assert_source_access, assert_source_run_access
@@ -353,7 +354,28 @@ class QueryService:
         verified_at = utcnow()
         snapshot = self.db.get(Snapshot, previous_verification.snapshot_id) if previous_verification else None
         candidates = [variant.model_dump() for variant in variants]
-        quality = assess_quality(snapshot.parsed_variants if snapshot else None, candidates)
+        previous_candidates = [
+            {field: row.get(field) for field in VariantInput.model_fields}
+            for row in snapshot.parsed_variants
+        ] if snapshot else []
+        reverified_response = (
+            snapshot is not None and parser_selection is not None
+            and snapshot.identity_contract_version == schema_version()
+            and snapshot.raw_hash == raw_hash and snapshot.body == result['body']
+            and snapshot.source_url == result['url'] and snapshot.content_type == result['content_type']
+            and snapshot.parser_version == result['parser_version']
+            and snapshot.parser_identity == result.get('parser_identity')
+            and previous_candidates == candidates
+        )
+        if reverified_response:
+            # Exact observations can be reverified without claiming product identity.
+            # Known product keys retain their duplicate/ambiguity checks.
+            quality = assess_records(previous_candidates, candidates,
+                lambda row: stable_key(row) if row.get('manufacturer_product_code') else digest(row),
+                row_fields, 'field-loss@2')
+            quality['namespace_reference_alignments'] = []
+        else:
+            quality = assess_quality(snapshot.parsed_variants if snapshot else None, candidates)
         applied_review = None
         if quality["reason_codes"] and snapshot is not None and verification_status == 'ok':
             from .quarantine_review import consume_approval

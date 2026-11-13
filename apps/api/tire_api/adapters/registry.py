@@ -15,7 +15,7 @@ import aiohttp
 
 from .michelin import parse_michelin_html
 from .michelin_regions import MICHELIN_REGIONS
-from . import hankook, toyo, pirelli, bridgestone
+from . import hankook, toyo, pirelli, bridgestone, continental
 from .robots import RobotsPolicy
 from .transport import SafeHttpClient, SourceAccessError, USER_AGENT
 from ..captures import CaptureWriteError, parser_failure_reason
@@ -115,7 +115,7 @@ for region_source_id, region_config in MICHELIN_REGIONS.items():
     register_source({**region_config, "id": region_source_id},
                     partial(parse_michelin_html, region=region_config["region"]))
 
-for brand_adapter in (toyo, hankook, pirelli, bridgestone):
+for brand_adapter in (toyo, hankook, pirelli, bridgestone, continental):
     register_source(brand_adapter.SOURCE_CONFIG, brand_adapter.parse_html)
 
 PENDING_SOURCES = [
@@ -175,6 +175,8 @@ def permitted_path(url: str, source_id: str = "michelin-us") -> bool:
         return False
     if source_id == pirelli.SOURCE_CONFIG['id']:
         return pirelli.permitted_path(url)
+    if source_id == continental.SOURCE_CONFIG['id']:
+        return url in spec.model_urls.values()
     parsed = urlsplit(url)
     return (parsed.scheme == "https" and parsed.hostname == spec.host and not parsed.query
             and not parsed.fragment and parsed.port in (None, 443)

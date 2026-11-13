@@ -28,6 +28,7 @@ _TELEMETRY_SOURCES = {
     'website-api.xiaomiev.com': 'xiaomi-su7', 'www.xiaomiev.com': 'xiaomi-su7',
     'api.nhtsa.gov': 'nhtsa',
     'tire.bridgestone.co.jp': 'bridgestone-jp',
+    'www.continental-tires.cn': 'continental-cn',
 }
 
 

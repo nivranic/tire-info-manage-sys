@@ -80,3 +80,5 @@
 /apps/api/tire_api/adapters/bridgestone.py text eol=lf
 /apps/api/tests/test_bridgestone.py text eol=lf
 /scripts/regression_children.py text eol=lf
+/apps/api/tire_api/adapters/continental.py text eol=lf
+/apps/api/tests/test_continental.py text eol=lf

@@ -137,7 +137,7 @@ const factLabels: Record<string, string> = {
   overall_diameter_in: "外径（英寸）", overall_width_in: "总宽（英寸）", revolutions_per_mile: "每英里转数",
   overall_diameter_mm: "外径（毫米）", overall_width_mm: "断面宽度（毫米）", standard_rim_width_in: "标准轮辋宽度（英寸）",
   jp_rolling_resistance_grade: "日本滚动阻力等级", jp_wet_grip_grade: "日本湿地抓地等级", jp_low_external_noise: "日本低车外音标记",
-  rim_guard: "轮辋保护标记", source_note: "来源注记",
+  rim_guard: "轮辋保护标记", source_note: "来源注记", vehicle_type: "适用车辆类别",
   rim_width_range_in: "适用轮辋宽度（英寸）", recommended_rim_width_in: "推荐轮辋宽度（英寸）", sidewall_code: "胎侧标记",
   tread_construction: "胎面结构", sidewall_construction: "胎侧结构", for_sale: "来源在售状态",
   acoustic_foam: "静音泡棉", m_plus_s: "M+S 泥雪标记", three_peak_mountain_snowflake: "三峰雪花标记（3PMSF）",

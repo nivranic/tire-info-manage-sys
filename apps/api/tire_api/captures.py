@@ -135,9 +135,14 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
         parsed = urlsplit(url)
         from .adapters.nhtsa import permitted_url
         if (parsed.scheme != "https" or not parsed.hostname or parsed.port not in (None, 443)
-                or parsed.username or parsed.password or parsed.query and not permitted_url(url)
+                or parsed.username or parsed.password
                 or parsed.fragment or "\\" in url):
             return None
+        if parsed.query and not permitted_url(url):
+            from .adapters.registry import SPECS
+            spec = SPECS.get(source_id) if isinstance(source_id, str) else None
+            if spec is None or url not in spec.model_urls.values() or mime not in spec.content_types:
+                return None
         raw = body.encode("utf-8", errors="strict")
     except (ValueError, UnicodeError):
         return None
