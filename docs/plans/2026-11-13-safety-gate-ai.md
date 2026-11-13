@@ -8,9 +8,16 @@
 
 ## 交接执行状态
 
-本次交付后端阶段：步骤 1–4 已实现并有专项测试；步骤 5 的共享类型／SDK／页面入口尚未实施，步骤 6–7 仅完成部分后端检查。完整功能与正常生产页面验收未完成，继续顺序与检查结果见[当前交接卡](../AGENT-HANDOFF-CURRENT.md)和[后端验收记录](../assurance/evidence/safety-gate-ai-backend-2026-11-13.md)。不要把本计划的目标描述当作已完成结果。
+步骤 1–5 已接通，后端阶段后又完成共享类型／SDK／正常页面与报告消费。步骤 6–7 已取得后端专项、类型／Web／构建、官方历史材料正常 HTTP 与生产页面的对应证据；新增组合反例、真实模型与 Native 仍有待验项。见[当前交接卡](../AGENT-HANDOFF-CURRENT.md)、[后端验收](../assurance/evidence/safety-gate-ai-backend-2026-11-13.md)及[消费者验收](../assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)。不据此宣称完整 V1 完成。
 
 ## 现状与取舍
+
+### 12e726e 后续消费者实施
+
+- 先扩 `packages/domain-types/src/safety-gate.ts` 与 `index.ts` 中的 AI 引用、在线请求、包／分析／报告边界；只扩 `AIAnalysisReference`，不扩离线包或知识搜索引用。同步 `packages/api-client/src/index.ts` 的 prepare 返回类型。
+- 新增 `apps/web/components/safety-gate-ai-values.ts`，集中周报／历史观察的精确目标构造、当前请求与原件核验；新增边界／元信息和原件恢复组件。来源 XML 只以文本展示，恢复前校验原件 SHA256、周报 query 和原生告警 ID／通报编号，切换会话或目标时取消读取并丢弃迟到响应。
+- 修改 `safety-gate.tsx`、`recalls.tsx`、`ai-analysis.tsx`、`ai-stream-progress.tsx` 与 `reports.tsx`：正常入口、历史／在线准备、固定边界、事实引用及报告均覆盖；保留现有 Native 轮询。
+- 用 Node 测试覆盖目标绑定、去重、当前请求与拒绝反例，用共享 SDK 的合成传输验证请求／响应／取消。执行 Web 测试、三端类型与独立生产构建；随后使用官方历史材料和合成 Provider 跑正常 HTTP／生产页面（含窄屏、原件核验和报告）。不以合成 Provider 证明真实 OpenAI 质量，不以共享代码证明真机。
 
 基线为927a2e8。桌面与Android已共享Safety Gate页面和普通/v1桥接，任务进度有Native轮询；这些是代码事实，实际宿主／设备待验。AI PackReference当前只有NHTSA recall，Safety Gate尚无独立引用与冻结字段合同。
 

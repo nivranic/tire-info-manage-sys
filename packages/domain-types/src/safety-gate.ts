@@ -4,6 +4,24 @@ export type SafetyGateQuery = { operation: "reports" } | {
   reference: string;
 };
 
+export interface SafetyGateAnalysisReference {
+  kind: "safety_gate";
+  snapshot_id: string;
+  alert_id: string;
+}
+
+export interface SafetyGateAnalysisTarget {
+  query: Extract<SafetyGateQuery, { operation: "report" }>;
+  reference: SafetyGateAnalysisReference;
+}
+
+export interface SafetyGateAnalysisBoundary {
+  policy: "safety-gate-fact-selection@1";
+  applicability: "not_assessed";
+  mode: "announcement_facts_only";
+  notice: string;
+}
+
 export interface SafetyGateReport {
   report_id: string;
   reference: string;

@@ -7,7 +7,7 @@
 - 原规格按 **12 个核心模块、10 项发布 Gate、13 项 SLO、15 项待确认决策**组织；这些是不同维度，不能相加当作独立需求总数。12 个模块均有工程实现，完整发布验收仍未闭合，不能给出可靠的整体完成百分比。
 - 已有在线查询、精确身份与冲突、比较、测试事件、证据保存、监控、账户与偏好、AI 证据链及外部权限工程。当前参数来源覆盖 11 个区域目录、7 个厂商品牌，另有 NHTSA、EU Safety Gate 与小米车型来源；可信 Parser 目录 15 项。
 - 最近已交付 Safety Gate 周报证据、逐告警版本／变化历史、监控调度／应用内提醒／任务 SSE、独立的索引与周报持续回退权限。
-- 上一交付点 `927a2e8` 为 **Safety Gate 外部受许可读取**：查询归属、许可绑定、专用 scope、固定窗口分页、共享 SDK 和 Web Key 管理已接通，后端仍限定受管 SQLite。本次在此基础上交付 **Safety Gate AI 后端阶段**；共享 TypeScript 类型、SDK 和页面分析入口尚未接入，不能按完整用户流程验收。
+- 上一交付点 `927a2e8` 为 **Safety Gate 外部受许可读取**：查询归属、许可绑定、专用 scope、固定窗口分页、共享 SDK 和 Web Key 管理已接通，后端仍限定受管 SQLite。最新已在后端基础上接通 **Safety Gate AI 共享类型／SDK／页面／报告消费**，并以官方历史卡车轮胎告警和合成 Provider 验证正常流程；真实模型及 Native 宿主／设备继续待验。
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 
 ## 用户已确定的边界
@@ -35,7 +35,19 @@
 | 对外能力 | REST、SSE、SDK、Webhook、Key、轮胎事实许可读取 | 正式 PG Reader、公网接收端、SDK 产品化、完整 WebSocket |
 | 管理后台 | Parser 健康／发布回滚、隔离、失败任务、纠错与审计 | 生产 IAM／租户／RLS、完整角色治理、灾备与发布验收 |
 
-## 本次代码交付点：Safety Gate AI 后端
+## 最新代码交付点：Safety Gate AI 消费流程
+
+基线 `12e726e33fce4bdfb49c7d2da164d7252f665eb3`，提交标题 `feat: connect Safety Gate AI evidence workflows`，最终 SHA 以 Git 为准。[消费者验收记录](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)包含材料、正常流程、原始失败和未验范围。
+
+- 周报告警及历史版本可直接进入 AI 对话框，按所选快照／原生告警 ID 准备历史证据或在线重核，单次历史回退与 AI 外发同意分别确认。
+- 包、流式结果、保存／恢复报告展示固定适用性边界；事实引用定位与源专属原件恢复已接通。恢复校验快照、周报、哈希及原生告警身份，拒绝错绑 XML。
+- 共享 AI 类型及 SDK 已扩展，设备离线 `OfflineReference` 保持原范围。Native 复用既有页面、桥接和轮询，没有新增权限。
+- SDK 3 组、Web 59 项、三端类型与 422 输入生产构建通过。正常 HTTP 26 项、浏览器最终流程／布局 25 项和原件检查 10 项通过；首次浏览器提交 3 项失败观察保留，按原请求恢复后成功。Markdown／HTML／PDF 均验证身份、边界与冻结复用。
+- 使用官方 Report-2026-19 的 Goodyear 卡车轮胎告警 `10098848` / `SR/01396/26`。8 次历史回放、3 次模拟超时、3 次合成模型调用，真实来源／模型调用 0。185 表全部行指纹关闭后不变、原件哈希有效，自有服务／端口关闭。
+
+新增后端组合反例、真实 OpenAI、实际 Native、正式 PG 外部 Reader、长期监控与完整 V1 仍待完成。旧后端记录中的“前端尚未接入”仅描述当时阶段，已由本次交付推进。
+
+## 此前后端交付点：Safety Gate AI
 
 起点为 `927a2e89fb0c3fe6faa6e13c8050d254f7fa5dab`，正式提交标题为 `feat: add Safety Gate AI evidence backend`；最终 SHA 以 Git 和交付消息为准。完整实施范围见[计划](plans/2026-11-13-safety-gate-ai.md)，本轮检查与未验边界见[后端验收记录](assurance/evidence/safety-gate-ai-backend-2026-11-13.md)。
 
@@ -47,7 +59,7 @@
 
 最终相关后端回归 **20 模块 527／527 通过**，无跳过；826 输入稳定、资源关闭、非自检拒绝 0。包括专项 18 项及旧 AI／流式／正文／NHTSA／测试事实／报告／车型／历史 Provider 兼容检查。保留首次专项 17／18 失败和首次兼容回归停滞记录；均为测试装配边界问题，修正后重跑通过。详细回执和复跑命令见后端验收记录。
 
-**当前尚未做：** Safety Gate AI 的共享 TS 类型、SDK 返回类型、页面目标／按钮、来源原件恢复、流式边界提示、正常 HTTP／生产 Web 联调。Desktop／Android 已共享工作台和 Safety Gate 普通页面，但新增 AI 流程及实际宿主／真机没有验收；不能把共享代码等同于 Native 已通过。
+**该阶段尚未接入的消费者已在最新交付中完成工程验证。** Desktop／Android 共享工作台及相关流程代码，实际宿主／真机仍未验收；不能把共享代码等同于 Native 已通过。
 
 ## 上一交付点：Safety Gate 外部受许可读取
 
@@ -65,17 +77,16 @@
 
 ## 接手后优先做什么
 
-1. 核对main、HEAD、工作区与实时远端，读本卡、[外部API合同](EXTERNAL-API.md)及上述验收；新clone重建依赖和材料，不把本机私槽视为已随Git交付。
-2. 优先完成 Safety Gate AI 的消费者：`packages/domain-types/src/index.ts` 扩 `AIAnalysisReference`、`AIPrepareRequest`、证据／事实／报告类型，`packages/api-client/src/index.ts` 的 prepare 返回类型加入 `SafetyGateResult`；不要扩设备 `OfflinePackReference`，它属于另一范围。
-3. 在 `ai-analysis.tsx` 接入历史／在线目标与原件恢复，`ai-stream-progress.tsx` 展示固定边界；`recall-evidence-values.ts` 按快照＋告警去重，`safety-gate.tsx` 增加分析入口，`recalls.tsx` 透传。引用使用周报结果 `provenance[0]`，不能用索引的 provenance。原件读取走 `safetyGateEvidence` 并核对哈希与告警身份。
-4. 补齐负 ID、容量、错报告／告警／核验状态、最终请求篡改、完成时材料损坏、预算／幂等／跨会话和混合证据反例；运行 SDK、三端类型、Web、构建与官方历史材料的正常 HTTP／生产界面验收。Native 复用已有桥接与轮询，不新增重复页面或放宽 IPC。
-5. 为正式PG外部Reader单独设计与验证事务锁、物化预算、冻结归属和并发撤销语义。当前明确返回不支持，不能直接撤掉SQLite检查。
-6. 验证监控自然长周期、多规则、真实变化提醒和通知lag；此前外部读取和模拟到期均不证明这些指标。继续其他P0官方渠道、地区与SKU参数覆盖。
-7. 扩充专业原件及复用许可、精确SKU身份、独立标注与真人Golden；继续代表性检索／重排质量输入和完整性能解释。
-8. 凭据齐备后首先执行真实OpenAI Responses及Embeddings语义验收。显式设置 `TI_AI_PROVIDER=openai_responses` 并核对 `/v1/ai/status`；缺凭据时推进独立工程。
-9. 收敛生产IAM／租户／RLS、六类平台、WCAG读屏、安全、性能、迁移／回退和灾备Gate，按实际验收逐项记录，不按已有实现推定完成。
+1. 核对 main、HEAD、工作区与实时远端，读本卡、Safety Gate AI 计划及消费者验收；新 clone 重建依赖和材料，本机私槽没有随 Git 交付。
+2. 补齐新 Safety Gate 后端合同的容量、错核验状态、最终发送包／body／收件模型篡改、完成时材料损坏及混合证据反例；保留既有 527 项后端回执，不能用旧域覆盖代替新增组合验证。
+3. 核对实际 Native 宿主的正常桥接和轮询消费。Web 工程验收已完成，真机／宿主权限、文件保存与恢复仍需实际证据，不扩离线包域或 IPC 权限。
+4. 为正式 PG 外部 Reader 单独设计与验证事务锁、物化预算、冻结归属和并发撤销语义。当前明确返回不支持，不能直接撤掉 SQLite 检查。
+5. 验证监控自然长周期、多规则、真实变化提醒和通知 lag；继续其他 P0 官方渠道、地区与 SKU 参数覆盖。模拟超时、历史回放和固定材料验证不能证明这些运行指标。
+6. 扩充专业原件及复用许可、精确 SKU 身份、独立标注与真人 Golden；继续代表性检索／重排质量输入和完整性能解释。
+7. 凭据齐备后首先执行真实 OpenAI Responses 及 Embeddings 语义验收，显式核对 Provider 与 `/v1/ai/status`；缺凭据时推进独立工程，不反复询问。
+8. 收敛生产 IAM／租户／RLS、六类平台、WCAG 读屏、安全、性能、迁移／回退和灾备 Gate，按实际验收逐项记录。
 
-本轮后端入口：`apps/api/tire_api/safety_gate_ai_evidence.py`、`ai_safety_gate_contract.py`、`ai_evidence.py`、`ai_analysis.py`、`ai_execution.py`、`ai_streaming.py`、`reports.py`、`report_rendering.py`。专项测试为 `apps/api/tests/test_safety_gate_ai.py`；外部读取配置和字段许可键见外部API合同。
+新消费者入口：`apps/web/components/safety-gate-ai-values.ts`、`safety-gate-ai-evidence.tsx`、`safety-gate.tsx`、`ai-analysis.tsx`、`ai-stream-progress.tsx`、`reports.tsx`。后端入口为 `apps/api/tire_api/safety_gate_ai_evidence.py`、`ai_safety_gate_contract.py`；外部读取配置与字段许可键见[外部 API 合同](EXTERNAL-API.md)。
 
 ## 发布仍未闭合
 
@@ -93,4 +104,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-CURRENT.md、原始规格、Safety Gate AI 计划及后端验收记录。已交付 Safety Gate 受许可外部读取和 AI 后端阶段，下一步完成 AI 共享类型／SDK／页面入口、来源恢复、正常 HTTP／生产 Web 联调与 Native 验收，再推进正式 PG Reader、长期监控及其余 V1 Gate。首个真实 AI 接口保持用户选择的 OpenAI Responses；Gemini 只是此前 agent 提前实现的可选适配器，不是用户改选。缺 OpenAI／EPREL 凭据时推进独立工程，不反复询问。保留历史失败、KIT C2 封存、材料许可及单次外发边界。12 模块、10 Gate、13 SLO、15 决策分别跟踪，不宣称完整 V1 已完成。沿 main 工作，不自行建分支／worktree 或使用代理；提交前验证、审查，推送后独立核对远端 SHA 与工作区。
+> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-CURRENT.md、原始规格、Safety Gate AI 计划和消费者验收。现已接通 Safety Gate 受许可外部读取、AI 后端与共享类型／SDK／页面／报告流程，并用官方历史卡车轮胎材料及合成 Provider 完成对应工程验收；补齐新后端组合反例、实际 Native、正式 PG Reader、长期监控及其余 V1 Gate。首个真实 AI 接口保持用户选择的 OpenAI Responses，Gemini 仅是历史可选适配器。缺 OpenAI／EPREL 凭据时推进独立工作，不反复询问。保留历史失败、KIT C2 封存、材料许可及单次外发边界；12 模块、10 Gate、13 SLO、15 决策分别跟踪，不宣称完整 V1 已完成。沿 main 工作，不自行建分支／worktree 或使用代理；提交前验证、审查，推送后独立核对远端 SHA 与工作区。

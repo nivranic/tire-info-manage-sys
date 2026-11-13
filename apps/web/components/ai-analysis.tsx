@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
-import type { AIAnalysis, AIAnalysisReference, AIPack, AIPrepareRequest, AIStatus, AIStreamDetail, EvidenceReportRecord, QueryResult, RecallAnalysisReference, RecallResult, Variant } from "@tire/domain-types";
+import type { AIAnalysis, AIAnalysisReference, AIPack, AIPrepareRequest, AIStatus, AIStreamDetail, EvidenceReportRecord, QueryResult, RecallAnalysisReference, RecallResult, SafetyGateAnalysisTarget, SafetyGateResult, Variant } from "@tire/domain-types";
 import { IdentityContractBadge, IdentityContractEvidence } from "./identity-contract";
 import { FrozenFieldResolutions } from "./field-authority";
 import { SaveReportDialog } from "./reports";
@@ -11,15 +11,19 @@ import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope, recallAnal
 import { recallCurrentRequest, uniqueAIReferences } from "./recall-evidence-values";
 import { AI_RECOVERY_KEY, aiStreamErrorMessage, aiStreamErrorMessages, canExportAIAnalysis, parseAIRecovery, type AIRecoveryPointer } from "./ai-stream-values";
 import AiBudgetMeter, { aiProviderLabel } from "./ai-budget";
+import { SafetyGateAnalysisBoundary, SafetyGateCitation, SafetyGateEvidenceMeta } from "./safety-gate-ai-evidence";
+import { isSafetyGateEvidence, safetyGateAnalysisNotice, safetyGateCurrentRequest } from "./safety-gate-ai-values";
 import OriginalTextCitation from "./original-text-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 
 export type AITarget = ({ variant: Variant; sourceId?: string } | { references: AIAnalysisReference[]; label: string }
-  | { recall: { campaign_number: string; reference: RecallAnalysisReference }; label: string }) & { defaultQuestion?: string };
+  | { recall: { campaign_number: string; reference: RecallAnalysisReference }; label: string }
+  | { safetyGate: SafetyGateAnalysisTarget; label: string }) & { defaultQuestion?: string };
 const stamp = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "未记录";
 const states = { pending: "调用处理中", outcome_unknown: "调用结果尚未确认", completed: "已完成引用校验", failed: "本次分析未完成" };
 const errors: Record<string, string> = {
   ...aiStreamErrorMessages,
+  ai_safety_gate_contract_stale: "告警证据合同无效。请重新准备所选周报与告警并重新授权；旧包仍可查看。",
   ai_recall_contract_stale: "召回证据合同缺失或已变化。请重新准备公告证据，核对全部记录与适用性边界后重新授权；旧包仍可查看。",
   ai_evidence_field_contract_stale: "这份证据包的字段权威规则缺失或已经变化。请重新准备所选证据，核对默认值及全部来源，再重新授权分析；旧包仍可查看。",
   ai_evidence_identity_contract_stale: "这份证据包缺少有效的身份合同，或绑定已经变化。旧包仍可查看；请重新准备所选证据，再核对并授权分析。",
@@ -46,7 +50,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   const [history, setHistory] = useState<AIAnalysis[]>([]);
   const [mode, setMode] = useState<"current" | "history">(target && "variant" in target ? "current" : "history");
   const [pack, setPack] = useState<AIPack | null>(null);
-  const [fallback, setFallback] = useState<QueryResult | RecallResult | null>(null);
+  const [fallback, setFallback] = useState<QueryResult | RecallResult | SafetyGateResult | null>(null);
   const [preparedRequest, setPreparedRequest] = useState<AIPrepareRequest | null>(null);
   const [question, setQuestion] = useState(target?.defaultQuestion || "解释所选证据中的参数、缺失项与适用限制。");
   const [externalConsent, setExternalConsent] = useState(false);
@@ -147,6 +151,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
       let payload: AIPrepareRequest;
       if (consentId && preparedRequest?.mode === "current") payload = { ...preparedRequest, consent_id: consentId };
       else if ("references" in target) payload = { mode: "history", references: uniqueAIReferences(target.references) };
+      else if ("safetyGate" in target) payload = mode === "history" ? { mode, references: [target.safetyGate.reference] } : safetyGateCurrentRequest(target.safetyGate);
       else if ("recall" in target) payload = mode === "history" ? { mode, references: [target.recall.reference] } : recallCurrentRequest(target.recall.campaign_number);
       else if (mode === "history") payload = { mode, references: [{ kind: "tire", snapshot_id: target.variant.snapshot_id, variant_id: target.variant.id }] };
       else {
@@ -189,7 +194,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
       } catch (cause) {
         if (!signal.aborted) {
           setRetrySameRequest(previous && !retrySameRequest && cause instanceof ApiError && cause.status === 404 ? true : false);
-          if (cause instanceof ApiError && ["ai_evidence_identity_contract_stale", "ai_evidence_field_contract_stale", "ai_recall_contract_stale"].includes(cause.code || "")) {
+          if (cause instanceof ApiError && ["ai_evidence_identity_contract_stale", "ai_evidence_field_contract_stale", "ai_recall_contract_stale", "ai_safety_gate_contract_stale"].includes(cause.code || "")) {
             intent.current = null; setAttempt(null); remember(null); setEvidenceStale(true); setExternalConsent(false);
           }
         }
@@ -216,6 +221,8 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
 
   function reset() { viewGeneration.current++; activeStream.current = null; intent.current = null; remember(null); setAttempt(null); setStream(null); setRun(null); setPack(null); setFallback(null); setExternalConsent(false); setEvidenceStale(false); setRetrySameRequest(false); setError(""); }
   const frozen = !!attempt || !!run;
+  const safetyGateTarget = !!target && ("safetyGate" in target || "references" in target && target.references.some(reference => reference.kind === "safety_gate"));
+  const safetyGatePack = !!pack?.safety_gate_boundary || !!pack?.evidence.some(isSafetyGateEvidence);
   const recallTarget = !!target && ("recall" in target || ("references" in target && target.references.some(reference => reference.kind === "recall")));
   const recallPack = !!pack?.evidence.some(evidence => evidence.evidence_type === "recall");
   const testPack = !!pack && containsTestEvidence(pack.evidence);
@@ -224,30 +231,34 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   return <><dialog ref={dialog} className="fact-review-dialog ai-dialog" aria-labelledby="ai-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
     <header className="fact-review-heading"><div><span className="eyebrow">EVIDENCE → ANALYSIS</span><h2 id="ai-title">基于证据的 AI 分析</h2></div><button type="button" className="icon-button" aria-label="关闭 AI 分析" onClick={onClose}>×</button></header>
     <div className="ai-content">
-      <p className="review-boundary">{recallTarget || recallPack ? recallAnalysisNotice : testPack || target && "references" in target && target.references.some(reference => reference.kind === "test_event") ? "含测试证据时仅摘录已录事实，按场次和参测对象分别引用。个人取舍可使用同场偏好解读；精确 SKU 性能关联和推荐尚未建立。" : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 AI Provider 的处理或免于计费。</p>
+      <p className="review-boundary">{safetyGateTarget || safetyGatePack ? safetyGateAnalysisNotice : recallTarget || recallPack ? recallAnalysisNotice : testPack || target && "references" in target && target.references.some(reference => reference.kind === "test_event") ? "含测试证据时仅摘录已录事实，按场次和参测对象分别引用。个人取舍可使用同场偏好解读；精确 SKU 性能关联和推荐尚未建立。" : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 AI Provider 的处理或免于计费。</p>
       <section className="ai-status" aria-label="模型状态"><strong>{aiProviderLabel(status?.model.provider)}</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p><AiBudgetMeter status={status} /></section>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
       {recovery && !stream && !attempt ? <section className="ai-recovery" aria-label="上次分析提交核对"><h3>核对本标签页上次提交</h3><p>刷新或重新打开不会重新调用模型。先读取原请求记录；如果无法确认，原调用仍可能处理或计费。</p><div className="compare-toolbar"><button type="button" className="secondary-button" disabled={busy} onClick={() => void perform(async signal => { const value = await tireApi.lookupAIStream(recovery.key, signal); if (!signal.aborted) showStream(value, recovery.key); })}>只读核对上次提交</button><button type="button" className="text-button" disabled={busy} onClick={reset}>返回证据准备</button></div></section> : null}
       {savedReport ? <section className="snapshot-banner" role="status"><strong>已保存报告：{savedReport.title}</strong><span>本浏览器会话 · 历史冻结正文 · 未新增模型调用</span>{onOpenReport ? <button type="button" className="text-button" onClick={() => onOpenReport(savedReport.id)}>在报告库打开</button> : null}</section> : null}
       {target && !run ? <section aria-label="分析范围">
         <h3>{"variant" in target ? `${target.variant.model} · ${target.variant.size} · ${target.variant.manufacturer_product_code || "代码未确认"}` : target.label}</h3>{"variant" in target ? <IdentityContractBadge contract={target.variant.identity_contract} /> : null}
-        {"variant" in target || "recall" in target ? <fieldset className="ai-mode" disabled={busy || frozen}><legend>证据时间范围</legend><label><input type="radio" name="ai-mode" checked={mode === "current"} onChange={() => { setMode("current"); reset(); }} />先在线核验</label><label><input type="radio" name="ai-mode" checked={mode === "history"} onChange={() => { setMode("history"); reset(); }} />仅分析所选历史快照</label></fieldset> : <p>仅分析所选历史版本，保留各自的来源时间。</p>}
+        {"variant" in target || "recall" in target || "safetyGate" in target ? <fieldset className="ai-mode" disabled={busy || frozen}><legend>证据时间范围</legend><label><input type="radio" name="ai-mode" checked={mode === "current"} onChange={() => { setMode("current"); reset(); }} />先在线核验</label><label><input type="radio" name="ai-mode" checked={mode === "history"} onChange={() => { setMode("history"); reset(); }} />仅分析所选历史快照</label></fieldset> : <p>仅分析所选历史版本，保留各自的来源时间。</p>}
         {recallTarget ? <RecallAnalysisBoundary pending /> : null}
+        {safetyGateTarget ? <SafetyGateAnalysisBoundary pending /> : null}
         {!frozen ? <button type="button" className="secondary-button" disabled={busy || !!recovery} onClick={() => void prepare()}>{busy ? "正在处理…" : mode === "current" ? "在线核验并准备证据" : "准备所选历史证据"}</button> : null}
-      </section> : !target && !run ? <p>从轮胎卡片、规格比较、正式召回公告或测试事件选择证据开始；也可以查看下方本会话调用记录。</p> : null}
+      </section> : !target && !run ? <p>从轮胎卡片、规格比较、正式召回公告、Safety Gate 告警或测试事件选择证据开始；也可以查看下方本会话调用记录。</p> : null}
       {fallback?.data_state === "consent_required" ? <section className="consent-box" aria-label="AI 历史证据授权"><h3>在线核验失败</h3><p>是否仅为本次分析读取该查询的历史快照？同意后仍标记为 LOCAL SNAPSHOT。</p><div className="compare-toolbar"><button className="secondary-button" disabled={busy} onClick={() => void consent("allow")}>仅本次使用历史快照</button><button className="text-button" disabled={busy} onClick={() => void consent("deny")}>拒绝使用历史数据</button></div></section> : null}
       {pack ? <>
         <RecallAnalysisBoundary boundary={pack.recall_boundary} pending={recallPack} />
+        <SafetyGateAnalysisBoundary boundary={pack.safety_gate_boundary} pending={safetyGatePack} />
         <TestAnalysisScope boundary={pack.test_boundary} pending={testPack} />
         <section className="snapshot-banner"><strong>{pack.source_state === "snapshot" ? "LOCAL SNAPSHOT · 历史证据" : "已在线核验的所选证据"}</strong><span>准备时间 {stamp(pack.created_at)} · 提交有效期至 {stamp(pack.expires_at)} · {pack.privacy_class === "public" ? "公开来源证据" : "非公开工作区证据"}</span></section>
         <details className="ai-evidence" open><summary>查看 {pack.evidence.length} 条来源与 {pack.facts.length} 个字段</summary>{pack.evidence.map(e => <section key={e.id} id={`ai-source-${e.id}`}><h3>{e.id} · {e.label}</h3>{e.kind === "tire" || e.identity_contract ? <IdentityContractEvidence contract={e.identity_contract} historical /> : null}<p>观察 {stamp(e.observed_at)} · 验证 {stamp(e.verified_at)}{e.revision ? ` · 修订 #${e.revision}` : ""}</p><p>{sourceLink(e.source_url) ? <a href={sourceLink(e.source_url)} target="_blank" rel="noopener noreferrer">打开原始来源</a> : "来源链接不可打开"} · {e.parser_version || "人工录入 / 车型证据"}</p>
           <RecallEvidenceMeta evidence={e} />
+          <SafetyGateEvidenceMeta evidence={e} />
+          {isSafetyGateEvidence(e) ? <SafetyGateCitation key={`${pack.id}:${e.id}`} evidence={e} /> : null}
           {e.original_text ? <OriginalTextCitation key={`${pack.id}:${e.id}`} selection={e.original_text.selection} retainedAt={e.retained_at} /> : null}
           {e.kind === "change_event" ? <div className="ai-change-provenance"><p className="review-boundary">这是 {stamp(e.change_observed_at)} 记录的历史变化。首次观察不代表新发布，后快照也不代表当前在线参数。</p><dl>
             <div><dt>变化前快照</dt><dd>{e.previous_snapshot_id ? <><code>{e.previous_snapshot_id}</code><br />观察 {stamp(e.previous_observed_at)}{e.previous_source_url && sourceLink(e.previous_source_url) ? <> · <a href={sourceLink(e.previous_source_url)} target="_blank" rel="noopener noreferrer">打开变化前来源</a></> : null}<br /><span>SHA-256 {e.previous_raw_hash || "未记录"}</span></> : "此前没有已采纳快照，不能据此推断厂商刚发布。"}</dd></div>
             <div><dt>变化后快照</dt><dd><code>{e.snapshot_id}</code><br />观察 {stamp(e.observed_at)}<br /><span>SHA-256 {e.raw_hash || "未记录"}</span></dd></div>
           </dl></div> : null}
-          <details><summary>证据字段</summary><dl>{pack.facts.filter(f => f.evidence_id === e.id).map(f => <div key={f.id} id={`ai-fact-${f.id}`} tabIndex={-1}><dt>{f.id} · {f.field}<RecallFactScope fact={f} evidence={e} /></dt><dd>{f.text}</dd></div>)}</dl></details></section>)}</details>
+          <details><summary>证据字段</summary><dl>{pack.facts.filter(f => f.evidence_id === e.id).map(f => <div key={f.id} id={`ai-fact-${f.id}`} tabIndex={-1}><dt>{f.id} · {f.field}<RecallFactScope fact={f} evidence={e} />{f.domain === "safety_gate" ? <small>告警 {f.record_key} 的原始字段</small> : null}</dt><dd>{f.text}</dd></div>)}</dl></details></section>)}</details>
         <FrozenFieldResolutions resolutions={pack.field_resolutions} policy={pack.field_policy} context="prepared" />
         {pack.conflicts.length ? <section className="source-conflict"><strong>所选证据存在 {pack.conflicts.length} 项未解决冲突</strong><details><summary>原始冲突记录</summary><pre>{JSON.stringify(pack.conflicts, null, 2)}</pre></details></section> : null}
         <div className="variant-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => setReportSave({ pack })}>保存证据报告</button>{canExportAIAnalysis(run) && run.pack_id === pack.id ? <button type="button" className="secondary-button" disabled={busy} onClick={() => setReportSave({ pack, analysis: run })}>保存含分析的报告</button> : null}</div>
@@ -263,7 +274,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
       {run && (!stream || run.state === "completed") ? <section className="ai-result" aria-label="AI 分析结果"><h3>{states[run.state]}</h3><p>{run.question}</p><small>{run.model} · {stamp(run.created_at)} · {run.usage ? `${run.usage.total_tokens} tokens` : `用量未确认，保留 ${run.reserved_tokens} tokens 预留`}</small>
         {run.error_code ? <p role="alert">{errors[run.error_code] || run.error_code}</p> : null}
         {run.answer ? <TestAnalysisScope boundary={run.answer.test_boundary} historical={testPack && !run.answer.test_boundary} /> : null}
-        {canExportAIAnalysis(run) ? <><RecallAnalysisBoundary boundary={run.answer.recall_boundary || pack?.recall_boundary} pending={recallPack} />{run.answer.claims.filter(claim => (!recallPack && !run.answer.test_boundary) || claim.type === "fact").map((claim, index) => <article className={`ai-claim ${claim.type}`} key={index}><strong>{claim.type === "fact" ? "证据原始字段" : "模型推断 · 需人工核对"}</strong><p>{claim.text}</p><div className="compare-toolbar">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} onClick={() => revealFact(id)}>核对 {id}</button>)}</div></article>)}{!recallPack && !run.answer.test_boundary && run.answer.uncertainty ? <div className="ai-claim inference"><strong>模型报告的不确定性 · 需核对</strong><p>{run.answer.uncertainty}</p></div> : null}<p className="review-boundary">{run.answer.notice}</p></> : null}
+        {canExportAIAnalysis(run) ? <><RecallAnalysisBoundary boundary={run.answer.recall_boundary || pack?.recall_boundary} pending={recallPack} /><SafetyGateAnalysisBoundary boundary={run.answer.safety_gate_boundary || pack?.safety_gate_boundary} pending={safetyGatePack} />{run.answer.claims.filter(claim => (!recallPack && !safetyGatePack && !run.answer.safety_gate_boundary && !run.answer.test_boundary) || claim.type === "fact").map((claim, index) => <article className={`ai-claim ${claim.type}`} key={index}><strong>{claim.type === "fact" ? "证据原始字段" : "模型推断 · 需人工核对"}</strong><p>{claim.text}</p><div className="compare-toolbar">{claim.fact_ids.map(id => <button type="button" className="text-button" key={id} onClick={() => revealFact(id)}>核对 {id}</button>)}</div></article>)}{!recallPack && !safetyGatePack && !run.answer.safety_gate_boundary && !run.answer.test_boundary && run.answer.uncertainty ? <div className="ai-claim inference"><strong>模型报告的不确定性 · 需核对</strong><p>{run.answer.uncertainty}</p></div> : null}<p className="review-boundary">{run.answer.notice}</p></> : null}
         {run.state === "pending" || run.state === "outcome_unknown" ? <><p>未确认完成的调用不会自动重试。请核对调用记录及供应商用量；结果未知不代表未计费。</p><button className="secondary-button" disabled={busy} onClick={() => void openRun(run.id)}>刷新这条调用记录</button></> : target ? <button className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}
       </section> : null}
       {stream && run && ["failed", "outcome_unknown"].includes(run.state) && target ? <button type="button" className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}

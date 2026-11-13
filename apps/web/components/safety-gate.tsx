@@ -7,6 +7,8 @@ import { DataTree } from "./reparse-review";
 import { useSourceAccess } from "./source-status";
 import { SafetyGateMonitoring } from "./safety-gate-monitoring";
 import QueryFallbackPolicy from "./query-fallback-policy";
+import type { AITarget } from "./ai-analysis";
+import { safetyGateTarget } from "./safety-gate-ai-values";
 import { safetyGateEventNames as eventNames } from "./safety-gate-values";
 
 type Slot = "catalog" | "report";
@@ -14,7 +16,7 @@ type Pending = { query: SafetyGateQuery; slot: Slot; queryId: string };
 const sourceId = "eu-safety-gate";
 const failure = (cause: unknown) => cause instanceof Error ? cause.message : "Safety Gate操作未完成。";
 
-export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolean }) {
+export default function SafetyGatePanel({ sessionReady, onAnalyze }: { sessionReady: boolean; onAnalyze?: (target: AITarget) => void }) {
   const access = useSourceAccess();
   const generation = access.get(sourceId)?.management.access_generation;
   const [history, setHistory] = useState(false);
@@ -184,6 +186,11 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
         <DataTree label="官方风险原文" value={alert.fields.danger} />
         <DataTree label="官方措施原文" value={alert.fields.measures} />
         <DataTree label="完整官方字段与图片来源地址" value={{ ...alert.fields, pictures: alert.pictures }} />
+        {onAnalyze && result ? <button type="button" className="secondary-button" disabled={busy || !sessionReady || !safetyGateTarget(result, alert.alert_id)} onClick={() => {
+          const target = safetyGateTarget(result, alert.alert_id);
+          if (target) onAnalyze({ safetyGate: target, label: `${target.query.reference} · ${alert.case_number}`,
+            defaultQuestion: "整理所选历史告警的官方事实与措施，不推断具体轮胎适用性或安全性。" });
+        }}>分析此告警原始事实</button> : null}
         <button type="button" className="text-button" disabled={busy || !sessionReady} onClick={() => void showAlertHistory(alert.alert_id)}>读取告警版本与变化</button>
         <a href={alert.source_url} target="_blank" rel="noreferrer">打开官方告警 {alert.case_number}</a>
       </article>)}
@@ -207,6 +214,11 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
         {observation.event ? <p>{eventNames[observation.event.kind]}</p> : null}
         {observation.event && Object.keys(observation.event.changes).length ? <DataTree label="变化前后字段" value={observation.event.changes} /> : null}
         <DataTree label="规范化告警内容与指纹" value={{ content_hash: observation.revision.content_hash, alert: observation.revision.alert }} />
+        {onAnalyze ? <button type="button" className="secondary-button" disabled={busy || !sessionReady} onClick={() => onAnalyze({
+          references: [{ kind: "safety_gate", snapshot_id: observation.snapshot_id, alert_id: observation.revision.alert.alert_id }],
+          label: `${observation.report.reference} · ${observation.revision.alert.case_number} · 内容版本 ${observation.revision.revision}`,
+          defaultQuestion: "整理所选历史告警版本的原始事实与措施，不判断当前状态或实物适用性。",
+        })}>分析此历史告警版本</button> : null}
         <button type="button" className="text-button" disabled={busy} onClick={() => void showEvidence(observation.snapshot_id)}>查看此观察原件</button>
       </article>)}
       {alertHistory.total > alertHistory.limit ? <div className="reparse-pages">

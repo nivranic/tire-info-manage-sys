@@ -4,6 +4,7 @@ import type { AIAnalysisReference, AIPackReference, AIPrepareRequest, KnowledgeS
 // bindings: a newer raw snapshot can legitimately reuse a semantic revision.
 export function aiReferenceKey(reference: AIAnalysisReference): string {
   switch (reference.kind) {
+    case "safety_gate": return JSON.stringify([reference.kind, reference.snapshot_id, reference.alert_id]);
     case "recall": return JSON.stringify([reference.kind, reference.snapshot_id, reference.recall_revision_id]);
     case "tire": return JSON.stringify([reference.kind, reference.snapshot_id, reference.variant_id]);
     case "vehicle": return JSON.stringify([reference.kind, reference.snapshot_id]);
