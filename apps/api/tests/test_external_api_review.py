@@ -796,6 +796,11 @@ def predecessor(factory, monkeypatch):
     database.close()
 
 
+LATER_TEXT_SEARCH_TABLES = {prefix + suffix
+    for prefix in ('source_text_fts', 'document_text_fts')
+    for suffix in ('', '_data', '_idx', '_content', '_docsize', '_config')}
+
+
 def test_023_migration_preserves_predecessor_ddl_rows_and_is_idempotent(predecessor):
     from historical_migration_support import (assert_target_delta, initialize_observing_version,
                                                snapshot_connection)
@@ -811,13 +816,16 @@ def test_023_migration_preserves_predecessor_ddl_rows_and_is_idempotent(predeces
     database.initialize()
     after = schema_snapshot(database)
     assert first == after
-    assert after['tables'] - before['tables'] == new_tables
+    # The exact 023 delta is observed above; current initialization also adds
+    # the independently enumerated source/document FTS5 projections.
+    assert after['tables'] - before['tables'] == new_tables | LATER_TEXT_SEARCH_TABLES
     assert not before['tables'] - after['tables']
     assert [row for row in after['schema'] if row[2] in before['tables']] == [row for row in before['schema'] if row[2] in before['tables']]
     assert after['versions'] == EXPECTED_SCHEMA_VERSIONS
     for table in before['tables'] - {'tire_schema_versions'}:
         assert after['rows'][table] == before['rows'][table], table
     assert all(after['rows'][table][0] == 0 for table in new_tables)
+    assert all(after['rows'][table][0] == 0 for table in ('source_text_fts', 'document_text_fts'))
     with database.engine.connect() as connection:
         assert connection.exec_driver_sql('PRAGMA integrity_check').scalar_one() == 'ok'
         assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
@@ -837,6 +845,6 @@ def test_023_migration_failure_rolls_back_new_tables_triggers_and_version(predec
             database.initialize()
     assert schema_snapshot(database) == before
     database.initialize()
-    assert schema_snapshot(database)['tables'] - before['tables'] == new_tables
+    assert schema_snapshot(database)['tables'] - before['tables'] == new_tables | LATER_TEXT_SEARCH_TABLES
 
 

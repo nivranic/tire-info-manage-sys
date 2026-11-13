@@ -1,6 +1,6 @@
 # 外部只读 API 与凭据管理
 
-R79 提供本机服务上的账户 API Key、来源目录与本人 Webhook 投递历史。它保持 loopback／TrustedHost 限制，没有开启公网部署。轮胎事实查询、比较、AI、原件导出和外部写 API 尚未接入这套 Key。
+本机服务提供账户 API Key、来源目录、本人 Webhook 投递历史，以及受许可的轮胎事实与 Safety Gate 周报告警读取。它保持 loopback／TrustedHost 限制，没有开启公网部署。比较、AI、原件导出和外部写 API 尚未接入这套 Key。轮胎接口详见[事实读取合同](EXTERNAL-FACT-API.md)，Safety Gate 合同见下文。
 
 在“我的关注”的监控区域打开“外部 API 凭据”。创建时选择权限、有效期并勾选授权；首次成功只显示一次密钥。界面关闭显示后无法重读。密钥不进入 LocalStorage、SessionStorage、URL 或文档；本地恢复指针只保存账户 ID 与操作 UUID。
 
@@ -10,6 +10,8 @@ R80 将管理库存拆成“本人全部有效密钥”和“密钥签发历史�
 |---|---|
 | `sources:read` | `GET /external/v1/sources` |
 | `webhooks:read` | `GET /external/v1/webhook-deliveries`、`GET /external/v1/webhook-deliveries/{id}` |
+| `facts:read` | `GET /external/v1/tire-facts`、`GET /external/v1/tire-facts/{variant_id}`，另需冻结归属及字段许可 |
+| `safety-gate:read` | `GET /external/v1/safety-gate-reports/{report_id}/alerts`，另需本人成功周报查询及字段许可 |
 
 每账户最多16把有效 Key，期限1–90天。撤销即时阻止后续请求；到期、账户删除或 HTTP／CLI 重置密码也使凭据失效。注销本机会话不会撤销已授予应用的 Key。轮换时先创建新 Key，确认应用使用后撤销旧 Key。
 
@@ -40,7 +42,7 @@ R80 将管理库存拆成“本人全部有效密钥”和“密钥签发历史�
 
 ## 分页与数据含义
 
-两个外部Bearer列表均返回 `{schema,items,next_cursor,limit,data_state:"local_snapshot"}`。`limit`默认20、范围1–100；最后页`next_cursor=null`。后续页使用原limit、过滤及cursor，不能跨Key、账户或端点复用。未知／重复参数、损坏cursor均拒绝。游标签名不加密数据，其owner绑定使用逐Key HMAC承诺值，payload不包含原user ID。15分钟有效期从第一页起固定，不随翻页延长。
+来源目录与Webhook两个外部Bearer列表均返回 `{schema,items,next_cursor,limit,data_state:"local_snapshot"}`。这两个列表的`limit`默认20、范围1–100；最后页`next_cursor=null`。后续页使用原limit、过滤及cursor，不能跨Key、账户或端点复用。未知／重复参数、损坏cursor均拒绝。游标签名不加密数据，其owner绑定使用逐Key HMAC承诺值，payload不包含原user ID。15分钟有效期从第一页起固定，不随翻页延长。轮胎事实与Safety Gate另有更严格的页面容量限制。
 
 来源目录只含 `id/name/source_class/region/parser_version/status`。ID最多80个安全字符，其余字段null或最多500个可打印Unicode码点。它描述适配器目录，不证明实时来源可达。目录摘要变化返回409 `external_catalog_changed`，从第一页重读。
 
@@ -61,6 +63,39 @@ const first = await api.sources({ limit: 20 });
 // 后续页沿用limit；first.next_cursor为null时停止。
 ```
 
-示例为服务器／可信本机程序。应用必须把transport固定到可信服务origin，不能让用户或远程内容选择接收凭据的目标。SDK仅发送GET，使用credentials=omit、no-store、redirect=error及no-referrer，不自动重试；响应最多1MiB，严格校验DTO与投递正文摘要。HTTP／传输异常使用无凭据文案。
+示例为服务器／可信本机程序。应用必须把transport固定到可信服务origin，不能让用户或远程内容选择接收凭据的目标。SDK仅发送GET，使用credentials=omit、no-store、redirect=error及no-referrer，不自动重试；来源／Webhook响应最多1MiB，轮胎事实按其专属合同限额，Safety Gate每页最多2MiB。严格校验DTO与投递正文摘要，HTTP／传输异常使用无凭据文案。
 
-023迁移只在新GUID私库验证。正常数据库未迁移；PostgreSQL运行、生产TLS／代理／IAM／RLS、分布式网关和完整外部CRUD仍待独立交付。R79基础与迁移边界见[第79轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-79-external-api.md)，R80库存补修及当前验收见[第80轮报告](E:/Mix/project/tire-info-manage-sys/docs/assurance/evidence/round-80-api-key-inventory.md)。
+023迁移的历史私库验证见[第79轮报告](assurance/evidence/round-79-external-api.md)，R80库存补修见[第80轮报告](assurance/evidence/round-80-api-key-inventory.md)。当前受管外部事实Reader仍为SQLite实现，生产TLS／IAM／RLS、分布式网关和完整外部CRUD仍待独立交付；普通业务PostgreSQL的其他验收不能替代正式外部Reader验证。
+
+## Safety Gate受许可周报告警
+
+请求为 `GET /external/v1/safety-gate-reports/{report_id}/alerts?mode=history&query_id=…&limit=20&cursor=…`。report_id沿官方数字身份；query_id必须来自当前Key所属账户的新成功周报查询，包含正常304重核验。匿名旧查询、失败请求、索引查询与历史回退不能替代成功周报查询。limit为1–20、默认20；未知／重复参数422，缺失或无权材料统一404。
+
+需要同时满足新scope、冻结查询归属和当前受管字段许可。旧Key不自动取得scope；Key最多包含四种受支持scope。账户、Key撤销／过期、许可头与证据在每页新鲜SQLite读事务中重核；请求不抓取、不继承Cookie或持续回退授权。许可变化使旧窗口失效，仍获准的新头返回409 `external_safety_gate_window_changed`，撤回许可返回404。游标固定15分钟到期，损坏／过期或跨Key／query／report／limit复用返回422。未配置grant或许可不覆盖时统一404；不支持的Reader后端返回503。
+
+服务端通过 `create_app(external_safety_gate_grant=...)` 配置固定grant ID，来源固定为eu-safety-gate；默认未配置，不能从客户端指定grant。管理员沿[许可账本流程](EXTERNAL-FACT-GOVERNANCE.md)预览并确认具体Snapshot／Parser／原件哈希与字段范围。官方CC0元信息可以作为审核材料，但不会自动批准或绕过账本；哈希本身不是权利证明。
+
+所有成功投影必须获准以下14个身份／证据字段：
+
+```text
+identity.report_id, identity.report_reference, identity.alert_id, identity.case_number
+evidence.report_published_date, evidence.alert_published_date, evidence.alert_source_url
+evidence.source_id, evidence.snapshot_id, evidence.raw_hash, evidence.parser_version
+evidence.source_url, evidence.observed_at, evidence.verified_at
+```
+
+其余19个可选字段均使用 `facts.` 前缀：category、product、brand、name、model_number、batch_number、barcode、risk_type、danger、measures、recall_url、description、notifying_country、country_of_origin、type、level、online_trader、company_recall_code、production_dates。只输出许可覆盖的字段；获准但源值未知的字段保留null。官方原文仍是源声明，不生成轮胎SKU适配或解除风险结论。
+
+响应schema为 `external-safety-gate-alert-page@1`，包含query_id、report、observation、items、limit及next_cursor，固定 `data_state=local_snapshot`、`source_refresh_performed=false`。每项包含原生alert_id、case_number、published_date、source_url、`applicability=not_assessed`及获准facts。它不返回XML正文、图片、账户ID、私人规则或许可审核原文。每份XML／文档物化前分别限8MiB，累计存储读取限32MiB，沿受管预算限制行数／JSON深度／节点，最终页面限2MiB。合法大字段超限时拒绝整页，可由调用方明确选择更小limit重新读取。
+
+```ts
+const page = await api.safetyGateAlerts({
+  report_id: "10000331", query_id: process.env.TI_OWNED_QUERY_ID!,
+  mode: "history", limit: 20,
+});
+// 后续页带上page.next_cursor并保持query_id、report_id与limit不变。
+```
+
+SDK冻结请求字段，校验闭合DTO、固定来源URL、身份、证据时间、字段白名单和游标页序；跨页保持窗口与到期时间，不自动重试。SDK只能校验签名游标的形状，HMAC权限验证由服务端执行。支持AbortSignal，即便传输或流取消不响应，也不会无限等待。
+
+2026-11-13验收覆盖正常HTTP、官方历史XML、官方许可元数据、共享SDK及生产Web签发／读取／撤销；没有实时官网或模型调用，没有公网／正式PG／Native验收，详见[本阶段记录](assurance/evidence/safety-gate-external-api-2026-11-13.md)。

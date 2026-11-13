@@ -7,7 +7,7 @@
 - 原规格按 **12 个核心模块、10 项发布 Gate、13 项 SLO、15 项待确认决策**组织；这些是不同维度，不能相加当作独立需求总数。12 个模块均有工程实现，完整发布验收仍未闭合，不能给出可靠的整体完成百分比。
 - 已有在线查询、精确身份与冲突、比较、测试事件、证据保存、监控、账户与偏好、AI 证据链及外部权限工程。当前参数来源覆盖 11 个区域目录、7 个厂商品牌，另有 NHTSA、EU Safety Gate 与小米车型来源；可信 Parser 目录 15 项。
 - 最近已交付 Safety Gate 周报证据、逐告警版本／变化历史、监控调度／应用内提醒／任务 SSE、独立的索引与周报持续回退权限。
-- 本次交付点为 **Safety Gate 查询归属与受管许可绑定**。外部告警读取 API、专用 scope、分页、SDK 和管理界面尚未接通。
+- 本次交付点为 **Safety Gate 外部受许可读取**：查询归属、许可绑定、专用 scope、固定窗口分页、共享 SDK 和 Web Key 管理已接通，后端仍限定受管 SQLite。
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 
 ## 用户已确定的边界
@@ -32,31 +32,34 @@
 | 证据浏览 | 快照／哈希／Parser、原件、HTML／PDF 正文、引用恢复 | 部署旧库切换、完整许可治理、生产对象存储 |
 | 个性化 | 车库、关注、偏好、保存比较、非 SKU 兴趣 | 跨设备、长期运行与真实推荐质量 |
 | AI 研究 | grounding、流式、报告、正文证据包、FTS／向量／融合检索与评估 | 真实 Responses／Embeddings 语义、代表性检索质量与模型治理 |
-| 对外能力 | REST、SSE、SDK、Webhook、Key、轮胎事实许可读取 | Safety Gate 外部 API、正式 PG Reader、公网接收端、SDK 产品化、完整 WebSocket |
+| 对外能力 | REST、SSE、SDK、Webhook、Key、轮胎事实许可读取 | 正式 PG Reader、公网接收端、SDK 产品化、完整 WebSocket |
 | 管理后台 | Parser 健康／发布回滚、隔离、失败任务、纠错与审计 | 生产 IAM／租户／RLS、完整角色治理、灾备与发布验收 |
 
 ## 本次代码交付点
 
-起点是已发布的 `d8a42a1146ca2684fcce5c3534eae1e64e8aa059`。交付提交使用 `feat: bind Safety Gate query ownership and license evidence`，最终完整 SHA 以 Git 和交付消息为准。
+起点是已发布的 `7714db8074727198f143941d63f9c42fb02d5ec3`，本轮提交标题为 `feat: expose licensed Safety Gate alert pages`；最终SHA以Git和交付消息为准。
 
-- `apps/api/tire_api/safety_gate.py`：普通登录查询在干净会话中捕获账户，以既有机制原子保存查询、审计及不可变 owner 收据。匿名旧查询不追认、会话换绑不转移归属，单次 consent 不新增归属。失败尝试有 owner 不等于成功核验。
-- `apps/api/tire_api/external_fact_governance.py`：固定 `eu-safety-gate` 分支使用自己的 Snapshot／Verification 表校验指定周报、原件与文档摘要、查询、Parser 和成功状态；保持原许可 receipt 结构，仍走管理员预览／确认账本。索引不能按周报告警审批，CC0 声明不绕过受管审批。
-- 新增 `test_safety_gate_query_ownership.py` 和 `test_safety_gate_external_governance.py`，并登记受管回归入口。没有新增数据库表或外部路由。
-- 归属读写和外部受管 Reader 仍受既有 SQLite 限制；普通 PostgreSQL 查询可以运行，但不能因此宣称正式 PostgreSQL 外部读取已实现。本次没有执行 PG 验收。
+- 新增 `apps/api/tire_api/external_safety_gate.py`：源专属受管Reader、闭合字段投影、每页权限／证据重验、签名分页与HTTP路由。服务端配置固定grant ID，默认未配置，不由客户端指定。
+- 新增独立 `safety-gate:read`，同步后端／旧Reader／SDK的四scope兼容；普通查询归属与许可账本沿用上一交付点，不新增表。
+- 新增共享类型及 `api.safetyGateAlerts`，请求冻结、2MiB响应限制、严格DTO／游标校验及取消。Key界面新增独立选项，提示Key还需具体材料及字段许可。
+- 每页要求本人成功 `query_id`、`mode=history`，limit为1–20，固定15分钟游标；保留原生身份、原件哈希／时间和未知适用性。不会抓取、继承Cookie或持续回退授权。
+- 正式PostgreSQL外部Reader仍未实现；其锁、物化SQL、凭据／归属合同需专门验证。普通PG业务的既有回执不能替代这一验收。
 
-本次八模块 **143／143 通过**，818 个源码输入稳定、自有资源关闭、非自检拒绝 0；原始失败和修正见[交付点验收记录](assurance/evidence/safety-gate-external-foundation-2026-11-13.md)。此前持续回退的 API 116、SDK 7、Web 55、三端类型、构建、PG 34、HTTP 26、生产 Web 45 项属于上一阶段证据，本次未重跑前端／浏览器／PG，不混用成新改动验收。
+本轮后端13模块 **344／344通过**，823输入稳定、资源关闭、非自检拒绝0。新SDK8组与四组旧SDK、三端类型、Web55项和417输入生产构建通过。官方历史XML与CC0元信息走正常Parser／受管审批后，HTTP28项及SDK四页75条告警通过；生产Web完成Key签发／消费／撤销和1440／390／320布局。
+
+关闭前15项、关闭后11项核对通过：185表指纹保留，原件／许可／归属完整，Parser Windows Job已完成并回收。两把测试Key撤销、grant撤回，API／Web及端口关闭。材料为保存的官方XML，真实来源／模型调用0，实时官网和PG／Native未验。[完整验收与原始失败](assurance/evidence/safety-gate-external-api-2026-11-13.md)
 
 ## 接手后优先做什么
 
-1. 核对 `main`、HEAD、工作区、实时远端，读本卡与[外部读取计划](plans/2026-11-13-safety-gate-external-api.md)。先确认本次回归和源码绑定，再继续计划步骤 3。
-2. 实现源专属 Reader 与 `GET /external/v1/safety-gate-reports/{report_id}/alerts`。要求本人成功 `query_id` 与 `mode=history`；不抓取、不继承 Cookie 或持续回退权限。
-3. 新增独立 `safety-gate:read` scope，固定服务端 grant 路由。每页在新鲜受管事务中重验 Bearer、账户、冻结归属、许可头、快照及字段范围；游标绑定 Key、owner 承诺、路由、query、report、limit、快照与许可头，15 分钟固定到期。
-4. 定稿闭合 DTO 与许可字段映射、输入／物化／响应容量上限。保留 `local_snapshot`、原生告警 ID、证据哈希／时间与未知适用性，禁止透传 XML、私人规则、账户 ID、许可审核原文。联动旧 scope 数量限制，避免破坏旧 Key。
-5. 接共享类型、SDK 严格响应校验、API Key 界面与文档。覆盖跨账户、匿名旧查询、失败／索引查询、撤销、错绑、分页重放、容量、并发及旧轮胎接口兼容。
-6. 完成真实许可材料、正常 HTTP、生产 Web 签发／撤销／消费和资源关闭验收；新源码独立绑定，保留所有失败记录后再宣称外部链路接通。
-7. 并行方向由接手 agent 按授权安排：继续 P0 来源、专业材料／精确 SKU、人工 Golden 与质量输入、Safety Gate AI／Native 和自然长周期。凭据齐备后首先验收 OpenAI Responses，显式设置 `TI_AI_PROVIDER=openai_responses` 并核对 `/v1/ai/status`。
+1. 核对main、HEAD、工作区与实时远端，读本卡、[外部API合同](EXTERNAL-API.md)及上述验收；新clone重建依赖和材料，不把本机私槽视为已随Git交付。
+2. 继续Safety Gate的AI证据引用和Native业务消费，复用原生告警身份、用途授权及同意机制；告警适用性保持待核对，不把它转换成精确SKU推荐。
+3. 为正式PG外部Reader单独设计与验证事务锁、物化预算、冻结归属和并发撤销语义。当前明确返回不支持，不能直接撤掉SQLite检查。
+4. 验证监控自然长周期、多规则、真实变化提醒和通知lag；本轮外部读取、此前模拟到期均不证明这些指标。继续其他P0官方渠道、地区与SKU参数覆盖。
+5. 扩充专业原件及复用许可、精确SKU身份、独立标注与真人Golden；继续代表性检索／重排质量输入和完整性能解释。
+6. 凭据齐备后首先执行真实OpenAI Responses及Embeddings语义验收。显式设置 `TI_AI_PROVIDER=openai_responses` 并核对 `/v1/ai/status`；缺凭据时推进独立工程。
+7. 收敛生产IAM／租户／RLS、六类平台、WCAG读屏、安全、性能、迁移／回退和灾备Gate，按实际验收逐项记录，不按已有实现推定完成。
 
-关键复用入口：`query_ownership.py`、`external_fact_governance.py`、`external_fact_reader.py`、`external_api.py`、`safety_gate.py`、`packages/domain-types/src/external-api.ts`、`packages/api-client/src/external-api.ts`、`apps/web/components/api-keys.tsx`。新增 scope 时需同时核对后端 Key、Reader 与 SDK 的三 scope 上限。
+关键入口：`external_safety_gate.py`、`external_api.py`、`external_fact_reader.py`、`external_fact_governance.py`、`query_ownership.py`、`packages/api-client/src/external-safety-gate.ts`、`packages/domain-types/src/external-api.ts`、`apps/web/components/api-keys.tsx`。详细配置和字段许可键见外部API合同。
 
 ## 发布仍未闭合
 
@@ -68,10 +71,10 @@
 
 ## 验收与资料保留规则
 
-- `.artifacts/`、原件、私库、凭据、依赖和构建产物不入 Git；新 clone 必须重建运行环境与验收材料。本次新增验证只用合成材料，没有真实模型调用。
+- `.artifacts/`、原件、私库、凭据、依赖和构建产物不入 Git；新 clone 必须重建运行环境与验收材料。本次回归使用合成材料，正常链路另使用已保存的官方XML及许可元数据；没有真实模型调用。
 - 不修改原规格字节；`docs/HANDOFF.md` 自 `## 当前交接入口（2026-10-26）` 起历史尾文保持封存。既有 KIT C2 UUID `9539e5d2-d28e-439e-a6c0-c2d4aea2bfc0` 保持 `processing_unconfirmed`，不重 POST、不重开私槽、不换 UUID 抓取。
 - 提交前检查源码绑定、差异与个人信息；推送前审查上游到 HEAD 的提交序列，推送后独立核对远端 SHA 和工作区。阶段完成不能将完整 V1 标记完成。
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-CURRENT.md、原始规格和 Safety Gate 外部读取计划。当前最新交付仅完成查询归属与许可证据绑定；从源专属外部 Reader、scope、分页、SDK 和 Web 开始，补正常链路及真实许可材料验收。OpenAI Responses 是用户选定的首个真实 AI 接口，Gemini 仅是历史可选适配器。缺 OpenAI／EPREL 凭据时推进独立工作，不反复询问。保留所有历史失败、KIT C2 封存和材料许可边界；12 模块、10 Gate、13 SLO、15 决策仍需逐项完成。沿 main 工作，不自行创建分支／worktree 或使用代理；每次交付写清实际验证、未验边界和下一步。
+> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-CURRENT.md、原始规格和 Safety Gate 外部读取计划。当前已接通Safety Gate受许可外部Reader、scope、分页、SDK和Web Key管理，正常历史材料链路已验收；继续AI／Native消费、正式PG Reader、长期监控及其余V1 Gate。OpenAI Responses 是用户选定的首个真实 AI 接口，Gemini 仅是历史可选适配器。缺 OpenAI／EPREL 凭据时推进独立工作，不反复询问。保留所有历史失败、KIT C2 封存和材料许可边界；12 模块、10 Gate、13 SLO、15 决策仍需逐项完成。沿 main 工作，不自行创建分支／worktree 或使用代理；每次交付写清实际验证、未验边界和下一步。

@@ -98,7 +98,8 @@ def allowed_origins() -> list[str]:
 
 
 def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
-               external_fact_routing: dict[str, str] | None = None) -> FastAPI:
+               external_fact_routing: dict[str, str] | None = None,
+               external_safety_gate_grant: str | None = None) -> FastAPI:
     from .material_source_policy import load_policies
     from .material_source_transport import MaterialSourceTransport
     material_policies = load_policies()
@@ -163,7 +164,9 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
     from .external_fact_reader import OwnedFactReader
     fact_reader = OwnedFactReader(database.engine,
         {} if external_fact_routing is None else external_fact_routing, adapter_registry)
-    register_external_api_routes(app, fact_reader=fact_reader)
+    from .external_safety_gate import SafetyGateReader
+    safety_gate_reader = SafetyGateReader(database.engine, external_safety_gate_grant)
+    register_external_api_routes(app, fact_reader=fact_reader, safety_gate_reader=safety_gate_reader)
     from .source_settings import register_source_setting_routes
     register_source_setting_routes(app)
     from .vehicles import register_vehicle_routes

@@ -7,7 +7,7 @@ import { useWorkbenchAuth } from "./auth";
 import "./api-keys.css";
 
 const pointerName = "tire-api-key-pending@1";
-const labels: Record<ApiKeyScope, string> = { "sources:read": "读取来源目录", "webhooks:read": "读取本人 Webhook 投递引用", "facts:read": "获准轮胎事实读取权限" };
+const labels: Record<ApiKeyScope, string> = { "sources:read": "读取来源目录", "webhooks:read": "读取本人 Webhook 投递引用", "facts:read": "获准轮胎事实读取权限", "safety-gate:read": "读取本人获准的 Safety Gate 周报告警" };
 const stamp = (v: string) => new Date(v).toLocaleString("zh-CN");
 const message = (cause: unknown) => cause instanceof ApiError ? ({
   api_key_limit: "当前有效密钥已达上限，请先撤销不用的密钥。",
@@ -21,7 +21,8 @@ export default function ApiKeyCenter() {
   const auth = useWorkbenchAuth();
   return <section className="api-key-panel" aria-label="外部 API 凭据">
     <h3>外部 API 凭据</h3>
-    <p>按权限提供来源目录和本人 Webhook 投递引用。密钥等同所授予的读取权限，请仅交给可信应用。</p>
+    <p>按所选权限提供来源目录、本人 Webhook 投递引用和获准的 Safety Gate 周报告警。请仅把密钥交给可信应用。</p>
+    <p>周报告警还需要本人成功查询记录，以及管理员批准的具体材料和字段范围。创建密钥不会自动取得这些材料的许可。</p>
     {auth.ready && auth.state.authenticated ? <PrivateKeys key={auth.ownerEpoch} epoch={auth.ownerEpoch} /> : <p>登录并确认当前账户后可管理本人密钥。</p>}
   </section>;
 }
@@ -93,7 +94,7 @@ function PrivateKeys({ epoch }: { epoch: number }) {
       <fieldset disabled={locked} className="api-key-fields"><legend>创建读取密钥</legend>
         <label className="api-key-field">密钥名称<input value={name} onChange={e => { setName([...e.target.value].slice(0, 80).join("")); setConsent(false); }} maxLength={160} required autoComplete="off" /></label>
         <label className="api-key-field">有效期<select value={days} onChange={e => { setDays(Number(e.target.value)); setConsent(false); }}><option value={7}>7天</option><option value={30}>30天</option><option value={90}>90天</option></select></label>
-        {(["sources:read", "webhooks:read"] as ApiKeyScope[]).map(scope => <label className="api-key-check" key={scope}><input type="checkbox" checked={scopes.includes(scope)} onChange={e => { setScopes(v => e.target.checked ? [...v, scope].sort() : v.filter(s => s !== scope)); setConsent(false); }} />{labels[scope]}</label>)}
+        {(["sources:read", "webhooks:read", "safety-gate:read"] as ApiKeyScope[]).map(scope => <label className="api-key-check" key={scope}><input type="checkbox" checked={scopes.includes(scope)} onChange={e => { setScopes(v => e.target.checked ? [...v, scope].sort() : v.filter(s => s !== scope)); setConsent(false); }} />{labels[scope]}</label>)}
         <label className="api-key-check"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />允许持有密钥的应用在有效期内读取以上所选内容。</label>
         <button className="secondary-button" disabled={locked || !consent || !name.trim() || !scopes.length} type="submit">创建密钥</button>
       </fieldset>

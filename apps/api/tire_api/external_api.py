@@ -23,7 +23,7 @@ from .webhook_models import WebhookEnvelope
 from .webhook_policy import CHANNELS, strict_json
 from .webhooks import delivery_view
 
-SCOPES = ('sources:read', 'webhooks:read', 'facts:read')
+SCOPES = ('sources:read', 'webhooks:read', 'facts:read', 'safety-gate:read')
 SAFE_HEADERS = {'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'}
 TOKEN_PATTERN = re.compile(r'ti_([a-f0-9]{32})\.([a-f0-9]{64})')
 SOURCE_ID = re.compile(r'[A-Za-z0-9_-]{1,80}')
@@ -94,8 +94,15 @@ def authenticate_external(database, request):
     if match is None:
         unauthorized()
     hashed = hashlib.sha256(token.encode('ascii')).hexdigest()
+    def bounded_key(db):
+        from .external_fact_governance import GovernanceError, _reader_preflight
+        try:
+            _reader_preflight(db, ApiKey, ApiKey.id == match.group(1), limits={'scopes': 4096})
+            return db.get(ApiKey, match.group(1))
+        except (GovernanceError, ValueError, TypeError, RecursionError):
+            unauthorized()
     with database.sessions() as db:
-        row = db.get(ApiKey, match.group(1))
+        row = bounded_key(db)
         try:
             valid = (row is not None and _valid_key(row) and hmac.compare_digest(row.bearer_sha256, hashed)
                 and utc(row.expires_at) > utcnow() and _revocation(db, row.id) is None
@@ -106,7 +113,7 @@ def authenticate_external(database, request):
             unauthorized()
         QueryService(db, None).lock_ingestion()
         db.expire_all()
-        row = db.get(ApiKey, match.group(1))
+        row = bounded_key(db)
         try:
             valid = (row is not None and _valid_key(row) and hmac.compare_digest(row.bearer_sha256, hashed)
                 and utc(row.expires_at) > utcnow() and _revocation(db, row.id) is None
@@ -160,7 +167,8 @@ async def external_boundary(request, call_next, database, origins=()):
             return external_response('external_method_not_allowed', 405, {'Allow': 'GET'})
         if path not in ('/external/v1/sources', '/external/v1/webhook-deliveries', '/external/v1/tire-facts') and not re.fullmatch(
                 r'/external/v1/webhook-deliveries/[A-Za-z0-9_-]{1,64}', path) and not re.fullmatch(
-                r'/external/v1/tire-facts/[^/]+', path):
+                r'/external/v1/tire-facts/[^/]+', path) and not re.fullmatch(
+                r'/external/v1/safety-gate-reports/[^/]+/alerts', path):
             return external_response('external_not_found', 404)
     elif request.headers.getlist('authorization'):
         return external_response('external_bearer_route_required', 401, {'WWW-Authenticate': 'Bearer'})
@@ -272,7 +280,7 @@ class Acknowledged(StrictModel):
 
 class KeyCreate(Acknowledged):
     name: str = Field(min_length=1, max_length=80)
-    scopes: list[Literal['sources:read', 'webhooks:read', 'facts:read']] = Field(min_length=1, max_length=3)
+    scopes: list[Literal['sources:read', 'webhooks:read', 'facts:read', 'safety-gate:read']] = Field(min_length=1, max_length=4)
     expires_in_days: StrictInt = Field(ge=1, le=90)
 
     @field_validator('name')
@@ -291,13 +299,15 @@ class KeyCreate(Acknowledged):
         return sorted(value)
 
 
-def register_external_api_routes(app: FastAPI, *, fact_reader=None):
+def register_external_api_routes(app: FastAPI, *, fact_reader=None, safety_gate_reader=None):
     from .api_key_inventory import register_api_key_inventory_routes
     register_api_key_inventory_routes(app)
     # Older direct registration callers need no database or registry state.
     # A complete app injects its one reader; a missing reader fails closed.
     from .external_fact_http import register_external_fact_routes
     register_external_fact_routes(app, fact_reader)
+    from .external_safety_gate import register_external_safety_gate_routes
+    register_external_safety_gate_routes(app, safety_gate_reader)
 
     def get_db():
         with app.state.database.sessions() as db:

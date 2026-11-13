@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from .db import (AuditEvent, FactVersion, ManualFactRevision, QueryRun, Snapshot,
                  TireVariant, User, VariantLifecycleEvent, Verification, utc)
 from .domain import VariantInput, digest, stable_json
-from .external_api import TOKEN_PATTERN, _valid_key
+from .external_api import SCOPES, TOKEN_PATTERN, _valid_key
 from .external_api_models import ApiKey, ApiKeyRevocation
 from .external_fact_governance import GovernanceError, GovernanceStore, _reader_preflight
 from .external_tire_fact_projection import ProjectionResult, project_observation
@@ -106,7 +106,7 @@ class OwnedFactReader:
         hashed = hashlib.sha256(header[7:].encode("ascii")).hexdigest()
         return _Credential(match.group(1), hashed, self._marker)
 
-    def _authenticate(self, db, credential, now, *, budget=None, return_key=False):
+    def _authenticate(self, db, credential, now, *, budget=None, return_key=False, required_scope='facts:read'):
         if type(credential) is not _Credential or credential.reader_marker is not self._marker:
             _fail("reader_unauthorized")
         if budget is None:
@@ -115,7 +115,7 @@ class OwnedFactReader:
             _fail("reader_unauthorized")
         count_statement = select(func.json_array_length(ApiKey.scopes)).where(ApiKey.id == credential.key_id)
         count = db.scalar(count_statement) if budget is None else budget.scalar(db, count_statement)
-        if count is not None and (type(count) is not int or count > 3):
+        if count is not None and (type(count) is not int or count > len(SCOPES)):
             _fail("reader_capacity" if budget is None else "reader_unauthorized")
         key = (db.get(ApiKey, credential.key_id, populate_existing=True) if budget is None else
                budget.get(db, ApiKey, credential.key_id, limits={"scopes": 4096}))
@@ -135,7 +135,7 @@ class OwnedFactReader:
             valid = False
         if not valid:
             _fail("reader_unauthorized")
-        if "facts:read" not in key.scopes:
+        if required_scope not in SCOPES or required_scope not in key.scopes:
             _fail("reader_scope_required")
         return key if return_key else key.owner_user_id
 

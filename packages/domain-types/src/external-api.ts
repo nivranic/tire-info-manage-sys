@@ -1,6 +1,6 @@
 import type { WebhookChannel, WebhookDelivery, WebhookDeliverySummary } from "./webhooks";
 
-export type ApiKeyScope = "sources:read" | "webhooks:read" | "facts:read";
+export type ApiKeyScope = "sources:read" | "webhooks:read" | "facts:read" | "safety-gate:read";
 export interface ApiKeyRecord {
   schema: "api-key@1"; id: string; name: string; scopes: ApiKeyScope[];
   created_at: string; expires_at: string; revoked_at: string | null;
@@ -84,4 +84,25 @@ export interface ExternalTireFactPage {
   schema: "external-tire-fact-page@1"; items: ExternalTireFactProjection[];
   next_cursor: string | null; limit: number; data_state: "local_snapshot";
   source_refresh_performed: false;
+}
+
+/** Explicit historical read of one owned and licensed official weekly report. */
+export interface ExternalSafetyGateRequest {
+  report_id: string; query_id: string; mode: "history";
+  limit?: number; cursor?: string; signal?: AbortSignal;
+}
+export type ExternalSafetyGateFact = "category" | "product" | "brand" | "name" | "model_number"
+  | "batch_number" | "barcode" | "risk_type" | "danger" | "measures" | "recall_url"
+  | "description" | "notifying_country" | "country_of_origin" | "type" | "level"
+  | "online_trader" | "company_recall_code" | "production_dates";
+export interface ExternalSafetyGateAlert {
+  alert_id: string; case_number: string; published_date: string; source_url: string;
+  applicability: "not_assessed"; facts: Partial<Record<ExternalSafetyGateFact, string | null>>;
+}
+export interface ExternalSafetyGatePage {
+  schema: "external-safety-gate-alert-page@1"; data_state: "local_snapshot"; source_refresh_performed: false;
+  query_id: string; report: { report_id: string; reference: string; published_date: string };
+  observation: { source_id: "eu-safety-gate"; snapshot_id: string; raw_hash: string; parser_version: string;
+    source_url: string; observed_at: string; verified_at: string };
+  items: ExternalSafetyGateAlert[]; limit: number; next_cursor: string | null;
 }

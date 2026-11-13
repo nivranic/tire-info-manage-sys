@@ -8,9 +8,9 @@
 
 ## 2026-11-13交付点
 
-步骤1、2已实现：正常查询归属和固定来源许可证据绑定。步骤3至6尚未完成，外部端点、专用scope、分页、SDK与Web仍待实施；不得把计划描述当作已交付能力。本次同时修正旧外部API迁移回归的完整初始化表集合预期，保留023版本精确增量与旧数据检查。最新验收见[交付点记录](../assurance/evidence/safety-gate-external-foundation-2026-11-13.md)，接手顺序见[简明交接卡](../AGENT-HANDOFF-CURRENT.md)。
+步骤1至6已完成本计划的受管SQLite实现与限定验收：归属／许可、Reader／HTTP、专用scope、分页、共享SDK及Web Key管理均接通。最终13模块344项、SDK／三端类型／Web55项／生产构建、官方历史材料HTTP28项、SDK75条及生产Web签发／撤销／布局通过；测试Key和grant撤销，服务关闭。真实来源／模型调用0，正式PG外部Reader、公网与Native继续开放。见[本轮验收](../assurance/evidence/safety-gate-external-api-2026-11-13.md)及[接手卡](../AGENT-HANDOFF-CURRENT.md)。前置归属／许可交付另见[此前记录](../assurance/evidence/safety-gate-external-foundation-2026-11-13.md)。
 
-## 当前证据与设计选择
+## 计划启动时的证据与设计选择
 
 基线为 `d8a42a1`，工作区干净。原规格要求公共REST、API Key、证据读取、游标分页及外部权限。当前外部轮胎事实接口已要求新查询冻结的账户归属与具体快照／字段许可；Safety Gate独立表尚未接入这两道门。
 

@@ -2,6 +2,8 @@ import type { ApiKeyCreate, ApiKeyList, ApiKeyOperation, ApiKeyRecord, ExternalD
 import { assertWebhookDelivery, assertWebhookDeliverySummary, verifyWebhookBodyHash } from "./webhooks";
 import { EXTERNAL_TIRE_FACT_MAX_BYTES, isExternalTireFactRequest, isExternalTireFactResult } from "./external-tire-facts";
 import { EXTERNAL_TIRE_FACT_PAGE_MAX_BYTES, isExternalTireFactPageRequest, isExternalTireFactPage, tireFactPageMatchesRequest } from "./external-tire-fact-page";
+import type { ExternalSafetyGateRequest, ExternalSafetyGatePage } from "@tire/domain-types";
+import { EXTERNAL_SAFETY_GATE_MAX_BYTES, isExternalSafetyGateRequest, isExternalSafetyGatePage, safetyGatePageMatchesRequest } from "./external-safety-gate";
 
 type Obj = Record<string, unknown>;
 type Send = <T>(path: string, init?: RequestInit) => Promise<T>;
@@ -12,6 +14,7 @@ export class ExternalApiError extends Error {
 function check(v: unknown): asserts v { if (!v) throw new ExternalApiContractError(); }
 export function assertExternalTireFactResult(v: unknown): asserts v is ExternalTireFactResult { check(isExternalTireFactResult(v)); }
 export function assertExternalTireFactPage(v: unknown): asserts v is ExternalTireFactPage { check(isExternalTireFactPage(v)); }
+export function assertExternalSafetyGatePage(v: unknown): asserts v is ExternalSafetyGatePage { check(isExternalSafetyGatePage(v)); }
 const obj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v);
 const exact = (v: unknown, fields: string[]): v is Obj => obj(v) && Object.keys(v).length === fields.length && fields.every(f => Object.hasOwn(v, f));
 const id = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v);
@@ -28,7 +31,7 @@ const time = (v: unknown): v is string => { try { apiKeyTime(v); return true; } 
 const uuid = (v: unknown): v is string => typeof v === "string" && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(v);
 const token = (v: unknown): v is string => typeof v === "string" && /^ti_[a-f0-9]{32}\.[a-f0-9]{64}$/.test(v);
 const cursor = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_.-]{1,2048}$/.test(v);
-const scopeList = (v: unknown): boolean => Array.isArray(v) && v.length >= 1 && v.length <= 3 && v.every(s => s === "sources:read" || s === "webhooks:read" || s === "facts:read") && new Set(v).size === v.length && [...v].sort().every((s, i) => s === v[i]);
+const scopeList = (v: unknown): boolean => Array.isArray(v) && v.length >= 1 && v.length <= 4 && v.every(s => s === "sources:read" || s === "webhooks:read" || s === "facts:read" || s === "safety-gate:read") && new Set(v).size === v.length && [...v].sort().every((s, i) => s === v[i]);
 export function assertApiKey(v: unknown): asserts v is ApiKeyRecord {
   check(exact(v, ["schema", "id", "name", "scopes", "created_at", "expires_at", "revoked_at"])
     && v.schema === "api-key@1" && typeof v.id === "string" && /^[a-f0-9]{32}$/.test(v.id) && text(v.name, 80) && v.name.trim() === v.name && v.name.length > 0 && scopeList(v.scopes)
@@ -81,7 +84,7 @@ function source(v: unknown) {
 export function createExternalApiClient(bearer: string, transport: (path: string, init: RequestInit) => Promise<Response>) {
   check(token(bearer));
   async function get(path: string, signal?: AbortSignal, maximumBytes = 1024 * 1024): Promise<unknown> {
-    const strictAbort = maximumBytes === EXTERNAL_TIRE_FACT_PAGE_MAX_BYTES;
+    const strictAbort = maximumBytes === EXTERNAL_TIRE_FACT_PAGE_MAX_BYTES || maximumBytes === EXTERNAL_SAFETY_GATE_MAX_BYTES;
     const abortError = () => new DOMException("请求已取消", "AbortError");
     function cancelWithoutWaiting(cancel: () => Promise<unknown> | undefined) {
       try { void cancel()?.catch(() => {}); } catch { /* Cleanup cannot replace the page result. */ }
@@ -125,6 +128,15 @@ export function createExternalApiClient(bearer: string, transport: (path: string
     const p = new URLSearchParams({ limit: String(request.limit ?? 20) }); if (request.cursor) p.set("cursor", request.cursor); return p;
   }
   return {
+    safetyGateAlerts: async (request: ExternalSafetyGateRequest): Promise<ExternalSafetyGatePage> => {
+      check(isExternalSafetyGateRequest(request, bearer.slice(3, 35)));
+      const { report_id, query_id, mode, signal, cursor: pageCursor } = request, limit = request.limit ?? 20;
+      const snapshot = { report_id, query_id, mode, signal, cursor: pageCursor, limit };
+      const params = new URLSearchParams({ query_id, mode, limit: String(limit) });
+      if (pageCursor !== undefined) params.set("cursor", pageCursor);
+      const v = await get(`/external/v1/safety-gate-reports/${report_id}/alerts?${params}`, signal, EXTERNAL_SAFETY_GATE_MAX_BYTES);
+      assertExternalSafetyGatePage(v); check(safetyGatePageMatchesRequest(v, snapshot, bearer.slice(3, 35))); return v;
+    },
     tireFacts: async (request: ExternalTireFactPageRequest): Promise<ExternalTireFactPage> => {
       check(isExternalTireFactPageRequest(request, bearer.slice(3, 35)));
       const { source_id, query_id, verification_id, signal, cursor: pageCursor } = request, limit = request.limit ?? 20;

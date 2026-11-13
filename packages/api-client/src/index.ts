@@ -17,7 +17,7 @@ import { createAiPricePlanningApi } from "./ai-price-planning";
 import { createWebhooksApi } from "./webhooks";
 import { createApiKeysApi } from "./external-api";
 import { createApiKeyInventoryApi } from "./api-key-inventory";
-export { createExternalApiClient, ExternalApiError, ExternalApiContractError, assertApiKey, assertApiKeyOperation, assertExternalTireFactResult, assertExternalTireFactPage, apiKeyTime } from "./external-api";
+export { createExternalApiClient, ExternalApiError, ExternalApiContractError, assertApiKey, assertApiKeyOperation, assertExternalTireFactResult, assertExternalTireFactPage, assertExternalSafetyGatePage, apiKeyTime } from "./external-api";
 export { WebhookContractError, assertWebhookTargets, assertWebhook, assertWebhookDelivery, assertWebhookOperation } from "./webhooks";
 export { CandidateAiContractError, assertCandidateAiPreparation, assertCandidateAiRecommendation } from "./candidate-ai";
 export * from "./exact-json";

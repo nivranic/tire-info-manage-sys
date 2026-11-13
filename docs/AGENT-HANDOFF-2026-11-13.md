@@ -1,6 +1,6 @@
 # 胎迹 Agent 交接卡
 
-最新接手先读[简明交接卡](AGENT-HANDOFF-CURRENT.md)。本文件保留此前各阶段详情；本次收尾补齐 Safety Gate 查询归属与受管许可绑定，完整外部读取端点／scope／分页／SDK／Web 尚未实现，继续步骤见简明卡与[外部读取计划](plans/2026-11-13-safety-gate-external-api.md)。
+最新接手先读[简明交接卡](AGENT-HANDOFF-CURRENT.md)。本文件保留此前各阶段详情；最新接通 Safety Gate 受许可外部Reader／scope／分页／SDK／Web Key管理，正式PG、公网和Native仍待完成；最新验收与继续步骤见简明卡与[外部读取计划](plans/2026-11-13-safety-gate-external-api.md)。
 
 更新于2026-11-13。本卡为当前交接入口，前一阶段的详细记录保留于[11月12日交接卡](AGENT-HANDOFF-2026-11-12.md)。
 
