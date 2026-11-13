@@ -1,6 +1,6 @@
 ## 最新收尾交接入口（2026-11-13）
 
-先读[简明 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)，包括 12 模块、10 Gate、13 SLO、15 决策、实际进度与接手步骤。最新优化 Parser 准备阶段，84 项专项通过；受控 PG 快照独立恢复 10 项通过（167 表／963 行及原件、报告、归档）。完整 PG 综合流程仍有 Parser 超时，见[Parser 与恢复验收](assurance/evidence/parser-preparation-2026-11-13.md)。此前 PG 外部 Reader 的 41 场景与 SQLite 248 项回执独立保留。
+先读[简明 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)，包括 12 模块、10 Gate、13 SLO、15 决策、实际进度与接手步骤。最新优化 Parser 准备阶段，84 项专项通过；受控 PG 快照独立恢复 10 项通过（167 表／963 行及原件、报告、归档）。完整 PG 综合流程仍有 Parser 超时，见[Parser 与恢复验收](assurance/evidence/parser-preparation-2026-11-13.md)。此前 PG 外部 Reader 的 41 场景与 SQLite 248 项回执独立保留。后续统一时间线已结束：31 项前置检查通过，随后在子进程启动前出现树校验约 16.95 秒的超时；集群关闭、412 输入稳定。下一步细分文件操作耗时与期限检查粒度，完整 V1 继续待验。
 
 此前已接通 AI 共享类型／SDK／页面／报告消费并完成受理合同加固，[消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)与历史失败保留。真实 OpenAI、PG 部署管理／吞吐、实际 Native、自然长周期及完整 V1 继续待验。下文为历史阶段记录。
 

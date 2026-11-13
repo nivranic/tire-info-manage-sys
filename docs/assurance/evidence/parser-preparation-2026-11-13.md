@@ -37,6 +37,23 @@
 
 进一步在私有 Bootstrap 副本加入固定阶段标记，6 次独立解析均通过，入口标记至 `response_ready` 约 1.05–1.75 秒；该范围不含进程创建和标记前导入，不能据此排除启动或调度延迟。回执 `.artifacts/parser-child-phases-r2/result.json`，SHA256 `fb25aba9cbbfcb58fbc633a00c0f4560200b1c0815a5360f6e4613f720832c5b`。初版私有观测脚本因插入缩进错误造成 6 次 `parser_crashed`，只属于观测装配失败；原样保留，后续增加 AST 校验。生产 Bootstrap 没有加入这些标记。
 
+## 后续统一时间线：准备阶段再次超时
+
+在代码提交 `2e2a2548888737b80cd3ee5479abbb16315bf571` 上收取完整 PG 观测结果。生产代码未变；私有 Bootstrap 副本只增加固定阶段标记，先经 AST 校验，父子使用一致的私有摘要。父进程包装原调用及管道，保留原预算、断言与异常传播。该观测会增加开销，属于诊断运行，不是无插桩性能基准。
+
+- 本轮 **31 个前置检查通过**，在 `historical_reparse_review_and_restart` 失败。3 次 Parser 观测中 2 次通过、1 次 `parser_timeout`；412 个输入的前后哈希一致。
+- 失败来自 `hankook-us`。以 supervisor 开始为零点：复制开始 1.343 ms，执行副本树校验开始 982.417 ms、结束 17,934.008 ms，复制结束 18,758.349 ms，supervisor 结束 19,487.595 ms。树校验本段约 **16,951.591 ms**，监督回执 `elapsed_ms=19484`。
+- 此次失败没有进入 `_command`／`Popen`，`pid=null`、`exit_code=null`、`reaped=false`、stdout／stderr 都为零。这里没有创建待回收的 Parser 子进程，不能将 `reaped=false` 解释成子进程泄漏，也不能将本次延迟归到子进程入口或 EOF。
+- 当前代码在 `copy_verified` 前后检查期限，长时间同步复制／校验不会在第 8 秒被即时中断；本次证据暴露了准备阶段预算检查的粒度边界。两个成功样本的 supervisor 总历时约 7.02／8.69 秒，进一步说明总收尾耗时不能等同于严格的 8 秒响应上限。
+- 集群已正常关闭；初始化口令文件和 `postmaster.pid` 已消失，55487 无监听。本轮没有改生产代码、系统设置或 Provider，也没有再次启动验收。
+
+本轮证据不能解释此前已经创建子进程的全部超时，更不能确定杀毒软件、磁盘或操作系统组件是根因。下一步先细分树校验的目录遍历、属性检查、打开与读取耗时，再评估准备阶段取消／期限检查的合理粒度；同时保留此前启动／入口／EOF 方向的未决问题。保持逐字节校验、安全边界及并发限制，不以加重试或扩大预算代替定位。
+
+私有原始回执（不随 Git 分发）：
+
+- `.artifacts/postgres/pgverify-cbc0474eb1d040f6b436cbe968d86e1f/report.json`，SHA256 `4fd5ac1046afcefbd24ea043cabef5c77963a2d8ee78e79cd3b9c2f77fe252d4`。
+- `.artifacts/pg-core-timeline-r1/timelines.jsonl`，SHA256 `955d5aa022a73364c71adae2c640fcd7d3fd0e76dac3e331a8d1adaa4e0e4626`。脚本为同目录 `observe.py`／`verify.ps1`，控制台输出为 `output.log`。
+
 ## 独立完整数据恢复
 
 综合链路未走到备份阶段，因此另取已关闭的受控失败验收快照制作全新副本，独立执行 `pg_dump`／`pg_restore`，没有把综合流程改成忽略 Parser 失败。原快照 3,738 个文件的哈希保持不变。
@@ -66,4 +83,4 @@ python -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root
 
 完整 PG 入口仍为 `pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin '<PostgreSQL bin directory>' -Port 55487 -Suite core`。独立恢复私槽未纳入 Git，新 clone 必须重建受控数据并复验。
 
-下一步补进程创建、首次入口、输入写完与管道 EOF 的统一时间线，继续定位混合流程超时；已有准备开销优化不能替代这一工作。完整 V1、生产部署／吞吐、实际 Native、自然长周期监控与真实模型质量继续开放。
+统一时间线已取得本轮准备阶段超时证据；下一步细分文件树校验耗时及期限检查粒度，同时保留此前已启动子进程超时的未决问题。已有优化与插桩观测不能替代完整综合验收。完整 V1、生产部署／吞吐、实际 Native、自然长周期监控与真实模型质量继续开放。
