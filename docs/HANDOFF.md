@@ -2,7 +2,9 @@
 
 先读[2026-11-13 Agent交接卡](AGENT-HANDOFF-2026-11-13.md)，其中汇总12模块、10项发布Gate、13项SLO、15项决策、当前进度、未完成项与接手顺序。
 
-新增Safety Gate逐告警内容版本、跨周观察与变化事件，支持同日冲突、字段前后值和固定历史分页。十二模块287通过，811输入稳定。真实官网API31项、最终源码HTTP13项、真实历史材料Web45项、合成变化Web26项及PostgreSQL17项通过，两份177表真实材料库的228次观察分别完成逐项核对，长周期调度与通知继续实施。[逐告警验收](assurance/evidence/safety-gate-alert-history-2026-11-13.md)
+Safety Gate持续监控、变化提醒与任务状态已接通正常Worker、API、共享SDK和生产Web。默认每6小时滚动核验最近4份英文周报，可配置1至12份及1至168小时。最终十模块215通过，815输入稳定、资源关闭、非自检拒绝0；Web55项、任务SDK13项、三端类型及414输入生产构建通过。真实官网与HTTP27项、PostgreSQL24项通过，SQLite旧库177→185表保留原列原行。已修复生产任务SSE缓冲，代理首块从25054ms降到212ms，页面同一任务336ms内更新完成态。自然长周期与真实新变化通知仍待验收。[监控验收](assurance/evidence/safety-gate-monitoring-2026-11-13.md)
+
+此前Safety Gate逐告警内容版本、跨周观察与变化事件，支持同日冲突、字段前后值和固定历史分页。十二模块287通过，811输入稳定。真实官网API31项、最终源码HTTP13项、真实历史材料Web45项、合成变化Web26项及PostgreSQL17项通过，两份177表真实材料库的228次观察分别完成逐项核对，长周期调度与通知继续实施。[逐告警验收](assurance/evidence/safety-gate-alert-history-2026-11-13.md)
 
 此前EU Safety Gate官方英文周报证据查询，保留原生告警身份、日期、原值与未知适用性。十一模块262项、真实API52项、生产Web60项、关闭后174表34项和旧172表副本升级9项通过。可信Parser目录15项，长周期监控、AI及Native消费继续推进，完整V1保持active。[Safety Gate验收](assurance/evidence/safety-gate-2026-11-13.md)
 

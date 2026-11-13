@@ -1,11 +1,12 @@
 import type { MonitorTask, MonitorTaskEvent, MonitorTaskKind, MonitorTaskPhase, MonitorTaskState } from "@tire/domain-types";
 
 export const taskStateLabels: Record<MonitorTaskState, string> = { never_run: "尚未执行", running: "执行中", succeeded: "已完成", failed: "执行失败", blocked: "来源设置阻止采纳", interrupted: "执行已中断", result_unknown: "结果待确认" };
-export const taskKindLabels: Record<MonitorTaskKind, string> = { tire: "轮胎规格监控", recall: "已选召回公告监控", recall_discovery: "召回名称发现监控" };
+export const taskKindLabels: Record<MonitorTaskKind, string> = { tire: "轮胎规格监控", recall: "已选召回公告监控", recall_discovery: "召回名称发现监控", safety_gate: "Safety Gate周报监控" };
 export const taskPhaseLabels: Record<MonitorTaskPhase, string> = { claimed: "已领取任务", running: "正在执行", finished: "已记录结果" };
 export const taskScopeLabel = (scope: MonitorTask["scope"]) => scope === "local_workspace" ? "本机工作区共享" : "当前会话";
-export const taskResultLabel = (value: string | null) => ({ live: "在线采纳成功", live_verified_304: "在线确认未变", source_unavailable: "来源不可用", worker_error: "任务执行异常", discovery_complete: "名称双遍扫描一致，尚未核验公告", discovery_incomplete: "名称扫描覆盖不完整，不推进基线或产生候选提醒" } as Record<string, string>)[value || ""] || value || "尚无来源结果";
+export const taskResultLabel = (value: string | null) => ({ live: "在线采纳成功", live_verified_304: "在线确认未变", source_unavailable: "来源不可用", worker_error: "任务执行异常", discovery_complete: "名称双遍扫描一致，尚未核验公告", discovery_incomplete: "名称扫描覆盖不完整，不推进基线或产生候选提醒", safety_gate_complete: "所选Safety Gate周报核验完成" } as Record<string, string>)[value || ""] || value || "尚无来源结果";
 export function taskQueryLabel(task: MonitorTask): string {
+  if ("report_limit" in task.query) return `最近 ${task.query.report_limit} 份英文周报 · ${task.query.text || "全部告警"}`;
   if ("search" in task.query) return `名称关键词：${task.query.search}`;
   return "campaign_number" in task.query ? `公告 ${task.query.campaign_number}` : [task.query.model, task.query.size || "全部尺寸"].filter(Boolean).join(" · ");
 }

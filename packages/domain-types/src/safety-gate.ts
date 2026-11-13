@@ -103,3 +103,79 @@ export interface SafetyGateAlertHistory {
   observations: SafetyGateAlertObservation[];
   notices: string[];
 }
+
+export interface SafetyGateMonitorQuery {
+  report_limit: number;
+  text: string;
+}
+
+export interface SafetyGateRuleSettings {
+  name: string;
+  enabled: boolean;
+  interval_seconds: number;
+  archived: boolean;
+}
+
+export interface SafetyGateMonitorRun {
+  id: string;
+  attempt_id: string;
+  state: string;
+  reason: string | null;
+  started_at: string;
+  finished_at: string;
+  coverage: "complete" | "incomplete";
+  selected_reports: SafetyGateReport[];
+  notification_count: number;
+  checks: {
+    query_id: string;
+    snapshot_id: string | null;
+    query: SafetyGateQuery;
+    state: string;
+    reason: string | null;
+    observed_at: string;
+  }[];
+}
+
+export interface SafetyGateMonitorRule extends SafetyGateRuleSettings {
+  id: string;
+  source_id: "eu-safety-gate";
+  query: SafetyGateMonitorQuery;
+  revision: number;
+  created_at: string;
+  job: {
+    id: string;
+    next_due_at: string | null;
+    lease_until: string | null;
+    last_run: SafetyGateMonitorRun | null;
+  };
+  notice: string;
+}
+
+export interface SafetyGateRuleDetail extends SafetyGateMonitorRule {
+  history: (SafetyGateRuleSettings & { revision: number; created_at: string })[];
+  history_truncated: boolean;
+}
+
+export interface SafetyGateRuleWrite extends SafetyGateMonitorRule {
+  write_result: { revision_id: string; revision: number };
+}
+
+export interface SafetyGateNotification {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  run_id: string;
+  delivered_at: string;
+  read_at: string | null;
+  observation: SafetyGateAlertObservation;
+  applicability: "not_assessed";
+}
+
+export interface SafetyGatePage<T> {
+  scope: "session";
+  data_state: "local_snapshot";
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}

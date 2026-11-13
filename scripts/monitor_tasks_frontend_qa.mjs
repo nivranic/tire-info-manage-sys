@@ -103,9 +103,13 @@ test("SDK uses encoded read-only task routes, separate history pages and native 
       await sdk.tireApi.monitorTasks({ kind: "recall", source_id: "source & region", state: "blocked", rule_id: "rule / one" }, 20);
       await sdk.tireApi.monitorTask("tire", "job / one", { attemptOffset: 40, legacyOffset: 20 });
       await sdk.tireApi.monitorTaskEvents("tire", "job / one", "opaque +/= cursor");
+      await sdk.tireApi.monitorTask("safety_gate", "safety / one");
+      await sdk.tireApi.monitorTaskEvents("safety_gate", "safety / one", "opaque safety cursor");
       assert.match(calls[0].path, /kind=recall/); assert.match(calls[0].path, /source_id=source\+%26\+region/);
       assert.match(calls[1].path, /job%20%2F%20one\?attempt_offset=40&attempt_limit=20&legacy_offset=20&legacy_limit=20/);
       assert.match(calls[2].path, /cursor=opaque\+%2B%2F%3D\+cursor&limit=50/);
+      assert.match(calls[3].path, /\/monitor-tasks\/safety_gate\/safety%20%2F%20one\?/);
+      assert.match(calls[4].path, /\/monitor-tasks\/safety_gate\/safety%20%2F%20one\/events\?cursor=opaque\+safety\+cursor/);
       assert.equal(calls.some(call => call.path.includes("/stream")), false);
     } finally { restore?.(); globalThis.fetch = originalFetch; }
   });
@@ -120,4 +124,18 @@ test("Web stream GET uses the same cursor and exposes HTTP reset code without ch
     };
     await assert.rejects(sdk.tireApi.streamMonitorTaskEvents("tire", "job-one", "opaque", () => {}), error => error instanceof sdk.ApiError && values.isTaskCursorReset(error));
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("Safety Gate runtime task scope supports reconnectable stream requests", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (path, init) => {
+      assert.match(path, /\/api\/v1\/monitor-tasks\/safety_gate\/safety-one\/events\/stream\?cursor=opaque/);
+      assert.equal(init.headers.get("accept"), "text/event-stream");
+      return response(end("opaque"));
+    };
+    assert.equal(await sdk.tireApi.streamMonitorTaskEvents("safety_gate", "safety-one", "opaque", () => {}), "window_complete");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -5,12 +5,13 @@ import { tireApi } from "@tire/api-client";
 import type { SafetyGateAlertHistory, SafetyGateEvidence, SafetyGateQuery, SafetyGateReport, SafetyGateResult } from "@tire/domain-types";
 import { DataTree } from "./reparse-review";
 import { useSourceAccess } from "./source-status";
+import { SafetyGateMonitoring } from "./safety-gate-monitoring";
+import { safetyGateEventNames as eventNames } from "./safety-gate-values";
 
 type Slot = "catalog" | "report";
 type Pending = { query: SafetyGateQuery; slot: Slot; queryId: string };
 const sourceId = "eu-safety-gate";
 const failure = (cause: unknown) => cause instanceof Error ? cause.message : "Safety Gate操作未完成。";
-const eventNames = { first_observed: "首次观察", content_changed: "内容变化", conflict_observed: "同日周报内容冲突", conflict_resolved: "同日周报内容恢复一致" };
 
 export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolean }) {
   const access = useSourceAccess();
@@ -186,6 +187,7 @@ export default function SafetyGatePanel({ sessionReady }: { sessionReady: boolea
       {pages > 1 ? <div className="reparse-pages"><button type="button" className="text-button" disabled={!shownPage} onClick={() => setPage(shownPage - 1)}>上一页告警</button><button type="button" className="text-button" disabled={shownPage + 1 >= pages} onClick={() => setPage(shownPage + 1)}>下一页告警</button></div> : null}
     </> : null}
     {provenance ? <><p className="recall-help">{provenance.attribution}</p><button type="button" className="text-button" disabled={busy} onClick={() => void showEvidence(provenance.snapshot_id)}>{result?.document ? "查看所选周报原始证据" : "查看索引原始证据"}</button></> : null}
+    <SafetyGateMonitoring sessionReady={sessionReady} onEvidence={id => void showEvidence(id)} />
     {alertHistory ? <section className="recall-evidence" aria-label="已保存告警版本">
       <h4>告警 {alertHistory.alert_id} · 已保存历史</h4>
       <p role="status">{alertHistory.state === "conflicting" ? "同日周报内容存在冲突" : "最新已观察内容"} · 适用性待核对</p>

@@ -167,9 +167,10 @@ def checked_snapshot(snapshot):
 
 
 class SafetyGateService:
-    def __init__(self, db, adapter, registry=None):
+    def __init__(self, db, adapter, registry=None, *, ingestion_guard=None):
         self.db, self.adapter = db, adapter
-        self.shared = QueryService(db, registry)
+        self.ingestion_guard = ingestion_guard
+        self.shared = QueryService(db, registry, ingestion_guard=ingestion_guard)
 
     def latest(self, key):
         return checked_snapshot(self.db.scalar(select(SafetyGateSnapshot).join(SafetyGateVerification)
@@ -270,6 +271,8 @@ class SafetyGateService:
                 else:
                     run.state = 'live'
                     self.shared.audit(session_id, 'safety_gate_online_succeeded', run.id, snapshot_id=snapshot.id)
+                    if self.ingestion_guard:
+                        self.ingestion_guard(self.db)
                     self.db.commit()
                     return self.response(query, 'live_verified_304' if result['status'] == 'not_modified' else 'live',
                         snapshot, run.id, verified_at=verified)
@@ -281,6 +284,8 @@ class SafetyGateService:
             self.shared.assert_source_access(run)
         except SourceAccessBlocked as error:
             return self.blocked(query, run, error)
+        if self.ingestion_guard:
+            self.ingestion_guard(self.db)
         run.state = 'consent_required' if request.fallback_policy == 'ask' else 'source_unavailable'
         run.reason = str(result.get('reason') or 'safety_gate_unavailable')[:200]
         self.shared.audit(session_id, 'safety_gate_online_failed', run.id, reason=run.reason)
@@ -291,6 +296,8 @@ class SafetyGateService:
         from .parser_releases import ParserDeploymentError, assert_selection_current
         self.shared.lock_ingestion()
         self.shared.assert_source_access(run)
+        if self.ingestion_guard:
+            self.ingestion_guard(self.db)
         if selection is not None:
             assert_selection_current(self.db, selection)
             check_result_identity(selection, result)

@@ -20,6 +20,8 @@ from .monitor_task_models import (MonitorTaskAttempt, MonitorTaskEvent,
                                  RecallDiscoveryTaskAttempt, RecallDiscoveryTaskEvent)
 from .recall_models import RecallMonitorJob, RecallMonitorRule, RecallMonitorRun, SOURCE_ID
 from .recall_discovery_monitor_models import RecallDiscoveryJob, RecallDiscoveryRule, RecallDiscoveryRun
+from .safety_gate_monitor_models import (SafetyGateMonitorJob, SafetyGateMonitorRule, SafetyGateMonitorRun,
+    SafetyGateTaskAttempt, SafetyGateTaskEvent)
 from .service import timestamp
 
 SCHEMA = 'monitor-tasks@1'
@@ -28,7 +30,7 @@ STREAM_SECONDS = 25.0
 HEARTBEAT_SECONDS = 10.0
 POLL_SECONDS = 1.0
 MAX_STREAM_EVENTS = 500
-Kind = Literal['tire', 'recall', 'recall_discovery']
+Kind = Literal['tire', 'recall', 'recall_discovery', 'safety_gate']
 TaskState = Literal['never_run', 'running', 'succeeded', 'failed', 'blocked', 'interrupted', 'result_unknown']
 BLOCKED_REASONS = {'source_paused', 'source_archived', 'source_access_changed', 'source_access_pin_missing'}
 SAFE_REASONS = BLOCKED_REASONS | {
@@ -44,9 +46,15 @@ SAFE_REASONS = BLOCKED_REASONS | {
     'discovery_pagination_changed', 'discovery_content_changed', 'discovery_parser_changed',
     'recall_discovery_execution_failed', 'recall_discovery_lease_lost', 'recall_discovery_rule_disabled',
     'recall_monitor_rule_changed', 'recall_discovery_rule_changed',
+    'safety_gate_monitor_lease_lost', 'safety_gate_monitor_rule_disabled', 'safety_gate_monitor_rule_changed',
+    'safety_gate_monitor_timeout', 'safety_gate_monitor_execution_failed', 'safety_gate_fetch_failed',
+    'safety_gate_schema_changed', 'source_rate_limited', 'upstream_network_error', 'robots_disallowed',
+    'source_disabled', 'evidence_capture_failed',
+    'safety_gate_monitor_incomplete',
 }
 RESULT_STATES = {'live', 'live_verified_304', 'source_unavailable', 'worker_error',
-                 'lease_lost', 'consent_required', 'local_snapshot', 'discovery_complete', 'discovery_incomplete'}
+                 'lease_lost', 'consent_required', 'local_snapshot', 'discovery_complete', 'discovery_incomplete',
+                 'safety_gate_complete'}
 
 
 def _safe_reason(value):
@@ -66,6 +74,8 @@ def _models(kind):
         return RecallMonitorJob, RecallMonitorRun
     if kind == 'recall_discovery':
         return RecallDiscoveryJob, RecallDiscoveryRun
+    if kind == 'safety_gate':
+        return SafetyGateMonitorJob, SafetyGateMonitorRun
     raise ValueError('invalid_monitor_task_kind')
 
 
@@ -75,6 +85,8 @@ def journal_models(kind):
         return MonitorTaskAttempt, MonitorTaskEvent
     if kind == 'recall_discovery':
         return RecallDiscoveryTaskAttempt, RecallDiscoveryTaskEvent
+    if kind == 'safety_gate':
+        return SafetyGateTaskAttempt, SafetyGateTaskEvent
     raise ValueError('invalid_monitor_task_kind')
 
 
@@ -191,7 +203,7 @@ def finish_attempt_locked(db, claim, state, reason=None, *, query_id=None, run_i
         raise ValueError('monitor_task_run_mismatch')
     result = _result_state(state)
     outcome = ('blocked' if reason in BLOCKED_REASONS else
-               'succeeded' if result in {'live', 'live_verified_304', 'discovery_complete'} else 'failed')
+               'succeeded' if result in {'live', 'live_verified_304', 'discovery_complete', 'safety_gate_complete'} else 'failed')
     _append_event(db, attempt, 'finished', outcome, result_state=result, reason=reason,
         query_id=query_id, run_id=run_id, now=now)
     return True
@@ -276,8 +288,9 @@ def _anchor(db, kind, job_id, cursor):
 def _visible_job(db, kind, job_id, scope):
     job_model, _ = _models(kind)
     statement = select(job_model).where(job_model.id == job_id)
-    if kind in {'recall', 'recall_discovery'}:
-        rule_model = RecallMonitorRule if kind == 'recall' else RecallDiscoveryRule
+    if kind in {'recall', 'recall_discovery', 'safety_gate'}:
+        rule_model = {'recall': RecallMonitorRule, 'recall_discovery': RecallDiscoveryRule,
+            'safety_gate': SafetyGateMonitorRule}[kind]
         statement = statement.where(job_model.session_id.in_(scope),
             exists(select(rule_model.id).where(rule_model.job_id == job_model.id,
                                                rule_model.session_id.in_(scope))))
@@ -317,11 +330,16 @@ def _rules(db, kind, job_id, scope):
         statement = current_rules().where(RecallMonitorRule.job_id == job_id,
                                           RecallMonitorRule.session_id.in_(scope))
         rule_model = RecallMonitorRule
-    else:
+    elif kind == 'recall_discovery':
         from .recall_discovery_monitoring import current_rules
         statement = current_rules().where(RecallDiscoveryRule.job_id == job_id,
                                           RecallDiscoveryRule.session_id.in_(scope))
         rule_model = RecallDiscoveryRule
+    else:
+        from .safety_gate_monitoring import current_rules
+        statement = current_rules().where(SafetyGateMonitorRule.job_id == job_id,
+                                          SafetyGateMonitorRule.session_id.in_(scope))
+        rule_model = SafetyGateMonitorRule
     total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
     rows = db.execute(statement.order_by(rule_model.id).limit(50)).all()
     return ([{'id': rule.id, 'name': revision.name, 'revision': revision.revision,
@@ -355,9 +373,9 @@ def task_view(db, kind, job, scope, *, now=None):
     elif job.lease_token:
         state = 'result_unknown'
     elif legacy:
-        state, terminal = ('succeeded' if legacy['state'] in {'live', 'live_verified_304', 'discovery_complete'} else 'failed'), True
+        state, terminal = ('succeeded' if legacy['state'] in {'live', 'live_verified_304', 'discovery_complete', 'safety_gate_complete'} else 'failed'), True
     return {'kind': kind, 'job_id': job.id, 'scope': 'local_workspace' if kind == 'tire' else 'session',
-        'source_id': job.source_id if kind == 'tire' else SOURCE_ID,
+        'source_id': job.source_id if kind in {'tire', 'safety_gate'} else SOURCE_ID,
         'query': {'campaign_number': job.campaign_number} if kind == 'recall' else deepcopy(job.query),
         'rules': rules, 'rule_count': total, 'rules_truncated': total > len(rules),
         'next_due_at': timestamp(job.next_due_at), 'lease_until': timestamp(job.lease_until),
@@ -384,16 +402,17 @@ def _state_expression(db, kind, job_model, run_model, now):
         job_model.lease_until.is_(None), job_model.lease_until <= now,
         current_lease_hash != last_lease_hash)), 'result_unknown'),
         (last_state.is_not(None), last_state), (job_model.lease_token.is_not(None), 'result_unknown'),
-        (last_result.in_(['live', 'live_verified_304', 'discovery_complete']), 'succeeded'),
+        (last_result.in_(['live', 'live_verified_304', 'discovery_complete', 'safety_gate_complete']), 'succeeded'),
         (last_result.is_not(None), 'failed'), else_='never_run')
 
 
 def task_list(db, scope, *, kind=None, source_id=None, rule_id=None, state=None, offset=0, limit=20):
     now = utcnow()
     statements = []
-    for lane in ([kind] if kind else ['tire', 'recall', 'recall_discovery']):
+    for lane in ([kind] if kind else ['tire', 'recall', 'recall_discovery', 'safety_gate']):
         job_model, run_model = _models(lane)
-        rule_model = {'tire': AlertRule, 'recall': RecallMonitorRule, 'recall_discovery': RecallDiscoveryRule}[lane]
+        rule_model = {'tire': AlertRule, 'recall': RecallMonitorRule, 'recall_discovery': RecallDiscoveryRule,
+            'safety_gate': SafetyGateMonitorRule}[lane]
         rule_clause = select(rule_model.id).where(rule_model.job_id == job_model.id)
         if rule_id:
             rule_clause = rule_clause.where(rule_model.id == rule_id)
@@ -402,7 +421,9 @@ def task_list(db, scope, *, kind=None, source_id=None, rule_id=None, state=None,
         statement = select(literal(lane).label('kind'), job_model.id.label('job_id')).where(exists(rule_clause))
         if lane != 'tire':
             statement = statement.where(job_model.session_id.in_(scope))
-            if source_id and source_id != SOURCE_ID:
+            if lane == 'safety_gate' and source_id:
+                statement = statement.where(job_model.source_id == source_id)
+            elif source_id and source_id != SOURCE_ID:
                 statement = statement.where(literal(False))
         elif source_id:
             statement = statement.where(job_model.source_id == source_id)
@@ -540,4 +561,4 @@ def register_monitor_task_routes(app: FastAPI):
             cursor = cursor or _cursor(kind, job_id)
         return StreamingResponse(stream_events(app.state.database, request, kind, job_id,
             scope, cursor), media_type='text/event-stream', headers={
-                'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no', 'X-Content-Type-Options': 'nosniff'})
+                'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no', 'X-Content-Type-Options': 'nosniff'})

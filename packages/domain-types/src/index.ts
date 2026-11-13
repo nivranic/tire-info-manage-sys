@@ -104,6 +104,7 @@ export type { TireFilter, TireFilterValue, ExactNumericToken, TireFilterOperator
 export type { RecallQuery, RecallRecord, RecallRevision, RecallResult, RecallHistory, RecallEvidence, RecallRuleSettings, RecallRule, RecallRuleDetail, RecallNotification, RecallPage, RecallAnalysisReference, RecallBoundary } from "./recalls";
 export type { RecallSearchQuery, RecallSearchCampaign, RecallSearchProduct, RecallSearchResult, RecallSearchEvidence } from "./recalls";
 export type { SafetyGateQuery, SafetyGateReport, SafetyGateAlert, SafetyGateDocument, SafetyGateProvenance, SafetyGateResult, SafetyGateEvidence, SafetyGateAlertObservation, SafetyGateAlertHistory } from "./safety-gate";
+export type { SafetyGateMonitorQuery, SafetyGateRuleSettings, SafetyGateMonitorRun, SafetyGateMonitorRule, SafetyGateRuleDetail, SafetyGateRuleWrite, SafetyGateNotification, SafetyGatePage } from "./safety-gate";
 export type { RecallDiscoveryQuery, RecallDiscoveryBudget, RecallDiscoveryCoverage, RecallDiscoveryRun,
   RecallDiscoveryRuleSettings, RecallDiscoveryRuleRevision, RecallDiscoveryRule, RecallDiscoveryRuleDetail, RecallDiscoveryRuleWrite,
   RecallDiscoveryPage, RecallDiscoveryCandidate, RecallDiscoveryRunDetail, RecallDiscoveryNotification,

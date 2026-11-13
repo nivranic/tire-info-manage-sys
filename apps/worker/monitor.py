@@ -107,9 +107,10 @@ async def run_scheduled_cycle(database: Database, *, max_jobs: int = 100) -> dic
             results.append({"job_id": claim["id"], "state": state, "reason": reason, "finalized": finalized})
     recalls = await run_recall_cycle(database, max_jobs=max_jobs)
     discovery = await run_recall_discovery_cycle(database, max_jobs=max_jobs)
+    safety_gate = await run_safety_gate_cycle(database, max_jobs=max_jobs)
     webhooks = await run_webhook_cycle(database, max_jobs=max_jobs)
-    return {"checked_at": utcnow().isoformat(), "jobs": len(results) + recalls["jobs"] + discovery['jobs'] + webhooks['jobs'],
-            "results": results + recalls["results"] + discovery['results'] + webhooks['results']}
+    return {"checked_at": utcnow().isoformat(), "jobs": len(results) + recalls["jobs"] + discovery['jobs'] + safety_gate['jobs'] + webhooks['jobs'],
+            "results": results + recalls["results"] + discovery['results'] + safety_gate['results'] + webhooks['results']}
 
 
 @observed_cycle
@@ -187,6 +188,41 @@ async def run_recall_discovery_cycle(database: Database, *, max_jobs: int = 100,
             span.finish('completed' if finalized and state == 'discovery_complete' else 'source_unavailable' if finalized else 'stale')
             results.append({'job_id': claim['id'], 'source': claim['source_id'], 'kind': 'recall_discovery',
                             'state': state, 'reason': reason, 'finalized': finalized})
+    return {'checked_at': utcnow().isoformat(), 'jobs': len(results), 'results': results}
+
+
+@observed_cycle
+async def run_safety_gate_cycle(database: Database, *, max_jobs: int = 100, adapter=None) -> dict:
+    from tire_api import safety_gate_monitoring as queue
+    results = []
+    for index in range(max_jobs):
+        if index:
+            await asyncio.sleep(queue.SOURCE_INTERVAL)
+        claim = queue.claim_job(database)
+        if claim is None:
+            break
+        with observe('worker.job', component='worker', source=claim['source_id']) as span:
+            span.finish('unknown', queue_lag_seconds=claim['queue_lag_seconds'])
+            try:
+                begin_attempt(database, claim, queue.guard_claim)
+                state, reason = await queue.execute_scan(database, claim, adapter)
+            except asyncio.CancelledError:
+                queue.finish_job(database, claim, 'lease_lost', 'worker_cancelled')
+                raise
+            except LeaseLost as error:
+                state, reason = 'lease_lost', str(error)
+            except SourceAccessBlocked as error:
+                state, reason = 'source_unavailable', error.code
+            except TimeoutError:
+                state, reason = 'source_unavailable', 'safety_gate_monitor_timeout'
+            except Exception:
+                state, reason = 'worker_error', 'safety_gate_monitor_execution_failed'
+            finalized = queue.finish_job(database, claim, state, reason)
+            if finalized:
+                state, reason = claim['final_result']['state'], claim['final_result']['reason']
+            span.finish('completed' if finalized and state == 'safety_gate_complete' else state if finalized else 'stale')
+            results.append({'job_id': claim['id'], 'source': claim['source_id'], 'kind': 'safety_gate',
+                'state': state, 'reason': reason, 'finalized': finalized})
     return {'checked_at': utcnow().isoformat(), 'jobs': len(results), 'results': results}
 
 

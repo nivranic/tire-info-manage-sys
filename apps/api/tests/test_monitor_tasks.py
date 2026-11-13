@@ -283,7 +283,7 @@ def test_sse_replays_id_and_last_event_id_with_bounded_end(setup, monkeypatch):
     finish(database, value)
     first = client.get(url('tire', job_id) + '/events', params={'limit': 1}).json()['items'][0]
     response = client.get(url('tire', job_id) + '/events/stream', headers={'Last-Event-ID': first['cursor']})
-    assert response.status_code == 200 and response.headers['cache-control'] == 'no-store'
+    assert response.status_code == 200 and response.headers['cache-control'] == 'no-store, no-transform'
     assert response.text.count('event: task_event') == 2
     assert 'event: heartbeat' in response.text and 'event: stream_end' in response.text
     assert 'window_complete' in response.text and f'id: {first["cursor"]}\n' not in response.text

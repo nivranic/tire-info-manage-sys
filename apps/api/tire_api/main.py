@@ -172,6 +172,8 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
     register_recall_routes(app)
     from .safety_gate import register_safety_gate_routes
     register_safety_gate_routes(app)
+    from .safety_gate_monitor_routes import register_safety_gate_monitor_routes
+    register_safety_gate_monitor_routes(app)
     from .recall_discovery import register_recall_discovery_routes
     register_recall_discovery_routes(app)
     from .recall_discovery_monitor_routes import register_recall_discovery_monitor_routes
@@ -332,7 +334,10 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
             response.set_cookie(SESSION_COOKIE, request.state.session_id, httponly=True,
                                 samesite="strict", secure=request.url.scheme == "https",
                                 max_age=int(SESSION_TTL.total_seconds()))
-        response.headers["Cache-Control"] = "no-store"
+        # Keep route-level streaming protection while enforcing private no-store.
+        no_transform = 'no-transform' in {
+            directive.strip().lower() for directive in response.headers.get('Cache-Control', '').split(',')}
+        response.headers["Cache-Control"] = "no-store, no-transform" if no_transform else "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 

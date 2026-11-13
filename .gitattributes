@@ -91,3 +91,15 @@
 /apps/web/components/safety-gate.tsx text eol=lf
 /apps/api/tire_api/safety_gate_alerts.py text eol=lf
 /apps/api/tests/test_safety_gate_alerts.py text eol=lf
+/apps/api/tests/test_safety_gate_monitoring.py text eol=lf
+/apps/api/tire_api/safety_gate_monitor_models.py text eol=lf
+/apps/api/tire_api/safety_gate_monitoring.py text eol=lf
+/apps/api/tire_api/safety_gate_monitor_routes.py text eol=lf
+/apps/api/tire_api/main.py text eol=lf
+/apps/api/tire_api/monitor_tasks.py text eol=lf
+/apps/worker/monitor.py text eol=lf
+/apps/web/components/safety-gate-monitoring.tsx text eol=lf
+/apps/web/components/safety-gate-values.ts text eol=lf
+/apps/web/components/task-center-values.ts text eol=lf
+/packages/domain-types/src/monitor-tasks.ts text eol=lf
+/scripts/monitor_tasks_frontend_qa.mjs text eol=lf

@@ -189,7 +189,7 @@ const syncHeaders = (owner: string) => {
 };
 
 type TaskStreamMessage = import("@tire/domain-types").MonitorTaskStreamMessage;
-const taskKinds = new Set(["tire", "recall", "recall_discovery"]);
+const taskKinds = new Set(["tire", "recall", "recall_discovery", "safety_gate"]);
 const taskPhases = new Set(["claimed", "running", "finished"]);
 const taskOutcomes = new Set(["running", "succeeded", "failed", "blocked", "interrupted"]);
 const boundedCursor = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value);
@@ -589,6 +589,20 @@ export const tireApi = {
     if (page.through_sequence !== undefined) query.set("through_sequence", String(page.through_sequence));
     return request<import("@tire/domain-types").SafetyGateAlertHistory>(`/v1/safety-gate/alerts/${encodeURIComponent(id)}/history?${query}`, { signal });
   },
+  safetyGateRules: (archived = false, offset = 0, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SafetyGatePage<import("@tire/domain-types").SafetyGateMonitorRule>>(`/v1/safety-gate-monitor-rules?archived=${archived}&offset=${offset}&limit=20`, { signal }),
+  safetyGateRule: (id: string, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SafetyGateRuleDetail>(`/v1/safety-gate-monitor-rules/${encodeURIComponent(id)}?mode=history`, { signal }),
+  createSafetyGateRule: (query: import("@tire/domain-types").SafetyGateMonitorQuery, settings: Omit<import("@tire/domain-types").SafetyGateRuleSettings, "archived">, key: string, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SafetyGateRuleWrite>("/v1/safety-gate-monitor-rules", { method: "POST", body: JSON.stringify({ query, ...settings }), headers: { "Idempotency-Key": key }, signal }),
+  reviseSafetyGateRule: (id: string, revision: number, settings: import("@tire/domain-types").SafetyGateRuleSettings, key: string, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SafetyGateRuleWrite>(`/v1/safety-gate-monitor-rules/${encodeURIComponent(id)}/revisions`, { method: "POST", body: JSON.stringify({ expected_revision: revision, ...settings }), headers: { "Idempotency-Key": key }, signal }),
+  safetyGateMonitorRuns: (id: string, offset = 0, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SafetyGatePage<import("@tire/domain-types").SafetyGateMonitorRun>>(`/v1/safety-gate-monitor-rules/${encodeURIComponent(id)}/runs?mode=history&offset=${offset}&limit=10`, { signal }),
+  safetyGateNotifications: (unread = false, offset = 0, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SafetyGatePage<import("@tire/domain-types").SafetyGateNotification>>(`/v1/safety-gate-notifications?mode=history&unread=${unread}&offset=${offset}&limit=20`, { signal }),
+  markSafetyGateNotification: (id: string, read: boolean, signal?: AbortSignal) =>
+    request<{ id: string; read_at: string | null }>(`/v1/safety-gate-notifications/${encodeURIComponent(id)}/read`, { method: "PUT", body: JSON.stringify({ read }), signal }),
   liveRecall: (query: import("@tire/domain-types").RecallQuery, signal?: AbortSignal, consentId?: string) => post<import("@tire/domain-types").RecallResult>("/v1/recalls/live-query", { query, fallback_policy: "ask", ...(consentId ? { consent_id: consentId } : {}) }, signal),
   recallHistory: (campaign: string, signal?: AbortSignal) => request<import("@tire/domain-types").RecallHistory>(`/v1/recalls/${encodeURIComponent(campaign)}/history?mode=history`, { signal }),
   recallEvidence: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").RecallEvidence>(`/v1/recall-evidence/${encodeURIComponent(id)}?mode=history`, { signal }),
