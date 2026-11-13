@@ -1,6 +1,6 @@
 # 胎迹 Agent 交接卡
 
-最新接手先读[简明交接卡](AGENT-HANDOFF-CURRENT.md)。最新已补 PostgreSQL 轮胎单事实／分页、Safety Gate 分页及冻结归属写入，分轮 41 个真实 PG 场景通过，SQLite 248 项通过；普通 PG 补充回归的 NHTSA Parser 升级失败仍须核对，备份恢复尚未执行，见[PG 验收](assurance/evidence/postgres-owned-reader-2026-11-13.md)。本文件下文保留此前各阶段详情，包括 Safety Gate AI [消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)、[AI 计划](plans/2026-11-13-safety-gate-ai.md)和[合同加固](assurance/evidence/safety-gate-ai-guards-2026-11-13.md)。真实模型、PG 部署／吞吐、公网和 Native 继续待验。
+最新接手先读[简明交接卡](AGENT-HANDOFF-CURRENT.md)。最新已优化 Parser 准备阶段并通过 84 项专项，受控 PG 快照独立恢复 10 项通过（167 表／963 行及原件、报告、归档），完整 PG 综合流程仍存在 8 秒预算超时，见[Parser 与恢复验收](assurance/evidence/parser-preparation-2026-11-13.md)。此前 PG 外部 Reader 分轮 41 场景、SQLite 248 项通过，见[PG 验收](assurance/evidence/postgres-owned-reader-2026-11-13.md)。本文件下文保留历史详情，包括 Safety Gate AI [消费者验收](assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)、[AI 计划](plans/2026-11-13-safety-gate-ai.md)和[合同加固](assurance/evidence/safety-gate-ai-guards-2026-11-13.md)。真实模型、PG 部署／吞吐、公网和 Native 继续待验。
 
 更新于2026-11-13。本卡为当前交接入口，前一阶段的详细记录保留于[11月12日交接卡](AGENT-HANDOFF-2026-11-12.md)。
 

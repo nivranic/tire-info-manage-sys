@@ -57,3 +57,5 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin '<PostgreSQL bin 
 `external-reader` 默认运行完整 41 场景。Python 入口的 `--checks` 可在受控集群环境内选择明确场景；未知或遗漏选择会使结果失败。不能手工传入生产连接串。
 
 下一步：实际 Native 宿主／设备、长期监控；PG 部署管理入口、权限与并发吞吐；真实 OpenAI Responses／Embeddings 条件齐备后的语义验收；其余发布 Gate。新 clone 必须重建环境并复跑，不能把本文当作现场验收。
+
+后续更新：已捕获 Parser 超时回执、减少准备阶段重复校验并通过 84 项专项；另完成该合成 PG 快照的全表与原件／报告／归档独立恢复。完整混合流程仍未通过，见[后续验收](parser-preparation-2026-11-13.md)，不能覆盖本文保留的原始失败。

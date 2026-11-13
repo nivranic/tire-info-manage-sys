@@ -164,6 +164,7 @@ TEST_MODULES = (
     'apps/api/tests/test_parser_releases.py',
     'apps/api/tests/test_parser_runtime.py',
     'apps/api/tests/test_parser_runtime_environment.py',
+    'apps/api/tests/test_parser_tree.py',
     'apps/api/tests/test_personalization.py',
     'apps/api/tests/test_personalization_review.py',
     'apps/api/tests/test_pirelli.py',

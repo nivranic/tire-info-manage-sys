@@ -20,7 +20,7 @@ import subprocess
 import shutil
 import sys
 import sysconfig
-from threading import Barrier
+from threading import Barrier, Lock
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -753,10 +753,42 @@ def run():
     REPORT['status'] = 'passed'
 
 
+def run_observed():
+    """Retain fixed Parser failure receipts even if a fixture returns unavailable.
+
+    No bodies, stderr, environment or arbitrary exception strings are recorded.
+    The original exception/limits remain unchanged; this adds no retry.
+    """
+    from unittest.mock import patch
+    from tire_api import parser_runtime
+
+    failures, lock = [], Lock()
+    original = parser_runtime._run_sync
+
+    def observe(*args, **kwargs):
+        try:
+            return original(*args, **kwargs)
+        except parser_runtime.ParserRunError as error:
+            receipt = error.receipt
+            entry = {'step': STEP, 'code': error.code, 'receipt': {
+                key: receipt.get(key) for key in ('run_id', 'source_id', 'parser_version',
+                    'bundle_id', 'execution_digest', 'deployment_revision', 'pid', 'exit_code',
+                    'reaped', 'elapsed_ms', 'stdout_bytes', 'stderr_bytes', 'limits_backend', 'limits')}}
+            with lock:
+                failures.append(entry)
+            raise
+
+    try:
+        with patch.object(parser_runtime, '_run_sync', observe):
+            run()
+    finally:
+        REPORT['parser_failure_receipts'] = failures
+
+
 if __name__ == '__main__':
     status = 0
     try:
-        run()
+        run_observed()
     except Exception as error:
         status = 1
         REPORT.update(status='failed', failure_step=STEP, error_type=type(error).__name__,

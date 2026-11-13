@@ -54,8 +54,8 @@ def digest(value):
     return hashlib.sha256(canonical(value)).hexdigest()
 
 
-def _plain_path(path, *, directory=None):
-    """Reject links/reparse points in every existing path component."""
+def _plain_path_info(path, *, directory=None):
+    """Validate every component once, retaining the leaf's no-follow metadata."""
     path = Path(path).absolute()
     for candidate in [*reversed(path.parents), path]:
         try:
@@ -64,12 +64,16 @@ def _plain_path(path, *, directory=None):
             raise BundleError('parser_bundle_missing') from None
         if stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400:
             raise BundleError('parser_bundle_link_forbidden')
-    info = path.stat()
     if directory is True and not stat.S_ISDIR(info.st_mode):
         raise BundleError('parser_bundle_integrity_failed')
     if directory is False and (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1):
         raise BundleError('parser_bundle_link_forbidden')
-    return path
+    return path, info
+
+
+def _plain_path(path, *, directory=None):
+    """Reject links/reparse points in every existing path component."""
+    return _plain_path_info(path, directory=directory)[0]
 
 
 def _environment():
@@ -93,21 +97,29 @@ def _tree(root, *, source=False):
 
     def walk(directory):
         nonlocal total
-        for path in sorted(directory.iterdir()):
-            _plain_path(path)
-            if path.is_dir():
+        for entry in sorted(directory.iterdir()):
+            path, info = _plain_path_info(entry)
+            if stat.S_ISDIR(info.st_mode):
                 if source and path.name in {'__pycache__', 'build'}:
                     continue
                 walk(path)
             else:
                 if source and path.suffix != '.py':
                     continue
-                _plain_path(path, directory=False)
-                if path.suffix != '.py' or path.stat().st_size > MAX_FILE_BYTES:
+                if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                    raise BundleError('parser_bundle_link_forbidden')
+                if path.suffix != '.py' or info.st_size > MAX_FILE_BYTES:
                     raise BundleError('parser_bundle_integrity_failed')
                 relative = path.relative_to(root).as_posix()
                 _checked_relative(relative)
                 with path.open('rb') as stream:
+                    # Recheck the actual opened object, not a second path walk.
+                    # A same-content replacement or newly added hardlink must
+                    # not pass merely because its bytes still match a manifest.
+                    opened = os.fstat(stream.fileno())
+                    if (not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                            or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino)):
+                        raise BundleError('parser_bundle_link_forbidden')
                     data = stream.read(MAX_FILE_BYTES + 1)
                 if len(data) > MAX_FILE_BYTES:
                     raise BundleError('parser_bundle_integrity_failed')
