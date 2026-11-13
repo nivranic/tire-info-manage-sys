@@ -22,7 +22,7 @@ from tire_api.parser_releases import (ParserDeploymentError, assert_selection_cu
 from tire_api.parser_provenance import parser_identity
 from tire_api.service import QueryService
 from test_parser_bundles import (BODY, QUERY, historical_install, mark_parser, trusted_copy,
-                                pre_bridgestone_install, pre_continental_install, pre_goodyear_install)
+                                pre_bridgestone_install, pre_continental_install, pre_goodyear_install, pre_safety_gate_install)
 from test_golden import evaluation_reference, fixture_expected, synthetic_set
 
 SOURCE = 'hankook-us'
@@ -49,7 +49,7 @@ def test_new_pirelli_bootstrap_seals_current_catalog_without_repinning_existing_
             new = bootstrap_source(db, 'pirelli-us')
             new_id, new_bundle = new.id, new.bundle_id
             assert new.revision == 1 and new.state == 'active' and new.action == 'bootstrap'
-            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._GOODYEAR_SOURCES)
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._SAFETY_GATE_SOURCES)
             assert new.bundle_id != old['hankook-us'][1]
             assert bootstrap_source(db, 'pirelli-us').id == new_id
             for source_id, checkpoint in old.items():
@@ -80,7 +80,7 @@ def test_new_jp_bootstrap_preserves_eleven_source_deployments(tmp_path, monkeypa
             new = bootstrap_source(db, 'bridgestone-jp')
             assert new.state == 'active' and new.revision == 1
             assert bootstrap_source(db, 'bridgestone-jp').id == new.id
-            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._GOODYEAR_SOURCES)
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._SAFETY_GATE_SOURCES)
             previous = bootstrap_source(db, 'hankook-us')
             assert (previous.id, previous.bundle_id, previous.revision, previous.descriptor) == checkpoint
             assert db.get(ParserBundle, checkpoint[1]).manifest == old_manifest
@@ -106,11 +106,37 @@ def test_new_cn_bootstrap_preserves_twelve_entry_deployments(tmp_path, monkeypat
             new = bootstrap_source(db, 'continental-cn')
             assert new.state == 'active' and new.revision == 1
             assert bootstrap_source(db, 'continental-cn').id == new.id
-            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._GOODYEAR_SOURCES)
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._SAFETY_GATE_SOURCES)
             previous = bootstrap_source(db, 'bridgestone-jp')
             assert (previous.id, previous.bundle_id, previous.revision, previous.descriptor) == checkpoint
             assert db.get(ParserBundle, checkpoint[1]).manifest == old_manifest
             assert 'adapters/continental.py' not in old_manifest['files']
+            assert db.scalar(select(func.count()).select_from(ParserDeploymentRevision)) == 2
+
+
+def test_new_safety_gate_bootstrap_preserves_fourteen_entry_deployments(tmp_path, monkeypatch):
+    source = trusted_copy(tmp_path, monkeypatch)
+    catalog = runtime.source_catalog()
+    pre_safety_gate_install(source)
+    app = create_app('sqlite:///' + (tmp_path / 'safety-bootstrap.db').as_posix(), RecordedRegistry())
+    with TestClient(app):
+        with monkeypatch.context() as patcher:
+            patcher.setattr(runtime, 'source_catalog', lambda: {key: value for key, value in catalog.items()
+                                                               if key in bundles._GOODYEAR_SOURCES})
+            with app.state.database.sessions() as db:
+                previous = bootstrap_source(db, 'goodyear-sg')
+                checkpoint = (previous.id, previous.bundle_id, previous.revision, deepcopy(previous.descriptor))
+                old_manifest = deepcopy(db.get(ParserBundle, previous.bundle_id).manifest)
+        trusted_copy(tmp_path, monkeypatch)
+        with app.state.database.sessions() as db:
+            new = bootstrap_source(db, 'eu-safety-gate')
+            assert new.state == 'active' and new.revision == 1
+            assert bootstrap_source(db, 'eu-safety-gate').id == new.id
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._SAFETY_GATE_SOURCES)
+            previous = bootstrap_source(db, 'goodyear-sg')
+            assert (previous.id, previous.bundle_id, previous.revision, previous.descriptor) == checkpoint
+            assert db.get(ParserBundle, checkpoint[1]).manifest == old_manifest
+            assert 'adapters/safety_gate.py' not in old_manifest['files']
             assert db.scalar(select(func.count()).select_from(ParserDeploymentRevision)) == 2
 
 
@@ -132,7 +158,7 @@ def test_new_sg_bootstrap_preserves_thirteen_entry_deployments(tmp_path, monkeyp
             new = bootstrap_source(db, 'goodyear-sg')
             assert new.state == 'active' and new.revision == 1
             assert bootstrap_source(db, 'goodyear-sg').id == new.id
-            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._GOODYEAR_SOURCES)
+            assert set(db.get(ParserBundle, new.bundle_id).manifest['parsers']) == set(bundles._SAFETY_GATE_SOURCES)
             previous = bootstrap_source(db, 'continental-cn')
             assert (previous.id, previous.bundle_id, previous.revision, previous.descriptor) == checkpoint
             assert db.get(ParserBundle, checkpoint[1]).manifest == old_manifest

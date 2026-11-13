@@ -26,7 +26,7 @@ class ChildDenied(PermissionError):
 # Public source bytes, never runtime arguments or credential-derived digests.
 REVIEWED = {
     'apps/api/tests/test_parser_runtime.py': 'ab6876a773acdac3d48e9dfe799d3284e55f25680741048c841b36bebec9e90b',
-    'apps/api/tests/test_parser_bundles.py': 'b6349e3589bee0bf83d8756e2aef20e0f2a1d3a68e0e1fa12a441a3d51c78f9e',
+    'apps/api/tests/test_parser_bundles.py': '0e5f0cdb74c528b8ba31571c7ca192eea82aa1222243cfa2ee87007754076a82',
     'apps/api/tests/test_adapter_import_behavior.py': 'e365639027b8fc681ce600856bf71382ddefab285130ec91eac5e5d72bc66d01',
     'apps/api/tests/test_auth_governance.py': '5a23fe46ccd753e72cfa97df7e6f274673ec60d977c5474e1e03a5430e63acb7',
     'apps/api/tests/test_auth_lifecycle.py': 'fc15caa941f3ec8fa89086ea51864fe01878552bd34319794305329a516af61a',
@@ -35,9 +35,9 @@ REVIEWED = {
     'apps/api/tests/test_raw_captures.py': '85cfcd2f6d66f453983ba3b1c5c610d4f44598df989839ce26a896b1289ff321',
     'apps/api/tests/test_device_ai_public_contract.py': '54d0bf931d0b08abdf3e8e8312d77f6ae937f6c9d0c3d35d1c6b7102e12f2312',
     'apps/api/tests/test_device_ai_routes_prepare.py': 'b2b2d8bd1dafae78307382ad9197652518908f0a524ae4eba5492488ca944c67',
-    'apps/api/tire_api/parser_child.py': '5bf3043f386258e131eebd21d701eef552858891e9639772830591ee514485a2',
+    'apps/api/tire_api/parser_child.py': '2dde90b8d30293578a7bc11973fd91c4f5bfe86dc9814c3d5f67a40520ff5fec',
     'apps/api/tire_api/parser_limits.py': 'af8b43d7e352e4b35126e743a3e63e16c5c54fcb9ac3e8e7853dc8bc1cc1adf6',
-    'apps/api/tire_api/parser_runtime.py': '3f285910f49dc8658b7fd76c759646d91f56f41d07eced25cdd75867d1fca719',
+    'apps/api/tire_api/parser_runtime.py': '72b8dce4650eff0b8df91594f99a8a304fda153c3fc987788afdf86370259594',
     'apps/api/tire_api/manage.py': '78d8598a3ce35e07b682415fb250a8c21583ddd363248c95ab8bd817c2c71bfd',
     'scripts/identity_contract.py': 'd518bf77981005c7808279119326f9c05eb77643a10cdb9e4e26b3939623ea05',
     'packages/api-client/tests/device-ai/json-esm-hook.mjs': 'f4327b15575b1f82f5bbc48469f84990a6b9127f6eb17ff4973b7a7fa6e5404d',

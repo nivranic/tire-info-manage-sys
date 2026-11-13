@@ -536,6 +536,7 @@ class Database:
         from . import vehicles  # noqa: F401
         from . import recall_models  # noqa: F401
         from . import recall_discovery  # noqa: F401
+        from . import safety_gate  # noqa: F401
         from . import recall_discovery_monitor_models  # noqa: F401
         from . import ai_stream_models  # noqa: F401
         from . import offline_models  # noqa: F401

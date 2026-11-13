@@ -125,9 +125,13 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
                 'body_encoding': 'binary'}
     if encoding != 'utf-8':
         return None
+    safety_gate_xml = False
+    if source_id == 'eu-safety-gate' and mime == 'application/xml':
+        from .adapters.safety_gate import permitted_url as permitted_safety_gate_url
+        safety_gate_xml = permitted_safety_gate_url(url, query)
     if (not isinstance(body, str) or not body or not isinstance(url, str) or len(url) > 8192
             or not isinstance(parser, str) or not 1 <= len(parser) <= 100
-            or not isinstance(mime, str) or mime not in {"text/html", "application/json", "text/javascript", "application/javascript", "text/plain"}):
+            or not isinstance(mime, str) or mime not in {"text/html", "application/json", "text/javascript", "application/javascript", "text/plain"} and not safety_gate_xml):
         return None
     if any(ord(character) < 32 for character in url + parser):
         return None
@@ -138,7 +142,7 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
                 or parsed.username or parsed.password
                 or parsed.fragment or "\\" in url):
             return None
-        if parsed.query and not permitted_url(url):
+        if parsed.query and not permitted_url(url) and not safety_gate_xml:
             from .adapters.registry import SPECS
             spec = SPECS.get(source_id) if isinstance(source_id, str) else None
             if spec is None or url not in spec.model_urls.values() or mime not in spec.content_types:
@@ -157,9 +161,19 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
 
 
 def capture_target(run: QueryRun) -> str:
+    if run.source_id == 'eu-safety-gate':
+        return 'recall'
     if run.source_id == 'nhtsa-us-recalls' and set(run.query) in ({'campaign_number'}, {'search', 'offset'}):
         return 'recall'
     return 'vehicle' if 'vehicle_id' in run.query else 'tire'
+
+
+def _recall_contract(source_id, query):
+    if source_id == 'eu-safety-gate':
+        from .adapters.safety_gate import query_url
+        return query_url(query), 'application/xml'
+    from .adapters.nhtsa import query_url
+    return query_url(query), 'application/json'
 
 
 def _binary_journal_bind(db: Session):
@@ -196,15 +210,15 @@ def before_parse_recorder(db: Session, run: QueryRun) -> Callable[[dict], None]:
                "target_kind": capture_target(run)}
     trusted_query = deepcopy(run.query)
     expected_url = None
+    expected_mime = None
     if context['target_kind'] == 'recall':
-        from .adapters.nhtsa import query_url
-        expected_url = query_url(run.query)
+        expected_url, expected_mime = _recall_contract(run.source_id, run.query)
     session_id, bind = run.session_id, db.get_bind()
     store = db.info.get('object_store')
 
     def record(observation: dict) -> None:
         values = validated_observation(observation, source_id=context['source_id'], query=trusted_query)
-        if values is None or expected_url and (values['source_url'] != expected_url or values['content_type'] != 'application/json'):
+        if values is None or expected_url and (values['source_url'] != expected_url or values['content_type'] != expected_mime):
             raise CaptureWriteError("evidence_capture_failed")
         try:
             binary = values.get('body_encoding') == 'binary'
@@ -259,8 +273,8 @@ def retain_rejected_response(db: Session, run: QueryRun, observation: Any,
             return None
     target = capture_target(run)
     if target == 'recall':
-        from .adapters.nhtsa import query_url
-        if values['source_url'] != query_url(run.query) or values['content_type'] != 'application/json':
+        expected_url, expected_mime = _recall_contract(run.source_id, run.query)
+        if values['source_url'] != expected_url or values['content_type'] != expected_mime:
             return None
     if stage == 'parser':
         reason = (parser_failure_reason(observation['parser_error']) if 'parser_error' in observation

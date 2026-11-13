@@ -134,10 +134,12 @@ _robots_requests: dict[str, float] = {}
 
 def sources() -> list[dict]:
     from .nhtsa import source_metadata
+    from .safety_gate import source_metadata as safety_gate_metadata
     disabled = {value.strip() for value in os.getenv("TI_DISABLED_SOURCES", "").split(",")}
     values = [spec.public() for spec in SPECS.values()]
     values.extend(dict(value) for value in PENDING_SOURCES if value["id"] not in SPECS)
     values.append(source_metadata())
+    values.append(safety_gate_metadata())
     for value in values:
         if value["id"] in disabled:
             value["status"] = "disabled"

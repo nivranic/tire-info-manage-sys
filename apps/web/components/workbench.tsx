@@ -746,7 +746,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
     { id: "open:knowledge", label: "打开历史证据检索", hint: "知识库", run: () => setKnowledgeOpen(true) },
     { id: "open:ai", label: "打开 AI 知识应用", hint: "证据分析", run: () => { setAiTarget(null); setAiOpen(true); } },
     { id: "open:reports", label: "打开证据报告库", hint: "历史报告", run: () => { setReportId(undefined); setReportsOpen(true); } },
-    { id: "open:recalls", label: "查询与监控召回公告", hint: "NHTSA", run: () => setRecallsOpen(true) },
+    { id: "open:recalls", label: "查询与监控召回公告", hint: "NHTSA / EU Safety Gate", run: () => setRecallsOpen(true) },
     { id: "open:account", label: "打开账户", hint: "AUTH", run: () => setAccountOpen(true) },
   ];
 
@@ -819,7 +819,7 @@ function WorkbenchContent({ pwa }: { pwa: boolean }) {
 
           {view === "compare" ? <div className="ai-entry compare-toolbar"><button className="secondary-button" onClick={() => setKnowledgeOpen(true)}>检索历史证据</button><button className="secondary-button" onClick={() => { setAiTarget(null); setAiOpen(true); }}>AI 调用记录与配置</button></div> : null}
           {view === "compare" ? <TestEvents sessionReady={!booting} /> : null}
-          {view === "sources" ? <><section className="quarantine-panel"><div className="panel-title"><span>轮胎安全召回</span><button type="button" data-recall-entry className="secondary-button" disabled={booting} onClick={() => setRecallsOpen(true)}>查询与监控召回公告</button></div><p className="quality-intro">NHTSA 美国监管公告 · 在线检索候选，核对官方范围与补救措施。</p></section><SourceInsight sources={sources} /><AiPricePlanning /><SourceManagement /><MonitorTaskCenter /><SourceQuality sources={sources} sessionReady={!booting} /><div className="method-note"><Icon name="shield" size={24} /><div><h3>证据保留原貌，事实保留版本</h3><p>每份快照记录来源 URL、观察时间、解析器版本和 SHA-256。选择查询结果中的「查看证据」，即可在右侧核对原始内容。</p><p>远端页面只作为纯文本证据展示，不执行其中的脚本或指令。</p></div></div></> : null}
+          {view === "sources" ? <><section className="quarantine-panel"><div className="panel-title"><span>轮胎安全召回</span><button type="button" data-recall-entry className="secondary-button" disabled={booting} onClick={() => setRecallsOpen(true)}>查询与监控召回公告</button></div><p className="quality-intro">NHTSA 美国召回与 EU Safety Gate 周报 · 在线核对官方范围与措施。</p></section><SourceInsight sources={sources} /><AiPricePlanning /><SourceManagement /><MonitorTaskCenter /><SourceQuality sources={sources} sessionReady={!booting} /><div className="method-note"><Icon name="shield" size={24} /><div><h3>证据保留原貌，事实保留版本</h3><p>每份快照记录来源 URL、观察时间、解析器版本和 SHA-256。选择查询结果中的「查看证据」，即可在右侧核对原始内容。</p><p>远端页面只作为纯文本证据展示，不执行其中的脚本或指令。</p></div></div></> : null}
 
           {savingSelection ? <SaveComparisonDialog selection={savingSelection} onClose={() => setSavingSelection(null)} onRefresh={() => { setSavingSelection(null); setComparisonRevision(value => value + 1); }} onSaved={() => { setSavingSelection(null); setSavedComparisonsRevision(value => value + 1); toast("已固定保存本次比较与引用证据。", "success"); }} /> : null}
           {garageTire ? <AssignTireDialog variant={garageTire} onClose={() => setGarageTire(null)} onSaved={() => { setGarageTire(null); navigate("garage"); toast("已保存当前轮胎记录，请核对前后轴。", "success"); }} /> : null}

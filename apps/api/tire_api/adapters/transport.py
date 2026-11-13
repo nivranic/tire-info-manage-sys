@@ -27,6 +27,7 @@ _TELEMETRY_SOURCES = {
     'www.hankooktire.com': 'hankook-us', 'www.pirelli.com': 'pirelli-us',
     'website-api.xiaomiev.com': 'xiaomi-su7', 'www.xiaomiev.com': 'xiaomi-su7',
     'api.nhtsa.gov': 'nhtsa',
+    'ec.europa.eu': 'eu-safety-gate',
     'tire.bridgestone.co.jp': 'bridgestone-jp',
     'www.continental-tires.cn': 'continental-cn',
     'www.goodyear.com.sg': 'goodyear-sg',

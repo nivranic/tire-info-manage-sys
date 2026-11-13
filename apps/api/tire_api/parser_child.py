@@ -184,6 +184,10 @@ def main():
             from tire_api.adapters.continental import parse_html
             _check_imports(package_root)
             payload = parse_html(body, query)
+        elif source_id == 'eu-safety-gate':
+            from tire_api.adapters.safety_gate import parse_xml
+            _check_imports(package_root)
+            payload = parse_xml(body, query)
         elif source_id == 'goodyear-sg':
             from tire_api.adapters.goodyear import parse_html
             _check_imports(package_root)

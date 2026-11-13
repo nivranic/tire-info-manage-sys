@@ -68,7 +68,7 @@ def strict_json(value):
 
 def _specs():
     from .adapters.michelin_regions import MICHELIN_REGIONS
-    from .adapters import hankook, toyo, xiaomi, nhtsa, pirelli, bridgestone, continental, goodyear
+    from .adapters import hankook, toyo, xiaomi, nhtsa, pirelli, bridgestone, continental, goodyear, safety_gate
     values = {'michelin-us': ('michelin-us-astro@2.0.0', 'tire', ['adapters/michelin.py', 'adapters/michelin_regions.py', 'adapters/registry.py'])}
     for source, config in MICHELIN_REGIONS.items():
         values[source] = (config['parser_version'], 'tire', ['adapters/michelin.py', 'adapters/michelin_regions.py', 'adapters/registry.py'])
@@ -76,6 +76,7 @@ def _specs():
         values[adapter.SOURCE_CONFIG['id']] = (adapter.PARSER_VERSION, 'tire', [f'adapters/{adapter.__name__.rsplit(".", 1)[1]}.py', 'adapters/registry.py'])
     values[xiaomi.SOURCE_ID] = (xiaomi.PARSER_VERSION, 'vehicle', ['adapters/xiaomi.py', 'adapters/xiaomi_first_generation_pdf.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py', 'db.py'])
     values[nhtsa.SOURCE_ID] = (nhtsa.PARSER_VERSION, 'recall', ['adapters/nhtsa.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py'])
+    values[safety_gate.SOURCE_ID] = (safety_gate.PARSER_VERSION, 'recall', ['adapters/safety_gate.py', 'adapters/transport.py', 'adapters/robots.py', 'captures.py'])
     from .document_pdf import PARSER_VERSION, SOURCE_ID
     values[SOURCE_ID] = (PARSER_VERSION, 'document', ['document_pdf.py'])
     return values
@@ -93,6 +94,8 @@ def query_fields(target_kind, query):
     if target_kind == 'vehicle':
         return {'vehicle_id'}
     if target_kind == 'recall':
+        if isinstance(query, dict) and 'operation' in query:
+            return {'operation'} if query.get('operation') == 'reports' else {'operation', 'report_id', 'reference'}
         return {'search', 'offset'} if isinstance(query, dict) and 'search' in query else {'campaign_number'}
     return {'model', 'size'}
 
@@ -298,7 +301,9 @@ def _run_sync(request, descriptor, cancelled, execution):
                                  'input_hash', 'execution_digest', 'deployment_revision'):
                         if response[name] != receipt[name]:
                             raise ValueError('invalid_response_identity')
-                    expected = dict if descriptor['target_kind'] in {'vehicle', 'document'} or descriptor['target_kind'] == 'recall' and 'search' in request['query'] else list
+                    expected = dict if (descriptor['target_kind'] in {'vehicle', 'document'}
+                        or descriptor['source_id'] == 'eu-safety-gate'
+                        or descriptor['target_kind'] == 'recall' and 'search' in request['query']) else list
                     if not isinstance(response['payload'], expected):
                         raise ValueError('invalid_payload_type')
                     bundles.verify_tree(package_root, request['manifest'])
