@@ -1,5 +1,7 @@
 # 胎迹 · 轮胎情报工作台
 
+当前接手入口为[简明 Agent 交接卡](docs/AGENT-HANDOFF-CURRENT.md)：汇总需求范围、完成情况、剩余工作和执行顺序。本次新增 Safety Gate 查询归属与许可证据绑定，外部告警读取 API／SDK 尚未接通，完整 V1 仍未完成。首个真实 AI 接口保持 OpenAI Responses API；Gemini 是历史可选适配器，真实调用待验。
+
 Safety Gate持续回退授权已接通正常查询与Web：周报索引和指定周报分开授权，支持会话、来源和查询类型范围；保持在线优先、拒绝优先、逐次持久消费及读后重核，后台监控和AI不继承。最终六模块116项、SDK7项、Web55项、三端类型、414输入生产构建、PostgreSQL34项、正常HTTP26项和生产Web45项通过。关闭后29项核对保留185表全部旧行旧列及15份原件，6份测试策略已撤销，自有资源已关闭。真实外部来源与模型调用0。[持续授权验收](docs/assurance/evidence/safety-gate-fallback-2026-11-13.md)
 
 Safety Gate持续监控、变化提醒与任务状态已接通正常Worker、API、共享SDK和生产Web。默认每6小时滚动核验最近4份英文周报，可配置1至12份及1至168小时。最终十模块215通过，815输入稳定、资源关闭、非自检拒绝0；Web55项、任务SDK13项、三端类型及414输入生产构建通过。真实官网与HTTP27项、PostgreSQL24项通过，SQLite旧库177→185表保留原列原行。已修复生产任务SSE缓冲，代理首块从25054ms降到212ms，页面同一任务336ms内更新完成态。自然长周期与真实新变化通知仍待验收。[监控验收](docs/assurance/evidence/safety-gate-monitoring-2026-11-13.md)

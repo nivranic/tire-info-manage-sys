@@ -1,3 +1,9 @@
+## 最新收尾交接入口（2026-11-13）
+
+先读[简明Agent接手卡](AGENT-HANDOFF-CURRENT.md)，包括需求总范围、12模块状态、未完成项、用户已确定的决定和下一步。最新交付为Safety Gate查询归属与受管许可证据绑定；外部API、scope、分页、SDK与Web仍待实施。首个真实AI接口继续采用OpenAI Responses API，Gemini仅为历史可选适配器。完整V1尚未完成。
+
+验证范围与原始失败见[本次验收](assurance/evidence/safety-gate-external-foundation-2026-11-13.md)。下文保留此前阶段记录。
+
 ## 当前交接入口（2026-11-13）
 
 先读[2026-11-13 Agent交接卡](AGENT-HANDOFF-2026-11-13.md)，其中汇总12模块、10项发布Gate、13项SLO、15项决策、当前进度、未完成项与接手顺序。

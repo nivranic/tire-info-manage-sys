@@ -324,11 +324,17 @@ def test_023_additive_file_migration_preserves_every_old_row_and_ddl(pre023):
     database.initialize()
     after = snapshot(database)
     assert first == after
-    assert after['tables'] - before['tables'] == set(TABLES)
+    # The exact 023 delta is checked at its version INSERT above. Full current
+    # initialization also creates the later source/document FTS5 projections.
+    later_search_tables = {prefix + suffix
+        for prefix in ('source_text_fts', 'document_text_fts')
+        for suffix in ('', '_data', '_idx', '_content', '_docsize', '_config')}
+    assert after['tables'] - before['tables'] == set(TABLES) | later_search_tables
     assert [row for row in after['schema'] if row[2] in before['tables']] == before['schema']
     for table in before['tables'] - {'tire_schema_versions'}:
         assert after['rows'][table] == before['rows'][table], table
     assert all(not after['rows'][table] for table in TABLES)
+    assert all(not after['rows'][table] for table in ('source_text_fts', 'document_text_fts'))
     with database.engine.connect() as connection:
         assert connection.execute(text('SELECT version FROM tire_schema_versions ORDER BY version')).scalars().all() == EXPECTED_SCHEMA_VERSIONS
         assert connection.exec_driver_sql('PRAGMA integrity_check').scalar_one() == 'ok'

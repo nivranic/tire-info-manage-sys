@@ -442,6 +442,8 @@ class GovernanceStore:
             return self._load(db, grant_id)[1].summary(now=self._now())
 
     def _bindings(self, db, source_id, coverage):
+        if source_id == 'eu-safety-gate':
+            return self._safety_gate_bindings(db, coverage)
         result, total = [], 0
         for item in coverage["observations"]:
             snapshot = db.get(Snapshot, item["snapshot_id"])
@@ -466,6 +468,46 @@ class GovernanceStore:
             result.append({**item, "source_id": source_id, "verification_id": selected[0].id,
                            "query_id": selected[1].id, "query_key": snapshot.query_key,
                            "parser_identity_digest": _digest(snapshot.parser_identity) if snapshot.parser_identity is not None else None})
+        return result
+
+    def _safety_gate_bindings(self, db, coverage):
+        from fastapi import HTTPException
+        from .safety_gate import SafetyGateSnapshot, SafetyGateVerification, checked_snapshot
+
+        result, total = [], 0
+        for item in coverage['observations']:
+            snapshot = db.get(SafetyGateSnapshot, item['snapshot_id'])
+            if (snapshot is None or snapshot.raw_hash != item['raw_hash']
+                    or snapshot.parser_version != item['parser_version']
+                    or type(snapshot.body) is not str or not snapshot.body
+                    or len(snapshot.body) > 8 * 1024 * 1024
+                    or type(snapshot.query) is not dict or snapshot.query.get('operation') != 'report'):
+                _fail('observation_binding_invalid')
+            try:
+                body_size = len(snapshot.body.encode('utf-8', errors='strict'))
+                if body_size > 8 * 1024 * 1024:
+                    _fail('observation_binding_invalid')
+                total += body_size
+                if total > 32 * 1024 * 1024:
+                    _fail('binding_capacity')
+                checked_snapshot(snapshot)
+            except (HTTPException, UnicodeError, TypeError, KeyError, AttributeError, RecursionError):
+                _fail('observation_binding_invalid')
+            selected = db.execute(select(SafetyGateVerification, QueryRun)
+                .join(QueryRun, QueryRun.id == SafetyGateVerification.query_id)
+                .where(SafetyGateVerification.snapshot_id == snapshot.id,
+                       SafetyGateVerification.query_key == snapshot.query_key,
+                       SafetyGateVerification.status.in_(('ok', 'not_modified')),
+                       QueryRun.source_id == 'eu-safety-gate', QueryRun.query_key == snapshot.query_key,
+                       QueryRun.state == 'live')
+                .order_by(SafetyGateVerification.verified_at.desc(), SafetyGateVerification.id.desc())
+                .limit(1)).first()
+            if (selected is None or _digest(selected[1].query) != snapshot.query_key
+                    or selected[0].parser_identity != snapshot.parser_identity):
+                _fail('observation_binding_invalid')
+            result.append({**item, 'source_id': 'eu-safety-gate', 'verification_id': selected[0].id,
+                           'query_id': selected[1].id, 'query_key': snapshot.query_key,
+                           'parser_identity_digest': _digest(snapshot.parser_identity) if snapshot.parser_identity is not None else None})
         return result
 
     def _prepare(self, db, actor, request, terms, current, rows, now):

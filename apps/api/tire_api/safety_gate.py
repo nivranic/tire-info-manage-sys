@@ -194,23 +194,27 @@ class SafetyGateService:
         self.shared.block_source_access(run, error)
         return self.response(query, run.state, query_id=run.id, reason=run.reason)
 
-    async def execute(self, request, session_id, *, audience='internal'):
+    async def execute(self, request, session_id, *, audience='internal', owner_actor=None):
         from .telemetry import observe
         with observe('source.query', component='crawler', source=source.SOURCE_ID) as operation:
-            result = await self._execute(request, session_id, audience=audience)
+            result = await self._execute(request, session_id, audience=audience, owner_actor=owner_actor)
             operation.finish(result['data_state'])
             return result
 
-    async def _execute(self, request, session_id, *, audience='internal'):
+    async def _execute(self, request, session_id, *, audience='internal', owner_actor=None):
         query = request.query.canonical()
         key = digest(query)
         if request.consent_id:
             return self.consume_consent(request, session_id, audience=audience)
         run = QueryRun(id=uid(), session_id=session_id, source_id=source.SOURCE_ID, query=query,
             query_key=key, fallback_policy=request.fallback_policy)
-        self.db.add(run)
-        self.shared.audit(session_id, 'safety_gate_online_started', run.id, query=query)
-        self.db.commit()
+        if owner_actor is None:
+            self.db.add(run)
+            self.shared.audit(session_id, 'safety_gate_online_started', run.id, query=query)
+            self.db.commit()
+        else:
+            from .query_ownership import create_query_with_owner
+            create_query_with_owner(self.db, run, owner_actor, lock_ingestion=self.shared.lock_ingestion)
         try:
             self.shared.pin_source_access(run)
         except SourceAccessBlocked as error:
@@ -399,8 +403,13 @@ def register_safety_gate_routes(app: FastAPI):
     @app.post('/v1/safety-gate/query')
     async def query(payload: SafetyGateRequest, request: Request, db: Session = Depends(get_db)):
         adapter = getattr(app.state, 'safety_gate_adapter', None) or source
-        return await SafetyGateService(db, adapter, app.state.registry).execute(payload, request.state.session_id,
-            audience='programmatic')
+        from .query_ownership import QueryOwnershipError, capture_query_actor
+        try:
+            actor = None if payload.consent_id else capture_query_actor(db, request.state.session_id)
+            return await SafetyGateService(db, adapter, app.state.registry).execute(payload, request.state.session_id,
+                audience='programmatic', owner_actor=actor)
+        except QueryOwnershipError as error:
+            raise HTTPException(401 if error.code == 'query_actor_invalid' else 409, {'code': error.code}) from None
 
     @app.get('/v1/safety-gate/history')
     def history(request: Request, operation: Literal['reports', 'report'], mode: Literal['history'],
