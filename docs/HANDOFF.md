@@ -1,3 +1,7 @@
+## 最新 PostgreSQL 升级合同兼容交付（2026-11-14）
+
+先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。已修复 001–004 增量迁移因列物理顺序导致的合同误拒绝；@2 按表名／列名排序，结构语义仍严格比较，需重新生成并批准空参考合同。141 项受管回归、29 项真实 PG／TLS 检查通过；正式历史 035 建库升级后合同匹配，154 张旧表 38 行及版本时间保留。更早 015 实测触发 vehicle_binary_migration_required，下一步实现 PG 024 显式迁移、备份／回退及完整 DML 最小权限。失败与范围见[升级合同验收](assurance/evidence/postgres-upgrade-contract-2026-11-14.md)。完整 V1 仍未完成，下文保留此前交付时点。
+
 ## 最新 PostgreSQL 运行启动分离交付（2026-11-14）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。显式 verify 通过源码绑定、外部摘要固定的空参考 schema 合同校验后启动 API／Worker，不执行 DDL；默认 migrate 保留。最终 141 项受管回归、22 项真实隔离 PG／TLS 验收通过，含可选 vector、非拥有者运行和结构篡改拒绝。五个集群及临时秘密／端口已清理。运行角色使用较宽 DML，旧 PG 升级库兼容、完整业务 DML 最小权限、生产部署和完整 V1 仍待完成。配置见[运行启动方案](POSTGRES-RUNTIME-SCHEMA.md)，失败与证据边界见[验收记录](assurance/evidence/postgres-runtime-schema-2026-11-14.md)。下文是此前交付时点，不代表当前仍缺显式 verify 能力。

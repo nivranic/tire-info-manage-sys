@@ -163,6 +163,7 @@ def run():
             assert response.status_code == 200 and response.json()['data_state'] == 'live'
             evidence = '/v1/evidence/' + response.json()['provenance'][0]['snapshot_id']
             assert client.get(evidence).status_code == 200
+            historical_cookies = dict(client.cookies)
         assert set(Base.metadata.tables) == {row[0] for row in contract['catalog']['relations'] if row[0] in Base.metadata.tables}
         REPORT['startup_statement_types'] = sorted(set(startup))
         record(STEP)
@@ -184,6 +185,71 @@ def run():
         assert worker_result['results'] == []
         assert worker_statements and set(worker_statements) <= {'SELECT','SET','SHOW','INSERT','UPDATE','DELETE','WITH'}
         REPORT['worker_statement_types'] = sorted(set(worker_statements))
+        record(STEP)
+
+        STEP = 'legacy_001_004_upgrade_preserves_rows_and_matches_reference'
+        # Same synthetic predecessor shape as the core acceptance; this is not
+        # a recovered deployment database or an archived historical release.
+        removed_columns = {
+            'verifications': ['etag', 'last_modified', 'parser_identity'],
+            'alert_rule_revisions': ['conditions'],
+            'query_runs': ['selection_filters'],
+            **{name: ['parser_identity'] for name in (
+                'snapshots', 'raw_captures', 'rejected_observations', 'source_quarantines',
+                'vehicle_snapshots', 'vehicle_verifications', 'vehicle_quarantines')},
+        }
+        old_versions = ('001_verification_validators', '002_monitor_rule_conditions',
+                        '003_parser_release_provenance', '004_query_selection_filters')
+
+        def legacy_rows(connection):
+            result = {}
+            for table in sorted(Base.metadata.tables):
+                rows = []
+                for row in connection.exec_driver_sql(f'SELECT to_jsonb(t) FROM public."{table}" t').scalars():
+                    for column in removed_columns.get(table, ()):
+                        row.pop(column, None)
+                    rows.append(json.dumps(row, sort_keys=True, separators=(',', ':')))
+                result[table] = sorted(rows)
+            return result
+
+        with patch.dict(os.environ):
+            for key in ('TI_DATABASE_SCHEMA_MODE', 'TI_DATABASE_SCHEMA_CONTRACT', 'TI_DATABASE_SCHEMA_SHA256'):
+                os.environ.pop(key, None)
+            migration_db = Database(url(target_name).render_as_string(hide_password=False))
+        try:
+            with migration_db.engine.begin() as connection:
+                for table, columns in removed_columns.items():
+                    for column in columns:
+                        connection.exec_driver_sql(f'ALTER TABLE public."{table}" DROP COLUMN "{column}"')
+                for version in old_versions:
+                    connection.execute(text('DELETE FROM public.tire_schema_versions WHERE version=:version'), {'version': version})
+                old_rows = legacy_rows(connection)
+                remaining_versions = connection.exec_driver_sql('SELECT version, applied_at FROM public.tire_schema_versions ORDER BY version').all()
+                assert old_rows['query_runs'] and old_rows['snapshots'] and old_rows['verifications']
+            migration_db.initialize()
+            with migration_db.engine.connect() as connection:
+                assert legacy_rows(connection) == old_rows
+                for table, columns in removed_columns.items():
+                    predicate = ' OR '.join(f'"{column}" IS NOT NULL' for column in columns)
+                    assert connection.exec_driver_sql(f'SELECT count(*) FROM public."{table}" WHERE {predicate}').scalar() == 0
+                all_versions = connection.exec_driver_sql('SELECT version, applied_at FROM public.tire_schema_versions ORDER BY version').all()
+                assert [row for row in all_versions if row.version not in old_versions] == remaining_versions
+            verify_schema(migration_db.engine, contract_path, digest)
+            record(STEP)
+            STEP = 'legacy_001_004_repeated_migration_is_stable'
+            migration_db.initialize()
+            with migration_db.engine.connect() as connection:
+                assert legacy_rows(connection) == old_rows
+                assert connection.exec_driver_sql('SELECT version, applied_at FROM public.tire_schema_versions ORDER BY version').all() == all_versions
+            verify_schema(migration_db.engine, contract_path, digest)
+            record(STEP)
+        finally:
+            migration_db.close()
+        STEP = 'legacy_001_004_nonowner_api_reads_old_evidence_and_new_query'
+        upgraded_app = create_app(limited_url, FixtureRegistry())
+        with TestClient(upgraded_app, cookies=historical_cookies) as client:
+            assert client.get(evidence).status_code == 200
+            assert live(client).status_code == 200
         record(STEP)
 
         STEP = 'runtime_cannot_perform_owner_ddl'
@@ -211,6 +277,10 @@ def run():
             'missing_table': 'DROP TABLE public.knowledge_index_state',
             'missing_column': 'ALTER TABLE public.users DROP COLUMN display_name',
             'column_type': 'ALTER TABLE public.users ALTER COLUMN display_name TYPE text',
+            'column_default': "ALTER TABLE public.users ALTER COLUMN display_name SET DEFAULT 'unreviewed'",
+            'column_nullable': 'ALTER TABLE public.users ALTER COLUMN display_name DROP NOT NULL',
+            'renamed_column': 'ALTER TABLE public.users RENAME COLUMN display_name TO renamed_display_name',
+            'extra_column': 'ALTER TABLE public.users ADD COLUMN unexpected text',
             'missing_constraint': 'ALTER TABLE public.external_fact_license_evidence DROP CONSTRAINT ck_external_fact_evidence_size',
             'missing_index': 'DROP INDEX public.ix_knowledge_search_vector',
             'disabled_trigger': 'ALTER TABLE public.external_fact_grant_revisions DISABLE TRIGGER external_fact_grant_revisions_no_update',

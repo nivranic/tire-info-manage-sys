@@ -11,7 +11,7 @@ import re
 from sqlalchemy import text
 
 
-SCHEMA = 'postgres-runtime-schema@1'
+SCHEMA = 'postgres-runtime-schema@2'
 MAX_BYTES = 8 * 1024 * 1024
 MAX_ROWS = 20000
 OVERSIZE = '__tire_schema_value_too_large__'
@@ -62,7 +62,9 @@ QUERIES = {
         "LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum "
         "LEFT JOIN pg_catalog.pg_collation co ON co.oid=a.attcollation "
         "LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid=co.collnamespace " + _PUBLIC +
-        " AND c.relkind IN ('r','p','v','m','f','S') ORDER BY c.relname,a.attnum",
+        # ADD COLUMN appends physically, even when the logical column matches a
+        # fresh schema. Named application columns have no positional contract.
+        " AND c.relkind IN ('r','p','v','m','f','S') ORDER BY c.relname,a.attname",
     'constraints': "SELECT c.relname,k.conname,k.contype,k.condeferrable,k.condeferred,k.convalidated,k.connoinherit," +
         _bounded('pg_get_constraintdef(k.oid,false)') + " FROM pg_catalog.pg_class c "
         "JOIN pg_catalog.pg_constraint k ON k.conrelid=c.oid " + _PUBLIC + " ORDER BY c.relname,k.conname",
