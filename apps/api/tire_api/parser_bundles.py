@@ -90,14 +90,22 @@ def _environment():
             'machine': platform.machine().lower(), 'dependencies': dict(sorted(dependencies.items()))}
 
 
-def _tree(root, *, source=False):
+def _checkpoint(check):
+    if check is not None:
+        check()
+
+
+def _tree(root, *, source=False, checkpoint=None):
+    _checkpoint(checkpoint)
     root = _plain_path(root, directory=True)
     found = {}
     total = 0
 
     def walk(directory):
         nonlocal total
+        _checkpoint(checkpoint)
         for entry in sorted(directory.iterdir()):
+            _checkpoint(checkpoint)
             path, info = _plain_path_info(entry)
             if stat.S_ISDIR(info.st_mode):
                 if source and path.name in {'__pycache__', 'build'}:
@@ -112,7 +120,9 @@ def _tree(root, *, source=False):
                     raise BundleError('parser_bundle_integrity_failed')
                 relative = path.relative_to(root).as_posix()
                 _checked_relative(relative)
+                _checkpoint(checkpoint)
                 with path.open('rb') as stream:
+                    _checkpoint(checkpoint)
                     # Recheck the actual opened object, not a second path walk.
                     # A same-content replacement or newly added hardlink must
                     # not pass merely because its bytes still match a manifest.
@@ -121,6 +131,7 @@ def _tree(root, *, source=False):
                             or (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino)):
                         raise BundleError('parser_bundle_link_forbidden')
                     data = stream.read(MAX_FILE_BYTES + 1)
+                _checkpoint(checkpoint)
                 if len(data) > MAX_FILE_BYTES:
                     raise BundleError('parser_bundle_integrity_failed')
                 total += len(data)
@@ -128,6 +139,7 @@ def _tree(root, *, source=False):
                     raise BundleError('parser_bundle_too_large')
                 found[relative] = data
     walk(root)
+    _checkpoint(checkpoint)
     if not found:
         raise BundleError('parser_bundle_integrity_failed')
     return found
@@ -229,29 +241,35 @@ def checked_manifest(manifest, *, protocol, limits, environment=True):
         raise BundleError('parser_bundle_manifest_invalid') from None
 
 
-def verify_tree(package_root, manifest):
+def verify_tree(package_root, manifest, *, checkpoint=None):
     """Files must match exactly; extra caches/code cannot affect imports."""
-    if _metadata(_tree(package_root)) != manifest['files']:
+    if _metadata(_tree(package_root, checkpoint=checkpoint)) != manifest['files']:
         raise BundleError('parser_bundle_integrity_failed')
+    _checkpoint(checkpoint)
 
 
-def copy_verified(package_root, manifest, destination, *, source=False):
-    values = _tree(package_root, source=source)
+def copy_verified(package_root, manifest, destination, *, source=False, checkpoint=None):
+    values = _tree(package_root, source=source, checkpoint=checkpoint)
     if _metadata(values) != manifest['files']:
         raise BundleError('parser_bundle_integrity_failed')
     destination = Path(destination)
+    _checkpoint(checkpoint)
     destination.mkdir(parents=True, exist_ok=False)
     _plain_path(destination, directory=True)
     for name, data in values.items():
+        _checkpoint(checkpoint)
         path = destination / name
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('xb') as stream:
+            _checkpoint(checkpoint)
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-    verify_tree(destination, manifest)
-    if _metadata(_tree(package_root, source=source)) != manifest['files']:
+        _checkpoint(checkpoint)
+    verify_tree(destination, manifest, checkpoint=checkpoint)
+    if _metadata(_tree(package_root, source=source, checkpoint=checkpoint)) != manifest['files']:
         raise BundleError('parser_bundle_integrity_failed')
+    _checkpoint(checkpoint)
 
 
 def _store_root(*, create=False):
@@ -314,24 +332,29 @@ def seal_deployed_bundle():
         raise BundleError('parser_bundle_storage_unavailable') from None
 
 
-def verify_bundle(manifest):
+def verify_bundle(manifest, *, checkpoint=None):
+    _checkpoint(checkpoint)
     runtime = _policy()
     manifest = checked_manifest(manifest, protocol=runtime.PROTOCOL, limits=runtime.limits())
+    _checkpoint(checkpoint)
     try:
         root = _store_root() / 'sha256' / manifest['bundle_id']
         _plain_path(root, directory=True)
         if {path.name for path in root.iterdir()} != {'manifest.json', 'package'}:
             raise BundleError('parser_bundle_integrity_failed')
         stored = _plain_path(root / 'manifest.json', directory=False)
+        _checkpoint(checkpoint)
         with stored.open('rb') as stream:
+            _checkpoint(checkpoint)
             stored_bytes = stream.read(128 * 1024 + 1)
+        _checkpoint(checkpoint)
         if len(stored_bytes) > 128 * 1024 or stored_bytes != canonical(manifest):
             raise BundleError('parser_bundle_integrity_failed')
         package = _plain_path(root / 'package', directory=True)
         if {path.name for path in package.iterdir()} != {'tire_api'}:
             raise BundleError('parser_bundle_integrity_failed')
         package_root = package / 'tire_api'
-        verify_tree(package_root, manifest)
+        verify_tree(package_root, manifest, checkpoint=checkpoint)
         return {'bundle_id': manifest['bundle_id'], 'manifest': manifest, 'package_root': package_root}
     except BundleError:
         raise

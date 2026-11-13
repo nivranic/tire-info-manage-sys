@@ -312,6 +312,106 @@ def test_preparation_budget_stops_before_process_spawn(monkeypatch, stage, failu
     assert receipt['stdout_bytes'] == receipt['stderr_bytes'] == 0
 
 
+@pytest.mark.parametrize('stage', ['source_read', 'destination_write', 'destination_read',
+                                   'source_recheck', 'result_recheck'])
+@pytest.mark.parametrize('failure', ['timeout', 'cancelled'])
+def test_file_preparation_and_result_checks_stop_after_expired_io(monkeypatch, stage, failure):
+    """A completed slow operation must not be followed by another file open."""
+    clock = {'now': 100.0}
+    observed = {'running': False, 'expired': False, 'phase': None, 'later_opens': [], 'processes': []}
+    counts = {'source': 0, 'destination': 0}
+    original_run, original_tree = runtime._run_sync, runtime.bundles._tree
+    original_open, original_fsync, original_popen = Path.open, os.fsync, runtime.subprocess.Popen
+    monkeypatch.setattr(runtime, 'time', SimpleNamespace(monotonic=lambda: clock['now'], sleep=time.sleep))
+
+    def expire():
+        if failure == 'timeout':
+            clock['now'] += runtime.TIMEOUT_SECONDS
+        else:
+            observed['cancelled'].set()
+        observed['expired'] = True
+
+    def run(request, descriptor, cancelled, execution):
+        observed.update(running=True, cancelled=cancelled)
+        try:
+            return original_run(request, descriptor, cancelled, execution)
+        finally:
+            observed['running'] = False
+
+    def tree(root, **kwargs):
+        previous = observed['phase']
+        if observed['running']:
+            kind = 'source' if Path(root) == runtime._ROOT else 'destination'
+            counts[kind] += 1
+            observed['phase'] = ({('source', 1): 'source_read', ('source', 2): 'source_recheck',
+                                  ('destination', 1): 'destination_read',
+                                  ('destination', 2): 'result_recheck'}.get((kind, counts[kind])))
+        try:
+            return original_tree(root, **kwargs)
+        finally:
+            observed['phase'] = previous
+
+    class SlowRead:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def __getattr__(self, name):
+            return getattr(self.stream, name)
+
+        def __enter__(self):
+            self.stream.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.stream.__exit__(*args)
+
+        def read(self, *args):
+            value = self.stream.read(*args)
+            if observed['running'] and not observed['expired'] and observed['phase'] == stage:
+                expire()
+            return value
+
+    def open_file(self, *args, **kwargs):
+        if observed['running'] and observed['expired']:
+            observed['later_opens'].append(self.name)
+        return SlowRead(original_open(self, *args, **kwargs))
+
+    def fsync(fd):
+        value = original_fsync(fd)
+        if stage == 'destination_write' and observed['running'] and not observed['expired']:
+            expire()
+        return value
+
+    def popen(*args, **kwargs):
+        assert stage == 'result_recheck', 'expired preparation must never spawn'
+        process = original_popen(*args, **kwargs)
+        observed['processes'].append(process)
+        return process
+
+    monkeypatch.setattr(runtime, '_run_sync', run)
+    monkeypatch.setattr(runtime.bundles, '_tree', tree)
+    monkeypatch.setattr(Path, 'open', open_file)
+    monkeypatch.setattr(os, 'fsync', fsync)
+    monkeypatch.setattr(runtime.subprocess, 'Popen', popen)
+    with pytest.raises(runtime.ParserRunError) as raised:
+        execute()
+    assert raised.value.code == 'parser_' + failure
+    assert observed['expired'] and observed['later_opens'] == []
+    receipt = raised.value.receipt
+    if stage == 'result_recheck':
+        assert receipt['reaped'] and observed['processes'][0].poll() is not None
+    else:
+        assert receipt['pid'] is None and observed['processes'] == []
+    held = 0
+    try:
+        for _ in range(runtime.MAX_CONCURRENT):
+            assert runtime._slots.acquire(blocking=False)
+            held += 1
+    finally:
+        for _ in range(held):
+            runtime._slots.release()
+
+
 @pytest.mark.parametrize('stage', ['limits', 'writer'])
 @pytest.mark.parametrize('failure', ['timeout', 'cancelled'])
 def test_preparation_budget_never_sends_go_and_reaps_child(monkeypatch, stage, failure):

@@ -195,6 +195,12 @@ def _run_sync(request, descriptor, cancelled, execution):
     threads, buffers, errors = [], {'stdout': bytearray(), 'stderr': bytearray()}, []
     failure = None
     response = None
+
+    def check_budget():
+        # Cooperative checkpoints stop between filesystem operations. They do
+        # not interrupt an OS call or shorten mandatory process/file cleanup.
+        _check_preparation_budget(cancelled, deadline)
+
     try:
         while not acquired:
             if cancelled.is_set():
@@ -210,11 +216,12 @@ def _run_sync(request, descriptor, cancelled, execution):
             try:
                 package_root = Path(directory) / 'package' / 'tire_api'
                 if execution['sealed']:
-                    source_root = bundles.verify_bundle(request['manifest'])['package_root']
+                    source_root = bundles.verify_bundle(request['manifest'], checkpoint=check_budget)['package_root']
                 else:
                     source_root = execution['source_root']
                 _check_preparation_budget(cancelled, deadline)
-                bundles.copy_verified(source_root, request['manifest'], package_root, source=not execution['sealed'])
+                bundles.copy_verified(source_root, request['manifest'], package_root,
+                                      source=not execution['sealed'], checkpoint=check_budget)
                 _check_preparation_budget(cancelled, deadline)
                 command = [*_command(), '--execution-root', str(package_root.parent)]
                 environment = _environment(directory)
@@ -306,13 +313,14 @@ def _run_sync(request, descriptor, cancelled, execution):
                         or descriptor['target_kind'] == 'recall' and 'search' in request['query']) else list
                     if not isinstance(response['payload'], expected):
                         raise ValueError('invalid_payload_type')
-                    bundles.verify_tree(package_root, request['manifest'])
+                    bundles.verify_tree(package_root, request['manifest'], checkpoint=check_budget)
                     if execution['sealed']:
-                        bundles.verify_bundle(request['manifest'])
-                    elif bundles._metadata(bundles._tree(source_root, source=True)) != request['manifest']['files']:
+                        bundles.verify_bundle(request['manifest'], checkpoint=check_budget)
+                    elif bundles._metadata(bundles._tree(source_root, source=True, checkpoint=check_budget)) != request['manifest']['files']:
                         raise ParserRunError('parser_code_mismatch')
                     if descriptor_for_manifest(request['manifest'], descriptor['source_id'])['execution_digest'] != descriptor['execution_digest']:
                         raise ParserRunError('parser_code_mismatch')
+                    check_budget()
                 except (ValueError, TypeError, KeyError, RecursionError, UnicodeError):
                     raise ParserRunError('parser_protocol_invalid') from None
             finally:

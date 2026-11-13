@@ -98,8 +98,8 @@ def test_source_changes_during_copy_are_rejected(tmp_path, monkeypatch):
     destination = tmp_path / 'copied'
     original = bundles.verify_tree
 
-    def mutate_source(checked, manifest):
-        original(checked, manifest)
+    def mutate_source(checked, manifest, **kwargs):
+        original(checked, manifest, **kwargs)
         (root / 'adapter.py').write_bytes(b'value = 2\n')
 
     monkeypatch.setattr(bundles, 'verify_tree', mutate_source)
