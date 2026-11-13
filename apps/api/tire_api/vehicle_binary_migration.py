@@ -228,6 +228,8 @@ def _sqlite_objects(connection):
 
 
 def _columns(connection, table):
+    if getattr(getattr(connection, "dialect", None), "name", None) == "postgresql":
+        return {column["name"]: column for column in inspect(connection).get_columns(table, schema="public")}
     return {row[1]: row for row in _rows(connection, "PRAGMA table_info(" + _quote(table) + ")")}
 
 
@@ -478,8 +480,11 @@ def _digest(value):
 def _validate_evidence(connection):
     """Only fixed integrity errors escape; no row or credential digest is logged."""
     try:
-        objects = _sqlite_objects(connection)
-        tables = {name for kind, name in objects if kind == "table"}
+        if getattr(getattr(connection, "dialect", None), "name", None) == "postgresql":
+            tables = set(inspect(connection).get_table_names(schema="public"))
+        else:
+            objects = _sqlite_objects(connection)
+            tables = {name for kind, name in objects if kind == "table"}
         query_rows = {row["id"]: row for row in _records(connection, "query_runs")}
         captures = {row["id"]: row for row in _records(connection, "raw_captures")}
         snapshots = {row["id"]: row for row in _records(connection, "vehicle_snapshots")}

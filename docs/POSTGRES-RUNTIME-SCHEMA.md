@@ -40,7 +40,7 @@ verify 连接固定 search_path 为 pg_catalog、public，并使用 READ COMMITT
 
 合同绑定当前包内所有 Python 源文件的相对路径与规范换行摘要；任何 Python 源码变化都要求重新构建、审查合同。需要部署可读的 Python 源文件，不支持仅含 pyc 的制品。这不是依赖二进制或整个容器镜像的签名证明。
 
-当前合同格式为 `postgres-runtime-schema@2`。列按表名与列名排序，消除 ADD COLUMN 导致的物理列顺序差异；类型、可空性、默认值、identity／generated 与 collation 仍完整比较。@1 合同不再接受，升级须从受控空参考库重新生成并批准合同及 SHA-256。
+当前合同格式为 `postgres-runtime-schema@3`。列按表名与列名排序，消除 ADD COLUMN 导致的物理列顺序差异；类型、可空性、默认值、identity／generated 与 collation 仍完整比较。文本枚举 CHECK 在 pg_dump／pg_restore 后可改变数组转型表示，@3 对已经核对类型的 text／varchar 列规范化可解析的字符串成员关系，成员值仍完整核对。@1／@2 合同需从受控空参考库重新生成并批准合同及 SHA-256。
 
 public 的表／列／类型／默认值、主外键与 CHECK／NOT NULL、索引及有效状态、用户触发器及 FK 内部触发器状态、应用函数定义、迁移版本、扩展版本和数据库 locale 都参与精确比较。内部触发器的数据库局部 OID 名称不参与比较，约束身份与保护状态仍保留。引用业务数据、索引统计、序列当前值和迁移时间戳不参与比较。
 
@@ -56,4 +56,4 @@ public 的表／列／类型／默认值、主外键与 CHECK／NOT NULL、索�
 
 本轮 141 项受管回归和 22 项真实 PG 验收见[验收记录](assurance/evidence/postgres-runtime-schema-2026-11-14.md)。实际 PG 角色采用较宽 DML 权限验证无拥有者启动；完整业务 DML 最小权限、旧 PG 库兼容、真实远端、操作系统终端及生产 IAM／RLS 继续待验。
 
-后续[升级合同验收](assurance/evidence/postgres-upgrade-contract-2026-11-14.md)取得 141 项回归和 29 项真实 PG 检查通过。正式历史 035 代码建库后升级亦匹配，154 张旧表的 38 行及版本时间保持。正式历史 015 仍触发 vehicle_binary_migration_required，须先实现 PG 024 显式迁移；合成历史与正式历史源码重建均不能代表任意部署库已验。
+后续[升级合同验收](assurance/evidence/postgres-upgrade-contract-2026-11-14.md)取得 141 项回归和 29 项真实 PG 检查通过。正式历史 035 代码建库后升级亦匹配，154 张旧表的 38 行及版本时间保持。后续已提供[PG 024 显式维护入口](POSTGRES-VEHICLE-MIGRATION.md)，完成历史 015 合成车型证据的升级、独立恢复与当前 API 读取。部署旧库继续按实际环境验收。

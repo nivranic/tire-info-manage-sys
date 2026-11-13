@@ -74,6 +74,27 @@ def test_reference_cli_requires_explicit_empty_target_and_hidden_input(tmp_path,
     assert calls == []
 
 
+def test_postgres_vehicle_maintenance_requires_explicit_target_and_offline_confirmation(tmp_path, monkeypatch, capsys):
+    from tire_api import vehicle_binary_postgres_cli as cli
+    from tire_api.vehicle_binary_postgres import migrate_postgres
+    from tire_api.vehicle_binary_migration import VehicleBinaryMigrationError
+    from types import SimpleNamespace
+    with pytest.raises(VehicleBinaryMigrationError, match='offline_confirmation_required'):
+        migrate_postgres(None)
+    with pytest.raises(VehicleBinaryMigrationError, match='unsupported_backend'):
+        migrate_postgres(SimpleNamespace(dialect=SimpleNamespace(name='sqlite')), offline_confirmed=True)
+    calls = []
+    monkeypatch.setattr(cli, 'postgres_engine', lambda *args: calls.append(args))
+    args = ['--postgres-profile', str(tmp_path / 'profile.json'), '--pg-bin', str(tmp_path),
+            '--backup-file', str(tmp_path / 'backup.dump')]
+    assert cli.main(args) == 1
+    assert 'request_invalid' in capsys.readouterr().out
+    monkeypatch.setattr(cli.sys, 'stdin', SimpleNamespace(isatty=lambda: False))
+    assert cli.main(args + ['--offline-confirmed']) == 1
+    assert 'interactive_authentication_required' in capsys.readouterr().out
+    assert calls == []
+
+
 @pytest.mark.parametrize("attempt", range(3))
 def test_concurrent_startup_creates_one_complete_schema(tmp_path, attempt):
     url = f"sqlite:///{(tmp_path / 'shared-startup.db').as_posix()}"

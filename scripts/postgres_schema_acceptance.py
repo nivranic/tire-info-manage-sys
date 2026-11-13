@@ -281,6 +281,8 @@ def run():
             'column_nullable': 'ALTER TABLE public.users ALTER COLUMN display_name DROP NOT NULL',
             'renamed_column': 'ALTER TABLE public.users RENAME COLUMN display_name TO renamed_display_name',
             'extra_column': 'ALTER TABLE public.users ADD COLUMN unexpected text',
+            'changed_enum': "ALTER TABLE public.ai_stream_events DROP CONSTRAINT ai_stream_events_type_check; "
+                "ALTER TABLE public.ai_stream_events ADD CONSTRAINT ai_stream_events_type_check CHECK (type IN ('accepted','failed'))",
             'missing_constraint': 'ALTER TABLE public.external_fact_license_evidence DROP CONSTRAINT ck_external_fact_evidence_size',
             'missing_index': 'DROP INDEX public.ix_knowledge_search_vector',
             'disabled_trigger': 'ALTER TABLE public.external_fact_grant_revisions DISABLE TRIGGER external_fact_grant_revisions_no_update',

@@ -11,7 +11,7 @@ import re
 from sqlalchemy import text
 
 
-SCHEMA = 'postgres-runtime-schema@2'
+SCHEMA = 'postgres-runtime-schema@3'
 MAX_BYTES = 8 * 1024 * 1024
 MAX_ROWS = 20000
 OVERSIZE = '__tire_schema_value_too_large__'
@@ -123,12 +123,34 @@ def capture_schema(connection):
         if name == 'triggers':
             rows.sort(key=_json)  # Internal trigger names contain database-local OIDs.
         result[name] = rows
+    _normalize_text_enums(result)
     # This version does not admit tenant-policy-dependent partial views.
     if result['policies'] or any(row[3] or row[4] for row in result['relations']):
         raise SchemaContractError('schema_rls_not_supported')
     if result['types'] or result['inheritance'] or any(row[1] not in ('f','p') for row in result['routines']):
         raise SchemaContractError('schema_feature_not_supported')
     return result
+
+
+def _normalize_text_enums(catalog):
+    # pg_dump can move varchar->text casts from an array to its elements.
+    # Admit only parsed literal membership on a separately checked text column.
+    from .vehicle_binary_migration import VehicleBinaryMigrationError, _check_expression
+    columns = {(row[0], row[1]): row[2] for row in catalog['columns']}
+    for row in catalog['constraints']:
+        if row[2] != 'c' or not row[-1].startswith('CHECK '):
+            continue
+        try:
+            expression = _check_expression(row[-1][6:])
+        except VehicleBinaryMigrationError:
+            continue
+        if expression[0] != 'in' or expression[1][0] != 'name':
+            continue
+        column = expression[1][1]
+        column_type = columns.get((row[0], column), '')
+        if column_type != 'text' and re.fullmatch(r'character varying(?:\(\d+\))?', column_type) is None:
+            continue
+        row[-1] = 'tire-text-enum@1:' + _json([column, [value[1] for value in expression[2]]]).decode('ascii')
 
 
 def _settings(connection):

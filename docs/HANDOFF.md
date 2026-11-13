@@ -1,3 +1,7 @@
+## 最新 PostgreSQL 车型 024 维护交付（2026-11-14）
+
+先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。历史 015 代码产生的合成车型证据已通过显式 CLI 快照备份、四表 ALTER、当前升级及 verify API 读取，独立恢复保留原库。17 项 PG 维护及 30 项运行合同检查通过，失败回执均保留。@3 规范化已核对文本枚举的恢复表达，部署需重建并批准合同。操作见[PG 车型维护说明](POSTGRES-VEHICLE-MIGRATION.md)，证据见[024 验收](assurance/evidence/postgres-vehicle-024-2026-11-14.md)。下一步推进完整业务 DML 最小权限、实际终端／远端和全资产恢复，完整 V1 持续进行。下文保留各历史交付时点。
+
 ## 最新 PostgreSQL 升级合同兼容交付（2026-11-14）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。已修复 001–004 增量迁移因列物理顺序导致的合同误拒绝；@2 按表名／列名排序，结构语义仍严格比较，需重新生成并批准空参考合同。141 项受管回归、29 项真实 PG／TLS 检查通过；正式历史 035 建库升级后合同匹配，154 张旧表 38 行及版本时间保留。更早 015 实测触发 vehicle_binary_migration_required，下一步实现 PG 024 显式迁移、备份／回退及完整 DML 最小权限。失败与范围见[升级合同验收](assurance/evidence/postgres-upgrade-contract-2026-11-14.md)。完整 V1 仍未完成，下文保留此前交付时点。
