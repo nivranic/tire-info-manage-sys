@@ -4,7 +4,7 @@
 
 ## 接手快照
 
-- 本轮固特异新加坡来源扩展起点为 `main` 的 `d7b343244e4d130e66bbf5e1bedf8eeea11cbab9`，当时工作区干净、上游跟踪分支一致。最新交付SHA及实时远端以交付消息和即时Git查询为准。
+- 本次交接整理起点为 `main` 的 `3e987b92f34fef06bb6adfc21c769ab10d9167e2`，工作区干净、本地待推提交为0。该提交已交付固特异新加坡来源，阶段实施起点为 `d7b343244e4d130e66bbf5e1bedf8eeea11cbab9`。本次交接文档的最终SHA及实时远端以交付消息和即时Git查询为准。
 - 首个真实生成Provider采用用户选择的OpenAI Responses API。Gemini适配器的提前实施属于此前Agent的排期选择，交付为 `d5fded1`。原规格的多模型表、Agent实施计划与用户的接入顺序分别保留其来源，详见[Gemini实施记录](plans/2026-11-12-gemini-native-provider.md)。
 - 当前参数来源为11个区域目录、7个厂商品牌，另有NHTSA召回和小米车型来源。可信Parser目录14项，包含13个业务来源与1个工作区PDF正文Parser。新增固特异新加坡两型号共68条来源观察已完成真实API与正常生产Web验收，精确产品代码与其他P0渠道继续推进。
 - 接手后先核对既有第40轮访问记录及当前可访问性，再选取能提供逐SKU身份与参数的官方渠道，复用固定Adapter、Parser与证据链。历史发现入口见[来源范围](../README.md#来源范围)。
@@ -44,6 +44,7 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 - 专业测试材料由Agent自主选择，并核对原始出版物、许可和可证明的SKU身份。
 - 当前没有EPREL Key，继续独立工作。OpenAI模型／Key及EPREL Key本轮在Process／User／Machine三个作用域复核为空，凭据条件具备后再执行真实接口验收。
 - 当前授权包含复核优化、总结进度、提交并push全部改动、编写Agent交接文档。
+- 原规格提供功能范围与技术建议，用户消息确定本轮任务及实施顺序。Gemini的历史适配排期由此前Agent决定，OpenAI Responses优先选择由用户明确给出。接手Agent据此安排真实接入验收。
 
 ## 12个核心模块的进度
 
@@ -61,6 +62,22 @@ HTML／PDF正文引用进入AI证据包、独立用途授权、同步／流式gr
 | 10 AI研究 | grounding、流式、报告、多模型适配、正文索引／混合检索、正文证据包及独立AI／导出用途、离线检索质量评估、Web | 真实Responses语义与Embeddings质量、代表性检索与重排质量、专业性能解释、模型治理 |
 | 11 对外能力 | REST、SSE、共享SDK、Webhook签名及有限重试、外部Key、字段许可治理 | 真实接收端、公网生产验收、SDK产品化、完整WebSocket，后期GraphQL／gRPC／MCP |
 | 12 管理后台 | Parser健康、发布回滚、隔离、失败任务、冲突、纠错、授权、审计 | 生产身份／租户／RLS、完整角色治理、灾备、发布验收 |
+
+## 官方安全来源与其他P0渠道研究停点
+
+固特异阶段之后已探查EU Safety Gate、Dunlop另一个日本官方域名及中国召回入口。当前成果为Git忽略目录中的下载材料与访问回执，API、数据库、Parser目录和Web的覆盖数量继续沿用上文已交付结果。
+
+| 渠道 | 已核对的访问结果 | 接手后的具体工作 |
+| --- | --- | --- |
+| EU Safety Gate | 官方robots为200／text/plain，允许周报XML入口。周报索引200／application/xml，473542字节、1124个报告条目。已取得Report-2026-45，发布日期2026-11-13，164092字节 | 检查详情中的告警身份、字段、可空值和修订语义，取得轮胎相关样本，核对官方复用条款与署名要求，再设计正常入口接入 |
+| Dunlop日本dt域名 | robots为200／text/plain、80字节，根路径允许，首页返回upstream_http_401 | 保留访问失败，核验其他公开官方产品入口及其合同。此前tyre域名robots返回200／HTML找不到页面的记录继续保留 |
+| 中国召回入口 | robots为404空响应，按现有RFC9309缺失规则处理。首页200／text/html，52057字节，已保存召回栏目和文章链接 | 核对具体文章、轮胎关联、来源身份、复用范围及稳定提取合同 |
+
+EU周报索引SHA256为 `fa07c4804bbb2829b96fa76414a10a36f691b6f7002d2e8b52c310abdc4cc6be`，详情为 `43dab5b90015ecb0792ee11ec6171bdcfa8eeb962e8014df9a0b7d8f28f0db2b`。本机回执与原始材料位于 `.artifacts/p0-official-20261113/`，对应 `eu-weekly-list`、`eu-weekly-2026-45`、`dunlop-dt-home`、`cn-home` 的JSON和bin文件。新clone需按官方入口重新取得材料。[EU周报索引](https://ec.europa.eu/safety-gate-alerts/api/download/weeklyReport/list/xml/en) [Dunlop日本入口](https://dt.dunlop.co.jp/) [中国召回入口](https://www.samrdprc.org.cn/)
+
+官方数据集元信息与免责声明仍需读取。CC0仅有二手检索线索，正式复用许可和署名合同待核对。现有NHTSA查询与持久化以美国campaign_number为身份，EU告警需要保留来源原生身份，并通过既有迁移、证据、隔离Parser和正常API／Web入口接入。下一项可独立实施工作优先安排Safety Gate，先完成样本与合同核验，再形成设计及实现。[官方数据集](https://data.europa.eu/data/datasets/rapex-rapid-alert-system-non-food?locale=en) [官方免责声明入口](https://api.tech.ec.europa.eu/justools-content/buckets/saga/folder/menu/filename/New_disclaimer_EN.pdf)
+
+本次仅复核既有测试回执、源码绑定和交接内容。下节591项回归、29项API及50项Web结果绑定固特异来源阶段，完整V1目标持续active。
 
 ## 固特异新加坡官方来源
 
@@ -276,7 +293,7 @@ API退出0，Web经SIGINT退出1，两个隔离PG集群均已停止。独立端�
 
 1. 核对main、HEAD、dirty、实时远端及本机回执，阅读本卡、原规格和拟修改模块的计划。隔离资源关闭情况见最新生产Web验收。新clone需要重建本机验收依赖并取得相应原件。
 2. 复用已接通的正文包、用途、同意、预算及报告链，沿OpenAI Responses执行真实API→Provider→引用恢复→Web语义验收。启动进程显式设置 `TI_AI_PROVIDER=openai_responses` 并核对状态接口。当前模型／Key缺失，继续推进可独立完成的质量评估输入、错误用量和材料核验。
-3. 日本S007A、马牌中国SC7与固特异新加坡AS6及SUV版已完成对应来源接入，先阅读各阶段验收，再依原规格P0表继续补齐厂商与安全来源。Dunlop日本robots入口本次返回HTTP200／HTML，标题为找不到页面，有效规则待取得，产品页请求数0，回执位于 `.artifacts/p0-dunlop-20261113/`。Yokohama美国既有条款禁止自动查询的记录继续保留，其他官方渠道依据各自公开合同核验。继续核对可访问页面、robots、参数身份和许可范围，复用固定Adapter、Parser发布和证据链。两份转录的角色排序及正常Web入口已有结果，扩大来源、精确版本、地区和时间的独立标注。真实Embeddings与外部真人审核按实际条件推进。
+3. 日本S007A、马牌中国SC7与固特异新加坡AS6及SUV版已完成对应来源接入，先阅读各阶段验收，再依原规格P0表继续补齐厂商与安全来源。当前优先推进上节Safety Gate研究停点，复用已取得的官方XML核对轮胎样本、条款、来源原生身份及正常业务链路。Dunlop的tyre域名robots返回200／HTML找不到页面，dt域名robots有效但首页401，两组回执分别位于 `.artifacts/p0-dunlop-20261113/` 和 `.artifacts/p0-official-20261113/`。中国召回首页已取得，文章和轮胎关联待核。Yokohama美国既有条款禁止自动查询的记录继续保留，其他官方渠道依据各自公开合同核验。继续核对可访问页面、robots、参数身份和许可范围，复用固定Adapter、Parser发布和证据链。两份转录的角色排序及正常Web入口已有结果，扩大来源、精确版本、地区和时间的独立标注。真实Embeddings与外部真人审核按实际条件推进。
 4. 原始报道已核对测试主体、载速、成绩及两车照片，墙面材料日期作为声明保留，逐项执行日待核。继续核对GTIN／产品代码／完整侧壁标识，处理万力与耐克森双侧源名，取得完整复用许可和正式原件，推进精确SKU与真人Golden。JRC匿名样本待型号映射，PERS此前捕获超时失败。详见[材料核验记录](assurance/evidence/material-review-2026-11-13.md)。
 5. 复用本轮Web修复，补读屏、全业务状态与完整WCAG验收。扩充P0来源和SU7官方OE事实，推进监控长期运行、生产权限、发布迁移／回退及六类平台、安全、性能、灾备和分发验收。
 
@@ -340,5 +357,7 @@ npm run typecheck --workspace @tire/mobile
 - `docs/HANDOFF.md`从2026-10-26入口起的本机历史尾文保留216248字节，SHA256为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`。仓库沿用现有Git文本换行规约，同一尾文的Git blob为215776字节，SHA256为 `55e7f298d159af75eefa0bb4230a9f1193b2938223e51cf2a41c1f9c79d43bab`，新clone按blob核对。
 
 ## 可复制的接手指令
+
+> 当前新增研究停点为EU Safety Gate、Dunlop日本dt域名与中国召回入口。先读本卡“官方安全来源与其他P0渠道研究停点”，复用 `.artifacts/p0-official-20261113/` 的官方访问回执。Safety Gate已取得周报索引和详情，下一步核对轮胎样本、官方复用合同及来源原生告警身份，再接通正常API、证据、隔离Parser、持久化和Web链路。完整V1继续推进，首个真实生成接入按用户选择采用OpenAI Responses API。
 
 > 接手胎迹完整V1。先读本卡、原规格及拟修改模块的计划，核对main、HEAD、dirty、实时远端和本机回执。当前12个核心模块已有实现，10项发布Gate、13项SLO及15项决策继续跟踪。最近工程已完成正文证据包、独立用途、同步／流式grounding、混合检索分页、PDF来源及出版日期、测试事件出版物角色。此前出版物阶段整站生产Web验收基于a916bf9，79项交互／布局断言、39个实际API成功响应、25项只读库核对通过，详细结果随ec00283交付。原报道事件为修订3，论文为修订2，旧版与原值保留。13查询排序结果来自两份真实转录与Agent标注，代表性和外部真人核验待完成。当前11个轮胎区域目录覆盖7个品牌，另有NHTSA召回与小米车型来源，可信Parser目录14项。固特异新加坡AS6及SUV版共68条声明，真实API29项、正常生产Web50项和两库关闭后28项通过，原始缺值与标记保留。最终十九模块591通过／7项历史完整响应缺失跳过，805输入稳定、资源关闭，最终交付156项核对通过。此前马牌中国SC7的47条来源观察、真实API24项、正常生产Web59项及三次官网200已核对。缺代码行相同冻结响应重核验复用快照与事实，原文或输出变化进入质量评估。最终十八模块568通过／7项历史响应缺失跳过，质量专项108项、Web55项、三端类型与构建通过。此前日本POTENZA S007A的75个SKU、真实API23项、生产Web42项及2次官网304已核对，Web55项、三端类型和新构建通过。八模块354通过／7项历史完整响应缺失跳过，交付专项52项通过，包含新来源32项、遥测20项和重建旧目录包执行。先读官方来源验收与第40轮访问记录，再核对其他官方渠道的可访问性、逐SKU身份与参数，复用Adapter、Parser与证据链扩展P0覆盖。继续核对参测产品代码／GTIN／完整侧壁、正式原件与复用许可，推进真实精确SKU和真人Golden。首个真实生成Provider按用户选择使用OpenAI Responses API，验收进程显式设置TI_AI_PROVIDER=openai_responses并核对状态接口。Gemini提前适配属于此前Agent自行排期，已有合成测试，真实Google调用待验。当前OpenAI模型／Key与EPREL凭据缺失，独立工作继续推进。随后补生产权限、读屏与完整WCAG、六类平台、性能、灾备及发布Gate。隔离材料、数据库、原始回执和截图位于Git忽略目录，新clone需重建依赖并取得对应材料。保留历史失败与KIT C2封存状态，遵循本卡操作约束，完成声明以实际验收结果为依据。
