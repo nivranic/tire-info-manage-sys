@@ -5,6 +5,9 @@
 # Preserve the user-provided requirements snapshot byte for byte on checkout.
 /docs/requirements/2026-09-26-tire-intelligence-original.md -text
 
+# Preserve the independently reviewed PDF Golden case and its pinned digest.
+/packages/domain-types/fixtures/professional-test-pdf-v1/*.json -text whitespace=cr-at-eol
+
 /apps/api/tests/fixtures/vehicle_binary_023/* -text
 
 # Preserve the exact source bytes reviewed by the regression child launcher.

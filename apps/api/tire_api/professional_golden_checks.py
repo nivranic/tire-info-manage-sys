@@ -102,6 +102,20 @@ class MetricLiteral(Closed):
     direction: Literal['lower', 'higher', 'unspecified']
 
 
+class PDFReferenceLiteral(Closed):
+    material_label: Label
+    extractor_version: str = Field(min_length=1, max_length=100)
+    page: int = Field(ge=1, le=2000)
+    start: int = Field(ge=0, le=100_000)
+    end: int = Field(ge=1, le=100_000)
+
+    @model_validator(mode='after')
+    def chunk_range(self):
+        if self.start % 1080 or not self.start < self.end <= self.start + 1200:
+            raise ValueError('PDF citation must use an original page chunk range')
+        return self
+
+
 class MeasurementLiteral(Closed):
     participant_key: ParticipantKey
     metric_key: ParticipantKey
@@ -109,6 +123,19 @@ class MeasurementLiteral(Closed):
     source_rank: int | None = Field(ge=1, le=10000)
     evidence_span: str = Field(min_length=1, max_length=300)
     evidence_locator: str = Field(min_length=1, max_length=300)
+    pdf_reference: PDFReferenceLiteral | None = None
+
+    @model_serializer(mode='wrap')
+    def serialize_measurement(self, handler):
+        value = handler(self)
+        if self.pdf_reference is None:
+            value.pop('pdf_reference', None)
+        return value
+
+
+class PublicationLiteral(Closed):
+    role: Literal['original_report', 'secondary_report', 'unknown']
+    basis: str = Field(min_length=5, max_length=1000)
 
 
 class EventLiteral(Closed):
@@ -117,6 +144,7 @@ class EventLiteral(Closed):
     organization: str = Field(min_length=1, max_length=160)
     relationship: Literal['independent', 'manufacturer_commissioned', 'unknown']
     publication_date: str | None = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+    publication: PublicationLiteral | None = None
     source_url: str = Field(min_length=1, max_length=2048)
     rights_basis: str = Field(min_length=5, max_length=1000)
     tested_size: str | None = Field(min_length=1, max_length=24)
@@ -128,6 +156,13 @@ class EventLiteral(Closed):
     participants: list[ParticipantLiteral] = Field(min_length=1, max_length=60)
     metrics: list[MetricLiteral] = Field(min_length=1, max_length=24)
     measurements: list[MeasurementLiteral] = Field(min_length=1, max_length=1000)
+
+    @model_serializer(mode='wrap')
+    def serialize_event(self, handler):
+        value = handler(self)
+        if self.publication is None:
+            value.pop('publication', None)
+        return value
 
     @model_validator(mode='after')
     def consistent_test_sizes(self):
@@ -234,7 +269,7 @@ class SourceReviewLiteral(Closed):
 
 
 class CaseInput(Closed):
-    mode: Literal['private_http', 'source_review_only']
+    mode: Literal['private_http', 'test_event_http', 'source_review_only']
     event: EventLiteral | None
     skus: list[SkuLiteral] = Field(max_length=60)
     bridge_attempts: list[BridgeAttemptLiteral] = Field(max_length=60)
@@ -246,6 +281,9 @@ class CaseInput(Closed):
         if self.mode == 'source_review_only':
             if self.event is not None or self.skus or self.bridge_attempts or self.candidate is not None or self.source_review is None:
                 raise ValueError('Source review cannot invent an event, SKU, bridge or HTTP interpretation')
+        elif self.mode == 'test_event_http':
+            if self.event is None or self.skus or self.bridge_attempts or self.candidate is not None or self.source_review is not None:
+                raise ValueError('Test event HTTP cases require an event and explicit empty SKU and bridge scopes')
         elif self.event is None or not self.skus or not self.bridge_attempts or self.source_review is not None:
             raise ValueError('Private HTTP cases require explicit event, SKU and bridge literals')
         return self
@@ -413,7 +451,7 @@ class EventBinding(Closed):
 
 
 class ExecutionBinding(Closed):
-    mode: Literal['private_http', 'source_review_only']
+    mode: Literal['private_http', 'test_event_http', 'source_review_only']
     run_id: str = Field(pattern=r'^[0-9a-f]{32}$')
     runner_sha256: Sha256
     product_source_fingerprint: Sha256
@@ -595,6 +633,28 @@ def json_sha256(value):
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
+def bound_event(case, material_bindings):
+    """Resolve literal source ranges against observed runtime document identities."""
+    event = deepcopy(case['input']['event'])
+    materials = {item['material_label']: item for item in case['materials']}
+    bindings = {item['material_label']: item for item in material_bindings}
+    for measurement in event['measurements']:
+        selected = measurement.get('pdf_reference')
+        if selected is None:
+            continue
+        label = selected['material_label']
+        if label not in bindings:
+            raise ProfessionalGoldenError('professional_golden_material_binding_missing')
+        binding, original = bindings[label], materials[label]['original']
+        if binding['raw_sha256'] != original['sha256'] or binding['byte_count'] != original['byte_count']:
+            raise ProfessionalGoldenError('professional_golden_material_binding_mismatch')
+        value = {'document_id': binding['document_id'], 'document_fingerprint': binding['metadata_sha256'],
+            'raw_hash': original['sha256'], 'extractor_version': selected['extractor_version'],
+            'page': selected['page'], 'start': selected['start'], 'end': selected['end']}
+        measurement['pdf_reference'] = {**value, 'chunk_id': json_sha256(value)}
+    return event
+
+
 def _raw(value):
     if isinstance(value, Closed):
         value = value.model_dump(mode='json', by_alias=True)
@@ -652,6 +712,12 @@ def _case_graph(case):
             and {p for p, _m in pairs} == people and {m for _p, m in pairs} == metrics
             and (event.reported_participants is None or event.reported_participants >= len(people))
             and (event.coverage != 'full_event' or event.reported_participants == len(people)))
+        references = [m.pdf_reference for m in event.measurements if m.pdf_reference is not None]
+        valid = (valid and all(reference.material_label in materials for reference in references)
+            and len({json_sha256(reference.model_dump()) for reference in references}) <= 32)
+        if data.mode == 'test_event_http':
+            valid = (valid and not case.expected.bridges and not case.expected.distinct_pairs
+                and case.expected.candidate is None and not case.expected.source_review_findings)
         evidence_refs = set()
         for attempt in data.bridge_attempts:
             valid = (valid and attempt.sku_label in skus and attempt.participant_key in people
@@ -1436,6 +1502,7 @@ def evaluate_case(case, actual):
                         or data['event_binding'] is None or data['event_snapshot'] is None):
                     raise ProfessionalGoldenError('professional_golden_actual_graph_invalid')
                 bound, snapshot = data['event_binding'], data['event_snapshot']
+                literal['input']['event'] = bound_event(literal, data['material_bindings'])
                 _event_snapshot(literal, data, failures)
                 for key in bound:
                     failures.compare(bound[key], snapshot.get(key, _MISSING), '/event_snapshot/' + key, 'binding_mismatch')

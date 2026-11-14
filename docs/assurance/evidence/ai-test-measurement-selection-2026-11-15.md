@@ -38,7 +38,7 @@
 - API首批失败集中在既有PDF流式授权撤销、调度后变化及冻结损坏用例。受管独立诊断的对应11参数用例及最终完整5模块239项均通过，产品源码保持相同，首次失败根因尚未确认。
 - 浏览器首批完成3项后，最后两条成绩准备返回409。直接API和同一长临时目录复现均200，第二次生产浏览器11项通过。两次浏览器之间仅为私有验收脚本增加错误记录，产品源码保持相同。首次409根因尚未确认。
 - 首次失败和复跑分别保留回执。该阶段新增选择与许可报告属于本地证据工程，真实Responses、Embeddings、精确SKU、真人Golden、EPREL、Native及完整V1 Gate继续待验。
-- 历史54项专业Golden依赖缺失R74原件，尚需恢复。Android instrumentation及设备、WCAG、自然长期监控、部署恢复与SLO仍按历史边界继续。
+- 该阶段结束时，历史54项专业Golden依赖的R74材料尚待恢复。后续PDF合同阶段已按冻结摘要恢复三份材料，54项全部执行通过，见[后续验收](professional-golden-pdf-2026-11-15.md)。Android instrumentation及设备、WCAG、自然长期监控、部署恢复与SLO继续待验。
 
 ## 回执
 
@@ -51,6 +51,6 @@
 | ai-measurement-selection-20261115-diagnostic/result.json | 891e45467a640a385599b113d1437dbd6ee88393d66cb7440541ce272830beb4 |
 | ai-measurement-selection-20261115-final/result.json | 303bbc95a8c7e424c0f4b8407e6ca6808bc6c3c3456e9f110d13ab0e79925fc7 |
 | ai-measurement-selection-20261115-pg/resource-audit.json | dce2be3dc1f1fc7ffdc305f9922436b9f02bd84a4955ba2f18ef0608b22bab5f |
-| PG report.json | fbec7f32e8331554303f872c937b6091d85fdc8482036fc6320110ca8e9ac8d7 |
-| Web首次report.json | 1ca8b77d115ed0545afa64535236d663d8f433dad256e87c5eb14bc3e0bbd24e |
-| Web最终report.json | bdbcacd3dcafbf014e8393febd5180d477a2d485df56d6e95d03d44709bbb0f4 |
+| postgres/pgverify-542a012c1bdf466bba74cd7220e6749b/report.json | fbec7f32e8331554303f872c937b6091d85fdc8482036fc6320110ca8e9ac8d7 |
+| ai-measurement-selection-20261115-real/web/run-86db1bee-1d23-4bac-a312-8d0b7bbaaecb/report.json，首次 | 1ca8b77d115ed0545afa64535236d663d8f433dad256e87c5eb14bc3e0bbd24e |
+| ai-measurement-selection-20261115-real/web/run-4ac8b453-73f7-495a-925b-5f4ecf7844bc/report.json，复跑 | bdbcacd3dcafbf014e8393febd5180d477a2d485df56d6e95d03d44709bbb0f4 |

@@ -19,7 +19,7 @@ from sqlalchemy.engine import make_url
 from admin_support import register_admin
 from test_fitment_relations import seed_tire, seed_vehicle
 from tire_api.db import Snapshot, TireVariant
-from tire_api.professional_golden_checks import json_sha256, load_case
+from tire_api.professional_golden_checks import bound_event, json_sha256, load_case
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -78,12 +78,7 @@ def _proposal(literal, attempt, event, skus, materials):
             for claim in attempt['assertions']], 'evidence_level': attempt['evidence_level']}
 
 
-def run_private_case(client, case, execution):
-    """Capture an explicit synthetic case in the caller's separately fenced private app."""
-    literal = load_case(case).model_dump(mode='json', by_alias=True)
-    data = literal['input']
-    if data['mode'] != 'private_http' or any(m['origin'] != 'synthetic' for m in literal['materials']):
-        raise ValueError('professional_golden_private_synthetic_case_required')
+def _private_database(client):
     database = client.app.state.database
     actual_path = Path(database.engine.url.database or '').resolve()
     configured = [make_url(os.environ.get(name, 'sqlite://'))
@@ -98,6 +93,60 @@ def run_private_case(client, case, execution):
     if any(not Path(os.environ.get(name, '')).resolve().is_relative_to(private_root)
            for name in ('TI_OBJECT_STORE_ROOT', 'TI_PARSER_BUNDLE_ROOT')):
         raise ValueError('professional_golden_private_storage_required')
+    return database
+
+
+def _upload_materials(client, literal, operator):
+    materials = {}
+    for material in literal['materials']:
+        original = material['original']
+        path = (ROOT / original['path']).resolve()
+        if not path.is_relative_to(ROOT):
+            raise ValueError('professional_golden_material_path_invalid')
+        with path.open('rb') as stream:
+            raw = stream.read(8_388_609)
+        if (len(raw) > 8_388_608 or len(raw) != original['byte_count']
+                or hashlib.sha256(raw).hexdigest() != original['sha256']):
+            raise ValueError('professional_golden_material_binding_invalid')
+        metadata = {'title': material['title'], 'source_url': material['source_reference_url'],
+            'operator': operator, 'rights_basis': material['rights']['basis']}
+        uploaded = _body(client.post('/v1/documents', content=raw,
+            headers={'content-type': 'application/pdf', 'x-evidence-metadata':
+                base64.b64encode(json.dumps(metadata, ensure_ascii=False).encode()).decode()}), 201)
+        listed = _body(client.get('/v1/test-sku-links/materials?mode=history'))['items']
+        receipt = next(row for row in listed if row['id'] == uploaded['id'])
+        materials[material['material_label']] = {'material_label': material['material_label'],
+            'document_id': uploaded['id'], 'raw_sha256': receipt['raw_hash'],
+            'byte_count': receipt['byte_count'], 'metadata_sha256': receipt['metadata_hash']}
+    return materials
+
+
+def run_test_event_case(client, case, execution):
+    """Observe a material-bound event through the normal upload and event routes."""
+    literal = load_case(case).model_dump(mode='json', by_alias=True)
+    if literal['input']['mode'] != 'test_event_http' or execution.get('mode') != 'test_event_http':
+        raise ValueError('professional_golden_test_event_case_required')
+    _private_database(client)
+    register_admin(client, 'golden-event-evaluator')
+    materials = _upload_materials(client, literal, 'Agent evidence evaluator')
+    event_payload = bound_event(literal, list(materials.values()))
+    created = _body(client.post('/v1/test-events', json={'event': event_payload,
+        'operator': 'Agent evidence evaluator', 'reason': 'Independent source literals; human Golden review pending'}), 201)
+    event = _body(client.get('/v1/test-events/' + created['id'] + '?mode=history'))
+    return {'schema': 'professional-golden-actual@1', 'case_id': literal['case_id'],
+        'input_sha256': json_sha256(literal['input']), 'execution': deepcopy(execution),
+        'event_binding': {key: event[key] for key in ('id', 'revision_id', 'revision', 'fingerprint')},
+        'event_snapshot': event, 'sku_bindings': [], 'material_bindings': list(materials.values()),
+        'bridge_results': [], 'candidate_result': None, 'source_review_result': None}
+
+
+def run_private_case(client, case, execution):
+    """Capture an explicit synthetic case in the caller's separately fenced private app."""
+    literal = load_case(case).model_dump(mode='json', by_alias=True)
+    data = literal['input']
+    if data['mode'] != 'private_http' or any(m['origin'] != 'synthetic' for m in literal['materials']):
+        raise ValueError('professional_golden_private_synthetic_case_required')
+    database = _private_database(client)
     register_admin(client)
     session = client.cookies['tire_local_session']
     vehicle_snapshot = seed_vehicle(database, session)
@@ -123,31 +172,11 @@ def run_private_case(client, case, execution):
                 ('variant_id', 'tire_snapshot_id', 'fact_version_id')}}
             created = _body(relation_post(client, relation_decision(client, sku_selection)), 201)['relation']
             _body(relation_post(client, relation_decision(client, sku_selection, 'review', created['id'])), 201)
-    created_event = _body(client.post('/v1/test-events', json={'event': data['event'],
+    materials = _upload_materials(client, literal, 'Synthetic engineering evaluator')
+    created_event = _body(client.post('/v1/test-events', json={'event': bound_event(literal, list(materials.values())),
         'operator': 'Synthetic engineering evaluator', 'reason': 'Independently authored synthetic case input'}), 201)
     event = _body(client.get('/v1/test-events/' + created_event['id'] + '?mode=history'))
     event_binding = {key: event[key] for key in ('id', 'revision_id', 'revision', 'fingerprint')}
-    materials = {}
-    for material in literal['materials']:
-        original = material['original']
-        path = (ROOT / original['path']).resolve()
-        if not path.is_relative_to(ROOT):
-            raise ValueError('professional_golden_material_path_invalid')
-        with path.open('rb') as stream:
-            raw = stream.read(8_388_609)
-        if (len(raw) > 8_388_608 or len(raw) != original['byte_count']
-                or hashlib.sha256(raw).hexdigest() != original['sha256']):
-            raise ValueError('professional_golden_material_binding_invalid')
-        metadata = {'title': material['title'], 'source_url': material['source_reference_url'],
-            'operator': 'Synthetic engineering evaluator', 'rights_basis': material['rights']['basis']}
-        uploaded = _body(client.post('/v1/documents', content=raw,
-            headers={'content-type': 'application/pdf', 'x-evidence-metadata':
-                base64.b64encode(json.dumps(metadata, ensure_ascii=False).encode()).decode()}), 201)
-        listed = _body(client.get('/v1/test-sku-links/materials?mode=history'))['items']
-        receipt = next(row for row in listed if row['id'] == uploaded['id'])
-        materials[material['material_label']] = {'material_label': material['material_label'],
-            'document_id': uploaded['id'], 'raw_sha256': receipt['raw_hash'],
-            'byte_count': receipt['byte_count'], 'metadata_sha256': receipt['metadata_hash']}
     other = TestClient(client.app, backend_options={'loop_factory': asyncio.SelectorEventLoop})
     runs = []
     try:

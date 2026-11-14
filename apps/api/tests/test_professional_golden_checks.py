@@ -1,7 +1,10 @@
 """Pure contract/graph/error visibility tests; these are not live HTTP evidence."""
 from copy import deepcopy
+import hashlib
+import json
 import os
 from pathlib import Path
+from uuid import uuid4
 import pytest
 
 from tire_api import professional_golden_checks as checks
@@ -45,7 +48,9 @@ def test_contract_and_synthetic_scope():
 def test_every_frozen_case_has_a_closed_independent_graph(cases):
     assert len(cases) == 7
     for case in cases.values():
-        assert checks.load_case(case).case_id == case['case_id']
+        loaded = checks.load_case(case)
+        assert loaded.case_id == case['case_id']
+        assert loaded.model_dump(mode='json', by_alias=True) == case
 
 
 def test_mixed_sizes_are_preserved_by_independent_literals(cases):
@@ -64,6 +69,184 @@ def test_mixed_sizes_are_preserved_by_independent_literals(cases):
             person['tested_size'] = size
         with pytest.raises(ValueError):
             checks.EventLiteral.model_validate(invalid)
+
+
+def pdf_event_case(cases):
+    case = deepcopy(cases['synthetic-exact-two'])
+    case['case_id'] = 'synthetic-pdf-event'
+    case['input'].update(mode='test_event_http', skus=[], bridge_attempts=[], candidate=None, source_review=None)
+    case['expected'].update(bridges=[], distinct_pairs=[], candidate=None, source_review_findings=[])
+    case['input']['event']['publication'] = {'role': 'original_report', 'basis': 'Project-authored synthetic report'}
+    case['input']['event']['measurements'][0]['pdf_reference'] = {
+        'material_label': case['materials'][0]['material_label'],
+        'extractor_version': 'pdf-page-text@1+pypdf@6.19.0', 'page': 1, 'start': 0, 'end': 1200}
+    return case
+
+
+def test_pdf_event_contract_preserves_source_literals_and_binds_runtime_ids(cases):
+    case = pdf_event_case(cases)
+    loaded = checks.load_case(case).model_dump(mode='json', by_alias=True)
+    assert loaded == case
+    binding = {'material_label': case['materials'][0]['material_label'], 'document_id': 'synthetic-runtime-document',
+        'raw_sha256': case['materials'][0]['original']['sha256'],
+        'byte_count': case['materials'][0]['original']['byte_count'], 'metadata_sha256': 'e' * 64}
+    bound = checks.bound_event(loaded, [binding])
+    expected = {'document_id': binding['document_id'], 'document_fingerprint': 'e' * 64,
+        'raw_hash': binding['raw_sha256'], 'extractor_version': 'pdf-page-text@1+pypdf@6.19.0',
+        'page': 1, 'start': 0, 'end': 1200}
+    assert bound['measurements'][0]['pdf_reference'] == {**expected, 'chunk_id': checks.json_sha256(expected)}
+    assert case['input']['event']['measurements'][0]['pdf_reference']['material_label'] == binding['material_label']
+    assert bound['publication'] == case['input']['event']['publication']
+
+
+@pytest.mark.parametrize('change', [{'page': True}, {'page': 0}, {'page': 2001}, {'start': -1},
+    {'start': 1}, {'start': '0'}, {'end': 0}, {'end': 1201}, {'material_label': 'absent'}, {'extra': 'unbound'}])
+def test_pdf_event_rejects_invalid_reference_ranges_and_unknown_material(cases, change):
+    case = pdf_event_case(cases)
+    case['input']['event']['measurements'][0]['pdf_reference'].update(change)
+    with pytest.raises(checks.ProfessionalGoldenError):
+        checks.load_case(case)
+
+
+def observe_http_case(case, directory, capture):
+    from fastapi.testclient import TestClient
+    from tire_api.main import create_app
+    from test_core import FixtureRegistry
+    root = Path(__file__).resolve().parents[3]
+    url = 'sqlite:///' + (directory / 'workspace.sqlite').as_posix()
+    with pytest.MonkeyPatch.context() as patch:
+        for name, value in {'TIRE_DATABASE_URL': url, 'DATABASE_URL': url,
+                'TI_AI_ENABLED': '0', 'TI_EMBEDDINGS_ENABLED': '0',
+                'TI_OBJECT_STORE_ROOT': str(directory / 'objects'),
+                'TI_PARSER_BUNDLE_ROOT': str(directory / 'bundles')}.items():
+            patch.setenv(name, value)
+        app = create_app(url, FixtureRegistry())
+        sources = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted((root / 'apps/api/tire_api').rglob('*.py'))}
+        execution = {'mode': case['input']['mode'], 'run_id': uuid4().hex,
+            'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            'product_source_fingerprint': checks.json_sha256(sources), 'private_http_observed': True}
+        try:
+            with TestClient(app) as client:
+                actual = capture(client, case, execution)
+        finally:
+            app.state.database.close()
+    result = checks.evaluate_case(case, actual)
+    for name, value in [('case', case), ('actual', actual), ('report', result)]:
+        (directory / (name + '.json')).write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding='utf-8')
+    assert result['state'] == 'passed', result
+    return actual
+
+
+@pytest.fixture(scope='module')
+def observed_pdf_event(cases, tmp_path_factory):
+    from professional_golden_support import run_test_event_case
+    from test_document_pdf import pdf_bytes
+    case = pdf_event_case(cases)
+    directory = tmp_path_factory.mktemp('pdf-golden')
+    raw = pdf_bytes((case['input']['event']['measurements'][0]['evidence_span'] + ' Original synthetic source ' * 80,))
+    path = directory / 'original.pdf'
+    path.write_bytes(raw)
+    case['materials'][0]['original'] = {'path': path.relative_to(Path(__file__).resolve().parents[3]).as_posix(),
+        'byte_count': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()}
+    return case, observe_http_case(case, directory, run_test_event_case)
+
+
+def test_pdf_event_normal_http_preserves_values_publication_and_scope(observed_pdf_event):
+    case, actual = observed_pdf_event
+    assert actual['sku_bindings'] == [] and actual['bridge_results'] == []
+    assert actual['execution']['mode'] == 'test_event_http'
+    assert actual['event_snapshot']['event']['publication'] == case['input']['event']['publication']
+    assert actual['event_snapshot']['event']['measurements'][0]['pdf_reference']['page'] == 1
+    report = checks.evaluate_corpus([case], [actual], 'a' * 64, 'b' * 64)
+    assert report['coverage']['real_positive_case_count'] == 0
+    assert report['coverage']['human_reviewed_case_count'] == 0
+
+
+@pytest.mark.parametrize('change', ['raw_value', 'page', 'start', 'end', 'raw_hash', 'document_id',
+    'document_fingerprint', 'extractor_version', 'chunk_id', 'publication', 'execution_scope'])
+def test_pdf_event_rejects_rehashed_original_or_scope_changes(observed_pdf_event, change):
+    case, actual = observed_pdf_event
+    damaged = deepcopy(actual)
+    event = damaged['event_snapshot']['event']
+    measured = event['measurements'][0]
+    if change == 'raw_value':
+        measured['raw_value'] = '999.0000'
+    elif change in ('page', 'start', 'end'):
+        measured['pdf_reference'][change] += 1
+    elif change == 'publication':
+        event['publication']['role'] = 'secondary_report'
+    elif change == 'execution_scope':
+        damaged['execution']['mode'] = 'private_http'
+    else:
+        measured['pdf_reference'][change] = 'd' * 64
+    reference = measured['pdf_reference']
+    if change != 'chunk_id':
+        reference['chunk_id'] = checks.json_sha256({key: value for key, value in reference.items() if key != 'chunk_id'})
+    fingerprint = checks.json_sha256(event)
+    damaged['event_binding']['fingerprint'] = fingerprint
+    damaged['event_snapshot']['fingerprint'] = fingerprint
+    damaged['event_snapshot']['history'][0]['fingerprint'] = fingerprint
+    assert checks.evaluate_case(case, damaged)['state'] == 'failed'
+
+
+def real_pdf_case():
+    root = Path(__file__).resolve().parents[3]
+    raw = (root / 'packages/domain-types/fixtures/professional-test-pdf-v1/real-crr2017-original-measurements.json').read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == 'c6a2653c02618cb2dcf61577c7adbef15832bb5c5702bc020096ba446cb3dcb4'
+    return strict_json_loads(raw)
+
+
+def test_real_crr2017_case_keeps_independent_22_values_and_original_source_scope():
+    case = real_pdf_case()
+    assert checks.load_case(case).model_dump(mode='json', by_alias=True) == case
+    assert case['tier'] == 'real_source_unknown_or_inadmissible'
+    assert case['input']['skus'] == [] and case['expected']['bridges'] == []
+    event = case['input']['event']
+    assert [value['raw_value'] for value in event['measurements']] == [
+        '0.0110', '0.0068', '0.0108', '0.0064', '0.0105', '0.0059', '0.0113', '0.0053',
+        '0.0160', '0.0082', '0.0141', '0.0074', '0.0088', '0.0041', '0.0130', '0.0058',
+        '0.0109', '0.0052', '0.0081', '0.0045', '0.0104', '0.0050']
+    assert event['reported_participants'] == 4 and event['coverage'] == 'selected_results'
+    assert event['metrics'][-1]['protocol'].find('50 km/h') >= 0
+    assert all(value['pdf_reference']['page'] == 4 for value in event['measurements'])
+
+
+def test_real_crr2017_normal_http_golden_event_with_saved_original(tmp_path):
+    from professional_golden_support import run_test_event_case
+    root = Path(__file__).resolve().parents[3]
+    case = real_pdf_case()
+    if not (root / case['materials'][0]['original']['path']).exists():
+        pytest.skip('Requires the captured licensed CRR2017 original with its pinned hash')
+    actual = observe_http_case(case, tmp_path, run_test_event_case)
+    assert len(actual['event_snapshot']['event']['measurements']) == 22
+    assert all(value['pdf_reference']['page'] == 4 for value in actual['event_snapshot']['event']['measurements'])
+    assert actual['sku_bindings'] == [] and actual['bridge_results'] == []
+    assert actual['event_snapshot']['verification_status'] == 'unverified'
+
+
+@pytest.mark.parametrize('case_id', ['synthetic-exact-two', 'synthetic-identity-conflict',
+    'synthetic-incomplete-explicit', 'synthetic-manual-unknown',
+    'synthetic-revoked-selection', 'synthetic-same-code-different-namespace'])
+def test_existing_synthetic_bridge_cases_replay_through_normal_private_http(cases, tmp_path, case_id):
+    from professional_golden_support import run_private_case
+    actual = observe_http_case(cases[case_id], tmp_path, run_private_case)
+    assert actual['execution']['mode'] == 'private_http'
+    assert actual['bridge_results']
+
+
+def test_event_only_scope_cannot_claim_sku_bridge_or_source_review(cases):
+    case = pdf_event_case(cases)
+    for change in [{'mode': 'private_http'}, {'skus': cases['synthetic-exact-two']['input']['skus']},
+            {'bridge_attempts': cases['synthetic-exact-two']['input']['bridge_attempts']}]:
+        invalid = deepcopy(case)
+        invalid['input'].update(change)
+        with pytest.raises(checks.ProfessionalGoldenError):
+            checks.load_case(invalid)
+    invalid = deepcopy(case)
+    invalid['expected']['source_review_findings'] = ['human_review_completed']
+    with pytest.raises(checks.ProfessionalGoldenError):
+        checks.load_case(invalid)
 
 
 @pytest.mark.parametrize('field,value', [('store_original', 1), ('workspace_reopen', 'true'),
