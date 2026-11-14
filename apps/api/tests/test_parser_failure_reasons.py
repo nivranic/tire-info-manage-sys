@@ -4,6 +4,7 @@ from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -184,3 +185,65 @@ def test_task_cancellation_is_not_converted_into_parser_failure(setup):
     assert adapter.last_result is None and adapter.last_receipt is None
     state = registry._states[registry.SPECS[SOURCE].origin]
     assert state['busy'] is False and state['failures'] == 0
+
+
+@pytest.fixture
+def process_acceptance(monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[3] / 'scripts'))
+    import postgres_process_acceptance as acceptance
+    monkeypatch.setattr(acceptance, 'REPORT', {})
+    return acceptance
+
+
+@pytest.mark.parametrize('code,expected', [
+    ('parser_timeout', 'parser_timeout'),
+    ('SYNTHETIC_PRIVATE_ERROR', 'parser_failed'),
+])
+def test_process_diagnostics_keep_fixed_parser_code_and_receipt_fields(process_acceptance, monkeypatch,
+                                                                      code, expected):
+    receipt = {'pid': 123, 'exit_code': 1, 'elapsed_ms': 8001, 'reaped': True,
+               'limits_backend': 'windows_job_object', 'bundle_id': 'a' * 64}
+    error = parser_runtime.ParserRunError(code, {**receipt, 'stderr': 'SYNTHETIC_PRIVATE_STDERR',
+                                               'query': {'text': 'SYNTHETIC_PRIVATE_QUERY'}})
+    error.args = ('SYNTHETIC_PRIVATE_MESSAGE',)
+    fetch = AsyncMock(side_effect=error)
+    monkeypatch.setattr(process_acceptance.RecordedRegistry, 'fetch', fetch)
+
+    with pytest.raises(parser_runtime.ParserRunError) as raised:
+        asyncio.run(process_acceptance.DiagnosedRecordedRegistry().fetch(SOURCE, QUERY))
+
+    assert raised.value is error
+    fetch.assert_awaited_once_with(SOURCE, QUERY)
+    report = process_acceptance.REPORT['recorded_source_failure']
+    assert report['failure_type'] == 'ParserRunError'
+    assert report['parser_error'] == expected and report['parser_receipt'] == receipt
+    assert report['message_omitted'] and report['locals_and_arguments_omitted']
+    assert 'SYNTHETIC_PRIVATE' not in json.dumps(report)
+
+
+def test_process_diagnostics_keep_ordinary_exception_safe(process_acceptance, monkeypatch):
+    error = RuntimeError('SYNTHETIC_PRIVATE_MESSAGE')
+    monkeypatch.setattr(process_acceptance.RecordedRegistry, 'fetch', AsyncMock(side_effect=error))
+    with pytest.raises(RuntimeError) as raised:
+        asyncio.run(process_acceptance.DiagnosedRecordedRegistry().fetch(SOURCE, QUERY))
+    assert raised.value is error
+    report = process_acceptance.REPORT['recorded_source_failure']
+    assert report['failure_type'] == 'RuntimeError' and 'parser_error' not in report
+    assert 'parser_receipt' not in report and 'SYNTHETIC_PRIVATE' not in json.dumps(report)
+
+
+def test_process_diagnostics_preserve_success(process_acceptance, monkeypatch):
+    result = {'status': 'ok', 'variants': []}
+    fetch = AsyncMock(return_value=result)
+    monkeypatch.setattr(process_acceptance.RecordedRegistry, 'fetch', fetch)
+    assert asyncio.run(process_acceptance.DiagnosedRecordedRegistry().fetch(SOURCE, QUERY)) is result
+    fetch.assert_awaited_once_with(SOURCE, QUERY)
+    assert process_acceptance.REPORT == {}
+
+
+def test_process_diagnostics_preserve_task_cancellation(process_acceptance, monkeypatch):
+    error = asyncio.CancelledError('SYNTHETIC_PRIVATE_CANCELLATION')
+    monkeypatch.setattr(process_acceptance.RecordedRegistry, 'fetch', AsyncMock(side_effect=error))
+    with pytest.raises(asyncio.CancelledError) as raised:
+        asyncio.run(process_acceptance.DiagnosedRecordedRegistry().fetch(SOURCE, QUERY))
+    assert raised.value is error and process_acceptance.REPORT == {}

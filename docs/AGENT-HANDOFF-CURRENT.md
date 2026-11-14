@@ -23,6 +23,7 @@
 - 后续活动Worker取消修正以 `c8b1aac` 为基线，最终八模块159项回归、真实12项／录制11项PG／TLS通过。四类队列取消后写入中断终态、保留原到期时间并保护替换租约；真实Worker重启消费成功，累计5次业务为live，843输入稳定。四个本轮集群、20个端口及临时秘密已核对。新API源码要求重建批准@4合同。录制首批source_fetch_failed的原异常根因待查；活动流、Webhook取消、服务管理器和远端继续验收。[活动Worker记录](assurance/evidence/active-worker-shutdown-2026-11-14.md)
 - 最新活动HTTP／AI流验收以 `6f866a3` 为基线，七模块220项回归、真实13项／录制12项PG／TLS通过。实际SSE在2秒宽限后关闭，合成Responses任务持久化未知结果并保守计入预算，重启cursor及原UUID重放的Provider调用为0。新增两种Webhook取消恢复用例，旧022夹具12个FTS关系遗漏已补。三个集群、18个端口和临时秘密已核对。实际OpenAI／Webhook网络、真实Web界面恢复及其他停机配置继续待验。[活动HTTP／AI流记录](assurance/evidence/active-http-ai-shutdown-2026-11-14.md)
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
+- 最新收尾以已发布 `f42e587` 为基线，复核配置、工厂及状态默认均为OpenAI Responses。新增Parser固定错误码及六字段诊断，5项新增专项与既有回归合计75项通过。沙箱首批67／75的硬链接WinError5取证及普通权限75／75对照均保留。真实Web恢复待验，两批分别遇到ParserRunError和私有驱动合成登录装配错误；服务、PG、三个端口及临时秘密已核对关闭。下一步先修正私有驱动凭据，再进行页面停机恢复。[Provider与交接收尾](assurance/evidence/provider-handoff-review-2026-11-14.md)
 
 ## 用户已确定的边界
 
@@ -254,4 +255,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及活动HTTP／AI流验收，核对main、HEAD、工作区和实时远端。本轮基线6f866a3，七模块220项回归、真实13项／录制12项PG／TLS通过。2秒停机宽限下实际SSE关闭，合成Responses任务写入持久未知结果，保留预算，重启cursor及原UUID重放通过。Webhook两种取消恢复已验API／事务，实际网络与自然租约待验。接续真实Web界面恢复、真实OpenAI网络／语义、其他宽限、服务管理器、Linux、长周期真实变化和远端部署。原upstream_timeout红批及录制source_fetch_failed原异常待查，安全栈记录已补。复用活动Worker、600秒租约61次观察、23项权限反例、024迁移、HNSW维护、@4匹配合同与Parser原8秒及OS证据。首个真实AI使用OpenAI Responses，Gemini为此前agent提前排期的可选适配器，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续SKU、人工Golden、专业许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，发布后核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读本卡、原规格及Provider交接复核，核对main、HEAD、工作区和实时远端。活动HTTP／AI流已在f42e587发布，历史220项回归、真实13项／录制12项PG／TLS通过。本轮新增Parser诊断及5项专项，三模块75项回归通过，保留沙箱硬链接WinError5首批失败及普通权限对照。真实Web恢复待验，先从本轮实际注册请求捕获合成登录凭据，修正私有驱动，再在全新私槽完成页面AI提交、停机、重启恢复及资源收尾。此前两批服务、PG和秘密均已核对关闭，422项前端构建输入匹配。录制source_fetch_failed已取得ParserRunError，具体错误码与OS根因继续取证，保留原8秒期限。复用2秒宽限HTTP/SSE持久未知终态、预算、cursor及原UUID重放Provider调用0次、Webhook取消API／事务、600秒租约61次观察、23项权限反例、024迁移、HNSW及@4合同证据。首个真实AI使用OpenAI Responses，Gemini由此前agent提前实现为可选适配器，缺凭据期间推进独立工程。继续真实OpenAI／Webhook网络、其他停机配置、Linux、长期真实监控、远端部署、SKU、人工Golden、专业许可、Native、无障碍及其余Gate。保留KIT C2与历史封存，12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，推送后核对远端SHA与工作区。

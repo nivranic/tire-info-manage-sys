@@ -36,9 +36,11 @@ sys.path[:0] = [str(ROOT / path) for path in ('apps/api', 'apps/api/tests', 'app
 import run_api_worker_regression as regression
 from postgres_acceptance import database_fingerprint
 from test_parser_releases import RecordedRegistry, SOURCE, QUERY
+from tire_api.captures import parser_failure_reason
 from tire_api.db import Database, MonitorJob, utc, utcnow
 from tire_api.domain import LiveQueryRequest
 from tire_api.main import SESSION_COOKIE
+from tire_api.parser_runtime import ParserRunError
 from tire_api.postgres_runtime_roles import check_runtime_role, runtime_role_sql
 from tire_api.postgres_schema import build_reference, verify_schema
 from tire_api.service import QueryService
@@ -54,6 +56,12 @@ class DiagnosedRecordedRegistry(RecordedRegistry):
             return await super().fetch(*args, **kwargs)
         except Exception as error:
             REPORT['recorded_source_failure'] = regression.safe_exception(error)
+            if isinstance(error, ParserRunError):
+                REPORT['recorded_source_failure']['parser_error'] = parser_failure_reason(error.code)
+                REPORT['recorded_source_failure']['parser_receipt'] = {
+                    key: error.receipt.get(key)
+                    for key in ('pid', 'exit_code', 'elapsed_ms', 'reaped', 'limits_backend', 'bundle_id')
+                }
             raise
 
 
