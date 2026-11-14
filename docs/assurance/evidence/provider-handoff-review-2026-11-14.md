@@ -24,6 +24,8 @@ python -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root
 
 ## 浏览器恢复验收现场
 
+后续已在 `4a54531` 基线上完成较长API停机后的手动只读恢复与刷新恢复，以下保留本阶段原始失败及当时接手步骤。[后续Web验收](web-ai-stream-recovery-2026-11-14.md)
+
 真实Web界面的API停机／重启恢复继续待验。现有两次尝试均为失败记录。
 
 | 批次 | 已取得的证据 | 后续工作 |

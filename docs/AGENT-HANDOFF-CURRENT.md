@@ -24,6 +24,7 @@
 - 最新活动HTTP／AI流验收以 `6f866a3` 为基线，七模块220项回归、真实13项／录制12项PG／TLS通过。实际SSE在2秒宽限后关闭，合成Responses任务持久化未知结果并保守计入预算，重启cursor及原UUID重放的Provider调用为0。新增两种Webhook取消恢复用例，旧022夹具12个FTS关系遗漏已补。三个集群、18个端口和临时秘密已核对。实际OpenAI／Webhook网络、真实Web界面恢复及其他停机配置继续待验。[活动HTTP／AI流记录](assurance/evidence/active-http-ai-shutdown-2026-11-14.md)
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 - 最新收尾以已发布 `f42e587` 为基线，复核配置、工厂及状态默认均为OpenAI Responses。新增Parser固定错误码及六字段诊断，5项新增专项与既有回归合计75项通过。沙箱首批67／75的硬链接WinError5取证及普通权限75／75对照均保留。真实Web恢复待验，两批分别遇到ParserRunError和私有驱动合成登录装配错误；服务、PG、三个端口及临时秘密已核对关闭。下一步先修正私有驱动凭据，再进行页面停机恢复。[Provider与交接收尾](assurance/evidence/provider-handoff-review-2026-11-14.md)
+- 后续真实Web恢复以 `4a54531` 为基线完成。正常登录、页面证据选择与外发同意、实际POST／SSE草稿、API停机隐藏草稿、同库重启后的手动只读恢复及刷新恢复通过，保留47,433 tokens预留且pending=false，重启Provider调用0次。三种视口无横向溢出，PG12项通过，14个服务记录与8个端口及临时秘密已核对。模型端采用合成Responses，短断线自动恢复和真实模型网络继续验收。[真实Web停机恢复](assurance/evidence/web-ai-stream-recovery-2026-11-14.md)
 
 ## 用户已确定的边界
 
@@ -255,4 +256,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读本卡、原规格及Provider交接复核，核对main、HEAD、工作区和实时远端。活动HTTP／AI流已在f42e587发布，历史220项回归、真实13项／录制12项PG／TLS通过。本轮新增Parser诊断及5项专项，三模块75项回归通过，保留沙箱硬链接WinError5首批失败及普通权限对照。真实Web恢复待验，先从本轮实际注册请求捕获合成登录凭据，修正私有驱动，再在全新私槽完成页面AI提交、停机、重启恢复及资源收尾。此前两批服务、PG和秘密均已核对关闭，422项前端构建输入匹配。录制source_fetch_failed已取得ParserRunError，具体错误码与OS根因继续取证，保留原8秒期限。复用2秒宽限HTTP/SSE持久未知终态、预算、cursor及原UUID重放Provider调用0次、Webhook取消API／事务、600秒租约61次观察、23项权限反例、024迁移、HNSW及@4合同证据。首个真实AI使用OpenAI Responses，Gemini由此前agent提前实现为可选适配器，缺凭据期间推进独立工程。继续真实OpenAI／Webhook网络、其他停机配置、Linux、长期真实监控、远端部署、SKU、人工Golden、专业许可、Native、无障碍及其余Gate。保留KIT C2与历史封存，12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，推送后核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及真实Web停机恢复记录，核对main、HEAD、工作区和实时远端。最新Web验收以4a54531为基线，PG12项通过，843输入匹配既有75项回归，422项生产构建输入匹配。私有驱动已从本轮实际注册请求取得合成登录凭据。页面完成外发同意、单次分析POST202及SSE草稿，2秒API停机后隐藏草稿，较长停机后手动只读恢复outcome_unknown及47,433 tokens保守预算，pending=false。刷新重开窗口继续恢复原请求，cursor序号1推进至4，新增分析POST与重启Provider调用均为0。三种视口核对通过，14个服务记录、8个端口、PG与临时秘密均已收尾。模型端为合成Responses，首个真实AI继续采用OpenAI Responses。接续Webhook实际网络取消及自然租约、短断线自动恢复、真实OpenAI与Embeddings、其他停机配置、Linux、远端部署和自然长周期监控。保留此前220项回归、真实13项／录制12项PG、600秒租约61次观察、23项权限反例、024迁移及HNSW／@4合同证据。录制source_fetch_failed的ParserRunError具体错误码与OS间歇延迟继续取证，维持当前8秒期限。保留KIT C2与历史封存，继续SKU、人工Golden、专业许可、Native、无障碍和其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，发布后核对远端SHA与工作区。
