@@ -3,12 +3,13 @@
 param(
     [Parameter(Mandatory)][string]$PostgresBin,
     [ValidateRange(1024, 65535)][int]$Port = 55432,
-    [ValidateSet('core', 'runtime-role', 'external-reader', 'runtime-schema', 'vehicle-migration')][string]$Suite = 'core',
+    [ValidateSet('core', 'runtime-role', 'external-reader', 'runtime-schema', 'runtime-process', 'vehicle-migration')][string]$Suite = 'core',
     [switch]$CliTls
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this script with PowerShell 7.' }
 if ($CliTls -and $Suite -in @('core', 'runtime-role')) { throw 'CliTls requires an external-reader, runtime-schema or vehicle-migration suite.' }
+if ($Suite -eq 'runtime-process' -and -not $CliTls) { throw 'The runtime-process suite requires CliTls.' }
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $bin = (Resolve-Path -LiteralPath $PostgresBin).Path
 foreach ($program in @('initdb.exe', 'pg_ctl.exe', 'pg_dump.exe', 'pg_restore.exe')) {
@@ -115,6 +116,7 @@ try {
         $acceptanceScript = switch ($Suite) {
             'external-reader' { 'scripts/postgres_external_reader_acceptance.py' }
             'runtime-schema' { 'scripts/postgres_schema_acceptance.py' }
+            'runtime-process' { 'scripts/postgres_process_acceptance.py' }
             'vehicle-migration' { 'scripts/postgres_vehicle_migration_acceptance.py' }
             default { 'scripts/postgres_acceptance.py' }
         }

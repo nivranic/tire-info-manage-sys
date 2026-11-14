@@ -59,3 +59,15 @@ public 的表／列／类型／默认值、主外键与 CHECK／NOT NULL、索�
 本轮 141 项受管回归和 22 项真实 PG 验收见[验收记录](assurance/evidence/postgres-runtime-schema-2026-11-14.md)。实际 PG 角色采用较宽 DML 权限验证无拥有者启动；完整业务 DML 最小权限、旧 PG 库兼容、真实远端、操作系统终端及生产 IAM／RLS 继续待验。
 
 后续[升级合同验收](assurance/evidence/postgres-upgrade-contract-2026-11-14.md)取得 141 项回归和 29 项真实 PG 检查通过。正式历史 035 代码建库后升级亦匹配，154 张旧表的 38 行及版本时间保持。后续已提供[PG 024 显式维护入口](POSTGRES-VEHICLE-MIGRATION.md)，完成历史 015 合成车型证据的升级、独立恢复与当前 API 读取。部署旧库继续按实际环境验收。
+
+## 独立HTTP与Worker进程复验
+
+已有API开发依赖和PostgreSQL运行时的Windows环境可使用正式独立进程入口。
+
+```text
+pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgres-bin> -Port <unused-port> -Suite runtime-process -CliTls
+```
+
+该入口在全新私有集群内核对实际uvicorn HTTP、Worker持久规则消费、进程中断与租约恢复、错误合同拒绝，以及数据库／原件／Parser包的独立恢复。服务进程使用非拥有者运行账户和显式verify合同。
+
+本轮9项PG／TLS检查及55项相关受管回归通过。来源输入采用已有录制片段，Worker显式禁用来源网络读取，租约到期采用隔离任务时间戳装配。远端环境、真实来源成功消费、自然租约期限和优雅停机继续验收。回执摘要、原始失败与复跑范围见[独立进程验收](assurance/evidence/postgres-process-runtime-2026-11-14.md)。
