@@ -4,7 +4,7 @@
 
 ## 接手基线
 
-- 既有分支为 `main`，空闲服务控制台停机已在 `c8b1aac` 交付，本轮活动Worker取消与重启修正以该提交为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
+- 既有分支为 `main`，活动Worker取消与重启修正已在 `6f866a3` 交付，本轮活动HTTP／AI流与Webhook取消恢复验收以该提交为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
 - 用户已授权持续实施、复核优化、总结、提交、push 全部改动和编写交接文档。沿既有分支工作，新分支、worktree 及代理操作须另有明确授权。
 - [原始需求](requirements/2026-09-26-tire-intelligence-original.md)保持原字节。[当前入口](AGENT-HANDOFF-CURRENT.md)与[此前阶段总表](AGENT-HANDOFF-2026-11-13.md)保留历史验收范围。
 - `.artifacts/`、`data/`、原件、私库、凭据、依赖及构建产物留在 Git 忽略范围。新 clone 需要重建依赖、材料和隔离验收环境。
@@ -120,6 +120,16 @@
 
 首轮受限回归122／159、正常权限硬链接对照和最终159项回执分别保留。录制PG首批种子查询为source_fetch_failed，单用户只读诊断取得1条原件及Parser not_started；具体原始异常根因待查，随后同源码串行11项通过。活动网络／AI流、Webhook取消、服务管理器、Linux信号、远端与长周期继续验收。[活动Worker验收与原始失败](assurance/evidence/active-worker-shutdown-2026-11-14.md)
 
+### 最新活动HTTP／AI流与Webhook取消恢复
+
+基线 `6f866a3`。正式进程入口在正常create_app／lifespan上注入合成Responses生产任务，实际HTTP/SSE客户端保持订阅，2秒停机宽限到期后取消活动请求。AI任务关闭并写入持久outcome_unknown／ai_stream_interrupted，预算保守计入，重启后原cursor取得终态，原UUID重放的Provider调用为0。
+
+最终七模块220项受管回归、真实来源13项／录制12项PG／TLS通过，843输入稳定。三个本轮集群、18个端口及临时秘密已核对，成功两批29个服务记录、18个实际控制台进程句柄已核对。当前API源码摘要及@4合同与上节匹配，部署按既有匹配合同工作流执行。
+
+新增两种Webhook发送取消恢复用例，覆盖未知结果、原租约、退避、旧token和用户取消状态。旧022当前形状夹具的12个FTS关系遗漏已据实补齐，首批218／220与探针保留。真实来源首批upstream_timeout后等待30秒，同源码正式复跑13项通过。此前录制source_fetch_failed的具体原异常待查，验收现补安全异常类型／栈记录。
+
+本轮模型端采用合成实现。实际OpenAI网络、真实Web界面断线恢复、Webhook网络／自然租约、默认及其他宽限配置、服务管理器、Linux与远端继续验收。[活动HTTP／AI流验收](assurance/evidence/active-http-ai-shutdown-2026-11-14.md)
+
 ## 运行角色阶段验证
 
 此前运行角色阶段七模块受管回归124／124通过，841输入稳定、资源关闭、非自检拒绝0。真实PG／TLS结构与权限检查31项、拥有者核心兼容58项、旧许可操作员兼容9场景均通过。该阶段运行角色综合验收前37项后遇到HNSW失败，后续由上述显式维护处理。
@@ -130,7 +140,7 @@
 
 1. 核对 `main`、HEAD、工作区和实时远端，读取本文、原规格、运行角色阶段验收、[运行 schema 方案](POSTGRES-RUNTIME-SCHEMA.md)与[024 维护说明](POSTGRES-VEHICLE-MIGRATION.md)。复用已有证据，先取新失败的 SQLSTATE、调用入口和日志。
 2. 复用已通过的23项运行角色反例及部分GRANT回滚检查，依据新失败补充专项。HNSW维护采用显式清单与@4合同，运行角色使用已审查DML策略。接续推进Parser性能取证、实际终端及远端部署。
-3. 复用活动Worker真实12项／录制11项PG／TLS、159项回归和此前自然600秒租约证据，继续活动HTTP／AI流、Webhook取消、服务管理器、Linux信号、自然长周期真实变化、多规则提醒和远端部署。对录制首批source_fetch_failed补原异常取证。OS打开链路继续按54组文件系统及16次原入口取证定位，监督器采用8秒期限，原始失败和生产尾延迟独立跟踪。
+3. 复用活动HTTP／AI流真实13项／录制12项PG／TLS、220项回归及此前活动Worker与自然600秒租约证据，继续真实Web界面断线恢复、实际OpenAI网络、Webhook网络／自然租约、其他停机宽限、服务管理器、Linux信号、自然长周期变化、多规则提醒和远端部署。对录制首批source_fetch_failed利用新增安全栈记录补原异常取证。OS打开链路继续按54组文件系统及16次原入口取证定位，监督器采用8秒期限，原始失败和生产尾延迟独立跟踪。
 4. 完善部署操作说明，验证实际终端、远端角色、对象／Parser 全资产恢复，再推进 IAM／RLS、吞吐及灾备指标。
 5. 凭据齐备时，先执行真实 OpenAI Responses 和 Embeddings 的 API、外发同意、Provider、引用恢复和 Web 语义验收。无凭据期间推进独立工程。
 6. 继续真实精确 SKU、人工 Golden、专业材料正式许可、更多来源与车型、自然长周期监控、实际 Native 宿主与设备、无障碍和其余发布 Gate。
@@ -157,4 +167,4 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读本卡、原规格及活动Worker停机验收，核对main、HEAD、工作区和实时远端。本轮基线c8b1aac，八模块159项回归、真实12项／录制11项PG／TLS通过，四类队列取消终态、原到期时间和替换租约保护已验，真实Worker重启后成功消费。5次真实业务为live，166张表／原件／Parser资产独立恢复通过。部署重建并批准匹配新源码的@4合同。录制首批source_fetch_failed已留原件与Parser not_started证据，原异常根因待查。接续活动HTTP／AI流、Webhook取消、服务管理器、Linux信号、自然长周期真实变化和远端部署。复用此前600秒租约61次观察、23项权限反例、024迁移、HNSW维护与Parser54组文件系统／16次原入口证据。首个真实AI使用OpenAI Responses，Gemini为此前agent提前排期的可选适配器，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续真实SKU、人工Golden、专业许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，推送后核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读本卡、原规格及活动HTTP／AI流验收，核对main、HEAD、工作区和实时远端。本轮基线6f866a3，七模块220项回归、真实13项／录制12项PG／TLS通过。2秒停机宽限下实际SSE关闭，合成Responses任务写入持久未知结果，保留预算，重启cursor及原UUID重放通过。Webhook两种取消恢复已验API／事务，实际网络与自然租约待验。接续真实Web界面恢复、真实OpenAI网络／语义、其他宽限、服务管理器、Linux、长周期真实变化和远端部署。原upstream_timeout红批及录制source_fetch_failed原异常待查，安全栈记录已补。复用活动Worker、600秒租约61次观察、23项权限反例、024迁移、HNSW维护、@4匹配合同与Parser原8秒及OS证据。首个真实AI使用OpenAI Responses，Gemini为此前agent提前排期的可选适配器，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续SKU、人工Golden、专业许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，推送后核对远端SHA与工作区。

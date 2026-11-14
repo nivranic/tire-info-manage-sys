@@ -21,6 +21,7 @@
 - 最新真实来源与自然租约模式9项通过，HTTP及Worker共4次业务查询均为live，600秒租约实际观察601.859秒、61次状态记录后成功恢复。166张表、3个原件及197个Parser资产独立恢复后继续在线消费。录制模式9项及相关回归55项通过，843输入稳定。继续自然长周期真实变化、优雅停机与远端部署。[真实进程验收](assurance/evidence/postgres-live-process-2026-11-14.md)
 - 最新Windows控制台停机接入正式进程入口，真实来源及录制模式各11项通过，API正常完成lifespan，空闲Worker沿Ctrl+C取消退出，实际服务和启动器句柄、PG后端及端口均核对。四模块75项回归通过，旧遥测断言已补Safety Gate周期，843输入稳定。运行中任务、活动流、服务管理器及远端继续验收。[停机记录](assurance/evidence/windows-service-shutdown-2026-11-14.md)
 - 后续活动Worker取消修正以 `c8b1aac` 为基线，最终八模块159项回归、真实12项／录制11项PG／TLS通过。四类队列取消后写入中断终态、保留原到期时间并保护替换租约；真实Worker重启消费成功，累计5次业务为live，843输入稳定。四个本轮集群、20个端口及临时秘密已核对。新API源码要求重建批准@4合同。录制首批source_fetch_failed的原异常根因待查；活动流、Webhook取消、服务管理器和远端继续验收。[活动Worker记录](assurance/evidence/active-worker-shutdown-2026-11-14.md)
+- 最新活动HTTP／AI流验收以 `6f866a3` 为基线，七模块220项回归、真实13项／录制12项PG／TLS通过。实际SSE在2秒宽限后关闭，合成Responses任务持久化未知结果并保守计入预算，重启cursor及原UUID重放的Provider调用为0。新增两种Webhook取消恢复用例，旧022夹具12个FTS关系遗漏已补。三个集群、18个端口和临时秘密已核对。实际OpenAI／Webhook网络、真实Web界面恢复及其他停机配置继续待验。[活动HTTP／AI流记录](assurance/evidence/active-http-ai-shutdown-2026-11-14.md)
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 
 ## 用户已确定的边界
@@ -227,7 +228,7 @@
 ## 接手后优先做什么
 
 1. 核对 main、HEAD、工作区与实时远端，读本卡、运行 schema／非拥有者角色／PG CLI 及 Windows 路径验收；新 clone 重建依赖和材料，本机私槽没有随 Git 交付。最新升级合同 141 项回归／29 项 PG 专项及正式历史 035 schema／行保留实验与此前角色、CLI、路径及 core 验收分别留证；保留历史失败，对新失败取原始证据，不重复泛化跑已通过且无变化的检查。
-2. PG许可CLI、治理操作员、verify、024显式维护及HNSW拥有者维护已实现。@4保存完整空间与维度，本轮API源码变化要求重建批准空参考合同。复用23项权限反例、Parser缺省架构、活动Worker真实12项／录制11项PG／TLS及159项回归与此前自然租约证据，接续活动HTTP／AI流、Webhook取消、服务管理器、Linux信号、自然长周期真实变化及远端部署。录制首批source_fetch_failed的原异常及Parser间歇超时继续取证。正式PG验收使用每批私有TMP，原8秒限制与所有核验保留。Reader固定表锁名单继续作为合同检查。
+2. PG许可CLI、治理操作员、verify、024显式维护及HNSW拥有者维护已实现。@4保存完整空间与维度，部署使用匹配可信源码的批准空参考合同。复用23项权限反例、Parser缺省架构、活动HTTP／AI流真实13项／录制12项PG／TLS及220项回归，接续真实Web界面断线恢复、真实OpenAI网络、Webhook网络／自然租约、其他宽限、服务管理器、Linux、自然长周期变化及远端部署。录制首批source_fetch_failed的原异常及Parser间歇超时继续取证，验收现有安全栈记录。正式PG验收使用每批私有TMP，原8秒限制与所有核验保留。Reader固定表锁名单继续作为合同检查。
 3. 阅读新增合同验收中的 8 项真实漏检与 2 项读取拒绝测试预期差异，保留原始失败；容量、核验状态、最终发送及完成重验、混合域已经取得专项证据，不重复做同一轮泛化回归。后续根据新的实现或失败补测。
 4. 核对实际 Native 宿主的正常桥接和轮询消费。Web 工程验收已完成，真机／宿主权限、文件保存与恢复仍需实际证据，不扩离线包域或 IPC 权限。
 5. 验证监控自然长周期、多规则、真实变化提醒和通知 lag；继续其他 P0 官方渠道、地区与 SKU 参数覆盖。模拟超时、历史回放和固定材料验证不能证明这些运行指标。
@@ -253,4 +254,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及活动Worker停机验收，核对main、HEAD、工作区和实时远端。本轮基线c8b1aac，八模块159项回归、真实12项／录制11项PG／TLS通过，四类队列取消终态、原到期时间和替换租约保护已验，真实Worker重启成功消费。5次真实业务为live，166张表／原件／Parser资产独立恢复通过。部署重建并批准匹配新源码的@4合同。录制首批source_fetch_failed已留原件与Parser not_started证据，原异常根因待查。接续活动HTTP／AI流、Webhook取消、服务管理器、Linux信号、自然长周期真实变化和远端部署。复用此前600秒租约61次观察、23项权限反例、024迁移、HNSW维护与Parser54组文件系统／16次原入口证据。首个真实AI使用OpenAI Responses，Gemini为此前agent提前排期的可选适配器，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续SKU／Golden、材料许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，发布后核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及活动HTTP／AI流验收，核对main、HEAD、工作区和实时远端。本轮基线6f866a3，七模块220项回归、真实13项／录制12项PG／TLS通过。2秒停机宽限下实际SSE关闭，合成Responses任务写入持久未知结果，保留预算，重启cursor及原UUID重放通过。Webhook两种取消恢复已验API／事务，实际网络与自然租约待验。接续真实Web界面恢复、真实OpenAI网络／语义、其他宽限、服务管理器、Linux、长周期真实变化和远端部署。原upstream_timeout红批及录制source_fetch_failed原异常待查，安全栈记录已补。复用活动Worker、600秒租约61次观察、23项权限反例、024迁移、HNSW维护、@4匹配合同与Parser原8秒及OS证据。首个真实AI使用OpenAI Responses，Gemini为此前agent提前排期的可选适配器，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续SKU、人工Golden、专业许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，发布后核对远端SHA与工作区。

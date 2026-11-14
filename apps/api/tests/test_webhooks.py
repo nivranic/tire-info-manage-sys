@@ -22,7 +22,8 @@ from tire_api.main import create_app
 from tire_api.monitoring import record_alerts
 from tire_api.service import QueryService
 from tire_api.webhook_delivery import claim_delivery, dispatch_claim, finish_delivery, run_webhook_cycle
-from tire_api.webhook_models import WebhookAttempt, WebhookCompletion, WebhookEnvelope, WebhookQueue
+from tire_api.webhook_models import (WebhookAttempt, WebhookCompletion, WebhookDispatchSlot,
+    WebhookEnvelope, WebhookQueue)
 
 
 @pytest.fixture
@@ -160,6 +161,75 @@ def test_cancel_inflight_stops_future_dispatch_but_keeps_factual_completion(case
     assert claim_delivery(case.database, now=now + timedelta(seconds=2)) is None
 
 
+@pytest.mark.parametrize('cancel_delivery', [False, True])
+def test_cancelled_worker_keeps_unknown_http_outcome_until_fenced_lease_recovery(case, cancel_delivery):
+    subscription = create_subscription(case, ['tire_monitor'], enabled=True)['response']
+    add_tire_notification(case)
+    delivery = rows(case, subscription)[0]
+    now = utcnow()
+
+    class HeldTransport:
+        def __init__(self):
+            self.entered = asyncio.Event()
+            self.calls = self.closed = 0
+
+        async def send(self, *_args):
+            self.calls += 1
+            try:
+                self.entered.set()
+                await asyncio.Event().wait()
+            finally:
+                self.closed += 1
+
+    async def scenario():
+        transport = HeldTransport()
+        task = asyncio.create_task(run_webhook_cycle(case.database, max_jobs=1, adapter=transport, now=now))
+        try:
+            await asyncio.wait_for(transport.entered.wait(), timeout=5)
+            with case.database.sessions() as db:
+                attempt = db.scalar(select(WebhookAttempt).where(WebhookAttempt.envelope_id == delivery['id']))
+                value = {'id': delivery['id'], 'token': attempt.token,
+                         'attempt_id': attempt.id, 'number': attempt.number}
+            if cancel_delivery:
+                response = case.client.post('/v1/webhooks/' + subscription['id'] + '/deliveries/' + delivery['id'] + '/cancel',
+                    json={'expected_attempts': 1, 'acknowledged': True}, headers={'Idempotency-Key': str(uuid4())})
+                assert response.status_code == 200, response.text
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert transport.calls == transport.closed == 1
+            return value
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+    original = asyncio.run(scenario())
+    with case.database.sessions() as db:
+        assert db.get(WebhookCompletion, original['attempt_id']) is None
+        assert db.get(WebhookDispatchSlot, 'global').token == original['token']
+        assert db.get(WebhookQueue, delivery['id']).state == ('cancelled' if cancel_delivery else 'inflight')
+    assert claim_delivery(case.database, now=now + timedelta(seconds=2)) is None
+    assert claim_delivery(case.database, now=now + timedelta(seconds=31)) is None
+    frozen = detail(case, subscription, delivery)
+    assert frozen['state'] == ('cancelled' if cancel_delivery else 'pending')
+    assert frozen['attempt_history'][0]['state'] == 'unknown'
+    assert frozen['attempt_history'][0]['error_code'] == 'webhook_lease_expired'
+    assert frozen['attempt_history'][0]['http_status'] is None
+    assert not finish_delivery(case.database, original, {'http_status': 204}, now=now + timedelta(seconds=32))
+    if cancel_delivery:
+        assert claim_delivery(case.database, now=now + timedelta(seconds=91)) is None
+    else:
+        transport = ControlledWebhookAdapter()
+        result = asyncio.run(run_webhook_cycle(case.database, max_jobs=1, adapter=transport,
+            now=now + timedelta(seconds=91)))
+        assert result['jobs'] == 1 and result['results'][0]['finalized']
+        assert len(transport.calls) == 1
+        assert transport.calls[0]['headers']['X-Tire-Webhook-Id'] == original['id']
+        assert transport.calls[0]['headers']['X-Tire-Webhook-Attempt'] == '2'
+        assert detail(case, subscription, delivery)['state'] == 'delivered'
+
+
 def test_manual_retry_adds_budget_with_operation_and_replay_is_read_only(case):
     subscription = create_subscription(case, ['tire_monitor'], enabled=True)['response']
     add_tire_notification(case)
@@ -202,8 +272,11 @@ def test_authenticated_guard_runs_before_invalid_body(case):
 
 @pytest.fixture
 def pre022(tmp_path, monkeypatch):
+    """Current table/search shapes with a pre-022 ledger for webhook DDL isolation."""
     from tire_api.db import Base
     from tire_api.knowledge_models import initialize_search
+    from tire_api.source_text_models import initialize_source_text_search
+    from tire_api.document_text_models import initialize_document_text_search
     from tire_api.webhook_models import MODELS
     from tire_api.external_api_models import TABLES as EXTERNAL_TABLES
     from test_identity_migration import seed_legacy
@@ -220,6 +293,8 @@ def pre022(tmp_path, monkeypatch):
         for version in EXPECTED_SCHEMA_VERSIONS[:21]:
             connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'), {'version': version})
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
     with database.sessions() as db:
         seed_legacy(db, namespace='SYNTHETIC-R78', product_code='SYNTHETIC-PRE022', watch=True)
     yield database, new_tables

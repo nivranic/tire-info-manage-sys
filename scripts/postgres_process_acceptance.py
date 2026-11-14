@@ -48,6 +48,42 @@ REPORT = {'scope': 'isolated loopback PG/TLS, actual HTTP and Worker processes, 
 STEP = 'setup'
 
 
+class DiagnosedRecordedRegistry(RecordedRegistry):
+    async def fetch(self, *args, **kwargs):
+        try:
+            return await super().fetch(*args, **kwargs)
+        except Exception as error:
+            REPORT['recorded_source_failure'] = regression.safe_exception(error)
+            raise
+
+
+def held_ai_app():
+    """Acceptance-only ASGI factory with a cancellable synthetic Responses producer."""
+    from tire_api.main import create_app
+    application = create_app()
+    marker = Path(os.environ['TI_DATABASE_SCHEMA_CONTRACT']).parent / 'synthetic-ai-provider.json'
+    state = {'calls': 0, 'closed': 0}
+    marker.write_text(json.dumps(state), encoding='utf-8')
+
+    class HeldProvider:
+        async def stream(self, config, body, on_text):
+            assert config.provider == 'openai_responses' and body['stream'] is True
+            pack = json.loads(body['input'][1]['content'])['untrusted_evidence_pack']
+            fact = pack['facts'][0]
+            claim = {'type': 'fact', 'text': '', 'fact_ids': [fact['id']], 'evidence_ids': [fact['evidence_id']]}
+            state['calls'] += 1
+            marker.write_text(json.dumps(state), encoding='utf-8')
+            try:
+                await on_text('{"claims":[' + json.dumps(claim) + ']')
+                await asyncio.Event().wait()
+            finally:
+                state['closed'] += 1
+                marker.write_text(json.dumps(state), encoding='utf-8')
+
+    application.state.ai_adapter = HeldProvider()
+    return application
+
+
 def record(name):
     REPORT['checks'].append({'name': name, 'passed': True})
     print(json.dumps(REPORT['checks'][-1]), flush=True)
@@ -159,13 +195,15 @@ def child(slot, label, arguments, environment, *, console=False):
 
 
 @contextmanager
-def http_service(slot, label, environment, *, cookies=None, graceful=False):
+def http_service(slot, label, environment, *, cookies=None, graceful=False,
+                 application='tire_api.main:app', extra_arguments=()):
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0))
         port = reservation.getsockname()[1]
     REPORT['ports'].append(port)
-    arguments = ['-m', 'uvicorn', 'tire_api.main:app', '--host', '127.0.0.1',
-                 '--port', str(port), '--workers', '1', '--no-access-log', '--log-level', 'info' if graceful else 'warning']
+    arguments = ['-m', 'uvicorn', application, '--host', '127.0.0.1',
+                 '--port', str(port), '--workers', '1', '--no-access-log',
+                 '--log-level', 'info' if graceful else 'warning', *extra_arguments]
     with child(slot, label, arguments, environment, console=graceful) as process, \
             httpx.Client(base_url=f'http://127.0.0.1:{port}', trust_env=False,
                          timeout=45, cookies=cookies) as client:
@@ -178,6 +216,100 @@ def http_service(slot, label, environment, *, cookies=None, graceful=False):
         health = wait_for(ready)
         assert health['database'] == 'postgresql'
         yield client
+
+
+def active_ai_shutdown(slot, environment, cookies, seeded):
+    """Exercise actual HTTP/SSE shutdown and durable replay with a synthetic producer."""
+    marker = slot / 'synthetic-ai-provider.json'
+    options = {'application': 'postgres_process_acceptance:held_ai_app',
+               'extra_arguments': ('--factory', '--app-dir', str(ROOT / 'scripts'),
+                                   '--timeout-graceful-shutdown', '2')}
+    ai_environment = {**environment, 'TI_AI_ENABLED': '1', 'TI_AI_PROVIDER': 'openai_responses',
+                      'TI_OPENAI_MODEL': 'synthetic-shutdown', 'TI_OPENAI_API_KEY': 'synthetic-never-live'}
+    ready = threading.Event()
+    stream_state = {'event_types': [], 'closed': False}
+    reader = None
+    try:
+        with http_service(slot, 'api-active-ai', ai_environment, cookies=cookies, graceful=True, **options) as client:
+            status = accepted(client.get('/v1/ai/status'))
+            assert status['model']['provider'] == 'openai_responses'
+            pack = accepted(client.post('/v1/ai/evidence-packs', json={'mode': 'history', 'references': [{
+                'kind': 'tire', 'snapshot_id': seeded['provenance'][0]['snapshot_id'],
+                'variant_id': seeded['variants'][0]['id']}]}))['pack']
+            key = str(uuid4())
+            payload = {'pack_id': pack['id'], 'question': '解释所选历史参数', 'allow_external_processing': True}
+            detail = accepted(client.post('/v1/ai/analysis-streams', json=payload,
+                headers={'Idempotency-Key': key}), 202)
+            request_id = detail['analysis']['id']
+            path = '/v1/ai/analysis-streams/' + request_id
+
+            def draft_ready():
+                value = accepted(client.get(path, params={'mode': 'history'}))
+                return value if value['draft_claims'] and not value['execution']['terminal'] else None
+            before = wait_for(draft_ready)
+            page = accepted(client.get(path + '/events'))
+            cursor = page['next_cursor']
+            base_url, reader_cookies = str(client.base_url), dict(client.cookies)
+
+            def subscribe():
+                try:
+                    with httpx.Client(base_url=base_url, cookies=reader_cookies, trust_env=False, timeout=35) as subscriber:
+                        with subscriber.stream('GET', path + '/events/stream') as response:
+                            assert response.status_code == 200
+                            assert response.headers['content-type'].startswith('text/event-stream')
+                            for line in response.iter_lines():
+                                if line.startswith('data:'):
+                                    event = json.loads(line[5:])
+                                    kind = event.get('type')
+                                    if kind is not None:
+                                        stream_state['event_types'].append(kind)
+                                    if kind == 'claim_draft':
+                                        ready.set()
+                except Exception as error:
+                    stream_state['error_type'] = type(error).__name__
+                finally:
+                    stream_state['closed'] = True
+
+            reader = threading.Thread(target=subscribe, name='acceptance-ai-sse-reader')
+            reader.start()
+            wait_for(lambda: ready.is_set() or not reader.is_alive())
+            assert ready.is_set() and reader.is_alive(), 'active_ai_sse_not_observed'
+            assert json.loads(marker.read_text(encoding='utf-8')) == {'calls': 1, 'closed': 0}
+            REPORT['active_ai_before'] = {'execution': before['execution'],
+                'draft_count': len(before['draft_claims']), 'subscriber_active': True}
+    finally:
+        if reader is not None:
+            reader.join(timeout=35)
+            assert not reader.is_alive(), 'active_ai_sse_reader_not_closed'
+    shutdown = REPORT['processes'][-1]
+    assert shutdown['returncode'] == 0
+    assert stream_state.get('error_type') in (None, 'RemoteProtocolError', 'ReadError'), 'unexpected_sse_reader_failure'
+    assert json.loads(marker.read_text(encoding='utf-8')) == {'calls': 1, 'closed': 1}
+    REPORT['active_ai_shutdown'] = {'subscriber': stream_state, 'synthetic_provider_calls': 1,
+                                   'synthetic_provider_closed': True, 'grace_seconds': 2}
+
+    with http_service(slot, 'api-ai-restarted', ai_environment, cookies=cookies, graceful=True, **options) as client:
+        after = accepted(client.get(path, params={'mode': 'history'}))
+        assert after['execution']['terminal'] and after['analysis']['state'] == 'outcome_unknown'
+        assert not after['execution']['projection_only']
+        assert after['analysis']['answer'] is None and after['analysis']['usage'] is None
+        assert after['analysis']['error_code'] == 'ai_stream_interrupted'
+        assert after['draft_claims'] == []
+        budget = accepted(client.get('/v1/ai/status'))['budget']
+        assert not budget['has_pending_request']
+        assert budget['accounted_tokens'] == after['analysis']['reserved_tokens']
+        events = accepted(client.get(path + '/events', params={'cursor': cursor}))
+        assert [item['type'] for item in events['items']] == ['outcome_unknown']
+        replay = accepted(client.post('/v1/ai/analysis-streams', json=payload,
+            headers={'Idempotency-Key': key}))
+        assert replay['replayed'] and replay['analysis']['id'] == request_id
+        assert replay['analysis']['state'] == 'outcome_unknown'
+        assert json.loads(marker.read_text(encoding='utf-8')) == {'calls': 0, 'closed': 0}
+        REPORT['active_ai_after'] = {'execution': after['execution'], 'state': after['analysis']['state'],
+            'replay_provider_calls': 0, 'cursor_event_types': [item['type'] for item in events['items']],
+            'budget_accounted_tokens': budget['accounted_tokens'], 'pending_request': budget['has_pending_request']}
+    REPORT['synthetic_ai_provider_enabled'] = True
+    REPORT['real_model_calls'] = 0
 
 
 def graceful_worker(slot, environment):
@@ -366,8 +498,9 @@ def run(*, live_source=False, natural_lease=False):
                 try:
                     runtime_db.initialize()
                     with runtime_db.sessions() as db:
-                        seeded = asyncio.run(QueryService(db, RecordedRegistry()).execute(SOURCE,
+                        seeded = asyncio.run(QueryService(db, DiagnosedRecordedRegistry()).execute(SOURCE,
                             LiveQueryRequest(query=QUERY, fallback_policy='never'), cookies[SESSION_COOKIE]))
+                    REPORT['recorded_query_outcome'] = {'state': seeded['data_state'], 'reason': seeded.get('reason')}
                     assert seeded['data_state'] == 'live'
                 finally:
                     runtime_db.close()
@@ -653,6 +786,11 @@ def run(*, live_source=False, natural_lease=False):
                 REPORT['active_worker_restart'] = resumed['results'][0]
             wait_for_runtime_disconnect()
             record(STEP)
+
+        STEP = 'active_http_sse_shutdown_closes_ai_producer_and_preserves_unknown_replay'
+        active_ai_shutdown(slot, restored_environment, cookies, seeded)
+        wait_for_runtime_disconnect()
+        record(STEP)
 
 
 if __name__ == '__main__':

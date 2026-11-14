@@ -28,6 +28,8 @@ Worker 在已启用订阅产生新通知时处理事务内队列。单独处理 
 
 人工重试每次增加 5 次预算，总上限 20，保留原 delivery ID、正文和连续 attempt 编号。仅仍有效的原订阅修订、未过期且完整的失败投递可以重试。取消、成功、损坏、策略变化或过期修订不能重新发送。取消或暂停只能停止后续派送，无法追回已经开始的 HTTP 请求；超时、进程崩溃或租约过期也无法证明对端未收到。取消后到达的响应只能记录尝试事实，不能把取消状态改回已送达。
 
+Worker在发送期间被取消时，原尝试保留其30秒租约，后续claim按原到期时间恢复为unknown。符合条件的投递继续既有退避，用户已经取消的投递保持cancelled。迟到响应受原token保护。两种取消路径的API／事务回归见[取消恢复验收](assurance/evidence/active-http-ai-shutdown-2026-11-14.md)，实际网络及自然租约仍待独立验收。
+
 ## 接收方签名核验
 
 请求正文是封闭的 `tire-webhook-event@1` JSON：`delivery_id`、`channel`、`notification_id`、`event_id`、`domain`、`occurred_at`、`data_scope=notification_reference_only` 以及固定边界文字。`tire_monitor` 的 event ID 是 `AlertEvent.id`，时间来自关联 `ChangeEvent.observed_at`；其他两类分别使用 `RecallEvent`、`InterestEvent`，只有兴趣类型有非空 domain。

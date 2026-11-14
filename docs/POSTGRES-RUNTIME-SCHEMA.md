@@ -85,3 +85,5 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 最新增加运行中Worker的Ctrl+C与重启检查。四类监控队列取消后记录中断终态，保留原到期时间并释放自身租约，后来接手者的租约由既有fencing保护。真实来源模式12项、录制模式串行复跑11项、八模块159项受管回归通过。活动边界为本轮数据库INSERT表锁等待，活动HTTP／AI流、Webhook取消、服务管理器和远端部署继续验收。[活动Worker验收](assurance/evidence/active-worker-shutdown-2026-11-14.md)
 
 该修正更新包内API源码，部署需要重新生成并批准空参考@4合同。本轮两模式源码SHA-256均为 `cbbbb5de20e1a5bec37a8a6843da0f5fdf6e727a906ee62912b7c9640a85a061`，隔离PG18合同SHA-256均为 `24edf9519b28945cf934353eb8d52dce500c430335228af9ede731f6aa200b30`。实际目标环境继续独立构建与审查合同。录制首批出现原件已保存、Parser尚未启动的source_fetch_failed，具体原始异常根因继续按验收记录跟踪。
+
+后续正式进程入口追加活动HTTP／AI流检查。验收factory复用正常create_app与lifespan，并注入合成Responses生产任务。实际SSE订阅在2秒停机宽限到期后取消，AI任务写入持久outcome_unknown，预算保守计入，重启后cursor恢复及原UUID重放均通过。真实来源13项、录制12项PG／TLS及七模块220项受管回归通过。当前API源码与上述@4合同摘要匹配。实际OpenAI网络、其他宽限配置、Webhook网络、服务管理器、Linux及远端继续验收。[活动HTTP／AI流记录](assurance/evidence/active-http-ai-shutdown-2026-11-14.md)
