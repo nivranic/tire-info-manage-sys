@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {".": "./src/index.ts"},
   "scripts": {
+    "test:samr-recalls": "tsc -p ./tests/tsconfig.samr-recalls.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/samr-recalls.mts",
     "test:text-embeddings": "tsc -p ./tests/tsconfig.text-embeddings.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/text-embeddings.mts",
     "test:document-text": "tsc -p ./tests/tsconfig.document-text.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/document-text.mts",
     "test:source-text": "tsc -p ./tests/tsconfig.source-text.json && node --experimental-transform-types --import ./tests/device-ai/json-esm-hook.mjs ./tests/source-text.mts",

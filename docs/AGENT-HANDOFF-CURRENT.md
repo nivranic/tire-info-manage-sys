@@ -1,5 +1,7 @@
 # 胎迹 Agent 接手卡
 
+中国召回专用 DTO、SDK 和 Web 已补齐，最终正常浏览器 31 项通过，含 6 次真实官方 live 查询、独立持续回退策略及来源代次取消。SDK 8 项、既有 SDK 3 项、Web 59 项、完整类型与生产构建通过。接续后台监控、逐公告历史与变化通知，详见[当前中国召回接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)和[工作台验收](assurance/evidence/samr-cn-web-2026-11-14.md)。下文保留此前交付时点。
+
 最新阶段先读[中国召回接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)及[阶段验收](assurance/evidence/samr-cn-source-2026-11-14.md)。中国官方检索、公告、原件、304与回退授权已接通，最终108项受管回归、独立HTTP／非拥有者PG／TLS专项12项和三端类型检查通过。当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、168张模型表。四批48个服务记录、58个进程ID、28个端口及临时密码／私钥文件已核对。专用SDK／Web、后台监控和间歇Parser超时继续推进。下文保留此前阶段记录与原始交付时点。
 
 更新于 2026-11-14。完整 V1 持续进行。先读[本次进度与交接卡](AGENT-HANDOFF-2026-11-14-PUBLISH.md)，其中汇总需求、本次Dunlop欧洲来源、验证范围、未完成项及接手顺序。当前13个轮胎区域目录、9个厂商品牌、17项可信Parser。Dunlop独立PG/TLS/HTTP专项12项通过，两次live，SKU及事实版本稳定，原件与历史观察时间可核对，三个集群及36个服务记录、43个进程ID、19个端口和临时秘密已核对。前两批私有脚本失败及正文动态变化证据保留，见[Dunlop验收](assurance/evidence/dunlop-eu-source-2026-11-14.md)。下文保留此前阶段的原始交付时点，历史实现与验收详见[阶段总表](AGENT-HANDOFF-2026-11-13.md)，需求以[原始规格](requirements/2026-09-26-tire-intelligence-original.md)为准。

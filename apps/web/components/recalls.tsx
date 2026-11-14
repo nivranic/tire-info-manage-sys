@@ -13,6 +13,7 @@ import { SourceOnlineNotice, SourceStatus, useSourceAccess } from "./source-stat
 import QueryFallbackPolicy from "./query-fallback-policy";
 import { useDeviceQueryFallback } from "./query-fallback-device";
 import SafetyGatePanel from "./safety-gate";
+import SamrRecallPanel from "./samr-recalls";
 const sourceId = "nhtsa-us-recalls";
 
 const campaignPattern = /^\d{2}T\d{6}$/;
@@ -302,7 +303,7 @@ function RecallMonitoring({ sessionReady, campaign }: { sessionReady: boolean; c
 }
 
 export function RecallWorkspace({ sessionReady, initialCampaign, onAnalyze }: { sessionReady: boolean; initialCampaign?: string; onAnalyze?: (target: AITarget) => void }) {
-  type Mode = "online" | "history" | "monitor" | "discovery_monitor" | "safety_gate";
+  type Mode = "online" | "history" | "monitor" | "discovery_monitor" | "safety_gate" | "samr";
   const [mode, setMode] = useState<Mode>("online");
   const [visited, setVisited] = useState({ monitor: false, discovery_monitor: false });
   const [campaign, setCampaign] = useState(initialCampaign || "23T001000");
@@ -320,11 +321,14 @@ export function RecallWorkspace({ sessionReady, initialCampaign, onAnalyze }: { 
     requestAnimationFrame(() => document.getElementById("recall-campaign-input")?.focus());
   }
   function createDiscoveryRule(search: string) { setSeed({ search, sequence: ++seedSequence.current }); changeMode("discovery_monitor"); }
-  return <div className="recall-workspace"><SourceStatus sourceId={mode === "safety_gate" ? "eu-safety-gate" : sourceId} /><SourceOnlineNotice sourceId={mode === "safety_gate" ? "eu-safety-gate" : sourceId} />{mode !== "safety_gate" ? <div className="recall-boundary"><Icon name="shield" size={22} /><p>{boundary}</p></div> : null}
+  const selectedSourceId = mode === "samr" ? "samr-cn-recalls" : mode === "safety_gate" ? "eu-safety-gate" : sourceId;
+  return <div className="recall-workspace"><SourceStatus sourceId={selectedSourceId} /><SourceOnlineNotice sourceId={selectedSourceId} />{mode !== "safety_gate" && mode !== "samr" ? <div className="recall-boundary"><Icon name="shield" size={22} /><p>{boundary}</p></div> : null}
     <div className="recall-modes" role="group" aria-label="召回功能"><button type="button" aria-pressed={mode === "online"} onClick={() => changeMode("online")}>官方在线查询</button><button type="button" aria-pressed={mode === "history"} onClick={() => changeMode("history")}>已保存的历史</button><button type="button" aria-pressed={mode === "monitor"} onClick={() => changeMode("monitor")}>公告监控</button><button type="button" aria-pressed={mode === "discovery_monitor"} onClick={() => changeMode("discovery_monitor")}>名称发现监控</button></div>
     {visited.monitor ? <div hidden={mode !== "monitor"}><RecallMonitoring sessionReady={sessionReady} campaign={campaign} /></div> : null}
     <button type="button" className="secondary-button" aria-pressed={mode === "safety_gate"} onClick={() => changeMode("safety_gate")}>EU Safety Gate 周报</button>
+    <button type="button" className="secondary-button" aria-pressed={mode === "samr"} onClick={() => changeMode("samr")}>中国市场监管召回</button>
     {mode === "safety_gate" ? <SafetyGatePanel sessionReady={sessionReady} onAnalyze={onAnalyze} /> : null}
+    {mode === "samr" ? <SamrRecallPanel sessionReady={sessionReady} /> : null}
     {visited.discovery_monitor ? <div hidden={mode !== "discovery_monitor"}><RecallDiscoveryMonitoring sessionReady={sessionReady} seed={seed} onSeedHandled={consumeSeed} onChoose={chooseCampaign} /></div> : null}
     {mode === "online" || mode === "history" ? <><RecallDiscovery key={`discovery-${mode}`} sessionReady={sessionReady} mode={mode} onChoose={chooseCampaign} onCreateRule={createDiscoveryRule} /><div className="recall-campaign-section"><h3>按公告编号核验</h3>{campaignNotice && mode === "online" ? <p className="review-boundary" role="status">{campaignNotice}</p> : null}<RecallQueryPanel key={mode} onAnalyze={onAnalyze} sessionReady={sessionReady} mode={mode} campaign={campaign} onCampaign={value => { setCampaign(value); setCampaignNotice(""); }} /></div></> : null}
   </div>;
@@ -338,5 +342,5 @@ export default function RecallDialog({ onClose, sessionReady, initialCampaign, o
     node?.showModal();
     return () => { node?.close(); (previous?.isConnected && !previous.closest("dialog:not([open])") ? previous : document.querySelector<HTMLElement>("[data-recall-entry]"))?.focus({ preventScroll: true }); };
   }, []);
-  return <dialog ref={dialog} className="fact-review-dialog recall-dialog" aria-labelledby="recall-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}><div className="fact-review-heading"><div><span className="eyebrow">OFFICIAL SAFETY ALERTS</span><h2 id="recall-title">轮胎召回公告</h2><p>美国召回与欧盟周报 · 原文证据与后续变化</p></div><button type="button" className="text-button" onClick={onClose}>关闭</button></div><div className="fact-review-content"><RecallWorkspace sessionReady={sessionReady} initialCampaign={initialCampaign} onAnalyze={onAnalyze} /></div></dialog>;
+  return <dialog ref={dialog} className="fact-review-dialog recall-dialog" aria-labelledby="recall-title" onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}><div className="fact-review-heading"><div><span className="eyebrow">OFFICIAL SAFETY ALERTS</span><h2 id="recall-title">轮胎召回公告</h2><p>中国市场监管、美国召回与欧盟周报 · 原文证据与后续变化</p></div><button type="button" className="text-button" onClick={onClose}>关闭</button></div><div className="fact-review-content"><RecallWorkspace sessionReady={sessionReady} initialCampaign={initialCampaign} onAnalyze={onAnalyze} /></div></dialog>;
 }
