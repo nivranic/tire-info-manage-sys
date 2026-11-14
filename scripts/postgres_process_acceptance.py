@@ -3,7 +3,10 @@
 Stored source inputs use the existing recorded transport fixture. Service processes
 use their normal entry points. Worker sources are explicitly disabled, so queue
 checks exercise unavailable outcomes without requesting an external website.
+Explicit --live-source uses the registered Hankook adapter for real HTTP queries
+and successful Worker consumption, including after independent asset restoration.
 """
+import argparse
 import asyncio
 from contextlib import contextmanager
 from datetime import timedelta
@@ -24,7 +27,7 @@ from uuid import uuid4
 import httpx
 import psycopg
 from psycopg import sql
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.engine import URL
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +35,7 @@ sys.path[:0] = [str(ROOT / path) for path in ('apps/api', 'apps/api/tests', 'app
 import run_api_worker_regression as regression
 from postgres_acceptance import database_fingerprint
 from test_parser_releases import RecordedRegistry, SOURCE, QUERY
-from tire_api.db import Database, MonitorJob, utcnow
+from tire_api.db import Database, MonitorJob, utc, utcnow
 from tire_api.domain import LiveQueryRequest
 from tire_api.main import SESSION_COOKIE
 from tire_api.postgres_runtime_roles import check_runtime_role, runtime_role_sql
@@ -57,13 +60,13 @@ def accepted(response, expected=200):
     return response.json()
 
 
-def wait_for(check, *, timeout=30):
+def wait_for(check, *, timeout=30, interval=0.1):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         result = check()
         if result:
             return result
-        time.sleep(0.1)
+        time.sleep(interval)
     raise AssertionError('process_observation_deadline')
 
 
@@ -111,8 +114,9 @@ def http_service(slot, label, environment, *, cookies=None):
         yield client
 
 
-def run_worker(slot, label, environment):
-    environment = {**environment, 'TI_DISABLED_SOURCES': SOURCE}
+def run_worker(slot, label, environment, *, live_source=False):
+    if not live_source:
+        environment = {**environment, 'TI_DISABLED_SOURCES': SOURCE}
     with child(slot, label, [str(ROOT / 'apps/worker/monitor.py'), '--once'], environment) as process:
         assert process.wait(timeout=45) == 0, 'worker_once_failed'
     lines = (slot / (label + '.stdout.log')).read_text(encoding='utf-8').splitlines()
@@ -140,7 +144,22 @@ def evaluate(client, capture_id, bundle_id):
     return value
 
 
-def run():
+def live_execution(client, query_id):
+    value = accepted(client.get('/v1/parser-executions/' + query_id, params={'mode': 'history'}))
+    completion = value['completion']
+    receipt = completion['receipt']
+    assert completion['error_code'] is None
+    if completion['state'] == 'completed':
+        assert receipt['reaped'] and receipt['exit_code'] == 0
+        assert receipt['bundle_id'] == value['selection']['bundle_id']
+    else:
+        assert completion['state'] == 'not_modified' and value['query_state'] == 'live_verified_304'
+        assert not receipt
+    REPORT.setdefault('live_executions', []).append({'query_id': query_id,
+        'selection': value['selection'], 'completion': completion})
+
+
+def run(*, live_source=False, natural_lease=False):
     global STEP
     expected = Path(os.environ['TIRE_PG_TEST_DATA']).resolve()
     assert expected.is_relative_to((ROOT / '.artifacts/postgres').resolve())
@@ -152,6 +171,12 @@ def run():
     owner, runtime = 'process_owner_' + uuid4().hex[:12], 'process_runtime_' + uuid4().hex[:12]
     owner_secret, runtime_secret = secrets.token_hex(32), secrets.token_hex(32)
     transport = {'sslmode': 'verify-full', 'sslrootcert': ca}
+    success_states = ('live', 'live_verified_304') if live_source else ('source_unavailable',)
+    task_state = 'succeeded' if live_source else 'failed'
+    REPORT['live_source'] = live_source
+    REPORT['natural_lease'] = natural_lease
+    if live_source:
+        REPORT['scope'] = 'isolated loopback PG/TLS, actual HTTP and Worker processes, live official Hankook source'
 
     with psycopg.connect(host='127.0.0.1', port=port, user='tire_verify_admin',
             password=os.environ['TIRE_PG_TEST_PASSWORD'], dbname='postgres', autocommit=True,
@@ -225,7 +250,7 @@ def run():
         assert 'TIRE_PG_TEST_PASSWORD' not in environment and owner_secret not in ''.join(environment.values())
         assert 'PROCESSOR_ARCHITECTURE' not in environment and 'PROCESSOR_ARCHITEW6432' not in environment
 
-        STEP = 'http_admin_session_and_recorded_evidence'
+        STEP = 'http_admin_session_and_source_evidence'
         with patch.dict(os.environ, environment), http_service(slot, 'api-first', environment) as client:
             password = secrets.token_urlsafe(24)
             account = accepted(client.post('/v1/auth/register', json={'username': 'admin', 'password': password}))
@@ -235,22 +260,31 @@ def run():
             assert sessions[0] > 0 and sessions[1] is True
             REPORT['http_runtime_tls_sessions'] = sessions[0]
             cookies = dict(client.cookies)
-            runtime_db = Database(url(target, limited=True))
-            try:
-                runtime_db.initialize()
-                with runtime_db.sessions() as db:
-                    seeded = asyncio.run(QueryService(db, RecordedRegistry()).execute(SOURCE,
-                        LiveQueryRequest(query=QUERY, fallback_policy='never'), cookies[SESSION_COOKIE]))
-                assert seeded['data_state'] == 'live'
-            finally:
-                runtime_db.close()
+            if live_source:
+                seeded = accepted(client.post('/v1/sources/' + SOURCE + '/live-query',
+                    json={'query': QUERY, 'fallback_policy': 'never'}))
+                REPORT['live_query_outcome'] = {'state': seeded['data_state'], 'reason': seeded.get('reason')}
+                assert seeded['data_state'] == 'live' and seeded['variants'], 'live_source_query_failed'
+                live_execution(client, seeded['query_id'])
+            else:
+                runtime_db = Database(url(target, limited=True))
+                try:
+                    runtime_db.initialize()
+                    with runtime_db.sessions() as db:
+                        seeded = asyncio.run(QueryService(db, RecordedRegistry()).execute(SOURCE,
+                            LiveQueryRequest(query=QUERY, fallback_policy='never'), cookies[SESSION_COOKIE]))
+                    assert seeded['data_state'] == 'live'
+                finally:
+                    runtime_db.close()
             captures = accepted(client.get('/v1/captures', params={'mode': 'history', 'source_id': SOURCE}))
             capture = captures['items'][0]
             raw = accepted(client.get(capture['evidence_path']))
             assert hashlib.sha256(raw['body'].encode()).hexdigest() == capture['raw_hash']
             bundle_id = capture['parser_identity']['bundle_id']
-            REPORT['fixture'] = {'raw_hash': capture['raw_hash'], 'bundle_id': bundle_id,
-                                 'transport': 'recorded excerpt, seeded through existing QueryService'}
+            REPORT['source_evidence'] = {'raw_hash': capture['raw_hash'], 'bundle_id': bundle_id,
+                'source_url': capture['source_url'], 'byte_count': capture['byte_count'],
+                'product_codes': sorted(item['manufacturer_product_code'] for item in seeded['variants']),
+                'transport': 'registered live adapter via HTTP' if live_source else 'recorded excerpt via QueryService'}
             record(STEP)
 
             STEP = 'http_parser_children_in_inherited_architecture_environment'
@@ -262,13 +296,16 @@ def run():
             rule = accepted(client.post('/v1/alert-rules', json={
                 'name': 'Synthetic process deployment rule', 'source_id': SOURCE, 'query': QUERY, 'enabled': True}), 201)
             job_id = rule['job']['id']
-            result = run_worker(slot, 'worker-once', environment)
+            result = run_worker(slot, 'worker-once', environment, live_source=live_source)
             assert result['jobs'] == 1 and result['results'][0]['job_id'] == job_id
-            assert result['results'][0]['state'] == 'source_unavailable' and result['results'][0]['finalized']
+            REPORT['first_worker_outcome'] = result['results'][0]
+            assert result['results'][0]['state'] in success_states and result['results'][0]['finalized']
             path = '/v1/monitor-tasks/tire/' + job_id
             detail = accepted(client.get(path))
             assert detail['attempts_total'] == 1 and detail['attempts'][0]['terminal']
-            assert detail['attempts'][0]['state'] == 'failed'
+            assert detail['attempts'][0]['state'] == task_state
+            if live_source:
+                live_execution(client, detail['attempts'][0]['query_id'])
             record(STEP)
 
             STEP = 'terminate_observed_blocked_worker_and_recover_expired_lease'
@@ -299,21 +336,56 @@ def run():
                         REPORT['interrupted_backend_observed'] = bool(backend)
                         process.terminate()
                         process.wait(timeout=15)
-                with owner_engine.begin() as connection:
-                    connection.execute(MonitorJob.__table__.update().where(MonitorJob.id == job_id)
-                        .values(lease_until=utcnow() - timedelta(seconds=1)))
+                if natural_lease:
+                    from tire_api.monitoring import LEASE_SECONDS
+                    with owner_engine.connect() as connection:
+                        expires = utc(connection.execute(select(MonitorJob.lease_until)
+                            .where(MonitorJob.id == job_id)).scalar_one())
+                    remaining = (expires - utcnow()).total_seconds()
+                    assert 0 < remaining <= LEASE_SECONDS
+                    started = time.monotonic()
+                    observations = 0
+                    print(json.dumps({'waiting_for_natural_lease': True, 'seconds_remaining': round(remaining, 3)}), flush=True)
+
+                    def expired():
+                        nonlocal observations
+                        current = accepted(client.get(path))
+                        assert current['attempts_total'] == 2
+                        observation = {'checked_at': utcnow().isoformat(), 'state': current['task']['state'],
+                            'elapsed_seconds': round(time.monotonic() - started, 3),
+                            'lease_until': current['task']['lease_until']}
+                        assert current['task']['lease_until'] == expires.isoformat()
+                        with (slot / 'lease-observations.jsonl').open('a', encoding='utf-8') as output:
+                            output.write(json.dumps(observation) + '\n')
+                        observations += 1
+                        return current['task']['state'] == 'result_unknown'
+
+                    wait_for(expired, timeout=remaining + 20, interval=10)
+                    elapsed = time.monotonic() - started
+                    assert elapsed + 1 >= remaining
+                    REPORT['natural_lease_observation'] = {'lease_seconds': LEASE_SECONDS,
+                        'expires_at': expires.isoformat(), 'initial_remaining_seconds': remaining,
+                        'elapsed_seconds': elapsed, 'observations': observations}
+                else:
+                    with owner_engine.begin() as connection:
+                        connection.execute(MonitorJob.__table__.update().where(MonitorJob.id == job_id)
+                            .values(lease_until=utcnow() - timedelta(seconds=1)))
                 detail = accepted(client.get(path))
                 assert detail['task']['state'] == 'result_unknown' and not detail['attempts'][0]['terminal']
-                recovered = run_worker(slot, 'worker-recovered', environment)
+                recovered = run_worker(slot, 'worker-recovered', environment, live_source=live_source)
                 assert recovered['jobs'] == 1 and recovered['results'][0]['finalized']
-                assert recovered['results'][0]['state'] == 'source_unavailable'
+                REPORT['recovered_worker_outcome'] = recovered['results'][0]
+                assert recovered['results'][0]['state'] in success_states
                 detail = accepted(client.get(path))
                 assert detail['attempts_total'] == 3
-                assert sorted(item['state'] for item in detail['attempts']) == ['failed', 'failed', 'interrupted']
+                assert sorted(item['state'] for item in detail['attempts']) == sorted([task_state, task_state, 'interrupted'])
                 assert all(item['terminal'] for item in detail['attempts'])
+                if live_source:
+                    live_execution(client, detail['attempts'][0]['query_id'])
                 events = accepted(client.get(path + '/events'))
                 REPORT['recovered_attempts'] = detail['attempts_total']
-                REPORT['lease_expiry_fixture'] = 'own isolated job timestamp advanced after observed process termination'
+                REPORT['lease_expiry_fixture'] = ('natural persisted lease expiry after observed process termination'
+                    if natural_lease else 'own isolated job timestamp advanced after observed process termination')
             finally:
                 owner_engine.dispose()
             record(STEP)
@@ -398,19 +470,28 @@ def run():
                         .values(next_due_at=utcnow() - timedelta(seconds=1)))
             finally:
                 restored_owner.dispose()
-            result = run_worker(slot, 'worker-restored', restored_environment)
+            result = run_worker(slot, 'worker-restored', restored_environment, live_source=live_source)
             assert result['jobs'] == 1 and result['results'][0]['finalized']
-            assert result['results'][0]['state'] == 'source_unavailable'
+            REPORT['restored_worker_outcome'] = result['results'][0]
+            assert result['results'][0]['state'] in success_states
             detail = accepted(client.get(path))
             assert detail['attempts_total'] == 4 and all(item['terminal'] for item in detail['attempts'])
+            if live_source:
+                live_execution(client, detail['attempts'][0]['query_id'])
         wait_for_runtime_disconnect()
         record(STEP)
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--live-source', action='store_true',
+                        help='Use the registered Hankook official source for HTTP and Worker consumption.')
+    parser.add_argument('--natural-lease', action='store_true',
+                        help='Observe the normal 600-second lease expiry without changing its timestamp.')
+    options = parser.parse_args()
     before = regression.bindings()
     try:
-        run()
+        run(live_source=options.live_source, natural_lease=options.natural_lease)
     except Exception as error:
         REPORT.update(failure_step=STEP, error_type=type(error).__name__, code=getattr(error, 'code', None),
             sqlstate=getattr(getattr(error, 'orig', error), 'sqlstate', None),

@@ -71,3 +71,11 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 该入口在全新私有集群内核对实际uvicorn HTTP、Worker持久规则消费、进程中断与租约恢复、错误合同拒绝，以及数据库／原件／Parser包的独立恢复。服务进程使用非拥有者运行账户和显式verify合同。
 
 本轮9项PG／TLS检查及55项相关受管回归通过。来源输入采用已有录制片段，Worker显式禁用来源网络读取，租约到期采用隔离任务时间戳装配。远端环境、真实来源成功消费、自然租约期限和优雅停机继续验收。回执摘要、原始失败与复跑范围见[独立进程验收](assurance/evidence/postgres-process-runtime-2026-11-14.md)。
+
+后续增加了显式真实来源和自然租约模式。
+
+```text
+pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgres-bin> -Port <unused-port> -Suite runtime-process -CliTls -LiveSource -NaturalLease
+```
+
+该模式使用已登记Hankook来源进行正常HTTP查询及Worker消费，并实际观察600秒租约到期。9项检查通过，61次自然状态记录后成功恢复，数据库和原件／Parser资产独立恢复后继续在线消费。录制模式9项及相关回归55项亦通过。自然长周期、多规则真实变化、优雅停机、远端部署和生产SLO继续验收。[真实进程与自然租约记录](assurance/evidence/postgres-live-process-2026-11-14.md)
