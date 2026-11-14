@@ -74,6 +74,48 @@ def prepared_test_pdf(setup, *, granted=False):
     return pack, selected, event, document
 
 
+def test_selected_nonfirst_measurement_keeps_pdf_binding_analysis_and_report_exports(setup):
+    from test_test_events import create, pdf_measurement_payload
+    client, _registry, model, _database = setup
+    payload, _document = pdf_measurement_payload(client)
+    values = payload['event']['measurements']
+    values[0], values[1] = values[1], values[0]
+    event = create(client, payload)
+    reference = {'kind': 'test_event', 'event_id': event['id'], 'event_revision': 1, 'measurement_numbers': [2]}
+    response = prepare(client, reference)
+    assert response.status_code == 200, response.text
+    pack = response.json()['pack']
+    facts = [fact for fact in pack['facts'] if fact['field'].startswith('本场成绩 ')]
+    assert len(facts) == 1 and facts[0]['field'] == '本场成绩 2'
+    assert facts[0]['field_code'] == 'manual_test_independent.field_9'
+    assert facts[0]['value']['pdf_reference'] == event['event']['measurements'][1]['pdf_reference']
+    assert analyze(client, pack).status_code == 403 and not model.calls
+    selected = {'kind': 'document_text', 'reference': facts[0]['value']['pdf_reference']}
+    assert authorize(client, selected).status_code == 200
+    model.mutation = lambda answer: answer.update(claims=[{'type': 'fact', 'text': '',
+        'fact_ids': [facts[0]['id']], 'evidence_ids': [facts[0]['evidence_id']]}], uncertainty='')
+    result = analyze(client, pack)
+    assert result.status_code == 200, result.text
+    assert result.json()['state'] == 'completed' and len(model.calls) == 1
+    saved = client.post('/v1/reports', headers={'Idempotency-Key': str(uuid4())}, json={
+        'mode': 'history', 'pack_id': pack['id'], 'analysis_id': result.json()['id'],
+        'title': 'Synthetic explicitly selected measurement', 'notes': ''})
+    assert saved.status_code == 201, saved.text
+    report = saved.json()
+    assert report['body']['facts'] == pack['facts']
+    assert authorize(client, selected, purpose=EXPORT_PURPOSE).status_code == 200
+    for format in ('markdown', 'html', 'pdf'):
+        exported = client.post('/v1/reports/' + report['id'] + '/exports', json={'revision': 1, 'format': format})
+        assert exported.status_code == 201, exported.text
+        assert client.get(exported.json()['content_url']).status_code == 200
+    reopened = client.get('/v1/reports/' + report['id'], params={'mode': 'history'})
+    assert reopened.status_code == 200 and reopened.json()['body'] == report['body']
+    changed = client.post('/v1/test-events/' + event['id'] + '/state', json={
+        'action': 'revoke', 'expected_revision': 1, 'operator': 'Synthetic reviewer', 'reason': 'Synthetic revocation'})
+    assert changed.status_code == 200, changed.text
+    assert analyze(client, pack).status_code == 409 and len(model.calls) == 1
+
+
 def test_test_pdf_original_needs_its_purpose_grant_before_any_model_reservation(setup):
     client, _registry, model, database = setup
     pack, _selected, _event, _document = prepared_test_pdf(setup)

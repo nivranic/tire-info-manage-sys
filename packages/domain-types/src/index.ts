@@ -135,7 +135,8 @@ export interface Source {
 
 export interface TireQuery { size?: string; model?: string }
 
-export type AIPackReference = { kind: "tire"; snapshot_id: string; variant_id: string } | { kind: "vehicle"; snapshot_id: string } | { kind: "test_event"; event_id: string; event_revision: number } | import("./recalls").RecallAnalysisReference;
+export type AITestEventReference = { kind: "test_event"; event_id: string; event_revision: number; measurement_numbers?: number[] };
+export type AIPackReference = { kind: "tire"; snapshot_id: string; variant_id: string } | { kind: "vehicle"; snapshot_id: string } | AITestEventReference | import("./recalls").RecallAnalysisReference;
 export type AIAnalysisReference = AIPackReference | { kind: "change_event"; change_id: string } | TextEmbeddingSelection | import("./safety-gate").SafetyGateAnalysisReference | import("./samr-recalls").SamrRecallAnalysisReference;
 export interface KnowledgeFilters {
   kind?: "tire" | "vehicle" | "test_event" | "recall";

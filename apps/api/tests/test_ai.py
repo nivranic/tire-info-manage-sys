@@ -71,6 +71,55 @@ def historical_pack(client):
     return response.json()['pack']
 
 
+def test_test_measurement_selection_preserves_original_numbers_and_legacy_pack(setup):
+    from tire_api.ai_evidence import PackReference
+    from test_test_events import create
+    client, _registry, _model, _database = setup
+    event = create(client)
+    reference = {'kind': 'test_event', 'event_id': event['id'], 'event_revision': 1}
+    original = PackReference.model_validate(reference).model_dump()
+    assert 'measurement_numbers' not in original
+    assert PackReference.model_validate({**reference, 'measurement_numbers': None}).model_dump() == original
+    def prepare_reference(value):
+        result = client.post('/v1/ai/evidence-packs', json={'mode': 'history', 'references': [value]})
+        assert result.status_code == 200, result.text
+        return result.json()['pack']
+    whole = prepare_reference(reference)
+    assert whole['fingerprint'] == prepare_reference({**reference, 'measurement_numbers': None})['fingerprint']
+    subset = prepare_reference({**reference, 'measurement_numbers': [3, 2]})
+    assert subset['fingerprint'] == prepare_reference({**reference, 'measurement_numbers': [2, 3]})['fingerprint']
+    measured = [fact for fact in subset['facts'] if fact['field'].startswith('本场成绩 ')]
+    assert [fact['field'] for fact in measured] == ['本场成绩 2', '本场成绩 3']
+    assert [fact['field_code'] for fact in measured] == ['manual_test_independent.field_9', 'manual_test_independent.field_10']
+    assert [fact['value']['raw_value'] for fact in measured] == ['40.0', '70']
+    assert subset['facts'][:7] == whole['facts'][:7]
+    assert subset['facts'][-1]['value'] == {'measurement_numbers': [2, 3], 'total_measurements': 3}
+    assert subset['fingerprint'] != whole['fingerprint']
+    assert len(whole['facts']) == 10
+
+
+@pytest.mark.parametrize('numbers', [[], [0], [-1], [1001], [True], ['2'], [1.5], [2, 2], [4]])
+def test_test_measurement_selection_rejects_invalid_or_out_of_event_range(setup, numbers):
+    from test_test_events import create
+    client, _registry, model, database = setup
+    event = create(client)
+    baseline = count(database, AIEvidencePack)
+    response = client.post('/v1/ai/evidence-packs', json={'mode': 'history', 'references': [{
+        'kind': 'test_event', 'event_id': event['id'], 'event_revision': 1, 'measurement_numbers': numbers}]})
+    assert response.status_code == 422, response.text
+    assert count(database, AIEvidencePack) == baseline and not model.calls
+
+
+def test_test_measurement_selection_is_domain_specific_and_canonical_for_duplicates():
+    from tire_api.ai_evidence import PackReference
+    with pytest.raises(ValidationError):
+        PackReference(kind='vehicle', snapshot_id='synthetic', measurement_numbers=[1])
+    reference = {'kind': 'test_event', 'event_id': 'synthetic', 'event_revision': 1}
+    with pytest.raises(ValidationError):
+        PreparePack(mode='history', references=[{**reference, 'measurement_numbers': [3, 2]},
+            {**reference, 'measurement_numbers': [2, 3]}])
+
+
 def analyze(client, pack, key=None, question='解释所选历史参数', **changes):
     return client.post('/v1/ai/analyses', headers={'Idempotency-Key': key or str(uuid4())}, json={
         'pack_id': pack['id'], 'question': question, 'allow_external_processing': True, **changes})

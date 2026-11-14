@@ -9,7 +9,9 @@ export function aiReferenceKey(reference: AIAnalysisReference): string {
     case "recall": return JSON.stringify([reference.kind, reference.snapshot_id, reference.recall_revision_id]);
     case "tire": return JSON.stringify([reference.kind, reference.snapshot_id, reference.variant_id]);
     case "vehicle": return JSON.stringify([reference.kind, reference.snapshot_id]);
-    case "test_event": return JSON.stringify([reference.kind, reference.event_id, reference.event_revision]);
+    case "test_event": return JSON.stringify(reference.measurement_numbers === undefined
+      ? [reference.kind, reference.event_id, reference.event_revision]
+      : [reference.kind, reference.event_id, reference.event_revision, [...reference.measurement_numbers].sort((a, b) => a - b)]);
     case "change_event": return JSON.stringify([reference.kind, reference.change_id]);
     case "source_text":
     case "document_text": return JSON.stringify([reference.kind, reference.reference.chunk_id]);

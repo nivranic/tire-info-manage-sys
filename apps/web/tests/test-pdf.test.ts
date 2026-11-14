@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { testPdfReference } from "../components/test-pdf-values.ts";
+import { aiReferenceKey, uniqueAIReferences } from "../components/recall-evidence-values.ts";
+import type { AITestEventReference } from "@tire/domain-types";
+
+test("AI test reference keys retain explicit original measurement numbers", () => {
+  const whole: AITestEventReference = { kind: "test_event", event_id: "synthetic-event", event_revision: 1 };
+  const subset = { ...whole, measurement_numbers: [3, 2] };
+  assert.equal(aiReferenceKey(whole), JSON.stringify(["test_event", "synthetic-event", 1]));
+  assert.equal(aiReferenceKey(subset), aiReferenceKey({ ...whole, measurement_numbers: [2, 3] }));
+  assert.notEqual(aiReferenceKey(whole), aiReferenceKey(subset));
+  assert.equal(uniqueAIReferences([whole, subset, { ...whole, measurement_numbers: [2, 3] }]).length, 2);
+});
 
 const reference = { document_id: "synthetic-document", document_fingerprint: "a".repeat(64), raw_hash: "b".repeat(64),
   extractor_version: "pdf-page-text@1+synthetic", page: 4, start: 12, end: 240, chunk_id: "c".repeat(64) };

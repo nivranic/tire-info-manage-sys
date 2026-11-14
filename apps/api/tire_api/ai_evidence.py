@@ -3,10 +3,10 @@ from copy import deepcopy
 import asyncio
 from datetime import datetime, timedelta
 import json
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import HTTPException
-from pydantic import Field, StrictInt, model_validator
+from pydantic import Field, StrictInt, model_serializer, model_validator
 from sqlalchemy import desc, select
 from sqlalchemy.orm import object_session
 
@@ -28,10 +28,18 @@ class PackReference(StrictModel):
     variant_id: str | None = Field(default=None, min_length=1, max_length=64)
     event_id: str | None = Field(default=None, min_length=1, max_length=64)
     event_revision: StrictInt | None = Field(default=None, ge=1)
+    measurement_numbers: list[Annotated[StrictInt, Field(ge=1, le=1000)]] | None = Field(default=None, min_length=1, max_length=1000)
     change_id: str | None = Field(default=None, min_length=1, max_length=64)
     recall_revision_id: str | None = Field(default=None, min_length=1, max_length=64)
     alert_id: str | None = Field(default=None, pattern=r'^-?[1-9][0-9]{0,11}$')
     article_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
+
+    @model_serializer(mode='wrap')
+    def serialize(self, handler):
+        value = handler(self)
+        if self.measurement_numbers is None:
+            value.pop('measurement_numbers', None)
+        return value
 
     @model_validator(mode='after')
     def complete_reference(self):
@@ -52,8 +60,13 @@ class PackReference(StrictModel):
             valid = valid and (bool(self.variant_id) if self.kind == 'tire' else not self.variant_id)
         if (not valid or self.kind != 'recall' and self.recall_revision_id is not None
                 or self.kind != 'safety_gate' and self.alert_id is not None
-                or self.kind != 'samr_recall' and self.article_id is not None):
+                or self.kind != 'samr_recall' and self.article_id is not None
+                or self.kind != 'test_event' and self.measurement_numbers is not None):
             raise ValueError('请提供该类证据的精确版本标识')
+        if self.measurement_numbers is not None:
+            if len(set(self.measurement_numbers)) != len(self.measurement_numbers):
+                raise ValueError('成绩序号不能重复')
+            self.measurement_numbers = sorted(self.measurement_numbers)
         return self
 
 
@@ -712,17 +725,28 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
                 if event.state == 'revoked':
                     raise HTTPException(409, '已撤销测试事件不参与 AI 分析')
                 data = event.payload
+                numbers = ref.measurement_numbers
+                if numbers is not None and numbers[-1] > len(data['measurements']):
+                    raise HTTPException(422, '所选成绩序号超出该场次范围，请重新载入并选择')
                 values = {'发布日期': data['publication_date'], '测试尺寸': data['tested_size'] or '混合尺寸，见逐参测胎记录',
                           '条件': data['conditions'], '车辆': data['vehicle'], '路面': data['surface'],
                           '覆盖范围': data['coverage'], '来源参测总数': data['reported_participants']}
+                kind = 'manual_test_' + data['relationship']
+                codes = {}
                 for i, measurement in enumerate(data['measurements']):
+                    if numbers is not None and i + 1 not in numbers:
+                        continue
                     person = next(p for p in data['participants'] if p['key'] == measurement['participant_key'])
                     metric = next(m for m in data['metrics'] if m['key'] == measurement['metric_key'])
                     values[f'本场成绩 {i + 1}'] = {'参测胎': person, '指标与条件': metric, **measurement}
-                builder.add(kind='manual_test_' + data['relationship'], label='人工记录 · ' + data['title'],
+                    codes[f'本场成绩 {i + 1}'] = kind + '.field_' + str(i + 8)
+                if numbers is not None:
+                    values['所选成绩范围'] = {'measurement_numbers': numbers, 'total_measurements': len(data['measurements'])}
+                    codes['所选成绩范围'] = kind + '.measurement_selection'
+                builder.add(kind=kind, label='人工记录 · ' + data['title'],
                     provenance={'event_id': event.event_id, 'revision': event.revision, 'source_url': data['source_url'],
                                 'observed_at': timestamp(event.created_at), 'verified_at': None,
-                                'data_state': state, 'verification_status': 'unverified'}, values=values, private=True)
+                                'data_state': state, 'verification_status': 'unverified'}, values=values, field_codes=codes, private=True)
     from .field_authority import policy_descriptor, resolve_fields
     from .field_evidence import complete_missing_candidates
     # Candidate collection is limited to the exact selected snapshot members.

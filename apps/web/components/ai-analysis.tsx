@@ -9,7 +9,7 @@ import { FrozenFieldResolutions } from "./field-authority";
 import { SaveReportDialog } from "./reports";
 import { AIStreamProgress } from "./ai-stream-progress";
 import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope, recallAnalysisNotice } from "./recall-evidence-meta";
-import { recallCurrentRequest, uniqueAIReferences } from "./recall-evidence-values";
+import { aiReferenceKey, recallCurrentRequest, uniqueAIReferences } from "./recall-evidence-values";
 import { AI_RECOVERY_KEY, aiStreamErrorMessage, aiStreamErrorMessages, canExportAIAnalysis, parseAIRecovery, type AIRecoveryPointer } from "./ai-stream-values";
 import AiBudgetMeter, { aiProviderLabel } from "./ai-budget";
 import { SafetyGateAnalysisBoundary, SafetyGateCitation, SafetyGateEvidenceMeta } from "./safety-gate-ai-evidence";
@@ -19,6 +19,7 @@ import TestPdfCitation from "./test-pdf-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { SamrAnalysisBoundary, SamrCitation, SamrEvidenceMeta } from "./samr-ai-evidence";
 import { isSamrEvidence, samrAnalysisNotice, samrCurrentRequest } from "./samr-ai-values";
+import TestAIMeasurementSelection from "./test-ai-measurement-selection";
 
 export type AITarget = ({ variant: Variant; sourceId?: string } | { references: AIAnalysisReference[]; label: string }
   | { recall: { campaign_number: string; reference: RecallAnalysisReference }; label: string }
@@ -68,6 +69,7 @@ function OwnerAIAnalysisDialog({ target, onClose, onOpenReport, ownerEpoch, reco
   const [pack, setPack] = useState<AIPack | null>(null);
   const [fallback, setFallback] = useState<QueryResult | RecallResult | SafetyGateResult | SamrRecallResult | null>(null);
   const [preparedRequest, setPreparedRequest] = useState<AIPrepareRequest | null>(null);
+  const [measurementSelections, setMeasurementSelections] = useState<Record<string, number[] | undefined>>({});
   const [question, setQuestion] = useState(target?.defaultQuestion || "解释所选证据中的参数、缺失项与适用限制。");
   const [externalConsent, setExternalConsent] = useState(false);
   const [evidenceStale, setEvidenceStale] = useState(false);
@@ -170,7 +172,7 @@ function OwnerAIAnalysisDialog({ target, onClose, onOpenReport, ownerEpoch, reco
       setPack(null); setRun(null);
       let payload: AIPrepareRequest;
       if (consentId && preparedRequest?.mode === "current") payload = { ...preparedRequest, consent_id: consentId };
-      else if ("references" in target) payload = { mode: "history", references: uniqueAIReferences(target.references) };
+      else if ("references" in target) payload = { mode: "history", references: uniqueAIReferences(selectedReferences) };
       else if ("safetyGate" in target) payload = mode === "history" ? { mode, references: [target.safetyGate.reference] } : safetyGateCurrentRequest(target.safetyGate);
       else if ("samr" in target) payload = mode === "history" ? { mode, references: [target.samr.reference] } : samrCurrentRequest(target.samr);
       else if ("recall" in target) payload = mode === "history" ? { mode, references: [target.recall.reference] } : recallCurrentRequest(target.recall.campaign_number);
@@ -242,6 +244,12 @@ function OwnerAIAnalysisDialog({ target, onClose, onOpenReport, ownerEpoch, reco
 
   function reset() { viewGeneration.current++; activeStream.current = null; intent.current = null; remember(null); setAttempt(null); setStream(null); setRun(null); setPack(null); setFallback(null); setExternalConsent(false); setEvidenceStale(false); setRetrySameRequest(false); setError(""); }
   const frozen = !!attempt || !!run;
+  const selectedReferences = target && "references" in target ? target.references.map(reference => {
+    const key = aiReferenceKey(reference);
+    return reference.kind === "test_event" && Object.hasOwn(measurementSelections, key)
+      ? { ...reference, measurement_numbers: measurementSelections[key] } : reference;
+  }) : [];
+  const emptyMeasurementSelection = selectedReferences.some(reference => reference.kind === "test_event" && reference.measurement_numbers?.length === 0);
   const samrTarget = !!target && ("samr" in target || "references" in target && target.references.some(reference => reference.kind === "samr_recall"));
   const samrPack = !!pack?.samr_boundary || !!pack?.evidence.some(isSamrEvidence);
   const safetyGateTarget = !!target && ("safetyGate" in target || "references" in target && target.references.some(reference => reference.kind === "safety_gate"));
@@ -265,7 +273,15 @@ function OwnerAIAnalysisDialog({ target, onClose, onOpenReport, ownerEpoch, reco
         {recallTarget ? <RecallAnalysisBoundary pending /> : null}
         {safetyGateTarget ? <SafetyGateAnalysisBoundary pending /> : null}
         {samrTarget ? <SamrAnalysisBoundary pending /> : null}
-        {!frozen ? <button type="button" className="secondary-button" disabled={busy || !!recovery} onClick={() => void prepare()}>{busy ? "正在处理…" : mode === "current" ? "在线核验并准备证据" : "准备所选历史证据"}</button> : null}
+        {selectedReferences.map((reference, index) => reference.kind === "test_event" ? <TestAIMeasurementSelection
+          key={target && "references" in target ? aiReferenceKey(target.references[index]) : index}
+          reference={reference} disabled={busy || frozen || !!recovery}
+          onChange={numbers => {
+            if (!target || !("references" in target)) return;
+            const key = aiReferenceKey(target.references[index]);
+            setMeasurementSelections(previous => ({ ...previous, [key]: numbers })); reset();
+          }} /> : null)}
+        {!frozen ? <button type="button" className="secondary-button" disabled={busy || !!recovery || emptyMeasurementSelection} onClick={() => void prepare()}>{busy ? "正在处理…" : mode === "current" ? "在线核验并准备证据" : "准备所选历史证据"}</button> : null}
       </section> : !target && !run ? <p>从轮胎卡片、规格比较、中国召回公告、正式召回公告、Safety Gate 告警或测试事件选择证据开始；也可以查看下方本会话调用记录。</p> : null}
       {fallback?.data_state === "consent_required" ? <section className="consent-box" aria-label="AI 历史证据授权"><h3>在线核验失败</h3><p>是否仅为本次分析读取该查询的历史快照？同意后仍标记为 LOCAL SNAPSHOT。</p><div className="compare-toolbar"><button className="secondary-button" disabled={busy} onClick={() => void consent("allow")}>仅本次使用历史快照</button><button className="text-button" disabled={busy} onClick={() => void consent("deny")}>拒绝使用历史数据</button></div></section> : null}
       {pack ? <>
