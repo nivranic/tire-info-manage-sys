@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手先读[2026-11-14 Agent交接卡](docs/AGENT-HANDOFF-2026-11-14.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、进度与接手顺序。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留历史记录。
+当前接手先读[进度与 Agent 交接卡](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)，汇总12个核心模块、10项发布Gate、13项SLO、15项决策及本次Dunlop交付。当前13个轮胎区域目录、9个厂商品牌、17项可信Parser，完整V1持续进行。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留阶段记录。
 
 Windows Parser已修正启动器缺省架构变量时的启动失败，缺省值由bundle环境声明采用的platform.machine派生。8次原入口（含修改前封存bundle）、125项受管回归、60项PG／TLS专项通过。部署须重建批准@4源码合同，OS文件打开延迟继续待查。[启动修正](docs/assurance/evidence/parser-host-architecture-2026-11-14.md)
 

@@ -1,3 +1,9 @@
+## 2026-11-14 进度与推送交接
+
+先读[最新 Agent 交接卡](AGENT-HANDOFF-2026-11-14-PUBLISH.md)。本次交付Dunlop欧洲SPORT MAXX RT2来源，当前13个轮胎区域目录、9个厂商品牌、17项可信Parser。卡片包含需求全貌、受管回归、正常API与在线canary证据、待验边界及下一步。首个真实AI按用户选择采用OpenAI Responses API，完整V1持续进行。
+
+以下保留各历史交付时点。
+
 ## HNSW拥有者维护与@4合同交付（2026-11-14）
 
 先读[当前接手卡](AGENT-HANDOFF-CURRENT.md)及[HNSW维护验收](assurance/evidence/postgres-vector-indexes-2026-11-14.md)。显式清单、空参考索引、拥有者维护及verify只读预检已接通，@4保存完整模型空间／维度，部署需重建批准合同。最终141项回归、36项PG／TLS专项及59项完整运行角色流程通过。原三份Parser期限失败保留，OS原因继续调查。正式PG验收使用每批私有TMP，未定义／空字符串／非空环境变量及实际恢复检查通过。接续权限专项、Parser性能、真实部署和完整V1，以下保留历史交付时点。
