@@ -279,6 +279,24 @@ def test_actual_process_exit_preserves_pending_receipt_after_restart(tmp_path):
         assert all(count(app.state.database, model) == 0 for model in (Snapshot, FactVersion, Verification, RejectedObservation))
 
 
+@pytest.mark.skipif(os.name != 'nt', reason='Windows extended filesystem namespaces')
+def test_child_boundary_compares_equivalent_paths_and_rejects_real_escapes(tmp_path):
+    import importlib.util
+    path = Path(__file__).resolve().parents[3] / 'scripts/regression_child.py'
+    spec = importlib.util.spec_from_file_location('capture_child_boundary_probe', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    boundary = module.ChildBoundary(tmp_path)
+    inside = tmp_path / 'bundles'
+    outside = tmp_path.parent / 'outside'
+    assert boundary.inside(inside)
+    assert boundary.inside('\\\\?\\' + str(inside))
+    assert not boundary.inside(outside)
+    assert not boundary.inside('\\\\?\\' + str(outside))
+    assert not boundary.inside('\\\\?\\' + str(tmp_path / '..' / 'outside'))
+    assert not boundary.inside('\\\\.\\NUL')
+
+
 @pytest.mark.parametrize('capture_fails', [False, True])
 def test_vehicle_parser_runs_only_after_durable_receipt(tmp_path, monkeypatch, capture_fails):
     class VehicleTransport(Transport):

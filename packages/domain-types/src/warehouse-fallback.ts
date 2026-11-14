@@ -1,5 +1,5 @@
 import type { DeviceFallbackPolicyMode, DeviceFallbackQueryKind, DeviceFallbackSourcePin } from "./device-fallback";
-export type WarehouseFallbackQueryKind = DeviceFallbackQueryKind | "safety_gate_reports" | "safety_gate_report";
+export type WarehouseFallbackQueryKind = DeviceFallbackQueryKind | "safety_gate_reports" | "safety_gate_report" | "samr_recall_search" | "samr_recall_notice";
 export interface WarehouseFallbackSourceSelection extends DeviceFallbackSourcePin { query_kinds: WarehouseFallbackQueryKind[] }
 export type WarehouseFallbackPolicyScope =
   | { kind: "session"; sources: WarehouseFallbackSourceSelection[] }

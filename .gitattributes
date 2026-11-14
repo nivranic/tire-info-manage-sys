@@ -88,6 +88,10 @@
 /apps/api/tests/test_yokohama.py text eol=lf
 /apps/api/tire_api/adapters/dunlop.py text eol=lf
 /apps/api/tests/test_dunlop.py text eol=lf
+/apps/api/tire_api/adapters/samr.py text eol=lf
+/apps/api/tire_api/samr_recalls.py text eol=lf
+/apps/api/tests/test_samr.py text eol=lf
+/apps/api/tests/test_samr_recalls.py text eol=lf
 /apps/api/tire_api/adapters/safety_gate.py text eol=lf
 /apps/api/tire_api/safety_gate.py text eol=lf
 /apps/api/tests/test_safety_gate.py text eol=lf

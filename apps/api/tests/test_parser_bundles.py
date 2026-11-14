@@ -31,8 +31,36 @@ def trusted_copy(tmp_path, monkeypatch):
     return source
 
 
+def pre_samr_install(source):
+    """Reconstruct the trusted seventeen-entry installation in a temporary copy."""
+    (source / 'adapters/samr.py').unlink()
+    for name in ('adapters/registry.py', 'parser_runtime.py'):
+        path = source / name
+        value = path.read_text(encoding='utf-8').replace(', samr', '')
+        value = value.replace('    from .samr import source_metadata as samr_metadata\n', '')
+        value = value.replace('    values.append(samr_metadata())\n', '')
+        value = '\n'.join(line for line in value.split('\n') if 'values[samr.SOURCE_ID]' not in line)
+        path.write_text(value, encoding='utf-8')
+    path = source / 'parser_child.py'
+    value = path.read_text(encoding='utf-8').replace('''        elif source_id == 'samr-cn-recalls':
+            from tire_api.adapters.samr import parse_document
+            _check_imports(package_root)
+            payload = parse_document(body, query)
+''', '')
+    path.write_text(value, encoding='utf-8')
+    path = source / 'parser_bundles.py'
+    value = path.read_text(encoding='utf-8')
+    value = value.replace("_SAMR_SOURCES = {**_DUNLOP_SOURCES, 'samr-cn-recalls': 'recall'}\n", '')
+    value = value.replace(', set(_SAMR_SOURCES)', '')
+    value = value.replace('_SAMR_SOURCES[source]', '_DUNLOP_SOURCES[source]')
+    value = value.replace("        if 'samr-cn-recalls' in parsers:\n            required.add('adapters/samr.py')\n", '')
+    assert 'samr' not in value and '_SAMR' not in value
+    path.write_text(value, encoding='utf-8')
+
+
 def pre_dunlop_install(source):
     """Reconstruct the trusted sixteen-entry installation in a temporary copy."""
+    pre_samr_install(source)
     (source / 'adapters/dunlop.py').unlink()
     for name in ('adapters/registry.py', 'parser_runtime.py'):
         path = source / name
@@ -373,8 +401,8 @@ def test_manifest_rejects_noncanonical_paths(path):
 
 
 @pytest.mark.parametrize('catalog', [bundles._LEGACY_SOURCES, bundles._NHTSA_SOURCES, bundles._SOURCES,
-                                   bundles._DOCUMENT_SOURCES, bundles._BRIDGESTONE_SOURCES, bundles._CONTINENTAL_SOURCES, bundles._GOODYEAR_SOURCES, bundles._SAFETY_GATE_SOURCES, bundles._YOKOHAMA_SOURCES, bundles._DUNLOP_SOURCES],
-                         ids=['legacy-eight', 'nhtsa-nine', 'tire-ten', 'document-eleven', 'jp-twelve', 'cn-thirteen', 'sg-fourteen', 'eu-fifteen', 'yokohama-sixteen', 'dunlop-seventeen'])
+                                   bundles._DOCUMENT_SOURCES, bundles._BRIDGESTONE_SOURCES, bundles._CONTINENTAL_SOURCES, bundles._GOODYEAR_SOURCES, bundles._SAFETY_GATE_SOURCES, bundles._YOKOHAMA_SOURCES, bundles._DUNLOP_SOURCES, bundles._SAMR_SOURCES],
+                         ids=['legacy-eight', 'nhtsa-nine', 'tire-ten', 'document-eleven', 'jp-twelve', 'cn-thirteen', 'sg-fourteen', 'eu-fifteen', 'yokohama-sixteen', 'dunlop-seventeen', 'samr-eighteen'])
 def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, catalog):
     trusted_copy(tmp_path, monkeypatch)
     manifest = bundles.seal_deployed_bundle()
@@ -395,6 +423,8 @@ def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, cat
         del manifest['files']['adapters/yokohama.py']
     if 'dunlop-eu' not in catalog:
         del manifest['files']['adapters/dunlop.py']
+    if 'samr-cn-recalls' not in catalog:
+        del manifest['files']['adapters/samr.py']
     manifest['bundle_id'] = bundles.digest({key: value for key, value in manifest.items() if key != 'bundle_id'})
     assert set(bundles.checked_manifest(manifest, protocol=runtime.PROTOCOL, limits=runtime.limits())['parsers']) == set(catalog)
     for mutation in ('subset', 'unknown', 'missing_required_file'):
@@ -404,7 +434,8 @@ def test_only_reviewed_complete_catalogs_are_accepted(tmp_path, monkeypatch, cat
         elif mutation == 'unknown':
             changed['parsers']['unreviewed-us'] = changed['parsers'].pop('hankook-us')
         else:
-            required = ('adapters/dunlop.py' if 'dunlop-eu' in catalog else
+            required = ('adapters/samr.py' if 'samr-cn-recalls' in catalog else
+                        'adapters/dunlop.py' if 'dunlop-eu' in catalog else
                         'adapters/yokohama.py' if 'yokohama-eu' in catalog else
                         'adapters/safety_gate.py' if 'eu-safety-gate' in catalog else
                         'adapters/goodyear.py' if 'goodyear-sg' in catalog else
@@ -441,7 +472,7 @@ def test_reconstructed_eight_source_eager_bundle_runs_tire_and_rejects_new_sourc
     source = trusted_copy(tmp_path, monkeypatch)
     mark_parser(source, 222)
     current = bundles.seal_deployed_bundle()
-    assert set(current['parsers']) == set(bundles._DUNLOP_SOURCES)
+    assert set(current['parsers']) == set(bundles._SAMR_SOURCES)
     original_command = runtime._command
     monkeypatch.setattr(runtime, '_command', lambda: [*original_command(), str(source.parent)])
     replay = asyncio.run(execute_bundle(old))
@@ -482,7 +513,7 @@ def test_real_nine_source_archive_runs_saved_tire_and_recall_and_rejects_pirelli
     new = bundles.seal_deployed_bundle()
     old_package = bundles.verify_bundle(old)['package_root']
     assert set(old['parsers']) == set(bundles._NHTSA_SOURCES)
-    assert set(new['parsers']) == set(bundles._DUNLOP_SOURCES)
+    assert set(new['parsers']) == set(bundles._SAMR_SOURCES)
     assert (old_package / 'adapters/__init__.py').read_text(encoding='utf-8') == EAGER_ADAPTER_INIT
     assert 'adapters/pirelli.py' not in old['files'] and not (old_package / 'adapters/pirelli.py').exists()
     assert 'pirelli' not in (old_package / 'adapters/registry.py').read_text(encoding='utf-8')
@@ -529,7 +560,7 @@ def test_reconstructed_eager_ten_bundle_keeps_own_code_with_current_lazy_install
     current_descriptor = bundles.bundle_descriptor(current, 'pirelli-us')
     current_tire_catalog = {key: value for key, value in current['parsers'].items() if key in bundles._SOURCES}
     assert old['parsers'] == current_tire_catalog
-    assert set(current['parsers']) == set(bundles._DUNLOP_SOURCES)
+    assert set(current['parsers']) == set(bundles._SAMR_SOURCES)
     assert old['bundle_id'] != current['bundle_id']
     original_command = runtime._command
     monkeypatch.setattr(runtime, '_command', lambda: [*original_command(), str(source.parent)])

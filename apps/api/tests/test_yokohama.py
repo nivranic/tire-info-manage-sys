@@ -108,7 +108,7 @@ def test_old_fifteen_source_bundle_executes_after_new_install(tmp_path, monkeypa
     trusted_copy(tmp_path, monkeypatch)
     current = bundles.seal_deployed_bundle()
     assert set(old['parsers']) == set(bundles._SAFETY_GATE_SOURCES)
-    assert set(current['parsers']) == set(bundles._DUNLOP_SOURCES)
+    assert set(current['parsers']) == set(bundles._SAMR_SOURCES)
     assert 'adapters/yokohama.py' not in old['files']
     result = asyncio.run(execute_bundle(old))
     assert result['payload'] and result['receipt']['exit_code'] == 0 and result['receipt']['reaped']

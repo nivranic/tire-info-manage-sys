@@ -34,7 +34,7 @@ def test_complete_catalog_is_read_only_and_does_not_promote_pending_source(setup
         'michelin-us', 'michelin-cn', 'michelin-uk', 'michelin-fr', 'michelin-de',
         'toyo-us', 'hankook-us', 'pirelli-us', 'bridgestone-jp', 'continental-cn',
         'goodyear-sg', 'yokohama-eu', 'dunlop-eu', 'eprel', 'xiaomi-cn-vehicles',
-        'nhtsa-us-recalls', 'eu-safety-gate',
+        'nhtsa-us-recalls', 'eu-safety-gate', 'samr-cn-recalls',
     }
     assert items['xiaomi-cn-vehicles']['target_kind'] == 'vehicle'
     assert items['nhtsa-us-recalls']['target_kind'] == 'recall'

@@ -188,6 +188,10 @@ def main():
             from tire_api.adapters.safety_gate import parse_xml
             _check_imports(package_root)
             payload = parse_xml(body, query)
+        elif source_id == 'samr-cn-recalls':
+            from tire_api.adapters.samr import parse_document
+            _check_imports(package_root)
+            payload = parse_document(body, query)
         elif source_id == 'goodyear-sg':
             from tire_api.adapters.goodyear import parse_html
             _check_imports(package_root)

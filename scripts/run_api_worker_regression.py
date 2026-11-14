@@ -45,7 +45,7 @@ GUARD_DENIAL_CATEGORIES = frozenset({
     'network_listen', 'sqlite_unreviewed_factory', 'sqlite_connection_identity_mismatch',
     'filesystem_untrusted_dir_fd',
 })
-# Explicit 190 API + 2 Worker module manifest. Never substitute discovery for it.
+# Explicit API and Worker module manifest. Never substitute discovery for it.
 TEST_MODULES = (
     'apps/api/tests/test_ai_original_text.py',
     'apps/api/tests/test_original_text_retrieval.py',
@@ -80,6 +80,8 @@ TEST_MODULES = (
     'apps/api/tests/test_goodyear.py',
     'apps/api/tests/test_yokohama.py',
     'apps/api/tests/test_dunlop.py',
+    'apps/api/tests/test_samr.py',
+    'apps/api/tests/test_samr_recalls.py',
     'apps/api/tests/test_safety_gate.py',
     'apps/api/tests/test_safety_gate_alerts.py',
     'apps/api/tests/test_safety_gate_monitoring.py',

@@ -129,6 +129,13 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
     if source_id == 'eu-safety-gate' and mime == 'application/xml':
         from .adapters.safety_gate import permitted_url as permitted_safety_gate_url
         safety_gate_xml = permitted_safety_gate_url(url, query)
+    samr_observation = False
+    if source_id == 'samr-cn-recalls':
+        from .adapters.samr import permitted_url as permitted_samr_url
+        samr_observation = permitted_samr_url(url, query)
+        expected_type = 'application/json' if isinstance(query, dict) and query.get('operation') == 'search' else 'text/html'
+        if not samr_observation or mime != expected_type:
+            return None
     if (not isinstance(body, str) or not body or not isinstance(url, str) or len(url) > 8192
             or not isinstance(parser, str) or not 1 <= len(parser) <= 100
             or not isinstance(mime, str) or mime not in {"text/html", "application/json", "text/javascript", "application/javascript", "text/plain"} and not safety_gate_xml):
@@ -142,7 +149,7 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
                 or parsed.username or parsed.password
                 or parsed.fragment or "\\" in url):
             return None
-        if parsed.query and not permitted_url(url) and not safety_gate_xml:
+        if parsed.query and not permitted_url(url) and not safety_gate_xml and not samr_observation:
             from .adapters.registry import SPECS
             spec = SPECS.get(source_id) if isinstance(source_id, str) else None
             if spec is None or url not in spec.model_urls.values() or mime not in spec.content_types:
@@ -161,7 +168,7 @@ def validated_observation(observation: Any, *, source_id: str | None = None,
 
 
 def capture_target(run: QueryRun) -> str:
-    if run.source_id == 'eu-safety-gate':
+    if run.source_id in {'eu-safety-gate', 'samr-cn-recalls'}:
         return 'recall'
     if run.source_id == 'nhtsa-us-recalls' and set(run.query) in ({'campaign_number'}, {'search', 'offset'}):
         return 'recall'
@@ -169,6 +176,9 @@ def capture_target(run: QueryRun) -> str:
 
 
 def _recall_contract(source_id, query):
+    if source_id == 'samr-cn-recalls':
+        from .adapters.samr import query_url
+        return query_url(query), 'application/json' if query['operation'] == 'search' else 'text/html'
     if source_id == 'eu-safety-gate':
         from .adapters.safety_gate import query_url
         return query_url(query), 'application/xml'

@@ -98,7 +98,7 @@ def test_registry_access_forms_load_the_same_complete_registry(first_access):
     assert observed['advertised_sources'] == [
         'bridgestone-jp', 'continental-cn', 'dunlop-eu', 'eprel', 'eu-safety-gate', 'goodyear-sg',
         'hankook-us', 'michelin-cn', 'michelin-de', 'michelin-fr', 'michelin-uk',
-        'michelin-us', 'nhtsa-us-recalls', 'pirelli-us', 'toyo-us', 'yokohama-eu',
+        'michelin-us', 'nhtsa-us-recalls', 'pirelli-us', 'samr-cn-recalls', 'toyo-us', 'yokohama-eu',
     ]
 
 

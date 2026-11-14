@@ -1,6 +1,8 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手先读[进度与 Agent 交接卡](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)，汇总12个核心模块、10项发布Gate、13项SLO、15项决策及本次Dunlop交付。当前13个轮胎区域目录、9个厂商品牌、17项可信Parser，完整V1持续进行。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留阶段记录。
+当前接手先读[中国召回阶段交接卡](docs/AGENT-HANDOFF-2026-11-14-SAMR.md)，整体需求继续参照[进度总表](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)的12个核心模块、10项发布Gate、13项SLO与15项决策。当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、168张模型表，完整V1持续进行。
+
+中国市场监管召回已接通官方检索、公告正文、原生文章身份、独立日期、原件、304和回退授权。最终108项受管回归、独立HTTP／非拥有者PG／TLS专项12项、正常ASGI真实来源27项及三端类型检查通过，子进程等价路径误判已修正。四批48个服务记录、58个进程ID、28个端口及临时密码／私钥文件已核对。专用SDK／Web、后台监控、批次／SKU、许可及间歇Parser超时继续推进。[中国来源验收](docs/assurance/evidence/samr-cn-source-2026-11-14.md)
 
 Dunlop欧洲SPORT MAXX RT2已补齐独立HTTP／非拥有者PG／TLS专项12项验收，两次官网查询均live，两个SKU的ID与事实版本稳定，原件及历史观察时间可核对。三批服务、进程、端口和临时秘密已核对，私有脚本换行转换及原文动态变化的原始失败分别保留。EPREL监管绑定、长期来源稳定性与完整V1继续验收。[Dunlop来源验收](docs/assurance/evidence/dunlop-eu-source-2026-11-14.md)
 

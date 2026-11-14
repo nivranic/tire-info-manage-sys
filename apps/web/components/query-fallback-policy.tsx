@@ -7,7 +7,7 @@ import { useWorkbenchPlatform } from "./workbench-platform";
 import { DataTree } from "./reparse-review";
 
 const modes: Record<DeviceFallbackPolicyMode, string> = { ask: "每次询问", never: "始终拒绝自动回退", session_allow: "本次会话持续允许", source_allow: "所选来源持续允许", query_allow: "此查询类型持续允许" };
-const kinds: Record<WarehouseFallbackQueryKind, string> = { tire: "轮胎规格", vehicle_fitments: "车型配置", recall_campaign: "召回公告编号", recall_search: "召回名称检索页", safety_gate_reports: "Safety Gate周报索引", safety_gate_report: "Safety Gate指定周报" };
+const kinds: Record<WarehouseFallbackQueryKind, string> = { tire: "轮胎规格", vehicle_fitments: "车型配置", recall_campaign: "召回公告编号", recall_search: "召回名称检索页", safety_gate_reports: "Safety Gate周报索引", safety_gate_report: "Safety Gate指定周报", samr_recall_search: "中国召回检索页", samr_recall_notice: "中国召回公告" };
 const detail = (cause: unknown) => cause instanceof Error ? cause.message : "策略操作未完成。";
 const sourceIdsIn = (scope: WarehouseFallbackPolicyScope) => scope.kind === "source" ? [scope.source_id] : scope.sources.map(source => source.source_id);
 const isDeviceKind = (kind: WarehouseFallbackQueryKind): kind is DeviceFallbackQueryKind => kind === "tire" || kind === "vehicle_fitments" || kind === "recall_campaign" || kind === "recall_search";
@@ -32,7 +32,7 @@ export default function QueryFallbackPolicy({ kind, sourceIds, sessionReady }: {
   const idsKey = [...new Set(explicitSources ?? sourceIds)].sort().join("|"), ids = idsKey ? idsKey.split("|") : [];
   const supportsDevice = isDeviceKind(kind);
   const registered = layer === "device" ? device?.authority.sources.filter(item => isDeviceKind(kind) && item.query_kinds.includes(kind)).map(item => item.source_id) || []
-    : access.items.filter(item => kind === "vehicle_fitments" ? item.target_kind === "vehicle" : kind === "recall_campaign" || kind === "recall_search" ? item.source_id === "nhtsa-us-recalls" && item.target_kind === "recall" : kind === "safety_gate_report" || kind === "safety_gate_reports" ? item.source_id === "eu-safety-gate" && item.target_kind === "recall" : item.target_kind === "tire").map(item => item.source_id);
+    : access.items.filter(item => kind === "vehicle_fitments" ? item.target_kind === "vehicle" : kind === "recall_campaign" || kind === "recall_search" ? item.source_id === "nhtsa-us-recalls" && item.target_kind === "recall" : kind === "safety_gate_report" || kind === "safety_gate_reports" ? item.source_id === "eu-safety-gate" && item.target_kind === "recall" : kind === "samr_recall_search" || kind === "samr_recall_notice" ? item.source_id === "samr-cn-recalls" && item.target_kind === "recall" : item.target_kind === "tire").map(item => item.source_id);
   const selected = source && ids.includes(source) ? source : ids[0] || "";
   const isAllow = mode !== "ask" && mode !== "never";
   const binding = device?.package_bindings.find(item => item.slot_id === slotId);

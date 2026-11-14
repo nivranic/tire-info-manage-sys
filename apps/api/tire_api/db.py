@@ -489,6 +489,7 @@ def register_schema_models() -> None:
     from . import recall_models  # noqa: F401
     from . import recall_discovery  # noqa: F401
     from . import safety_gate  # noqa: F401
+    from . import samr_recalls  # noqa: F401
     from . import safety_gate_alerts  # noqa: F401
     from . import safety_gate_monitor_models  # noqa: F401
     from . import recall_discovery_monitor_models  # noqa: F401

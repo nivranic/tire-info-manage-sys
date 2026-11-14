@@ -164,7 +164,7 @@ def test_old_sixteen_entry_archive_executes_after_new_install(tmp_path, monkeypa
     trusted_copy(tmp_path, monkeypatch)
     current = bundles.seal_deployed_bundle()
     assert set(old['parsers']) == set(bundles._YOKOHAMA_SOURCES)
-    assert set(current['parsers']) == set(bundles._DUNLOP_SOURCES)
+    assert set(current['parsers']) == set(bundles._SAMR_SOURCES)
     assert 'adapters/dunlop.py' not in old['files']
     result = asyncio.run(execute_bundle(old))
     assert result['payload'] and result['receipt']['reaped'] and result['receipt']['exit_code'] == 0

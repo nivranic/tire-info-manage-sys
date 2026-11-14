@@ -33,6 +33,7 @@ _TELEMETRY_SOURCES = {
     'www.goodyear.com.sg': 'goodyear-sg',
     'www.yokohama.eu': 'yokohama-eu',
     'www.dunloptyres.com': 'dunlop-eu',
+    'www.samrdprc.org.cn': 'samr-cn-recalls',
 }
 
 

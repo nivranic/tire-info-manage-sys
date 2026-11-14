@@ -16,9 +16,21 @@ import threading
 from urllib.parse import parse_qs, unquote, urlsplit
 
 
+def comparable_path(path):
+    """Match the parent guard's comparison of resolved Windows filesystem paths."""
+    if os.name == 'nt':
+        value = str(path)
+        if value.startswith('\\\\?\\UNC\\'):
+            return Path('\\\\' + value[8:])
+        if (value.startswith('\\\\?\\') and len(value) >= 7
+                and value[4].isascii() and value[4].isalpha() and value[5:7] == ':\\'):
+            return Path(value[4:])
+    return path
+
+
 class ChildBoundary:
     def __init__(self, private_root):
-        self.private = Path(private_root).resolve(strict=True)
+        self.private = comparable_path(Path(private_root).resolve(strict=True))
         self.counts = {}
         self._pair = threading.local()
         self._sqlite = threading.local()
@@ -48,14 +60,12 @@ class ChildBoundary:
                     if not size or size >= len(buffer):
                         return False
                     value = buffer.value
-                    if value.startswith('\\\\?\\'):
-                        value = value[4:]
                 else:
                     value = os.readlink('/proc/self/fd/' + str(value))
             except (OSError, ValueError):
                 return False
         try:
-            return Path(os.fsdecode(value)).resolve().is_relative_to(self.private)
+            return comparable_path(Path(os.fsdecode(value)).resolve()).is_relative_to(self.private)
         except (OSError, TypeError, ValueError):
             return False
 
