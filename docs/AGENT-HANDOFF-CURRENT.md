@@ -15,6 +15,7 @@
 - 最新补齐 **PG 024 显式迁移与快照备份恢复**，17 项真实 PG 维护检查及 30 项运行合同检查通过。合同升级为 @3，完整业务 DML 最小权限继续待验。
 - 已交接API／Worker运行角色策略，固定166张模型表、逐列UPDATE、有限DELETE及固定SHARE锁函数，治理两表仅允许读取。后续HNSW显式拥有者维护与@4完整模型空间合同已实现，141项回归和36项PG／TLS专项通过。
 - 运行角色权限专项已补23项真实反例及部分GRANT后检查回滚，正式PG／TLS60项、相关受管回归45项通过，842输入稳定。[权限专项](assurance/evidence/postgres-runtime-permissions-2026-11-14.md)保留装配失败与最小探针，后续推进Parser性能取证、实际终端和远端部署。
+- Parser最新54组文件系统样本及16次原入口复验将主要耗时收敛到Windows新文件打开链路，直接CreateFileW也复现。原入口全部匹配并回收，OS归因和原间歇超时继续待查。[性能取证](assurance/evidence/parser-file-open-2026-11-14.md)记录计时、诊断环境和既有TEMP／TMP配置。
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 
 ## 用户已确定的边界
@@ -247,4 +248,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及HNSW维护验收，核对main、HEAD与实时远端。PG许可CLI、治理操作员、verify、024备份迁移及HNSW拥有者维护已接通。@4显式保存完整空间／维度，运行端只读核对，部署需重建批准空参考合同。复用23项权限反例及部分GRANT回滚证据，继续Parser性能取证、真实终端、远端与全资产恢复。保留Parser原始超时，默认与私有临时目录均有失败，OS根因待查。正式PG验收采用每批私有TMP，原8秒限制和全部核验继续执行。首个真实AI使用OpenAI Responses，缺OpenAI／EPREL凭据时继续独立工程。保留KIT C2与历史封存，继续SKU／Golden、材料许可、长周期、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main工作，遵循分支／worktree、代理和PowerShell7规则，发布后独立核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及HNSW维护验收，核对main、HEAD与实时远端。PG许可CLI、治理操作员、verify、024备份迁移及HNSW拥有者维护已接通。@4显式保存完整空间／维度，运行端只读核对，部署需重建批准空参考合同。复用23项权限反例及部分GRANT回滚证据，继续Parser性能取证、真实终端、远端与全资产恢复。复用54组文件系统与16次原入口取证，接续OS打开链路归因，保留默认与私有临时目录的原始失败。正式PG验收采用每批私有TMP，原8秒限制和全部核验继续执行。首个真实AI使用OpenAI Responses，缺OpenAI／EPREL凭据时继续独立工程。保留KIT C2与历史封存，继续SKU／Golden、材料许可、长周期、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main工作，遵循分支／worktree、代理和PowerShell7规则，发布后独立核对远端SHA与工作区。
