@@ -15,6 +15,7 @@ import TestPdfCitation from "./test-pdf-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import { useToast } from "./toast";
+import { useWorkbenchAuth } from "./auth";
 
 const stamp = (value?: string | null) => value ? new Date(value).toLocaleString("zh-CN") : "未记录";
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : "请求未完成。";
@@ -28,13 +29,22 @@ type SaveAttempt = { key: string; payload: ReportCreate };
 // checking the authoritative report library before starting another save.
 const pendingSaves = new Map<string, SaveAttempt>();
 
-export function SaveReportDialog({ pack, analysis, onClose, onSaved }: {
+type SaveReportProps = {
   pack: AIPack; analysis?: AIAnalysis; onClose: () => void; onSaved: (report: EvidenceReportDetail) => void;
-}) {
+};
+
+export function SaveReportDialog(props: SaveReportProps) {
+  const auth = useWorkbenchAuth();
+  if (!auth.ready) return <p role="status">正在确认当前账户，报告保存暂不可用。</p>;
+  return <OwnerSaveReportDialog key={auth.ownerEpoch} {...props} ownerEpoch={auth.ownerEpoch} ownerKey={auth.state.user?.id || `anonymous-${auth.ownerEpoch}`} />;
+}
+
+function OwnerSaveReportDialog({ pack, analysis, onClose, onSaved, ownerEpoch, ownerKey }: SaveReportProps & { ownerEpoch: number; ownerKey: string }) {
+  const auth = useWorkbenchAuth();
   const platform = useWorkbenchPlatform();
   const dialog = useRef<HTMLDialogElement>(null);
   const operation = useRef<AbortController | null>(null);
-  const pendingId = `${pack.id}:${analysis?.id || "evidence"}`;
+  const pendingId = JSON.stringify([ownerKey, pack.id, analysis?.id || "evidence"]);
   const attempt = useRef<SaveAttempt | null>(pendingSaves.get(pendingId) || null);
   const [title, setTitle] = useState(attempt.current?.payload.title || "");
   const [notes, setNotes] = useState(attempt.current?.payload.notes || "");
@@ -46,11 +56,13 @@ export function SaveReportDialog({ pack, analysis, onClose, onSaved }: {
     const node = dialog.current;
     const focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     node?.showModal();
-    return () => { operation.current?.abort(); node?.close(); if (focus?.isConnected && !focus.closest("dialog:not([open])")) focus.focus({ preventScroll: true }); };
+    const cancel = () => operation.current?.abort();
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); node?.close(); if (focus?.isConnected && !focus.closest("dialog:not([open])")) focus.focus({ preventScroll: true }); };
   }, []);
 
   async function save() {
-    if (operation.current || !analysisMatches || !title.trim()) return;
+    if (!auth.isCurrentOwner(ownerEpoch) || operation.current || !analysisMatches || !title.trim()) return;
     const value = attempt.current || { key: crypto.randomUUID(), payload: {
       mode: "history" as const, pack_id: pack.id, analysis_id: analysis?.id || null, title: title.trim(), notes,
     } };
@@ -58,13 +70,13 @@ export function SaveReportDialog({ pack, analysis, onClose, onSaved }: {
     const controller = new AbortController(); operation.current = controller; setBusy(true); setError("");
     try {
       const report = await tireApi.createReport(value.payload, value.key, controller.signal);
-      if (!controller.signal.aborted) { pendingSaves.delete(pendingId); onSaved(report); onClose(); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { pendingSaves.delete(pendingId); onSaved(report); onClose(); }
     } catch (cause) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) {
         setError(errorText(cause));
         if (cause instanceof ApiError && cause.status >= 400 && cause.status < 500) { pendingSaves.delete(pendingId); attempt.current = null; setLocked(false); }
       }
-    } finally { if (operation.current === controller) operation.current = null; if (!controller.signal.aborted) setBusy(false); }
+    } finally { if (operation.current === controller) operation.current = null; if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
 
   return <dialog ref={dialog} className="fact-review-dialog report-save-dialog" aria-labelledby="report-save-title"
@@ -131,7 +143,16 @@ function FrozenReportBody({ report }: { report: EvidenceReportDetail }) {
   </section>;
 }
 
-export default function ReportsDialog({ initialId, onClose }: { initialId?: string; onClose: () => void }) {
+type ReportsProps = { initialId?: string; onClose: () => void };
+
+export default function ReportsDialog(props: ReportsProps) {
+  const auth = useWorkbenchAuth();
+  if (!auth.ready) return <p role="status">正在确认当前账户，旧报告暂不显示。</p>;
+  return <OwnerReportsDialog key={auth.ownerEpoch} {...props} ownerEpoch={auth.ownerEpoch} />;
+}
+
+function OwnerReportsDialog({ initialId, onClose, ownerEpoch }: ReportsProps & { ownerEpoch: number }) {
+  const auth = useWorkbenchAuth();
   const toast = useToast();
   const platform = useWorkbenchPlatform();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -166,22 +187,24 @@ export default function ReportsDialog({ initialId, onClose }: { initialId?: stri
     const node = dialog.current;
     const focus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     node?.showModal();
-    return () => { operation.current?.abort(); node?.close(); if (focus?.isConnected) focus.focus({ preventScroll: true }); };
+    const cancel = () => { operation.current?.abort(); listRequest.current?.abort(); };
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); node?.close(); if (focus?.isConnected) focus.focus({ preventScroll: true }); };
   }, []);
 
   useEffect(() => {
     const controller = new AbortController(); listRequest.current = controller; setLoading(true); setListError(""); setMoreBusy(false); setItems([]); setTotal(0);
     void tireApi.reports(archived, controller.signal).then(value => {
-      if (!controller.signal.aborted) { setItems(value.items); setTotal(value.total); }
-    }).catch(cause => { if (!controller.signal.aborted) setListError(errorText(cause)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setItems(value.items); setTotal(value.total); }
+    }).catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setListError(errorText(cause)); }).finally(() => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setLoading(false); });
     return () => controller.abort();
   }, [archived, listRevision]);
 
   useEffect(() => {
     if (!selectedId) return;
     const controller = new AbortController(); setDetailLoading(true); setDetail(null); setError(""); setDownloaded(null); setSaveCancelled(false); setStale(false);
-    void tireApi.report(selectedId, controller.signal).then(value => { if (!controller.signal.aborted) accept(value); })
-      .catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); }).finally(() => { if (!controller.signal.aborted) setDetailLoading(false); });
+    void tireApi.report(selectedId, controller.signal).then(value => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) accept(value); })
+      .catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }).finally(() => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setDetailLoading(false); });
     return () => controller.abort();
   }, [selectedId, detailRevision]);
 
@@ -206,17 +229,17 @@ export default function ReportsDialog({ initialId, onClose }: { initialId?: stri
     setMoreBusy(true); setListError("");
     try {
       const value = await tireApi.reports(archived, controller.signal, items.length);
-      if (!controller.signal.aborted) { setItems(previous => [...new Map([...previous, ...value.items].map(item => [item.id, item])).values()]); setTotal(value.total); }
-    } catch (cause) { if (!controller.signal.aborted) setListError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setMoreBusy(false); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setItems(previous => [...new Map([...previous, ...value.items].map(item => [item.id, item])).values()]); setTotal(value.total); }
+    } catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setListError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setMoreBusy(false); }
   }
 
   async function perform(work: (signal: AbortSignal) => Promise<void>) {
-    if (operation.current) return;
+    if (operation.current || !auth.isCurrentOwner(ownerEpoch)) return;
     const controller = new AbortController(); operation.current = controller; setBusy(true); setError("");
     try { await work(controller.signal); }
-    catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { if (operation.current === controller) operation.current = null; if (!controller.signal.aborted) setBusy(false); }
+    catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (operation.current === controller) operation.current = null; if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
 
   async function mutate(action: "metadata" | "archive" | "restore") {
@@ -225,9 +248,9 @@ export default function ReportsDialog({ initialId, onClose }: { initialId?: stri
       try {
         const value = action === "metadata" ? await tireApi.editReport(detail.id, detail.revision, title.trim(), notes, signal)
           : await tireApi.reportState(detail.id, detail.revision, action, signal);
-        if (!signal.aborted) { accept(value); setListRevision(previous => previous + 1); toast(action === "metadata" ? `已保存标题与备注修订 #${value.revision}。` : action === "archive" ? "报告已归档，可在归档范围查看。" : "报告已恢复为未归档。", "success"); }
+        if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) { accept(value); setListRevision(previous => previous + 1); toast(action === "metadata" ? `已保存标题与备注修订 #${value.revision}。` : action === "archive" ? "报告已归档，可在归档范围查看。" : "报告已恢复为未归档。", "success"); }
       } catch (cause) {
-        if (!signal.aborted && (!(cause instanceof ApiError) || cause.status === 409 || cause.status >= 500)) setStale(true);
+        if (!signal.aborted && auth.isCurrentOwner(ownerEpoch) && (!(cause instanceof ApiError) || cause.status === 409 || cause.status >= 500)) setStale(true);
         throw cause;
       }
     });
@@ -250,10 +273,10 @@ export default function ReportsDialog({ initialId, onClose }: { initialId?: stri
       const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
       const actual = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, "0")).join("");
       if (actual !== artifact.sha256.toLowerCase()) throw new Error("文件 SHA-256 校验失败，未下载。");
-      if (signal.aborted) return;
+      if (signal.aborted || !auth.isCurrentOwner(ownerEpoch)) return;
       const filename = `tire-report-${requested.reportId.replace(/[^a-z0-9-]/gi, "").slice(0, 64)}-r${requested.revision}.${requested.format === "markdown" ? "md" : requested.format}`;
       const result = await platform.saveDownload({ blob, filename, signal });
-      if (signal.aborted) return;
+      if (signal.aborted || !auth.isCurrentOwner(ownerEpoch)) return;
       if (result.saved) setDownloaded(artifact);
       else setSaveCancelled(true);
       setDetail(previous => previous?.id === requested.reportId ? { ...previous, exports: [artifact, ...previous.exports.filter(item => item.id !== artifact.id)].sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at)).slice(0, 100) } : previous);

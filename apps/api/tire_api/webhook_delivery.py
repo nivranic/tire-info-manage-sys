@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import hashlib
 import re
 
-from sqlalchemy import func, inspect, select
+from sqlalchemy import and_, func, inspect, or_, select
 
 from .db import AlertEvent, ChangeEvent, NotificationDelivery, User, UserSession, uid, utc, utcnow
 from .domain import digest, stable_json
@@ -233,9 +233,17 @@ def enqueue_notification(db, channel, notification, event, origin=None):
     owner = None
     if channel != 'tire_monitor':
         session = db.get(UserSession, notification.session_id)
-        if not session or not session.user_id or utc(session.expires_at) <= utcnow() or not db.get(User, session.user_id):
+        owner = (session.owner_user_id or session.user_id) if session else None
+        if owner is None or db.get(User, owner) is None:
             return
-        owner = session.user_id
+        # A private rule retains its original owner after session rotation.
+        # Delivery eligibility still requires a live login for that account.
+        active_login = db.scalar(select(UserSession.id).where(
+            UserSession.user_id == owner, UserSession.expires_at > utcnow(),
+            or_(UserSession.owner_user_id == owner,
+                and_(UserSession.owner_user_id.is_(None), UserSession.user_id == owner))).limit(1))
+        if active_login is None:
+            return
     origin = origin or _origin(db, channel, event)
     if origin is None:
         raise HistoryInvalid()

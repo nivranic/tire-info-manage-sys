@@ -1,5 +1,7 @@
 # 胎迹 Agent 接手卡
 
+最新阶段已实施账户持久归属、登录／注册／退出轮换及报告／AI账户代次隔离。先读[账户归属交接卡](AGENT-HANDOFF-2026-11-15-ACCOUNT-OWNERSHIP.md)和[阶段验收](assurance/evidence/session-data-ownership-2026-11-15.md)，其中列出12个模块、未完成Gate、迁移策略和下一步。完整V1继续进行。下文保留历史阶段的交付时点。
+
 最新阶段先读[测试成绩PDF原件交接卡](AGENT-HANDOFF-2026-11-14-TEST-PDF.md)及[阶段验收](assurance/evidence/test-measurement-pdf-2026-11-14.md)。成绩短摘录已绑定保存PDF区间，录入、修订、比较、AI与报告沿同一原件和用途授权检查。正常链路采用合成成绩／Responses，真实SKU、真人Golden、真实模型及完整V1继续待验。账户切换复现已有报告归属隔离缺陷，优先修复并复验相关AuthZ Gate。下文保留历史阶段的交付时点。
 
 本阶段完成robots精确HTTPS跳转、@2来源凭证与Web消费，并通过正常捕获接口取得首份可恢复专业研究PDF。15页原件、CC BY 4.0、正文索引／引用及完整下载摘要已核对，精确SKU和真人Golden继续待验。接手先读[许可原件接手卡](AGENT-HANDOFF-2026-11-14-MATERIAL.md)和[阶段验收](assurance/evidence/material-robots-original-2026-11-14.md)，继续完整V1。

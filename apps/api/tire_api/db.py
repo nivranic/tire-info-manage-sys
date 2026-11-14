@@ -12,7 +12,7 @@ import tempfile
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint, create_engine, event
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, LargeBinary, String, Text, UniqueConstraint, create_engine, event, false
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -39,8 +39,17 @@ class UserSession(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # 多用户账户（014 迁移）：NULL = 匿名会话；绑定后读取作用域聚合到该用户全部会话。
+    # user_id is the current login. Ownership survives logout and expiration.
     user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    owner_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    anonymous_claimable: Mapped[bool] = mapped_column(default=True, server_default=false())
+
+
+@event.listens_for(UserSession, 'before_insert')
+def bind_new_session_owner(_mapper, _connection, session):
+    if session.user_id is not None:
+        session.owner_user_id = session.owner_user_id or session.user_id
+        session.anonymous_claimable = False
 
 
 class User(Base):

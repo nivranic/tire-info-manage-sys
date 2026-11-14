@@ -504,7 +504,7 @@ def test_recall_private_owner_is_frozen_before_session_rebind(factory):
 
 
 @pytest.mark.parametrize('binding', ['anonymous', 'expired'])
-def test_private_notification_from_unowned_or_expired_session_is_not_enqueued(factory, binding):
+def test_private_notification_uses_durable_owner_and_requires_same_account_login(factory, binding):
     case = factory()
     sub = subscription(case, channels=['recall_monitor'])
     ok(case.client.post('/v1/recall-monitor-rules', json={'name': 'Private scope boundary',
@@ -513,15 +513,17 @@ def test_private_notification_from_unowned_or_expired_session_is_not_enqueued(fa
         session = db.get(UserSession, case.client.cookies['tire_local_session'])
         if binding == 'anonymous':
             session.user_id = None
+            session.owner_user_id = None
         else:
             session.expires_at = utcnow() - timedelta(seconds=1)
         db.commit()
-    # Another authenticated session can produce the shared ingestion event;
-    # matching private rule still refers to its original now-ineligible session.
+    # A new login can resume an owned rule after its old credential expires.
+    # A truly anonymous rule has no account to resume it.
     valid = another(case, login_owner=True)
     try:
         ok(valid.post('/v1/recalls/live-query', json={'query': {'campaign_number': CAMPAIGN}}))
-        assert ok(valid.get(BASE + '/' + sub['id'] + '/deliveries?mode=history'))['total'] == 0
+        expected = 1 if binding == 'expired' else 0
+        assert ok(valid.get(BASE + '/' + sub['id'] + '/deliveries?mode=history'))['total'] == expected
     finally:
         valid.close()
 

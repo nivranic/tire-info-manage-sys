@@ -50,6 +50,7 @@ VERSION_032 = '032_source_page_url_moves'
 VERSION_033 = '033_source_text_index'
 VERSION_034 = '034_document_text_index'
 VERSION_035 = '035_text_embedding_authorizations'
+VERSION_036 = '036_session_data_ownership'
 TABLES_025 = {'external_fact_license_evidence', 'external_fact_grant_revisions'}
 TABLES_026 = {'query_run_owner_receipts'}
 TABLES_027 = {'test_event_golden_cases', 'test_event_golden_case_revisions',
@@ -72,7 +73,11 @@ SAFETY_GATE_TABLES = {'safety_gate_snapshots', 'safety_gate_verifications',
     'safety_gate_monitor_rules', 'safety_gate_rule_revisions', 'safety_gate_monitor_jobs',
     'safety_gate_monitor_runs', 'safety_gate_monitor_checks', 'safety_gate_notifications',
     'safety_gate_task_attempts', 'safety_gate_task_events'}
-CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034 | TABLES_035 | SAFETY_GATE_TABLES
+SAMR_TABLES = {'samr_recall_snapshots', 'samr_recall_verifications', 'samr_notice_revisions',
+    'samr_notice_observations', 'samr_notice_changes', 'samr_monitor_rules', 'samr_rule_revisions',
+    'samr_monitor_jobs', 'samr_monitor_runs', 'samr_monitor_checks', 'samr_notifications',
+    'samr_task_attempts', 'samr_task_events'}
+CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034 | TABLES_035 | SAFETY_GATE_TABLES | SAMR_TABLES
 
 
 @pytest.fixture
@@ -421,9 +426,9 @@ def test_new_application_preflight_rejects_view_only_owned_name_without_ddl(tmp_
 
 
 def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False):
-    """025-035 plus additive Safety Gate tables; only 030 changes an old column."""
+    """025-036 with explicit 030 and 036 column deltas and preserved old cells."""
     after = inventory(connection)
-    added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032, VERSION_033, VERSION_034, VERSION_035]
+    added_versions = ([VERSION_024] if backfill_024 else []) + [VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032, VERSION_033, VERSION_034, VERSION_035, VERSION_036]
     assert after['versions'] == before['versions'] + added_versions == EXPECTED_SCHEMA_VERSIONS
     assert set(after['tables']) == set(before['tables']) | CURRENT_TAIL_TABLES
     # 030's exact single-column DDL change is checked separately, with every
@@ -431,6 +436,10 @@ def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False
     old_objects = {item['name']: item for item in before['schema_objects']}
     for item in after['schema_objects']:
         if item['table'] in CURRENT_TAIL_TABLES:
+            continue
+        if item['name'] == 'ix_local_sessions_owner_user_id':
+            assert item['type'] == 'index' and item['table'] == 'local_sessions'
+            assert re.sub(r'\s+', '', item['sql']).upper() == 'CREATEINDEXIX_LOCAL_SESSIONS_OWNER_USER_IDONLOCAL_SESSIONS(OWNER_USER_ID)'
             continue
         expected = old_objects[item['name']]
         if item['type'] == 'table' and item['name'] == 'interest_revisions':
@@ -440,14 +449,20 @@ def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False
             restored, count = re.subn(r',\s*' + fragment + r'(?=\s*\))|' + fragment + r'\s*,\s*', '', item['sql'], flags=re.I)
             assert count == 1
             assert re.sub(r'\s+', '', restored) == re.sub(r'\s+', '', expected['sql'])
+        elif item['type'] == 'table' and item['name'] == 'local_sessions':
+            restored = item['sql']
+            for fragment in (r'owner_user_id\s+VARCHAR\(64\)', r'anonymous_claimable\s+BOOLEAN\s+NOT\s+NULL\s+DEFAULT\s+FALSE'):
+                restored, count = re.subn(r',\s*' + fragment + r'(?=\s*[,\)])', '', restored, flags=re.I)
+                assert count == 1
+            assert re.sub(r'\s+', '', restored) == re.sub(r'\s+', '', expected['sql'])
         else:
             assert item == expected
-    assert {item['name'] for item in after['schema_objects'] if item['table'] not in CURRENT_TAIL_TABLES} == set(old_objects)
+    assert {item['name'] for item in after['schema_objects'] if item['table'] not in CURRENT_TAIL_TABLES} == set(old_objects) | {'ix_local_sessions_owner_user_id'}
     for table, expected in before['tables'].items():
         if table == 'tire_schema_versions':
             assert after['tables'][table]['columns'] == expected['columns']
             assert after['tables'][table]['foreign_keys'] == expected['foreign_keys']
-            where = " WHERE version NOT IN ('025_external_fact_governance','026_query_ownership','027_test_event_golden','028_ai_price_versions','029_source_page_monitoring','030_interest_source_quality','031_source_material_stops','032_source_page_url_moves','033_source_text_index','034_document_text_index','035_text_embedding_authorizations')"
+            where = " WHERE version NOT IN ('025_external_fact_governance','026_query_ownership','027_test_event_golden','028_ai_price_versions','029_source_page_monitoring','030_interest_source_quality','031_source_material_stops','032_source_page_url_moves','033_source_text_index','034_document_text_index','035_text_embedding_authorizations','036_session_data_ownership')"
             if backfill_024:
                 where += " AND version != '024_vehicle_binary_raw'"
             assert rows_digest(connection, table, where=where) == {
@@ -460,6 +475,17 @@ def _assert_current_tail_startup_delta(connection, before, *, backfill_024=False
             assert rows_digest(connection, table, columns=[column[1] for column in expected['columns']]) == {
                 key: expected[key] for key in ('row_count', 'rows_sha256')}
             assert connection.exec_driver_sql('SELECT COUNT(*) FROM interest_revisions WHERE source_quality_notifications IS NOT 0').scalar() == 0
+        elif table == 'local_sessions':
+            current = after['tables'][table]
+            count = len(expected['columns'])
+            assert current['columns'][:count] == expected['columns']
+            assert current['columns'][count:] == [
+                [count, 'owner_user_id', 'VARCHAR(64)', 0, None, 0, 0],
+                [count + 1, 'anonymous_claimable', 'BOOLEAN', 1, 'FALSE', 0, 0]]
+            assert current['foreign_keys'] == expected['foreign_keys']
+            assert rows_digest(connection, table, columns=[column[1] for column in expected['columns']]) == {
+                key: expected[key] for key in ('row_count', 'rows_sha256')}
+            assert connection.exec_driver_sql('SELECT COUNT(*) FROM local_sessions WHERE owner_user_id IS NOT user_id OR anonymous_claimable IS NOT 0').scalar() == 0
         else:
             assert after['tables'][table] == expected, table
     assert all(after['tables'][table]['row_count'] == 0 for table in CURRENT_TAIL_TABLES - FTS_033_INTERNAL_TABLES - FTS_034_INTERNAL_TABLES)

@@ -76,6 +76,9 @@ def test_cli_reset_password_is_the_local_recovery_path(tmp_path):
     app = create_app(url, FixtureRegistry())
     with TestClient(app) as client:
         assert register(client, username="root").status_code == 200
+        from test_research import WEIGHTS
+        assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
+        original_cookies = dict(client.cookies)
     result = subprocess.run([sys.executable, "-m", "tire_api.manage", "reset-password",
                              "--username", "root", f"--new-password={cli_password}"],
                             capture_output=True, text=True, cwd=".", timeout=120,
@@ -83,5 +86,8 @@ def test_cli_reset_password_is_the_local_recovery_path(tmp_path):
     assert result.returncode == 0, result.stderr
     assert '"ok": true' in result.stdout
     restarted = create_app(url, FixtureRegistry())
-    with TestClient(restarted) as client:
+    with TestClient(restarted, cookies=original_cookies) as client:
+        assert client.get('/v1/auth/me').json()['authenticated'] is False
+        assert client.get('/v1/driving-preferences').json()['weights'] is None
         assert login(client, "root", cli_password).status_code == 200
+        assert client.get('/v1/driving-preferences').json()['weights'] == WEIGHTS

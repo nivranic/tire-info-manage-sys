@@ -81,6 +81,30 @@ def test_report_is_historical_frozen_and_idempotent_without_external_calls(setup
     assert save(client, pack, body={'claims': ['invented']}).status_code == 422
 
 
+def test_account_switch_preserves_report_ai_and_export_ownership(setup):
+    from test_auth_accounts import login, register
+    client, _registry, model, _database = setup
+    assert register(client, username='report_owner').status_code == 200
+    pack = historical_pack(client)
+    analysis = analyze(client, pack).json()
+    report = save(client, pack, analysis['id']).json()
+    metadata, original = export(client, report)
+    original_cookie = client.cookies['tire_local_session']
+    assert client.post('/v1/auth/logout').status_code == 200
+    assert register(client, username='other_report_owner').status_code == 200
+    assert client.get('/v1/reports', params={'mode': 'history'}).json()['items'] == []
+    assert client.get('/v1/ai/analyses', params={'mode': 'history'}).json()['items'] == []
+    for actor in (client, TestClient(client.app, cookies={'tire_local_session': original_cookie})):
+        for path in (f"/v1/reports/{report['id']}", f"/v1/ai/analyses/{analysis['id']}", metadata['content_url']):
+            params = None if '?' in path else {'mode': 'history'}
+            assert actor.get(path, params=params).status_code == 404
+    assert login(client, 'report_owner').status_code == 200
+    assert client.get(f"/v1/reports/{report['id']}", params={'mode': 'history'}).json()['body_hash'] == report['body_hash']
+    assert client.get(f"/v1/ai/analyses/{analysis['id']}", params={'mode': 'history'}).json()['id'] == analysis['id']
+    assert client.get(metadata['content_url']).content == original
+    assert len(model.calls) == 1
+
+
 def test_private_ownership_covers_pack_analysis_report_metadata_and_exports(setup):
     client, _, _, database = setup
     pack = historical_pack(client)

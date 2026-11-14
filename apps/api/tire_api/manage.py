@@ -17,7 +17,7 @@ import os
 
 from sqlalchemy import select
 
-from .auth import hash_password, sweep_expired_sessions
+from .auth import hash_password, revoke_session_logins, sweep_expired_sessions
 from .db import User, UserSession
 from .service import QueryService
 
@@ -71,13 +71,11 @@ def main():
                 print(json.dumps({"error": "invalid_password_length"}, ensure_ascii=False))
                 raise SystemExit(1)
             user.password_hash = hash_password(new_password)
-            sessions = db.scalars(select(UserSession).where(UserSession.user_id == user.id)).all()
-            for session in sessions:
-                session.user_id = None
+            unbound = revoke_session_logins(db, UserSession.user_id == user.id)
             from .external_api import revoke_account_keys
             revoke_account_keys(db, user.id)
             db.commit()
-            print(json.dumps({"ok": True, "username": user.username, "sessions_unbound": len(sessions)},
+            print(json.dumps({"ok": True, "username": user.username, "sessions_unbound": unbound},
                              ensure_ascii=False))
     finally:
         database.close()

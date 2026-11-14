@@ -115,8 +115,7 @@ def test_reset_password_for_missing_user_is_404(setup_app):
 
 
 def test_delete_user_keeps_session_anchored_data_rows(setup_app):
-    """R3-1：删户数据不级联——DB 行留存、会话行留存且解绑、旧 cookie 匿名可见自身、
-    其他账户作用域不可见。"""
+    """Deletion retains data and its account owner while retiring old credentials."""
     client, app = setup_app
     register(client, username="root")
     assert client.put("/v1/driving-preferences", json={"expected_revision": 0, "weights": WEIGHTS}).status_code == 200
@@ -132,13 +131,13 @@ def test_delete_user_keeps_session_anchored_data_rows(setup_app):
             DrivingPreferenceRevision.actor_session_id == root_session))
         assert row is not None and row.weights == WEIGHTS  # 数据行留存，未级联删除
         assert db.get(UserSession, root_session).user_id is None  # 会话行留存且已解绑
-    assert client.get("/v1/driving-preferences").json()["weights"] == WEIGHTS  # 旧 cookie 匿名可见自身
+        assert db.get(UserSession, root_session).owner_user_id == root_id
+    assert client.get("/v1/driving-preferences").json()["weights"] is None
     assert alice.get("/v1/driving-preferences").json()["weights"] is None  # 其他账户不可见
 
 
-def test_deleted_users_data_joins_next_login_on_same_session(setup_app):
-    """R2-2 如实锚定：会话聚合的自然延伸——删户后该会话再登录另一账户，
-    其上锚定的旧数据并入新账户作用域（共享浏览器场景的已知隐私后果，ADR-057 补记8）。"""
+def test_deleted_users_data_stays_private_after_another_account_logs_in(setup_app):
+    """A replacement login cannot adopt a deleted account's session records."""
     client, app = setup_app
     register(client, username="root")
     assert client.put("/v1/driving-preferences", json={"expected_revision": 0, "weights": WEIGHTS}).status_code == 200
@@ -149,10 +148,10 @@ def test_deleted_users_data_joins_next_login_on_same_session(setup_app):
     assert client.post(f"/v1/auth/users/{alice_id}/role", json={"is_admin": True}).status_code == 200
     assert client.delete(f"/v1/auth/users/{root_id}").status_code == 200
     assert client.get("/v1/auth/me").json()["authenticated"] is False
-    assert client.get("/v1/driving-preferences").json()["weights"] == WEIGHTS  # 匿名期间仅自身可见
+    assert client.get("/v1/driving-preferences").json()["weights"] is None
     assert login(client, "alice", PASSWORD).status_code == 200  # 同一会话登录他人
-    assert client.get("/v1/driving-preferences").json()["weights"] == WEIGHTS  # 旧数据并入 alice 作用域
-    assert alice.get("/v1/driving-preferences").json()["weights"] == WEIGHTS  # 且 alice 的其他会话同样可见
+    assert client.get("/v1/driving-preferences").json()["weights"] is None
+    assert alice.get("/v1/driving-preferences").json()["weights"] is None
 
 
 def test_login_sweep_unbinds_expired_sessions(setup_app):
@@ -293,3 +292,85 @@ def test_driving_preferences_are_private_per_actor(setup_app):
     assert cleared_state["weights"] is None and cleared_state["scope"] == "actor"
     assert cleared_state["revision"] == 3  # 全局计数 1(client)+2(other)+3(clear)，各主体链条编号跳档
     assert client.get("/v1/driving-preferences").json()["weights"] is None
+
+
+def test_logout_keeps_private_data_with_first_account_and_rotates_cookie(setup_app):
+    client, app = setup_app
+    first = register(client, username='first_owner').json()['user']
+    assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
+    original = client.cookies['tire_local_session']
+    assert client.post('/v1/auth/logout').status_code == 200
+    assert client.cookies['tire_local_session'] != original
+    assert client.get('/v1/driving-preferences').json()['weights'] is None
+    assert register(client, username='next_owner').status_code == 200
+    assert client.get('/v1/driving-preferences').json()['weights'] is None
+    previous_cookie = TestClient(app, cookies={'tire_local_session': original})
+    assert previous_cookie.get('/v1/auth/me').json()['authenticated'] is False
+    assert previous_cookie.get('/v1/driving-preferences').json()['weights'] is None
+    returned = TestClient(app)
+    assert login(returned, 'first_owner').status_code == 200
+    assert returned.get('/v1/driving-preferences').json()['weights'] == WEIGHTS
+    with app.state.database.sessions() as db:
+        row = db.get(UserSession, original)
+        assert row.user_id is None and row.owner_user_id == first['id']
+
+
+def test_first_login_rotates_anonymous_cookie_and_adopts_its_new_private_data_once(setup_app):
+    client, app = setup_app
+    assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
+    anonymous = client.cookies['tire_local_session']
+    assert register(client, username='anonymous_owner').status_code == 200
+    assert client.cookies['tire_local_session'] != anonymous
+    assert client.get('/v1/driving-preferences').json()['weights'] == WEIGHTS
+    replay = TestClient(app, cookies={'tire_local_session': anonymous})
+    assert replay.get('/v1/auth/me').json()['authenticated'] is False
+    assert replay.get('/v1/driving-preferences').json()['weights'] is None
+    assert register(replay, username='different_owner').status_code == 200
+    assert replay.get('/v1/driving-preferences').json()['weights'] is None
+
+
+def test_direct_login_to_another_account_preserves_both_owners(setup_app):
+    client, app = setup_app
+    assert register(client, username='first_owner').status_code == 200
+    assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
+    original = client.cookies['tire_local_session']
+    second = TestClient(app)
+    assert register(second, username='second_owner').status_code == 200
+    assert login(client, 'second_owner').status_code == 200
+    assert client.cookies['tire_local_session'] != original
+    assert client.get('/v1/driving-preferences').json()['weights'] is None
+    assert second.get('/v1/driving-preferences').json()['weights'] is None
+    assert login(client, 'first_owner').status_code == 200
+    assert client.get('/v1/driving-preferences').json()['weights'] == WEIGHTS
+
+
+@pytest.mark.parametrize('action', ['reset', 'expire', 'delete'])
+def test_invalidated_credentials_cannot_expose_or_reassign_private_records(setup_app, action):
+    client, app = setup_app
+    owner = register(client, username='private_owner').json()['user']
+    assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
+    original = client.cookies['tire_local_session']
+    admin = TestClient(app)
+    other = register(admin, username='other_admin').json()['user']
+    assert client.post('/v1/auth/users/' + other['id'] + '/role', json={'is_admin': True}).status_code == 200
+    password = PASSWORD
+    if action == 'reset':
+        password = secrets.token_urlsafe(16)
+        assert admin.post('/v1/auth/users/' + owner['id'] + '/password', json={'new_password': password}).status_code == 200
+    elif action == 'delete':
+        assert admin.delete('/v1/auth/users/' + owner['id']).status_code == 200
+    else:
+        with app.state.database.sessions() as db:
+            db.get(UserSession, original).expires_at = utcnow() - timedelta(seconds=1)
+            db.commit()
+        assert login(admin, 'other_admin').status_code == 200
+    assert client.get('/v1/auth/me').json()['authenticated'] is False
+    assert client.get('/v1/driving-preferences').json()['weights'] is None
+    assert login(client, 'other_admin').status_code == 200
+    assert client.get('/v1/driving-preferences').json()['weights'] is None
+    assert admin.get('/v1/driving-preferences').json()['weights'] is None
+    with app.state.database.sessions() as db:
+        assert db.get(UserSession, original).owner_user_id == owner['id']
+    if action != 'delete':
+        assert login(client, 'private_owner', password).status_code == 200
+        assert client.get('/v1/driving-preferences').json()['weights'] == WEIGHTS

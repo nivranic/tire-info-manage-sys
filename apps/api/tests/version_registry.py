@@ -43,6 +43,7 @@ EXPECTED_SCHEMA_VERSIONS = [
     '033_source_text_index',
     '034_document_text_index',
     '035_text_embedding_authorizations',
+    '036_session_data_ownership',
 ]
 
 # 008 之前的历史基线（构造 pre-009 升级起点用；与断言基线是两个概念，勿合并）。

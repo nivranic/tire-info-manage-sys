@@ -15,6 +15,8 @@ from tire_api.ai_models import AICompletion, AIEvidencePack, AIRequest
 from tire_api.ai_stream_models import AIStreamExecution, AIStreamEvent
 from tire_api.db import Base, Database, UserSession, uid, utcnow
 from tire_api.knowledge_models import initialize_search
+from tire_api.source_text_models import initialize_source_text_search
+from tire_api.document_text_models import initialize_document_text_search
 from tire_api.main import create_app
 from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
     assert_trigger_contract, initialize_observing_version, snapshot_connection)
@@ -42,6 +44,8 @@ def predecessor(tmp_path, monkeypatch):
         for version in OLD_VERSIONS:
             connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'), {'version': version})
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
     with database.sessions() as db:
         pack = AIEvidencePack(actor_session_id='synthetic-owner', mode='history', data_state='local_snapshot',
             privacy_class='public', payload={'legacy': 'exact frozen synthetic evidence'}, fingerprint='a' * 64,

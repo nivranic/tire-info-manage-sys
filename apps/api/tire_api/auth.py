@@ -2,10 +2,10 @@
 
 Design constraints (see docs/DEPLOYMENT-KEY-POLICY.md and the risk register):
 - Zero new dependencies: hashlib.scrypt (N=2^14, r=8, p=1) + hmac.compare_digest.
-- Sessions stay cookie-based (httponly, samesite=strict); login binds user_id on
-  the current session, logout unbinds it. No tokens are introduced.
-- Read scoping upgrades session-filtered listings to "all sessions of the bound
-  user" (session_scope below); anonymous behavior is unchanged.
+- Cookie sessions rotate on login and logout. user_id records a live login,
+  while owner_user_id retains the account ownership of session-anchored data.
+- New anonymous sessions can be adopted once. Unbound legacy data retains its
+  original session scope until its ownership can be established separately.
 - Threat model: workstation role separation on a loopback-bound service. This is
   NOT protection against local malware; do not deploy on a server as-is.
 """
@@ -18,11 +18,11 @@ import time
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import Field
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .db import User, UserSession, utcnow
+from .db import User, UserSession, uid, utc, utcnow
 from .domain import StrictModel
 
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 1 << 14, 8, 1
@@ -55,16 +55,25 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def session_scope(db: Session, session_id: str) -> list[str]:
-    """Data-visibility range for a session: all sessions of the bound user, or itself when anonymous."""
-    user_id = db.scalar(select(UserSession.user_id).where(UserSession.id == session_id))
-    if not user_id:
+    """Durable account scope, including its retired session-anchored records."""
+    session = db.get(UserSession, session_id, populate_existing=True)
+    owner = (session.owner_user_id or session.user_id) if session else None
+    if owner is None:
         return [session_id]
-    return list(db.scalars(select(UserSession.id).where(UserSession.user_id == user_id)))
+    return list(db.scalars(select(UserSession.id).where(or_(UserSession.owner_user_id == owner,
+        and_(UserSession.owner_user_id.is_(None), UserSession.user_id == owner)))))
+
+
+def session_is_active(session):
+    return (session is not None and utc(session.expires_at) > utcnow()
+        and (session.user_id is None and session.owner_user_id is None
+             or session.user_id is not None and session.owner_user_id in (None, session.user_id)))
 
 
 def current_user(db: Session, session_id: str) -> User | None:
-    user_id = db.scalar(select(UserSession.user_id).where(UserSession.id == session_id))
-    return db.get(User, user_id) if user_id else None
+    session = db.get(UserSession, session_id, populate_existing=True)
+    return (db.get(User, session.user_id, populate_existing=True)
+        if session_is_active(session) and session.user_id is not None else None)
 
 
 def require_admin(request: Request, db: Session) -> None:
@@ -85,16 +94,34 @@ def make_admin_guard(get_db):
     return admin_guard
 
 
-def sweep_expired_sessions(db: Session) -> int:
-    """解绑已过期的登录会话，收敛 session_scope 的聚合范围。
-
-    只做 UPDATE 不删行：数据表（关注/报告/AI 历史等）以 actor_session_id
-    外键引用会话行，且连接已开启 PRAGMA foreign_keys=ON，删除会被约束阻断。
-    过期会话行本身极小，允许留存在本机 SQLite 中。
-    """
-    result = db.execute(update(UserSession).where(
-        UserSession.user_id.is_not(None), UserSession.expires_at <= utcnow()).values(user_id=None))
+def revoke_session_logins(db: Session, criterion) -> int:
+    """Clear login bindings while retaining known historical data ownership."""
+    result = db.execute(update(UserSession).where(criterion).values(user_id=None,
+        owner_user_id=func.coalesce(UserSession.owner_user_id, UserSession.user_id), anonymous_claimable=False))
     return int(result.rowcount or 0)
+
+
+def sweep_expired_sessions(db: Session) -> int:
+    return revoke_session_logins(db, and_(UserSession.user_id.is_not(None), UserSession.expires_at <= utcnow()))
+
+
+def rotate_session(db: Session, session_id: str, user: User | None):
+    session = db.get(UserSession, session_id, populate_existing=True)
+    if not session_is_active(session):
+        raise HTTPException(409, {'code': 'auth_session_changed', 'message': '会话已变化，请重新确认账户后重试。'})
+    expiration = session.expires_at
+    if session.user_id is not None and session.owner_user_id is None:
+        session.owner_user_id = session.user_id
+    if user is not None and session.owner_user_id is None and session.anonymous_claimable:
+        session.owner_user_id = user.id
+    session.user_id = None
+    session.anonymous_claimable = False
+    session.expires_at = utcnow()
+    replacement = UserSession(id=uid(), expires_at=expiration,
+        user_id=user.id if user else None, owner_user_id=user.id if user else None,
+        anonymous_claimable=user is None)
+    db.add(replacement)
+    return replacement.id
 
 
 class RegisterRequest(StrictModel):
@@ -137,13 +164,6 @@ def register_auth_routes(app: FastAPI) -> None:
 
     admin_guard = make_admin_guard(get_db)
 
-    def bind_session(db: Session, request: Request, user: User) -> None:
-        session = db.get(UserSession, request.state.session_id)
-        if session is None:
-            raise HTTPException(401, {"code": "session_required", "message": "会话尚未建立，请重试。"})
-        session.user_id = user.id
-        db.commit()
-
     @app.post("/v1/auth/register")
     def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> dict:
         if current_user(db, request.state.session_id) is not None:
@@ -151,6 +171,8 @@ def register_auth_routes(app: FastAPI) -> None:
                                       "message": "当前会话已登录，请先登出再注册新账户。"})
         # ingestion 锁串行化"首用户判定+写入"，防止并发注册产生双管理员。
         QueryService(db, None).lock_ingestion()
+        if current_user(db, request.state.session_id) is not None:
+            raise HTTPException(409, {'code': 'already_authenticated', 'message': '当前会话已登录，请先登出再注册新账户。'})
         sweep_expired_sessions(db)
         if db.scalar(select(User.id).where(User.username == payload.username)):
             raise HTTPException(409, {"code": "username_taken", "message": "此用户名已被注册。"})
@@ -158,8 +180,10 @@ def register_auth_routes(app: FastAPI) -> None:
         user = User(username=payload.username, display_name=payload.display_name.strip() or payload.username,
                     password_hash=hash_password(payload.password), is_admin=first)
         db.add(user)
+        db.flush()
+        session_id = rotate_session(db, request.state.session_id, user)
         db.commit()
-        bind_session(db, request, user)
+        request.state.session_id = session_id
         return {"user": user_view(user), "authenticated": True}
 
     @app.post("/v1/auth/login")
@@ -177,19 +201,27 @@ def register_auth_routes(app: FastAPI) -> None:
                 if record[0] >= LOGIN_FAIL_LIMIT:
                     record[1] = time.monotonic() + LOGIN_BLOCK_SECONDS
             raise HTTPException(401, {"code": "bad_credentials", "message": "用户名或密码不正确。"})
+        verified_hash = user.password_hash
+        QueryService(db, None).lock_ingestion()
+        user = db.get(User, user.id, populate_existing=True)
+        if user is None or user.password_hash != verified_hash:
+            raise HTTPException(401, {'code': 'bad_credentials', 'message': '用户名或密码不正确。'})
+        sweep_expired_sessions(db)
+        session_id = rotate_session(db, request.state.session_id, user)
+        db.commit()
+        request.state.session_id = session_id
         with attempts_lock:
             record = attempts.setdefault(payload.username, [0, 0.0])
             record[0], record[1] = 0, 0.0
-        sweep_expired_sessions(db)
-        bind_session(db, request, user)
         return {"user": user_view(user), "authenticated": True}
 
     @app.post("/v1/auth/logout")
     def logout(request: Request, db: Session = Depends(get_db)) -> dict:
-        session = db.get(UserSession, request.state.session_id)
-        if session is not None and session.user_id is not None:
-            session.user_id = None
+        QueryService(db, None).lock_ingestion()
+        if current_user(db, request.state.session_id) is not None:
+            session_id = rotate_session(db, request.state.session_id, None)
             db.commit()
+            request.state.session_id = session_id
         return {"authenticated": False, "user": None}
 
     @app.get("/v1/auth/me")
@@ -251,36 +283,31 @@ def register_auth_routes(app: FastAPI) -> None:
             raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
         target.password_hash = hash_password(payload.new_password)
         # 强制该用户全部会话重新登录（新密码生效即旧凭据作废）。
-        sessions = db.scalars(select(UserSession).where(UserSession.user_id == target.id)).all()
-        for session in sessions:
-            session.user_id = None
+        unbound = revoke_session_logins(db, UserSession.user_id == target.id)
         from .external_api import revoke_account_keys
         revoke_account_keys(db, target.id)
         QueryService(db, None).audit(request.state.session_id, "user_password_reset",
                                      target_user_id=target.id, target_username=target.username,
-                                     sessions_unbound=len(sessions))
+                                     sessions_unbound=unbound)
         db.commit()
-        return {"id": target.id, "sessions_unbound": len(sessions)}
+        return {"id": target.id, "sessions_unbound": unbound}
 
     @app.delete("/v1/auth/users/{user_id}", dependencies=[Depends(admin_guard)])
     def delete_user(user_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+        QueryService(db, None).lock_ingestion()
+        require_admin(request, db)
         target = db.get(User, user_id)
         if target is None:
             raise HTTPException(404, {"code": "user_not_found", "message": "用户不存在。"})
         if target.is_admin and db.scalar(select(func.count()).select_from(User).where(User.is_admin)) == 1:
             raise HTTPException(409, {"code": "last_admin",
                                       "message": "不能删除唯一管理员；请先提升另一位管理员。"})
-        # 数据行（关注/报告/AI 历史等）以会话为归属锚点，不随删户级联删除：解绑后其
-        # 会话退化为匿名，数据仅对该会话自身可见；若有人在该会话上重新登录另一账
-        # 户，数据会并入新账户的作用域（会话聚合语义的自然延伸——共享浏览器场景
-        # 下被删用户的私有数据会暴露给下一登录者，见 ADR-2026-057 补记 8）。
-        sessions = db.scalars(select(UserSession).where(UserSession.user_id == target.id)).all()
-        for session in sessions:
-            session.user_id = None
+        # Keep session-anchored data and its former account owner after deletion.
+        unbound = revoke_session_logins(db, UserSession.user_id == target.id)
         username = target.username
         QueryService(db, None).audit(request.state.session_id, "user_deleted",
                                      target_user_id=target.id, target_username=username,
-                                     sessions_unbound=len(sessions))
+                                     sessions_unbound=unbound)
         db.delete(target)
         db.commit()
-        return {"ok": True, "username": username, "sessions_unbound": len(sessions)}
+        return {"ok": True, "username": username, "sessions_unbound": unbound}

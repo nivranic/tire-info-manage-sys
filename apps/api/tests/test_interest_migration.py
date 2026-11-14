@@ -12,6 +12,8 @@ from tire_api.interest_models import Interest, InterestEvent, InterestNotificati
 from tire_api.interest_catalog_models import TireCatalogRevision
 from tire_api.interest_applicability_models import TireCurationApplicabilityEvent
 from tire_api.knowledge_models import initialize_search
+from tire_api.source_text_models import initialize_source_text_search
+from tire_api.document_text_models import initialize_document_text_search
 from tire_api.main import create_app
 from test_ai_stream_migration import snapshot
 from test_identity_migration import seed_legacy
@@ -56,6 +58,8 @@ def predecessor(tmp_path, monkeypatch):
         for statement in DEVICE_AI_LEDGER_TRIGGERS_SQLITE:
             connection.exec_driver_sql(statement)
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
     with database.sessions() as db:
         seed_legacy(db, namespace='REVIEW-NAMESPACE', product_code='SYNTHETIC-PRE016', watch=True)
     try:

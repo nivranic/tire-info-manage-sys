@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
+import { useWorkbenchAuth } from "./auth";
 import type { AIAnalysis, AIAnalysisReference, AIPack, AIPrepareRequest, AIStatus, AIStreamDetail, EvidenceReportRecord, QueryResult, RecallAnalysisReference, RecallResult, SafetyGateAnalysisTarget, SafetyGateResult, SamrRecallAnalysisTarget, SamrRecallResult, Variant } from "@tire/domain-types";
 import { IdentityContractBadge, IdentityContractEvidence } from "./identity-contract";
 import { FrozenFieldResolutions } from "./field-authority";
@@ -47,7 +48,17 @@ const errorLabel = (code: string) => errors[code] || aiStreamErrorMessage(code);
 const errorText = (cause: unknown) => cause instanceof ApiError && cause.code ? errors[cause.code] || (cause.code.startsWith("ai_stream_") ? aiStreamErrorMessage(cause.code) : `${cause.message}（${cause.code}）`) : cause instanceof Error ? errors[cause.message] || cause.message : "请求未完成。";
 const sourceLink = (value: string) => { try { const url = new URL(value); return ["https:", "http:"].includes(url.protocol) ? url.href : undefined; } catch { return undefined; } };
 
-export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { target?: AITarget; onClose: () => void; onOpenReport?: (id: string) => void }) {
+type AIAnalysisProps = { target?: AITarget; onClose: () => void; onOpenReport?: (id: string) => void };
+let anonymousRecovery: { epoch: number; pointer: AIRecoveryPointer | null } | null = null;
+
+export default function AIAnalysisDialog(props: AIAnalysisProps) {
+  const auth = useWorkbenchAuth();
+  if (!auth.ready) return <p role="status">正在确认当前账户，旧分析暂不显示。</p>;
+  return <OwnerAIAnalysisDialog key={auth.ownerEpoch} {...props} ownerEpoch={auth.ownerEpoch} recoveryKey={auth.state.user ? `${AI_RECOVERY_KEY}:${auth.state.user.id}` : null} />;
+}
+
+function OwnerAIAnalysisDialog({ target, onClose, onOpenReport, ownerEpoch, recoveryKey }: AIAnalysisProps & { ownerEpoch: number; recoveryKey: string | null }) {
+  const auth = useWorkbenchAuth();
   const dialog = useRef<HTMLDialogElement>(null);
   const operation = useRef<AbortController | null>(null);
   const statusRead = useRef(0);
@@ -81,24 +92,27 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
     const controller = new AbortController();
     const initialGeneration = viewGeneration.current;
     void Promise.all([refreshStatus(controller.signal), tireApi.aiHistory(controller.signal)]).then(([, h]) => {
-      if (!controller.signal.aborted) setHistory(h.items);
-    }).catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setHistory(h.items);
+    }).catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); });
     let pointer: AIRecoveryPointer | null = null;
-    try { pointer = parseAIRecovery(sessionStorage.getItem(AI_RECOVERY_KEY)); } catch { /* Recovery can still use session history. */ }
+    try { pointer = recoveryKey ? parseAIRecovery(sessionStorage.getItem(recoveryKey)) : anonymousRecovery?.epoch === ownerEpoch ? anonymousRecovery.pointer : null; } catch { /* Recovery can still use session history. */ }
     if (pointer) {
-      setRecovery(pointer);
+      if (!auth.isCurrentOwner(ownerEpoch)) return;
+    setRecovery(pointer);
       void tireApi.lookupAIStream(pointer.key, controller.signal).then(value => {
-        if (!controller.signal.aborted && viewGeneration.current === initialGeneration) showStream(value, pointer!.key);
-      }).catch(cause => { if (!controller.signal.aborted && viewGeneration.current === initialGeneration) setError(cause instanceof ApiError && cause.status === 404 ? "当前会话未找到上次提交记录。可继续只读核对；恢复进度不会重新提交模型。" : errorText(cause)); });
+        if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch) && viewGeneration.current === initialGeneration) showStream(value, pointer!.key);
+      }).catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch) && viewGeneration.current === initialGeneration) setError(cause instanceof ApiError && cause.status === 404 ? "当前会话未找到上次提交记录。可继续只读核对；恢复进度不会重新提交模型。" : errorText(cause)); });
     }
-    return () => { controller.abort(); operation.current?.abort(); node?.close(); if (focus?.isConnected) focus.focus({ preventScroll: true }); };
+    const cancel = () => { controller.abort(); operation.current?.abort(); };
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); node?.close(); if (focus?.isConnected) focus.focus({ preventScroll: true }); };
   }, []);
 
   useEffect(() => {
     if (!run || run.state === "pending") return;
     const controller = new AbortController();
     void refreshStatus(controller.signal).catch(cause => {
-      if (!controller.signal.aborted) setError(errorText(cause));
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause));
     });
     return () => controller.abort();
   }, [run?.id, run?.state]);
@@ -107,15 +121,16 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
     const sequence = ++statusRead.current;
     try {
       const next = await tireApi.aiStatus(signal);
-      if (!signal.aborted && sequence === statusRead.current) setStatus(next);
+      if (!signal.aborted && auth.isCurrentOwner(ownerEpoch) && sequence === statusRead.current) setStatus(next);
     } catch (cause) {
-      if (!signal.aborted && sequence === statusRead.current) throw cause;
+      if (!signal.aborted && auth.isCurrentOwner(ownerEpoch) && sequence === statusRead.current) throw cause;
     }
   }
 
   function remember(pointer: AIRecoveryPointer | null) {
+    if (!auth.isCurrentOwner(ownerEpoch)) return;
     setRecovery(pointer);
-    try { if (pointer) sessionStorage.setItem(AI_RECOVERY_KEY, JSON.stringify(pointer)); else sessionStorage.removeItem(AI_RECOVERY_KEY); } catch { /* Closing this tab still leaves the server-side history. */ }
+    try { if (recoveryKey) { if (pointer) sessionStorage.setItem(recoveryKey, JSON.stringify(pointer)); else sessionStorage.removeItem(recoveryKey); } else anonymousRecovery = { epoch: ownerEpoch, pointer }; } catch { /* Closing this tab still leaves the server-side history. */ }
   }
 
   function showStream(value: AIStreamDetail, key?: string) {
@@ -128,7 +143,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   }
 
   function updateStream(value: AIStreamDetail) {
-    if (activeStream.current !== value.analysis.id) return;
+    if (!auth.isCurrentOwner(ownerEpoch) || activeStream.current !== value.analysis.id) return;
     setRun(value.analysis);
     setHistory(previous => [value.analysis, ...previous.filter(row => row.id !== value.analysis.id)].slice(0, 20));
   }
@@ -141,11 +156,11 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   }
 
   async function perform(work: (signal: AbortSignal) => Promise<void>) {
-    if (operation.current) return;
+    if (operation.current || !auth.isCurrentOwner(ownerEpoch)) return;
     const controller = new AbortController(); operation.current = controller; setBusy(true); setError("");
     try { await work(controller.signal); }
-    catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { operation.current = null; if (!controller.signal.aborted) setBusy(false); }
+    catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { operation.current = null; if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
 
   async function prepare(consentId?: string) {
@@ -164,10 +179,10 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         const source = target.sourceId || target.variant.source_id || (await tireApi.evidence(target.variant.snapshot_id, signal)).source_id;
         payload = { mode, source_id: source, query: { model: target.variant.model, size: target.variant.size }, variant_ids: [target.variant.id] };
       }
-      if (signal.aborted) return;
+      if (signal.aborted || !auth.isCurrentOwner(ownerEpoch)) return;
       setPreparedRequest(payload); setFallback(null); setExternalConsent(false);
       const value = await tireApi.prepareAI(payload, signal);
-      if (signal.aborted) return;
+      if (signal.aborted || !auth.isCurrentOwner(ownerEpoch)) return;
       setPack(value.pack); setFallback(value.pack ? null : value.query_result); setEvidenceStale(false);
       if (!value.pack && value.query_result?.data_state !== "consent_required") setError(`未取得可分析的精确证据：${value.reason || "来源不可用"}`);
     });
@@ -179,7 +194,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
     let id: string | undefined;
     await perform(async signal => {
       const value = await tireApi.consent(queryId, decision, signal);
-      if (!signal.aborted) { id = value.id; setFallback(null); if (decision === "deny") setError("已拒绝本次历史数据使用；未调用 AI。"); }
+      if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) { id = value.id; setFallback(null); if (decision === "deny") setError("已拒绝本次历史数据使用；未调用 AI。"); }
     });
     if (decision === "allow" && id) await prepare(id);
   }
@@ -196,9 +211,9 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         const result = previous && !retrySameRequest
           ? await tireApi.lookupAIStream(value.key, signal)
           : await tireApi.startAIStream({ pack_id: value.pack_id, question: value.question, allow_external_processing: value.allow_external_processing }, value.key, signal);
-        if (!signal.aborted) showStream(result, value.key);
+        if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) showStream(result, value.key);
       } catch (cause) {
-        if (!signal.aborted) {
+        if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) {
           setRetrySameRequest(previous && !retrySameRequest && cause instanceof ApiError && cause.status === 404 ? true : false);
           if (cause instanceof ApiError && ["ai_evidence_identity_contract_stale", "ai_evidence_field_contract_stale", "ai_recall_contract_stale", "ai_safety_gate_contract_stale", "ai_samr_contract_stale"].includes(cause.code || "")) {
             intent.current = null; setAttempt(null); remember(null); setEvidenceStale(true); setExternalConsent(false);
@@ -211,17 +226,17 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
   }
 
   async function openRun(id: string, isStream = false) {
-    if (operation.current) return;
+    if (operation.current || !auth.isCurrentOwner(ownerEpoch)) return;
     viewGeneration.current++;
     activeStream.current = null;
     await perform(async signal => {
       if (isStream) {
         const value = await tireApi.aiStream(id, signal);
-        if (!signal.aborted) { intent.current = null; setAttempt(null); showStream(value, recovery?.requestId === id ? recovery.key : undefined); }
+        if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) { intent.current = null; setAttempt(null); showStream(value, recovery?.requestId === id ? recovery.key : undefined); }
         return;
       }
       const value = await tireApi.aiAnalysis(id, signal);
-      if (!signal.aborted) { setStream(null); intent.current = null; setRun(value); setPack(value.pack || null); setQuestion(value.question); setAttempt(null); setFallback(null); setExternalConsent(false); setEvidenceStale(false); }
+      if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setStream(null); intent.current = null; setRun(value); setPack(value.pack || null); setQuestion(value.question); setAttempt(null); setFallback(null); setExternalConsent(false); setEvidenceStale(false); }
     });
   }
 
@@ -242,7 +257,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
       <p className="review-boundary">{samrTarget || samrPack ? samrAnalysisNotice : safetyGateTarget || safetyGatePack ? safetyGateAnalysisNotice : recallTarget || recallPack ? recallAnalysisNotice : testPack || target && "references" in target && target.references.some(reference => reference.kind === "test_event") ? "含测试证据时仅摘录已录事实，按场次和参测对象分别引用。个人取舍可使用同场偏好解读；精确 SKU 性能关联和推荐尚未建立。" : "分析限定于本次所选证据。事实逐项引用，推断单独标注；不会修改来源参数。"}关闭窗口仅停止等待和读取进度，不能保证已取消 AI Provider 的处理或免于计费。</p>
       <section className="ai-status" aria-label="模型状态"><strong>{aiProviderLabel(status?.model.provider)}</strong><p>{status ? status.model.state === "configured" ? `${status.model.model} · 已配置，连接待实际调用验证` : errors[status.model.state] || status.model.state : "正在读取配置…"}</p><AiBudgetMeter status={status} /></section>
       {error ? <p className="inline-error" role="alert">{error}</p> : null}
-      {recovery && !stream && !attempt ? <section className="ai-recovery" aria-label="上次分析提交核对"><h3>核对本标签页上次提交</h3><p>刷新或重新打开不会重新调用模型。先读取原请求记录；如果无法确认，原调用仍可能处理或计费。</p><div className="compare-toolbar"><button type="button" className="secondary-button" disabled={busy} onClick={() => void perform(async signal => { const value = await tireApi.lookupAIStream(recovery.key, signal); if (!signal.aborted) showStream(value, recovery.key); })}>只读核对上次提交</button><button type="button" className="text-button" disabled={busy} onClick={reset}>返回证据准备</button></div></section> : null}
+      {recovery && !stream && !attempt ? <section className="ai-recovery" aria-label="上次分析提交核对"><h3>核对本标签页上次提交</h3><p>刷新或重新打开不会重新调用模型。先读取原请求记录；如果无法确认，原调用仍可能处理或计费。</p><div className="compare-toolbar"><button type="button" className="secondary-button" disabled={busy} onClick={() => void perform(async signal => { const value = await tireApi.lookupAIStream(recovery.key, signal); if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) showStream(value, recovery.key); })}>只读核对上次提交</button><button type="button" className="text-button" disabled={busy} onClick={reset}>返回证据准备</button></div></section> : null}
       {savedReport ? <section className="snapshot-banner" role="status"><strong>已保存报告：{savedReport.title}</strong><span>本浏览器会话 · 历史冻结正文 · 未新增模型调用</span>{onOpenReport ? <button type="button" className="text-button" onClick={() => onOpenReport(savedReport.id)}>在报告库打开</button> : null}</section> : null}
       {target && !run ? <section aria-label="分析范围">
         <h3>{"variant" in target ? `${target.variant.model} · ${target.variant.size} · ${target.variant.manufacturer_product_code || "代码未确认"}` : target.label}</h3>{"variant" in target ? <IdentityContractBadge contract={target.variant.identity_contract} /> : null}
@@ -290,7 +305,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
         {run.state === "pending" || run.state === "outcome_unknown" ? <><p>未确认完成的调用不会自动重试。请核对调用记录及供应商用量；结果未知不代表未计费。</p><button className="secondary-button" disabled={busy} onClick={() => void openRun(run.id)}>刷新这条调用记录</button></> : target ? <button className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}
       </section> : null}
       {stream && run && ["failed", "outcome_unknown"].includes(run.state) && target ? <button type="button" className="secondary-button" disabled={busy} onClick={reset}>重新准备证据，开始新的分析</button> : null}
-      <section className="ai-history" aria-label="AI 调用记录"><div className="panel-title"><h3>本浏览器会话的最近调用</h3><button className="text-button" disabled={busy} onClick={() => void perform(async signal => { const [h] = await Promise.all([tireApi.aiHistory(signal), refreshStatus(signal)]); if (!signal.aborted) setHistory(h.items); })}>刷新记录与配置</button></div>{history.length ? history.map(item => <button className="ai-history-item" type="button" key={item.id} disabled={busy} onClick={() => void openRun(item.id, item.request_contract?.delivery_mode === "stream")}><span>{item.question}</span><small>{states[item.state]} · {stamp(item.created_at)}</small></button>) : <p>暂无调用记录。准备证据不会调用模型。</p>}</section>
+      <section className="ai-history" aria-label="AI 调用记录"><div className="panel-title"><h3>本浏览器会话的最近调用</h3><button className="text-button" disabled={busy} onClick={() => void perform(async signal => { const [h] = await Promise.all([tireApi.aiHistory(signal), refreshStatus(signal)]); if (!signal.aborted && auth.isCurrentOwner(ownerEpoch)) setHistory(h.items); })}>刷新记录与配置</button></div>{history.length ? history.map(item => <button className="ai-history-item" type="button" key={item.id} disabled={busy} onClick={() => void openRun(item.id, item.request_contract?.delivery_mode === "stream")}><span>{item.question}</span><small>{states[item.state]} · {stamp(item.created_at)}</small></button>) : <p>暂无调用记录。准备证据不会调用模型。</p>}</section>
     </div>
   </dialog>{reportSave ? <SaveReportDialog pack={reportSave.pack} analysis={reportSave.analysis} onClose={() => setReportSave(null)} onSaved={setSavedReport} /> : null}</>;
 }

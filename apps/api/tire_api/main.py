@@ -22,6 +22,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .db import ChangeEvent, Database, Snapshot, UserSession, Verification, WatchItem, utc, utcnow, uid
+from .auth import session_is_active
 from .domain import CompareRequest, ConsentRequest, LiveQueryRequest, WatchRequest, digest
 from .service import QueryService, provenance, timestamp
 from .telemetry import TelemetryRuntime, observe
@@ -310,7 +311,7 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
         with database.sessions() as db:
             cookie = request.cookies.get(SESSION_COOKIE)
             session = db.get(UserSession, cookie) if cookie and len(cookie) <= 64 else None
-            if not session or utc(session.expires_at) <= utcnow():
+            if not session_is_active(session):
                 if offline_sync or fallback_metadata:
                     return offline_sync_error(401, "offline_sync_session_required" if offline_sync else
                                                "query_fallback_session_required")
@@ -334,12 +335,13 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
             elif source_metadata:
                 owner_scope = digest({'namespace': 'offline-owner-scope@1', 'session': session.id})
             request.state.session_id = session.id
+            initial_session_id = session.id
         response = await call_next(request)
         if offline_sync:
             response.headers[OFFLINE_SYNC_OWNER_HEADER] = owner_scope
         elif source_metadata and 200 <= response.status_code < 300:
             response.headers[OFFLINE_SYNC_OWNER_HEADER] = owner_scope
-        if new_session or renewed:
+        if new_session or renewed or request.state.session_id != initial_session_id:
             response.set_cookie(SESSION_COOKIE, request.state.session_id, httponly=True,
                                 samesite="strict", secure=request.url.scheme == "https",
                                 max_age=int(SESSION_TTL.total_seconds()))

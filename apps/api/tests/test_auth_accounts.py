@@ -222,3 +222,67 @@ def test_session_user_binding_survives_restart(tmp_path):
     with TestClient(upgraded, cookies=cookies) as client:
         state = me(client)
         assert state["authenticated"] and state["user"]["username"] == "alice"
+
+
+def test_036_upgrades_old_session_shape_preserves_data_and_cannot_claim_unknown_owner(tmp_path):
+    from sqlalchemy import text
+    from tire_api.db import Base, Database, register_schema_models
+    from tire_api.migrations import upgrade
+    from version_registry import EXPECTED_SCHEMA_VERSIONS
+
+    url = 'sqlite:///' + (tmp_path / 'ownership-upgrade.db').as_posix()
+    database = Database(url)
+    try:
+        register_schema_models()
+        with database.engine.begin() as connection:
+            connection.exec_driver_sql('BEGIN IMMEDIATE')
+            connection.exec_driver_sql('CREATE TABLE local_sessions ('
+                'id VARCHAR(64) NOT NULL PRIMARY KEY, created_at DATETIME NOT NULL, '
+                'expires_at DATETIME NOT NULL, user_id VARCHAR(64))')
+            connection.exec_driver_sql('CREATE INDEX ix_local_sessions_user_id ON local_sessions(user_id)')
+            Base.metadata.create_all(connection)
+            connection.exec_driver_sql('CREATE TABLE tire_schema_versions ('
+                'version VARCHAR(80) PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+            for version in EXPECTED_SCHEMA_VERSIONS[:-1]:
+                connection.execute(text('INSERT INTO tire_schema_versions(version) VALUES (:v)'), {'v': version})
+            for sid, owner in [('legacy-owned', 'prior-owner'), ('legacy-unbound', None)]:
+                connection.exec_driver_sql('INSERT INTO local_sessions VALUES (?,?,?,?)',
+                    (sid, '2026-01-01 00:00:00', '2027-01-01 00:00:00', owner))
+            connection.exec_driver_sql('INSERT INTO users VALUES (?,?,?,?,?,?)',
+                ('prior-owner', 'prior_owner', 'Prior owner', 'unusable-legacy-hash', False, '2026-01-01 00:00:00'))
+            before = connection.exec_driver_sql('SELECT * FROM local_sessions ORDER BY id').all()
+            versions = connection.exec_driver_sql('SELECT * FROM tire_schema_versions ORDER BY version').all()
+            connection.exec_driver_sql("CREATE TRIGGER fail_ownership_version BEFORE INSERT ON tire_schema_versions "
+                "WHEN NEW.version='036_session_data_ownership' BEGIN SELECT RAISE(ABORT,'synthetic_036_failure'); END")
+            from sqlalchemy.exc import IntegrityError
+            with pytest.raises(IntegrityError, match='synthetic_036_failure'):
+                with connection.begin_nested():
+                    upgrade(connection)
+            assert len(connection.exec_driver_sql('PRAGMA table_info(local_sessions)').all()) == 4
+            assert connection.exec_driver_sql('SELECT * FROM local_sessions ORDER BY id').all() == before
+            assert connection.exec_driver_sql('SELECT * FROM tire_schema_versions ORDER BY version').all() == versions
+            connection.exec_driver_sql('DROP TRIGGER fail_ownership_version')
+            upgrade(connection)
+            after = connection.exec_driver_sql('SELECT * FROM local_sessions ORDER BY id').all()
+            assert [row[:4] for row in after] == [tuple(row) for row in before]
+            assert {row[0]: row[4:] for row in after} == {
+                'legacy-owned': ('prior-owner', 0), 'legacy-unbound': (None, 0)}
+            assert connection.exec_driver_sql('SELECT * FROM tire_schema_versions ORDER BY version').all()[:-1] == versions
+            upgrade(connection)
+            assert connection.exec_driver_sql('SELECT * FROM local_sessions ORDER BY id').all() == after
+            assert connection.exec_driver_sql('PRAGMA foreign_key_check').all() == []
+        # Ordinary startup also initializes the real FTS prerequisites.
+        database.initialize()
+    finally:
+        database.close()
+    app = create_app(url, FixtureRegistry())
+    with TestClient(app, cookies={'tire_local_session': 'legacy-unbound'}) as client:
+        from test_research import WEIGHTS
+        assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
+        assert register(client, username='new_owner').status_code == 200
+        assert client.get('/v1/driving-preferences').json()['weights'] is None
+        with app.state.database.sessions() as db:
+            from tire_api.db import DrivingPreferenceRevision, UserSession
+            from sqlalchemy import select
+            assert db.scalar(select(DrivingPreferenceRevision.actor_session_id)) == 'legacy-unbound'
+            assert db.get(UserSession, 'legacy-unbound').owner_user_id is None

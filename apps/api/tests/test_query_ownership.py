@@ -418,8 +418,9 @@ class QueryOwnershipTests(unittest.TestCase):
         with Session(self.engine, expire_on_commit=False) as db:
             run = self.create(db)
         before = self.receipt_state()
+        request = self.request()
         with Session(self.engine) as db:
-            self.endpoints['logout'](self.request(), db)
+            self.endpoints['logout'](request, db)
         self.assertEqual(self.read(run.id).owner_user_id, 'owner-a')
         with Session(self.engine) as db:
             session = db.get(UserSession, 'session-a')
@@ -428,7 +429,7 @@ class QueryOwnershipTests(unittest.TestCase):
             auth.sweep_expired_sessions(db)
             db.commit()
             self.assertIsNone(db.get(UserSession, 'session-a').user_id)
-            self.endpoints['login'](auth.LoginRequest(username='owner_b', password=PASSWORD), self.request(), db)
+            self.endpoints['login'](auth.LoginRequest(username='owner_b', password=PASSWORD), request, db)
         self.assertEqual(self.read(run.id).owner_user_id, 'owner-a')
         self.code('query_owner_not_found', self.read, run.id, 'owner-b')
         self.assertEqual(self.receipt_state(), before)
@@ -445,10 +446,41 @@ class QueryOwnershipTests(unittest.TestCase):
             db.add(User(id='replacement-a', username='owner_a', display_name='Synthetic replacement',
                 password_hash=auth.hash_password(PASSWORD), is_admin=False))
             db.commit()
-            self.endpoints['login'](auth.LoginRequest(username='owner_a', password=PASSWORD), self.request(), db)
+            self.endpoints['login'](auth.LoginRequest(username='owner_a', password=PASSWORD), self.request('session-anon'), db)
         self.assertEqual(self.receipt_state(), before)
         self.code('query_owner_not_found', self.read, run.id, 'owner-a')
         self.code('query_owner_not_found', self.read, run.id, 'replacement-a')
+
+    def test_concurrent_logins_adopt_anonymous_data_for_only_one_account(self):
+        barrier = threading.Barrier(2)
+        results = []
+
+        def login(username):
+            request = self.request('session-anon')
+            try:
+                with Session(self.engine) as db:
+                    barrier.wait(5)
+                    result = self.endpoints['login'](auth.LoginRequest(username=username, password=PASSWORD), request, db)
+                    results.append(('success', result['user']['id'], request.state.session_id))
+            except HTTPException as error:
+                results.append(('rejected', error.status_code, error.detail['code']))
+
+        threads = [threading.Thread(target=login, args=(name,)) for name in ('owner_a', 'owner_b')]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(10)
+            self.assertFalse(thread.is_alive())
+        success = [result for result in results if result[0] == 'success']
+        self.assertEqual(len(success), 1)
+        self.assertIn(('rejected', 409, 'auth_session_changed'), results)
+        with Session(self.engine) as db:
+            retired = db.get(UserSession, 'session-anon')
+            self.assertEqual(retired.owner_user_id, success[0][1])
+            self.assertFalse(retired.anonymous_claimable)
+            self.assertIsNone(retired.user_id)
+            self.assertEqual(auth.current_user(db, success[0][2]).id, retired.owner_user_id)
+            self.assertIn('session-anon', auth.session_scope(db, success[0][2]))
 
     def test_background_and_existing_deny_consent_do_not_backfill_ownership(self):
         with Session(self.engine, expire_on_commit=False) as db:
@@ -494,9 +526,11 @@ class QueryOwnershipTests(unittest.TestCase):
             self.code('query_owner_conflict', self.create, db, self.run_row('ownerless'), actor)
         with Session(self.engine, expire_on_commit=False) as db:
             run = self.create(db, self.run_row('owned-a'))
-            self.endpoints['login'](auth.LoginRequest(username='owner_b', password=PASSWORD), self.request(), db)
-            actor = capture_query_actor(db, 'session-a')
-            self.code('query_owner_conflict', self.create, db, self.run_row('owned-a'), actor)
+            request = self.request()
+            self.endpoints['login'](auth.LoginRequest(username='owner_b', password=PASSWORD), request, db)
+            actor = capture_query_actor(db, request.state.session_id)
+            self.code('query_owner_conflict', self.create, db,
+                self.run_row('owned-a', session_id=request.state.session_id), actor)
         self.assertEqual(self.triples(), (2, 1, 1))
 
     def test_each_insert_fault_rolls_back_all_three_rows(self):
@@ -734,7 +768,7 @@ class QueryOwnershipTests(unittest.TestCase):
                 if not release.wait(4): raise RuntimeError('bounded release timeout')
 
         def before_sql(_conn, _cursor, statement, *_args):
-            if statement.lower().startswith('update local_sessions') and threading.get_ident() != owner_thread_id[0]:
+            if statement.strip().upper() == 'BEGIN IMMEDIATE' and threading.get_ident() != owner_thread_id[0]:
                 chronology.append('auth_update_attempt')
                 auth_attempted.set()
 
@@ -752,7 +786,9 @@ class QueryOwnershipTests(unittest.TestCase):
         def login():
             try:
                 with Session(self.engine) as db:
-                    self.endpoints['login'](auth.LoginRequest(username='owner_b', password=PASSWORD), self.request(), db)
+                    request = self.request()
+                    self.endpoints['login'](auth.LoginRequest(username='owner_b', password=PASSWORD), request, db)
+                    self.assertEqual(auth.current_user(db, request.state.session_id).id, 'owner-b')
                 chronology.append('auth_commit')
                 auth_done.set()
             except BaseException: errors.append('auth_failed')
@@ -784,5 +820,7 @@ class QueryOwnershipTests(unittest.TestCase):
         self.assertTrue(owner_committed.is_set())  # Callback observation, not a DB ordering oracle.
         self.assertEqual(self.read('concurrent-owner').owner_user_id, 'owner-a')
         with Session(self.engine) as db:
-            self.assertEqual(db.get(UserSession, 'session-a').user_id, 'owner-b')
+            session = db.get(UserSession, 'session-a')
+            self.assertIsNone(session.user_id)
+            self.assertEqual(session.owner_user_id, 'owner-a')
 

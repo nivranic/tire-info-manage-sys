@@ -423,3 +423,20 @@ def upgrade(connection: Connection, *, include_vehicle_binary: bool = True,
         install_guards(connection)
         connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
                            {'version': '035_text_embedding_authorizations'})
+    if (include_vehicle_binary and include_test_event_golden and include_ai_pricing
+            and include_source_page_monitoring and include_source_quality_interests
+            and include_source_material_stops and include_source_page_url_moves
+            and include_source_text and include_document_text and include_text_embeddings
+            and '036_session_data_ownership' not in applied):
+        columns = {column['name'] for column in inspect(connection).get_columns('local_sessions')}
+        if 'owner_user_id' not in columns:
+            connection.exec_driver_sql('ALTER TABLE local_sessions ADD COLUMN owner_user_id VARCHAR(64)')
+        if 'anonymous_claimable' not in columns:
+            # Unbound legacy rows can include data from earlier account logouts.
+            # Their original owner cannot be established from the remaining row.
+            connection.exec_driver_sql('ALTER TABLE local_sessions ADD COLUMN anonymous_claimable BOOLEAN NOT NULL DEFAULT FALSE')
+        connection.exec_driver_sql('UPDATE local_sessions SET owner_user_id=user_id '
+                                  'WHERE owner_user_id IS NULL AND user_id IS NOT NULL')
+        connection.exec_driver_sql('CREATE INDEX IF NOT EXISTS ix_local_sessions_owner_user_id ON local_sessions (owner_user_id)')
+        connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'),
+                           {'version': '036_session_data_ownership'})

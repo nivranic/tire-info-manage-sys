@@ -64,7 +64,7 @@ APPEND_TABLES = (*(table for table in MODEL_TABLES if table not in GOVERNANCE_TA
 DELETE_TABLES = ('users', 'watch_items', 'knowledge_documents', 'knowledge_facets',
                  'source_text_chunks', 'document_text_pages', 'document_text_chunks')
 UPDATE_COLUMNS = {
-    'local_sessions': ('expires_at', 'user_id'),
+    'local_sessions': ('expires_at', 'user_id', 'owner_user_id', 'anonymous_claimable'),
     'users': ('username', 'display_name', 'password_hash', 'is_admin'),
     'query_runs': ('source_access_generation', 'state', 'reason'),
     'fallback_consents': ('used_at',),

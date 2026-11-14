@@ -11,6 +11,8 @@ from sqlalchemy.schema import CreateTable
 from tire_api.db import Base, UserSession, uid, utcnow
 from tire_api.main import create_app
 from tire_api.knowledge_models import initialize_search
+from tire_api.source_text_models import initialize_source_text_search
+from tire_api.document_text_models import initialize_document_text_search
 from tire_api.offline_models import OfflinePack, OfflinePackPlan
 from version_registry import EXPECTED_SCHEMA_VERSIONS, PRE_009_VERSIONS
 from test_ai_stream_migration import snapshot, OLD_VERSIONS
@@ -34,6 +36,8 @@ def predecessor(tmp_path, monkeypatch):
         for version in VERSIONS:
             connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'), {'version': version})
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
     with database.sessions() as db:
         db.add(UserSession(id=uid(), expires_at=utcnow()))
         db.commit()

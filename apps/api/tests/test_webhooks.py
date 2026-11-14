@@ -75,6 +75,39 @@ def test_three_real_producers_freeze_reference_only_body(case, channel):
         assert frozen['attempt_history'] == []
 
 
+@pytest.mark.parametrize('channel', ['recall_monitor', 'interest'])
+def test_same_account_login_rotation_keeps_private_notification_delivery(case, channel):
+    from admin_support import ADMIN_PASSWORD
+    subscription = create_subscription(case, [channel], enabled=True)['response']
+    add_private_notification(case, channel)
+    before = len(rows(case, subscription))
+    assert before > 0
+    assert case.client.post('/v1/auth/logout').status_code == 200
+    assert case.client.post('/v1/auth/login', json={
+        'username': case.user['username'], 'password': ADMIN_PASSWORD}).status_code == 200
+    add_private_notification(case, channel)
+    assert len(rows(case, subscription)) > before
+
+
+def test_other_account_login_cannot_resume_previous_private_notification_delivery(case):
+    import secrets
+    from admin_support import ADMIN_PASSWORD
+    subscription = create_subscription(case, ['interest'], enabled=True)['response']
+    add_private_notification(case, 'interest')
+    with case.database.sessions() as db:
+        before = db.scalar(select(func.count()).select_from(WebhookEnvelope))
+    assert case.client.post('/v1/auth/logout').status_code == 200
+    assert case.client.post('/v1/auth/register', json={
+        'username': 'another_monitor_owner', 'password': secrets.token_urlsafe(16)}).status_code == 200
+    add_tire_notification(case)
+    with case.database.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(WebhookEnvelope)) == before
+    assert case.client.post('/v1/auth/login', json={
+        'username': case.user['username'], 'password': ADMIN_PASSWORD}).status_code == 200
+    add_private_notification(case, 'interest')
+    assert len(rows(case, subscription)) > before
+
+
 def test_hmac_exact_bytes_stable_delivery_and_retry_after(case):
     subscription = create_subscription(case, ['tire_monitor'], enabled=True)['response']
     add_tire_notification(case)
