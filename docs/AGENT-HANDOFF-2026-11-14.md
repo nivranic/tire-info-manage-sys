@@ -4,7 +4,7 @@
 
 ## 接手基线
 
-- 既有分支为 `main`，运行角色阶段已在 `4425509` 交付，后续HNSW维护以该提交为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
+- 既有分支为 `main`，HNSW维护已在 `923a61f` 交付，本轮权限专项以该提交为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
 - 用户已授权持续实施、复核优化、总结、提交、push 全部改动和编写交接文档。沿既有分支工作，新分支、worktree 及代理操作须另有明确授权。
 - [原始需求](requirements/2026-09-26-tire-intelligence-original.md)保持原字节。[当前入口](AGENT-HANDOFF-CURRENT.md)与[此前阶段总表](AGENT-HANDOFF-2026-11-13.md)保留历史验收范围。
 - `.artifacts/`、`data/`、原件、私库、凭据、依赖及构建产物留在 Git 忽略范围。新 clone 需要重建依赖、材料和隔离验收环境。
@@ -76,7 +76,11 @@
 
 后续已实现 `postgres_vector_indexes.py`，由拥有者依据显式清单及批准合同维护HNSW。空参考库使用同一清单创建索引，完整声明进入@4合同。verify的ensure_hnsw在外发前和构建后仅读取并核对完整模型空间、维度和实际目录，默认migrate保留本地建索引行为。运行账户的DDL权限继续由原策略拒绝。
 
-最终七模块141项回归及36项PG／TLS专项通过。@4完整运行角色59项通过，包含向量、Parser、备份恢复及恢复后消费。48次Parser观察无失败，原三份超时与OS根因待查状态继续保留。实际权限专项、生产IAM／RLS、终端与远端部署继续待验。[本轮验收](assurance/evidence/postgres-vector-indexes-2026-11-14.md)
+最终七模块141项回归及36项PG／TLS专项通过。@4完整运行角色59项通过，包含向量、Parser、备份恢复及恢复后消费。48次Parser观察无失败，原三份超时与OS根因待查状态继续保留。生产权限、IAM／RLS、终端与远端部署继续待验。[本轮验收](assurance/evidence/postgres-vector-indexes-2026-11-14.md)
+
+### 后续权限专项
+
+已补23项真实缺权及ACL／成员／RLS／锁函数漂移反例，并验证部分GRANT后检查回滚、完整重授及幂等。正式PG／TLS专项60项、治理CLI与启动相关受管回归45项通过，842输入稳定。6个一次性集群已关闭，原始装配失败及最小探针保留。生产权限、实际终端和远端部署继续待验。[权限专项记录](assurance/evidence/postgres-runtime-permissions-2026-11-14.md)
 
 ## 运行角色阶段验证
 
@@ -87,7 +91,7 @@
 ## 接手顺序
 
 1. 核对 `main`、HEAD、工作区和实时远端，读取本文、原规格、运行角色阶段验收、[运行 schema 方案](POSTGRES-RUNTIME-SCHEMA.md)与[024 维护说明](POSTGRES-VEHICLE-MIGRATION.md)。复用已有证据，先取新失败的 SQLSTATE、调用入口和日志。
-2. 补运行角色专项反例，包括缺列权限、额外ACL、成员与RLS、锁函数正文／配置篡改、未批准的definer、执行grant option和部分GRANT后检查回滚。HNSW维护采用显式清单与@4合同，运行角色继续使用已审查DML策略。
+2. 复用已通过的23项运行角色反例及部分GRANT回滚检查，依据新失败补充专项。HNSW维护采用显式清单与@4合同，运行角色使用已审查DML策略。接续推进Parser性能取证、实际终端及远端部署。
 3. 继续定位Parser间歇超时。系统默认与私有临时目录均有失败，OS根因待查。保留原8秒限制、全部核验和原始失败，结合文件树、复制、启动及结果复核耗时取证。正式PG验收已使用每批私有临时目录，生产目录的可靠性继续独立验收。
 4. 完善部署操作说明，验证实际终端、远端角色、对象／Parser 全资产恢复，再推进 IAM／RLS、吞吐及灾备指标。
 5. 凭据齐备时，先执行真实 OpenAI Responses 和 Embeddings 的 API、外发同意、Provider、引用恢复和 Web 语义验收。无凭据期间推进独立工程。
@@ -95,7 +99,7 @@
 
 ### 复跑入口
 
-使用 PowerShell 7，所有输出使用全新 Git 忽略槽。PostgreSQL 二进制由本机已准备目录提供，执行期间保持受测源码稳定。
+使用 PowerShell 7，所有输出使用全新 Git 忽略槽。runtime-schema专项要求现有PostgreSQL运行时已安装pgvector，执行期间保持受测源码稳定。
 
 ```text
 python -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root <fresh-private-slot> --targets apps/api/tests/test_schema_startup.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_embeddings.py apps/api/tests/test_external_fact_governance_cli.py apps/api/tests/test_external_fact_governance.py apps/api/tests/test_safety_gate_external_governance.py apps/worker/test_monitor.py
@@ -115,4 +119,4 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 
 ## 可复制的接手指令
 
-> 接手胎迹完整V1。先读本卡、原始需求和最新验收，核对main、HEAD、工作区及实时远端。PG许可CLI、治理操作员、显式verify及旧车型024备份迁移恢复已交付。后续HNSW拥有者维护和@4完整模型空间合同已接通，运行账户只读核对索引，治理两表仅允许读取。先补运行角色权限反例，再推进真实终端、远端及全资产恢复。持续调查Parser间歇超时，默认与私有临时目录均有失败，OS根因待查，保留原期限、全部核验及失败。PG验收使用每批私有TMP。首个真实AI使用OpenAI Responses，Gemini沿用历史可选适配器状态。缺OpenAI／EPREL凭据时继续独立工程。保留KIT C2及历史封存，继续真实SKU、人工Golden、专业许可、自然长周期、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪。沿main工作，遵循分支／worktree、代理及PowerShell7规则，推送后独立核对远端SHA与工作区。
+> 接手胎迹完整V1。先读本卡、原始需求和最新验收，核对main、HEAD、工作区及实时远端。PG许可CLI、治理操作员、显式verify及旧车型024备份迁移恢复已交付。后续HNSW拥有者维护和@4完整模型空间合同已接通，运行账户只读核对索引，治理两表仅允许读取。复用23项权限反例及部分GRANT回滚证据，推进真实终端、远端及全资产恢复。持续调查Parser间歇超时，默认与私有临时目录均有失败，OS根因待查，保留原期限、全部核验及失败。PG验收使用每批私有TMP。首个真实AI使用OpenAI Responses，Gemini沿用历史可选适配器状态。缺OpenAI／EPREL凭据时继续独立工程。保留KIT C2及历史封存，继续真实SKU、人工Golden、专业许可、自然长周期、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪。沿main工作，遵循分支／worktree、代理及PowerShell7规则，推送后独立核对远端SHA与工作区。

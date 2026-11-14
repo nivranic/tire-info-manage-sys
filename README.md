@@ -2,6 +2,8 @@
 
 当前接手先读[2026-11-14 Agent交接卡](docs/AGENT-HANDOFF-2026-11-14.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、进度与接手顺序。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留历史记录。
 
+运行角色权限专项已补齐23项缺权与漂移反例、部分GRANT后检查回滚及完整重授幂等。正式PG／TLS专项60项、相关受管回归45项通过，842输入稳定。后续优先推进Parser性能取证和真实部署。[权限验收](docs/assurance/evidence/postgres-runtime-permissions-2026-11-14.md)
+
 最新已接通HNSW显式拥有者维护、verify只读预检及@4完整模型空间合同，部署需重建批准空参考合同。最终141项回归、36项PG／TLS专项及59项完整运行角色流程通过，原Parser期限失败与OS根因待查状态保留。[本轮验收](docs/assurance/evidence/postgres-vector-indexes-2026-11-14.md)。真实OpenAI、实际Native、生产部署和完整V1继续待验。首个真实AI采用OpenAI Responses API，Gemini沿用此前agent实现的可选适配器状态。
 
 Safety Gate持续回退授权已接通正常查询与Web：周报索引和指定周报分开授权，支持会话、来源和查询类型范围；保持在线优先、拒绝优先、逐次持久消费及读后重核，后台监控和AI不继承。最终六模块116项、SDK7项、Web55项、三端类型、414输入生产构建、PostgreSQL34项、正常HTTP26项和生产Web45项通过。关闭后29项核对保留185表全部旧行旧列及15份原件，6份测试策略已撤销，自有资源已关闭。真实外部来源与模型调用0。[持续授权验收](docs/assurance/evidence/safety-gate-fallback-2026-11-13.md)

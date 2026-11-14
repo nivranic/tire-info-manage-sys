@@ -45,6 +45,169 @@ def refused(code, call):
         raise AssertionError('schema_refusal_missing')
 
 
+def runtime_permission_checks(administrator, runtime_engine, role, database_name, owner):
+    """Exercise effective ACL drift and the exact generated provisioning plan."""
+    global STEP
+    from tire_api.postgres_runtime_roles import UPDATE_COLUMNS, check_runtime_role, runtime_role_sql
+    from tire_api.external_fact_sql import LOCK_ROUTINES
+
+    peer = 'runtime_peer_' + uuid4().hex[:12]
+    administrator.execute(sql.SQL('CREATE ROLE {} NOLOGIN NOINHERIT').format(sql.Identifier(peer)))
+    identifiers = {'role': sql.Identifier(role), 'peer': sql.Identifier(peer),
+                   'database': sql.Identifier(database_name), 'owner': sql.Identifier(owner),
+                   'body': sql.Literal(LOCK_ROUTINES['tire_lock_external_owner']),
+                   'user_updates': sql.SQL(',').join(sql.Identifier(column) for column in UPDATE_COLUMNS['users'])}
+    cases = (
+        ('missing_update_column', 'REVOKE UPDATE (display_name) ON public.users FROM {role}',
+         'GRANT UPDATE (display_name) ON public.users TO {role}', 'actor_lock_grant'),
+        ('missing_table_read', 'REVOKE SELECT ON public.snapshots FROM {role}',
+         'GRANT SELECT ON public.snapshots TO {role}', 'required_table_grants'),
+        ('missing_append', 'REVOKE INSERT ON public.raw_captures FROM {role}',
+         'GRANT INSERT ON public.raw_captures TO {role}', 'required_table_grants'),
+        ('missing_delete', 'REVOKE DELETE ON public.knowledge_facets FROM {role}',
+         'GRANT DELETE ON public.knowledge_facets TO {role}', 'required_table_grants'),
+        ('missing_lock_execute', 'REVOKE EXECUTE ON FUNCTION public.tire_lock_external_owner() FROM {role}',
+         'GRANT EXECUTE ON FUNCTION public.tire_lock_external_owner() TO {role}', 'required_routines'),
+        ('extra_column_update', 'GRANT UPDATE (id) ON public.snapshots TO {role}',
+         'REVOKE UPDATE (id) ON public.snapshots FROM {role}', 'column_privileges'),
+        ('extra_table_update', 'GRANT UPDATE ON public.users TO {role}',
+         'REVOKE UPDATE ON public.users FROM {role}; '
+         'GRANT UPDATE ({user_updates}) ON public.users TO {role}', 'table_privileges'),
+        ('governance_append', 'GRANT INSERT ON public.external_fact_grant_revisions TO {role}',
+         'REVOKE INSERT ON public.external_fact_grant_revisions FROM {role}', 'table_privileges'),
+        ('table_grant_option', 'GRANT SELECT ON public.snapshots TO {role} WITH GRANT OPTION',
+         'REVOKE GRANT OPTION FOR SELECT ON public.snapshots FROM {role}', 'table_grant_options'),
+        ('column_grant_option', 'GRANT UPDATE (display_name) ON public.users TO {role} WITH GRANT OPTION',
+         'REVOKE GRANT OPTION FOR UPDATE (display_name) ON public.users FROM {role}', 'column_grant_options'),
+        ('routine_grant_option', 'GRANT EXECUTE ON FUNCTION public.tire_lock_external_owner() TO {role} WITH GRANT OPTION',
+         'REVOKE GRANT OPTION FOR EXECUTE ON FUNCTION public.tire_lock_external_owner() FROM {role}', 'routine_grant_options'),
+        ('public_schema_create', 'GRANT CREATE ON SCHEMA public TO PUBLIC',
+         'REVOKE CREATE ON SCHEMA public FROM PUBLIC', 'schema_ddl'),
+        ('public_temporary', 'GRANT TEMPORARY ON DATABASE {database} TO PUBLIC',
+         'REVOKE TEMPORARY ON DATABASE {database} FROM PUBLIC', 'database_ddl'),
+        ('role_parent', 'GRANT {peer} TO {role}', 'REVOKE {peer} FROM {role}', 'role_memberships'),
+        ('role_member', 'GRANT {role} TO {peer}', 'REVOKE {role} FROM {peer}', 'role_memberships'),
+        ('role_inherit', 'ALTER ROLE {role} INHERIT', 'ALTER ROLE {role} NOINHERIT', 'role_attributes'),
+        ('row_security', 'ALTER TABLE public.snapshots ENABLE ROW LEVEL SECURITY',
+         'ALTER TABLE public.snapshots DISABLE ROW LEVEL SECURITY', 'row_security_unsupported'),
+        ('default_acl', 'ALTER DEFAULT PRIVILEGES FOR ROLE {owner} IN SCHEMA public GRANT SELECT ON TABLES TO {role}',
+         'ALTER DEFAULT PRIVILEGES FOR ROLE {owner} IN SCHEMA public REVOKE SELECT ON TABLES FROM {role}', 'default_privileges'),
+        ('unknown_definer', 'CREATE FUNCTION public.synthetic_runtime_definer() RETURNS void LANGUAGE plpgsql '
+         'SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN RETURN; END $$',
+         'DROP FUNCTION public.synthetic_runtime_definer()', 'security_definer_access'),
+        ('lock_body', 'CREATE OR REPLACE FUNCTION public.tire_lock_external_owner() RETURNS void LANGUAGE plpgsql '
+         'VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN RETURN; END $$',
+         'CREATE OR REPLACE FUNCTION public.tire_lock_external_owner() RETURNS void LANGUAGE plpgsql '
+         'VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS {body}', 'required_routines'),
+        ('lock_search_path', 'ALTER FUNCTION public.tire_lock_external_owner() SET search_path=public,pg_catalog',
+         'ALTER FUNCTION public.tire_lock_external_owner() SET search_path=pg_catalog', 'required_routines'),
+        ('lock_invoker', 'ALTER FUNCTION public.tire_lock_external_owner() SECURITY INVOKER',
+         'ALTER FUNCTION public.tire_lock_external_owner() SECURITY DEFINER', 'required_routines'),
+        ('lock_overload', 'CREATE FUNCTION public.tire_lock_external_owner(integer) RETURNS void LANGUAGE plpgsql '
+         'SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN RETURN; END $$',
+         'DROP FUNCTION public.tire_lock_external_owner(integer)', 'security_definer_access'),
+    )
+    assert check_runtime_role(runtime_engine)['ok']
+    for name, mutation, restore, code in cases:
+        STEP = 'runtime_policy_rejects_' + name
+        administrator.execute(sql.SQL(mutation).format(**identifiers))
+        observed = []
+        def observe(_c, _cu, statement, _p, _ctx, _many):
+            observed.append(statement.lstrip().split(None, 1)[0].upper())
+        try:
+            event.listen(runtime_engine, 'before_cursor_execute', observe)
+            try:
+                result = check_runtime_role(runtime_engine)
+            finally:
+                event.remove(runtime_engine, 'before_cursor_execute', observe)
+            REPORT.setdefault('runtime_policy_rejections', []).append({
+                'case': name, 'violations': result['violations'], 'statement_types': sorted(set(observed))})
+            assert not result['ok'] and code in result['violations'], result['violations']
+            assert observed and set(observed) <= {'SELECT', 'SET', 'SHOW', 'WITH'}, observed
+            # Missing privileges are repairable by the plan. Unsafe privileges
+            # and altered routines must be refused before any grants persist.
+            if not name.startswith('missing_'):
+                try:
+                    administrator.execute(runtime_role_sql(role, database_name)).close()
+                except psycopg.Error as error:
+                    assert error.sqlstate == 'P0001', error.sqlstate
+                else:
+                    raise AssertionError('unsafe_runtime_plan_accepted')
+                finally:
+                    administrator.execute('ROLLBACK').close()
+        finally:
+            administrator.execute(sql.SQL(restore).format(**identifiers))
+        restored = check_runtime_role(runtime_engine)
+        REPORT['runtime_policy_rejections'][-1]['restored_violations'] = restored['violations']
+        assert restored['ok'], restored['violations']
+        record(STEP)
+
+    STEP = 'runtime_policy_partial_grants_postcheck_rollback_and_reapply'
+    candidate, candidate_secret = 'runtime_candidate_' + uuid4().hex[:12], secrets.token_hex(32)
+    grantor, grantor_secret = 'runtime_grantor_' + uuid4().hex[:12], secrets.token_hex(32)
+    for name, password in ((candidate, candidate_secret), (grantor, grantor_secret)):
+        administrator.execute(sql.SQL('CREATE ROLE {} LOGIN NOINHERIT PASSWORD {} '
+            'NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS').format(sql.Identifier(name), sql.Literal(password)))
+    administrator.execute(sql.SQL('GRANT CONNECT ON DATABASE {} TO {} WITH GRANT OPTION').format(
+        sql.Identifier(database_name), sql.Identifier(grantor)))
+    administrator.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {} WITH GRANT OPTION').format(sql.Identifier(grantor)))
+    administrator.execute(sql.SQL('GRANT SELECT ON ALL TABLES IN SCHEMA public TO {}').format(sql.Identifier(grantor)))
+    for routine in LOCK_ROUTINES:
+        administrator.execute(sql.SQL('GRANT EXECUTE ON FUNCTION public.{}() TO {}').format(
+            sql.Identifier(routine), sql.Identifier(grantor)))
+
+    def candidate_acl():
+        return administrator.execute("""
+            SELECT entries.kind, entries.object_id, entries.column_id,
+                   a.grantor, a.grantee, a.privilege_type, a.is_grantable
+            FROM (
+                SELECT 'database' AS kind, oid AS object_id, 0 AS column_id, datacl AS acl
+                FROM pg_database WHERE datname=current_database()
+                UNION ALL SELECT 'schema', oid, 0, nspacl FROM pg_namespace
+                UNION ALL SELECT 'relation', oid, 0, relacl FROM pg_class
+                UNION ALL SELECT 'column', attrelid, attnum, attacl FROM pg_attribute
+                UNION ALL SELECT 'routine', oid, 0, proacl FROM pg_proc
+            ) entries CROSS JOIN LATERAL aclexplode(entries.acl) a
+            WHERE a.grantee=(SELECT oid FROM pg_roles WHERE rolname=%s)
+            ORDER BY 1,2,3,4,5,6,7
+        """, (candidate,)).fetchall()
+
+    before = candidate_acl()
+    assert not before
+    notices = []
+    with psycopg.connect(host=runtime_engine.url.host, port=runtime_engine.url.port, user=grantor,
+            password=grantor_secret, dbname=database_name, autocommit=True, connect_timeout=5,
+            **dict(runtime_engine.url.query)) as partial:
+        partial.add_notice_handler(lambda notice: notices.append(notice.sqlstate))
+        try:
+            cursor = partial.execute(runtime_role_sql(candidate, database_name))
+            while cursor.nextset():
+                pass
+            cursor.close()
+        except psycopg.Error as error:
+            REPORT['runtime_partial_grant_sqlstate'] = error.sqlstate
+            REPORT['runtime_partial_grant_notice_sqlstates'] = notices
+            assert error.sqlstate == 'P0001', error.sqlstate
+            assert partial.info.transaction_status == psycopg.pq.TransactionStatus.INERROR
+            assert notices, 'no_grant_stage_observed'
+        else:
+            raise AssertionError('incomplete_runtime_grants_accepted')
+        finally:
+            partial.execute('ROLLBACK').close()
+    assert candidate_acl() == before
+    administrator.execute(runtime_role_sql(candidate, database_name)).close()
+    installed = candidate_acl()
+    assert installed
+    administrator.execute(runtime_role_sql(candidate, database_name)).close()
+    assert candidate_acl() == installed
+    candidate_engine = create_engine(runtime_engine.url.set(username=candidate, password=candidate_secret))
+    try:
+        assert check_runtime_role(candidate_engine)['ok']
+    finally:
+        candidate_engine.dispose()
+    record(STEP)
+
+
 def run():
     global STEP
     expected = Path(os.environ['TIRE_PG_TEST_DATA']).resolve()
@@ -303,6 +466,14 @@ def run():
             checked.dispose()
         REPORT['runtime_forbidden_dml_count'] = len(statements)
         record(STEP)
+
+        checked = create_engine(url(target_name, limited=True))
+        try:
+            with admin_for(target_name) as administrator:
+                runtime_permission_checks(administrator, checked, runtime, target_name, owner)
+            verify_schema(checked, contract_path, digest)
+        finally:
+            checked.dispose()
 
         changes = {
             'missing_table': 'DROP TABLE public.knowledge_index_state',

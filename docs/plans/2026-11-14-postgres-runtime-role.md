@@ -1,6 +1,6 @@
 # PostgreSQL 应用运行角色计划
 
-2026-11-14阶段交接见[完整交接卡](../AGENT-HANDOFF-2026-11-14.md)。策略、固定锁函数及正式入口已实现，后续[HNSW拥有者维护](../POSTGRES-VECTOR-INDEXES.md)及@4声明解决索引DDL依赖。继续权限专项、Parser性能取证与实际部署验收。
+2026-11-14阶段交接见[完整交接卡](../AGENT-HANDOFF-2026-11-14.md)。策略、固定锁函数及正式入口已实现，后续[HNSW拥有者维护](../POSTGRES-VECTOR-INDEXES.md)及@4声明解决索引DDL依赖。[权限专项](../assurance/evidence/postgres-runtime-permissions-2026-11-14.md)已补23项反例、部分GRANT回滚及完整重授幂等，正式PG／TLS60项和相关受管回归45项通过。继续Parser性能取证与实际部署验收。
 
 **Goal** — API／Worker 使用经过审查的逐表和逐列 DML 权限运行，数据库拥有者承担迁移与维护。
 
