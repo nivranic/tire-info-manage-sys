@@ -32,7 +32,7 @@ $startAttempted = $false
 $stopped = $false
 $pgStartProcess = $null
 $reportPath = Join-Path $runDir 'report.json'
-$envNames = @('TIRE_PG_TEST_PASSWORD', 'TIRE_PG_TEST_PORT', 'TIRE_PG_TEST_DATA', 'TIRE_PG_BIN', 'TIRE_PG_TEST_REPORT', 'TIRE_PG_TEST_TLS_ROOT', 'TIRE_PG_TEST_TLS_WRONG_ROOT', 'TI_OBJECT_STORE_BACKEND', 'TI_OBJECT_STORE_ROOT')
+$envNames = @('TIRE_PG_TEST_PASSWORD', 'TIRE_PG_TEST_PORT', 'TIRE_PG_TEST_DATA', 'TIRE_PG_BIN', 'TIRE_PG_TEST_REPORT', 'TIRE_PG_TEST_TLS_ROOT', 'TIRE_PG_TEST_TLS_WRONG_ROOT', 'TI_OBJECT_STORE_BACKEND', 'TI_OBJECT_STORE_ROOT', 'TEMP', 'TMP', 'TMPDIR')
 $previousEnvironment = @{}
 foreach ($name in $envNames) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
@@ -104,6 +104,12 @@ try {
     $env:TIRE_PG_TEST_REPORT = $reportPath
     $env:TI_OBJECT_STORE_BACKEND = 'filesystem'
     $env:TI_OBJECT_STORE_ROOT = Join-Path $runDir 'objects'
+    # Keep parser copies and all other temporary test files in this private run.
+    $temporaryRoot = Join-Path $runDir 'tmp'
+    $null = New-Item -ItemType Directory -Path $temporaryRoot
+    $env:TEMP = $temporaryRoot
+    $env:TMP = $temporaryRoot
+    $env:TMPDIR = $temporaryRoot
     Push-Location $workspace
     try {
         $acceptanceScript = switch ($Suite) {
@@ -123,7 +129,11 @@ try {
         $stopped = $LASTEXITCODE -eq 0 -or -not (Test-Path -LiteralPath (Join-Path $dataDir 'postmaster.pid'))
     }
     if ($null -ne $pgStartProcess) { $pgStartProcess.Dispose() }
-    foreach ($name in $envNames) { [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process') }
+    foreach ($name in $envNames) {
+        $restoredEnvironmentValue = $previousEnvironment[$name]
+        if ($null -eq $restoredEnvironmentValue) { $restoredEnvironmentValue = [NullString]::Value }
+        [Environment]::SetEnvironmentVariable($name, $restoredEnvironmentValue, 'Process')
+    }
     Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
     if ($CliTls -and (-not $startAttempted -or $stopped)) {
         Remove-Item -LiteralPath (Join-Path $dataDir 'server.key') -Force -ErrorAction SilentlyContinue

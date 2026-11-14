@@ -1,3 +1,7 @@
+## HNSW拥有者维护与@4合同交付（2026-11-14）
+
+先读[当前接手卡](AGENT-HANDOFF-CURRENT.md)及[HNSW维护验收](assurance/evidence/postgres-vector-indexes-2026-11-14.md)。显式清单、空参考索引、拥有者维护及verify只读预检已接通，@4保存完整模型空间／维度，部署需重建批准合同。最终141项回归、36项PG／TLS专项及59项完整运行角色流程通过。原三份Parser期限失败保留，OS原因继续调查。正式PG验收使用每批私有TMP，未定义／空字符串／非空环境变量及实际恢复检查通过。接续权限专项、Parser性能、真实部署和完整V1，以下保留历史交付时点。
+
 ## PostgreSQL 运行角色阶段交接（2026-11-14）
 
 先读[2026-11-14 Agent 交接卡](AGENT-HANDOFF-2026-11-14.md)和[阶段验收](assurance/evidence/postgres-runtime-role-2026-11-14.md)。本轮交接固定166张模型表的运行DML策略、两个固定SHARE锁函数和正式runtime-role复现入口。治理两表仅允许读取，31项真实PG／TLS结构与权限检查通过，完整业务在前37项之后遇到动态HNSW索引所有权失败，后续先完成索引维护与schema合同衔接。首个真实AI采用OpenAI Responses API。完整V1持续进行，以下保留历史交付时点。

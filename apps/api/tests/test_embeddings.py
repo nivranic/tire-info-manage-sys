@@ -12,6 +12,7 @@ from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import func, select, text
@@ -58,6 +59,43 @@ def settings(monkeypatch):
     monkeypatch.setenv('TI_AI_DAILY_TOKEN_LIMIT', '1000000')
     monkeypatch.setenv('TI_AI_DAILY_REQUEST_LIMIT', '100')
     monkeypatch.setenv('TI_AI_ALLOW_PRIVATE', '0')
+
+
+def test_verify_hnsw_uses_only_approved_catalog_reads():
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from tire_api.dense import ensure_hnsw
+    from tire_api.postgres_vector_indexes import index_name
+    config = SimpleNamespace(model_space='a' * 64, dimensions=3)
+    name = index_name(config.model_space)
+    row = ('embedding_vectors', name, False, False, True, True, True, True, 'synthetic approved definition')
+    database = Mock(info={'schema_mode': 'verify', 'postgres_indexes': {name: row},
+                          'postgres_vector_indexes': {config.model_space: config.dimensions}})
+    database.execute.return_value.first.return_value = row
+    ensure_hnsw(database, config)
+    assert database.execute.call_count == 1
+    statement, parameters = database.execute.call_args.args
+    assert str(statement).startswith('SELECT ') and parameters == {'name': name}
+    database.execute.return_value.first.return_value = (*row[:-1], 'changed definition')
+    with pytest.raises(HTTPException) as refusal:
+        ensure_hnsw(database, config)
+    assert refusal.value.status_code == 503
+    assert refusal.value.detail['code'] == 'pgvector_index_maintenance_required'
+
+
+def test_verify_hnsw_rejects_undeclared_full_space_sharing_index_prefix():
+    from unittest.mock import Mock
+    from tire_api.dense import ensure_hnsw
+    from tire_api.postgres_vector_indexes import index_name
+    approved, requested = 'a' * 64, 'a' * 24 + 'b' * 40
+    name = index_name(approved)
+    row = ('embedding_vectors', name, False, False, True, True, True, True, 'synthetic approved definition')
+    database = Mock(info={'schema_mode': 'verify', 'postgres_indexes': {name: row},
+                          'postgres_vector_indexes': {approved: 3}})
+    with pytest.raises(HTTPException) as refusal:
+        ensure_hnsw(database, SimpleNamespace(model_space=requested, dimensions=3))
+    assert refusal.value.detail['code'] == 'pgvector_index_maintenance_required'
+    database.execute.assert_not_called()
 
 
 def test_sqlite_rejects_before_paid_call_and_structured_query_needs_no_model(monkeypatch):

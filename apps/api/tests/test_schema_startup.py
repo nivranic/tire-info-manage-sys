@@ -38,7 +38,10 @@ def test_pg_verify_dispatch_cannot_run_create_or_upgrade(tmp_path, monkeypatch):
         raise AssertionError('verify must never perform DDL')
     monkeypatch.setattr(Base.metadata, 'create_all', denied)
     monkeypatch.setattr(migrations, 'upgrade', denied)
-    monkeypatch.setattr(postgres_schema, 'verify_schema', lambda *args: calls.append(args))
+    def verified(*args):
+        calls.append(args)
+        return {'catalog': {'indexes': []}, 'vector_indexes': []}
+    monkeypatch.setattr(postgres_schema, 'verify_schema', verified)
     try:
         database.initialize()
         assert calls == [(database.engine, tmp_path / 'contract.json', 'a' * 64)]
@@ -72,6 +75,76 @@ def test_reference_cli_requires_explicit_empty_target_and_hidden_input(tmp_path,
     assert cli.main(args + ['--empty-reference-confirmed']) == 1
     assert 'interactive_authentication_required' in capsys.readouterr().out
     assert calls == []
+
+
+@pytest.mark.parametrize('indexes', [
+    None, {}, [{'model_space': 'a' * 64, 'dimensions': True}],
+    [{'model_space': 'a' * 64, 'dimensions': 0}],
+    [{'model_space': 'a' * 64, 'dimensions': 2001}],
+    [{'model_space': 'A' * 64, 'dimensions': 3}],
+    [{'model_space': "'; DROP TABLE users", 'dimensions': 3}],
+    [{'model_space': 'a' * 64, 'dimensions': 3, 'sql': 'unapproved'}],
+    [{'model_space': 'a' * 64, 'dimensions': 3}] * 2,
+    [{'model_space': 'a' * 64, 'dimensions': 3},
+     {'model_space': 'a' * 24 + 'b' * 40, 'dimensions': 4}],
+    [{'model_space': f'{value:064x}', 'dimensions': 3} for value in range(33)],
+])
+def test_vector_index_manifest_rejects_ambiguous_or_unbounded_declarations(indexes):
+    from tire_api.postgres_schema import SchemaContractError
+    from tire_api.postgres_vector_indexes import checked_indexes
+    with pytest.raises(SchemaContractError, match='vector_index_manifest_invalid'):
+        checked_indexes(indexes)
+
+
+def test_vector_index_manifest_is_closed_sorted_and_uses_fixed_sql(tmp_path):
+    import json
+    from tire_api.postgres_vector_indexes import load_index_manifest, index_sql
+    path = tmp_path / 'indexes.json'
+    specs = [{'model_space': 'b' * 64, 'dimensions': 4}, {'model_space': 'a' * 64, 'dimensions': 3}]
+    path.write_text(json.dumps({'schema': 'postgres-vector-indexes@1', 'indexes': specs}), encoding='utf-8')
+    assert load_index_manifest(path) == tuple(reversed(specs))
+    statement = index_sql('a' * 64, 3)
+    assert statement.startswith('CREATE INDEX ix_embedding_hnsw_' + 'a' * 24)
+    assert 'ON public.embedding_vectors' in statement
+    assert 'public.vector(3)' in statement and 'public.vector_cosine_ops' in statement
+    assert 'IF NOT EXISTS' not in statement
+    assert 'IF NOT EXISTS' in index_sql('a' * 64, 3, if_not_exists=True)
+
+
+def test_vector_maintenance_cli_requires_terminal_before_reading_secrets(monkeypatch, capsys):
+    from types import SimpleNamespace
+    from tire_api import postgres_vector_indexes as cli
+    calls = []
+    monkeypatch.setattr(cli.sys, 'stdin', SimpleNamespace(isatty=lambda: False))
+    monkeypatch.setattr(cli, '_password', lambda *args: calls.append(args))
+    args = ['--postgres-profile', 'synthetic-profile', '--vector-indexes-file', 'synthetic-manifest',
+            '--schema-contract', 'synthetic-contract', '--schema-sha256', 'a' * 64]
+    assert cli.main(args) == 1
+    assert 'interactive_authentication_required' in capsys.readouterr().out
+    assert calls == []
+
+
+def test_vector_maintenance_cli_hides_secrets_and_disposes_engine(monkeypatch, capsys):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from tire_api import postgres_vector_indexes as cli
+    engine = Mock()
+    monkeypatch.setattr(cli.sys, 'stdin', SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(cli, 'load_index_manifest', lambda *args: ())
+    monkeypatch.setattr(cli, 'load_contract', lambda *args: {})
+    monkeypatch.setattr(cli, '_request', lambda *args: {})
+    monkeypatch.setattr(cli, 'postgres_connect_args', lambda *args: {})
+    monkeypatch.setattr(cli, '_password', lambda *args: 'synthetic-private-secret')
+    monkeypatch.setattr(cli, 'postgres_engine', lambda *args: engine)
+    def fail(*args):
+        raise RuntimeError('synthetic-private-secret')
+    monkeypatch.setattr(cli, 'maintain_indexes', fail)
+    args = ['--postgres-profile', 'synthetic-profile', '--vector-indexes-file', 'synthetic-manifest',
+            '--schema-contract', 'synthetic-contract', '--schema-sha256', 'a' * 64]
+    assert cli.main(args) == 1
+    output = capsys.readouterr().out
+    assert 'vector_index_maintenance_failed' in output and 'synthetic-private-secret' not in output
+    engine.dispose.assert_called_once()
 
 
 def test_postgres_vehicle_maintenance_requires_explicit_target_and_offline_confirmation(tmp_path, monkeypatch, capsys):

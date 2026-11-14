@@ -15,17 +15,20 @@ def main(argv=None):
         parser = _Parser(description='Migrate an empty reference database and publish a new schema contract.')
         parser.add_argument('--postgres-profile', required=True)
         parser.add_argument('--output-file', required=True)
+        parser.add_argument('--vector-indexes-file')
         parser.add_argument('--empty-reference-confirmed', action='store_true', required=True)
         args = parser.parse_args(argv)
         if not sys.stdin.isatty():
             raise GovernanceError('interactive_authentication_required')
+        from .postgres_vector_indexes import load_index_manifest
+        indexes = load_index_manifest(args.vector_indexes_file) if args.vector_indexes_file else ()
         parameters = postgres_connect_args(_request(args.postgres_profile))
         password = _password('Reference PostgreSQL password: ')
         try:
             engine = postgres_engine(parameters, password)
         finally:
             del password
-        result = {'ok': True, **build_reference(engine, args.output_file)}
+        result = {'ok': True, **build_reference(engine, args.output_file, vector_indexes=indexes)}
     except (SchemaContractError, GovernanceError) as error:
         result = {'ok': False, 'code': error.code}
     except (Exception, KeyboardInterrupt):

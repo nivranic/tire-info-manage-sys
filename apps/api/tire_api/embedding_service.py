@@ -32,9 +32,13 @@ def require_config(db):
     if not available:
         raise HTTPException(503, {'code': reason, 'message': '本次需要 PostgreSQL 和 pgvector；未调用外部服务'})
     try:
-        return configured_embeddings()
+        config = configured_embeddings()
     except EmbeddingError as error:
         raise HTTPException(503, str(error)) from None
+    if db.info.get('schema_mode') == 'verify':
+        from .dense import ensure_hnsw
+        ensure_hnsw(db, config)
+    return config
 
 
 def document_material(db, documents, config):

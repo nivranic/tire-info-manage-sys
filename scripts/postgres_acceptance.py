@@ -154,6 +154,8 @@ def run(*, runtime_role=False):
         from sqlalchemy import create_engine
         from tire_api.postgres_schema import build_reference
         from tire_api.postgres_runtime_roles import runtime_role_sql, check_runtime_role
+        from tire_api.embedding_gateway import EmbeddingConfig
+        from tire_api.postgres_vector_indexes import maintain_indexes
         own_url = URL.create('postgresql+psycopg', username=role, password=app_password,
                              host='127.0.0.1', port=port, database=dbname).render_as_string(hide_password=False)
         if not runtime_role:
@@ -168,12 +170,18 @@ def run(*, runtime_role=False):
                     with psycopg.connect(host='127.0.0.1', port=port, user='tire_verify_admin', password=password,
                                          dbname=reference_name) as extension_admin:
                         extension_admin.execute('CREATE EXTENSION vector')
+                vector_indexes = ()
+                if vector:
+                    embedding = EmbeddingConfig(model='synthetic-embedding-fixture', dimensions=3, api_key='')
+                    vector_indexes = ({'model_space': embedding.model_space, 'dimensions': embedding.dimensions},)
                 reference_engine = create_engine(reference_url)
                 contract_path = expected_data.parent / ('runtime-schema-' + uuid4().hex + '.json')
                 try:
-                    contract = build_reference(reference_engine, contract_path)
+                    contract = build_reference(reference_engine, contract_path, vector_indexes=vector_indexes)
                 finally:
                     reference_engine.dispose()
+                if vector:
+                    maintain_indexes(owned.engine, contract_path, contract['sha256'], vector_indexes)
                 with owned.engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
                     connection.exec_driver_sql('REVOKE CREATE,TEMPORARY ON DATABASE "' + dbname + '" FROM PUBLIC')
                     connection.exec_driver_sql('REVOKE CREATE ON SCHEMA public FROM PUBLIC')
@@ -660,7 +668,8 @@ def run(*, runtime_role=False):
             extension_admin.execute('CREATE EXTENSION IF NOT EXISTS vector')
         url = activate_runtime(name, vector=True)
         from test_text_embeddings import verify_text_embedding_persistence
-        text_checks = verify_text_embedding_persistence(url, authenticate=login_admin)
+        text_checks = verify_text_embedding_persistence(url, authenticate=login_admin,
+            mutation_sqlstate='42501' if runtime_role else 'P0001')
         text_embedding_checkpoint = text_checks.pop('checkpoint')
         REPORT['text_embeddings'] = text_checks
         record(STEP)

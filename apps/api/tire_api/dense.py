@@ -56,15 +56,24 @@ def mirror_cache(db, cached):
 
 
 def ensure_hnsw(db, config):
-    # Only validated dimensions and a digest enter DDL; no names or query text.
-    dimensions = config.dimensions
-    space = config.model_space
-    if type(dimensions) is not int or not 1 <= dimensions <= 2000 or len(space) != 64 or any(c not in '0123456789abcdef' for c in space):
-        raise ValueError('invalid vector space')
+    from fastapi import HTTPException
+    from .postgres_schema import QUERIES
+    from .postgres_vector_indexes import index_name, index_sql
+    statement = index_sql(config.model_space, config.dimensions, if_not_exists=True)
+    if db.info.get('schema_mode') == 'verify':
+        name = index_name(config.model_space)
+        expected = db.info.get('postgres_indexes', {}).get(name)
+        declared = db.info.get('postgres_vector_indexes', {}).get(config.model_space) == config.dimensions
+        query = ('SELECT * FROM (' + QUERIES['indexes'] + ') AS indexes('
+            'table_name,index_name,is_unique,is_primary,is_immediate,is_valid,is_ready,is_live,definition) '
+            "WHERE table_name='embedding_vectors' AND index_name=:name")
+        actual = db.execute(text(query), {'name': name}).first() if declared and expected is not None else None
+        if actual is None or tuple(actual) != expected:
+            raise HTTPException(503, {'code': 'pgvector_index_maintenance_required',
+                'message': '当前模型空间的 HNSW 索引需要拥有者依据已批准合同维护'})
+        return
     db.execute(text('SELECT pg_advisory_xact_lock(821741906)'))
-    db.execute(text(f'CREATE INDEX IF NOT EXISTS ix_embedding_hnsw_{space[:24]} ON embedding_vectors '
-                    f'USING hnsw ((embedding::vector({dimensions})) vector_cosine_ops) '
-                    f"WHERE model_space = '{space}' AND dimensions = {dimensions}"))
+    db.execute(text(statement))
 
 
 def cosine_candidates(db, config, materials, query_vector):

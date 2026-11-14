@@ -1,6 +1,8 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手先读[2026-11-14 Agent 交接卡](docs/AGENT-HANDOFF-2026-11-14.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、进度与接手顺序。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留历史交付记录。最新已交付PG许可CLI、治理操作员、源码绑定verify及旧车型024显式备份迁移恢复；本轮另交接API／Worker运行角色阶段策略，完整业务验收在动态HNSW索引入口被拥有权检查拒绝，后续先解决索引维护与schema合同衔接。真实OpenAI、实际Native和完整V1继续待验。首个真实AI接口按用户选择采用OpenAI Responses API，Gemini源于此前agent提前实现的可选适配器。
+当前接手先读[2026-11-14 Agent交接卡](docs/AGENT-HANDOFF-2026-11-14.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、进度与接手顺序。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留历史记录。
+
+最新已接通HNSW显式拥有者维护、verify只读预检及@4完整模型空间合同，部署需重建批准空参考合同。最终141项回归、36项PG／TLS专项及59项完整运行角色流程通过，原Parser期限失败与OS根因待查状态保留。[本轮验收](docs/assurance/evidence/postgres-vector-indexes-2026-11-14.md)。真实OpenAI、实际Native、生产部署和完整V1继续待验。首个真实AI采用OpenAI Responses API，Gemini沿用此前agent实现的可选适配器状态。
 
 Safety Gate持续回退授权已接通正常查询与Web：周报索引和指定周报分开授权，支持会话、来源和查询类型范围；保持在线优先、拒绝优先、逐次持久消费及读后重核，后台监控和AI不继承。最终六模块116项、SDK7项、Web55项、三端类型、414输入生产构建、PostgreSQL34项、正常HTTP26项和生产Web45项通过。关闭后29项核对保留185表全部旧行旧列及15份原件，6份测试策略已撤销，自有资源已关闭。真实外部来源与模型调用0。[持续授权验收](docs/assurance/evidence/safety-gate-fallback-2026-11-13.md)
 

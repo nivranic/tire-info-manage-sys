@@ -583,14 +583,19 @@ class Database:
         from .webhook_policy import load_targets
         self.webhook_catalog = load_targets()
         self.sessions = sessionmaker(self.engine, expire_on_commit=False,
-            info={"object_store": self.object_store, "webhook_catalog": self.webhook_catalog})
+            info={"object_store": self.object_store, "webhook_catalog": self.webhook_catalog,
+                  "schema_mode": self.schema_mode})
         self.backend = parsed.get_backend_name()
 
     def initialize(self) -> None:
         register_schema_models()
         if self.schema_mode == 'verify':
             from .postgres_schema import verify_schema
-            verify_schema(self.engine, self.schema_contract, self.schema_sha256)
+            contract = verify_schema(self.engine, self.schema_contract, self.schema_sha256)
+            self.sessions.kw['info']['postgres_indexes'] = {
+                row[1]: tuple(row) for row in contract['catalog']['indexes']}
+            self.sessions.kw['info']['postgres_vector_indexes'] = {
+                item['model_space']: item['dimensions'] for item in contract['vector_indexes']}
             return
         # create_all(checkfirst=True) is not atomic across processes. Hold one
         # transaction-scoped lock before schema inspection, table creation and

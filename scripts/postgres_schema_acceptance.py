@@ -365,8 +365,10 @@ def run():
             administrator.execute('CREATE EXTENSION vector')
         vector_engine = postgres_engine(postgres_connect_args(profile(vector_name)), owner_secret)
         vector_path = slot / 'vector-reference.json'
+        vector_indexes = ({'model_space': 'a' * 64, 'dimensions': 3},
+                          {'model_space': 'b' * 64, 'dimensions': 4})
         try:
-            vector_contract = build_reference(vector_engine, vector_path)
+            vector_contract = build_reference(vector_engine, vector_path, vector_indexes=vector_indexes)
             grants(vector_engine, vector_name)
         finally:
             vector_engine.dispose()
@@ -378,6 +380,125 @@ def run():
         finally:
             vector_runtime.close()
         record(STEP)
+
+        STEP = 'vector_owner_maintenance_postcheck_rolls_back_partial_ddl'
+        from tire_api.db import apply_schema
+        from tire_api.dense import ensure_hnsw
+        from tire_api import postgres_vector_indexes as vector_cli
+        index_target = database()
+        with admin_for(index_target) as administrator:
+            administrator.execute('CREATE EXTENSION vector')
+        index_owner = postgres_engine(postgres_connect_args(profile(index_target)), owner_secret)
+        index_profile, index_manifest = slot / 'index-profile.json', slot / 'index-manifest.json'
+        index_profile.write_text(json.dumps(profile(index_target)), encoding='utf-8')
+        index_args = ['--postgres-profile', str(index_profile), '--vector-indexes-file', str(index_manifest),
+                      '--schema-contract', str(vector_path), '--schema-sha256', vector_contract['sha256']]
+        def apply_index_cli(specs, *, approved_path=vector_path, approved_sha256=vector_contract['sha256']):
+            index_manifest.write_text(json.dumps({'schema': 'postgres-vector-indexes@1', 'indexes': specs}), encoding='utf-8')
+            output = io.StringIO()
+            with patch.object(vector_cli.sys, 'stdin', SimpleNamespace(isatty=lambda: True)), \
+                 patch.object(vector_cli, '_password', return_value=owner_secret), redirect_stdout(output):
+                code = vector_cli.main([*index_args[:-4], '--schema-contract', str(approved_path),
+                                        '--schema-sha256', approved_sha256])
+            return code, json.loads(output.getvalue())
+        def hnsw_count():
+            with index_owner.connect() as connection:
+                return connection.exec_driver_sql("SELECT count(*) FROM pg_indexes WHERE schemaname='public' "
+                    "AND tablename='embedding_vectors' AND indexdef LIKE '%%USING hnsw%%'").scalar()
+        try:
+            with index_owner.begin() as connection:
+                connection.exec_driver_sql('SET LOCAL search_path=public,pg_catalog')
+                apply_schema(connection)
+            assert hnsw_count() == 0
+            wrong = [vector_indexes[0], {**vector_indexes[1], 'dimensions': 5}]
+            code, outcome = apply_index_cli(wrong)
+            assert code == 1 and outcome['code'] == 'vector_index_not_declared'
+            assert hnsw_count() == 0
+            altered = load_contract(vector_path, vector_contract['sha256'])
+            for row in altered['catalog']['indexes']:
+                if row[1] == vector_cli.index_name('b' * 64):
+                    row[-1] = row[-1].replace('vector_cosine_ops', 'vector_l2_ops')
+            altered_path = slot / 'wrong-index-definition.json'
+            altered_path.write_text(json.dumps(altered), encoding='utf-8')
+            attempted = []
+            def observe_creation(_c, _cu, statement, _p, _ctx, _many):
+                if statement.startswith('CREATE INDEX ix_embedding_hnsw_'):
+                    attempted.append(statement.split()[2])
+            event.listen(Engine, 'before_cursor_execute', observe_creation)
+            try:
+                code, outcome = apply_index_cli(vector_indexes, approved_path=altered_path,
+                    approved_sha256=hashlib.sha256(altered_path.read_bytes()).hexdigest())
+            finally:
+                event.remove(Engine, 'before_cursor_execute', observe_creation)
+            assert code == 1 and outcome['code'] == 'schema_contract_mismatch'
+            assert len(attempted) == 2
+            assert hnsw_count() == 0
+            record(STEP)
+
+            STEP = 'vector_owner_cli_declared_indexes_and_idempotency'
+            code, outcome = apply_index_cli(vector_indexes)
+            assert code == 0 and outcome['created'] == 2 and outcome['existing'] == 0
+            code, outcome = apply_index_cli(vector_indexes)
+            assert code == 0 and outcome['created'] == 0 and outcome['existing'] == 2
+            verify_schema(index_owner, vector_path, vector_contract['sha256'])
+            grants(index_owner, index_target)
+            record(STEP)
+
+            STEP = 'vector_runtime_approved_index_check_is_select_only'
+            runtime_index_db = Database(url(index_target, limited=True).render_as_string(hide_password=False),
+                schema_contract=vector_path, schema_sha256=vector_contract['sha256'])
+            try:
+                runtime_index_db.initialize()
+                statements = []
+                def observe_index(_c, _cu, statement, _p, _ctx, _many):
+                    statements.append(statement.lstrip().split(None, 1)[0].upper())
+                event.listen(runtime_index_db.engine, 'before_cursor_execute', observe_index)
+                with runtime_index_db.sessions() as session:
+                    ensure_hnsw(session, SimpleNamespace(model_space='a' * 64, dimensions=3))
+                event.remove(runtime_index_db.engine, 'before_cursor_execute', observe_index)
+                assert statements and set(statements) == {'SELECT'}
+                record(STEP)
+
+                STEP = 'vector_runtime_maintenance_and_index_ddl_are_rejected'
+                refused('vector_index_owner_required', lambda: vector_cli.maintain_indexes(
+                    runtime_index_db.engine, vector_path, vector_contract['sha256'], vector_indexes))
+                with runtime_index_db.engine.connect() as connection:
+                    try:
+                        connection.exec_driver_sql('CREATE INDEX forbidden_vector_index ON public.embedding_vectors(dimensions)')
+                    except Exception as error:
+                        assert getattr(getattr(error, 'orig', None), 'sqlstate', None) == '42501'
+                    else:
+                        raise AssertionError('runtime_index_ddl_present')
+                    finally:
+                        connection.rollback()
+                record(STEP)
+
+                STEP = 'vector_changed_index_rejected_by_runtime_and_owner_preflight'
+                name = vector_cli.index_name('a' * 64)
+                with index_owner.begin() as connection:
+                    connection.exec_driver_sql('DROP INDEX public.' + name)
+                    connection.exec_driver_sql('CREATE INDEX ' + name + ' ON public.embedding_vectors(dimensions)')
+                with runtime_index_db.sessions() as session:
+                    from fastapi import HTTPException
+                    try:
+                        ensure_hnsw(session, SimpleNamespace(model_space='a' * 64, dimensions=3))
+                    except HTTPException as error:
+                        assert error.status_code == 503 and error.detail['code'] == 'pgvector_index_maintenance_required'
+                    else:
+                        raise AssertionError('runtime_changed_index_accepted')
+                code, outcome = apply_index_cli(vector_indexes)
+                assert code == 1 and outcome['code'] == 'schema_contract_mismatch'
+                refused('schema_contract_mismatch', runtime_index_db.initialize)
+                with index_owner.begin() as connection:
+                    connection.exec_driver_sql('DROP INDEX public.' + name)
+                code, outcome = apply_index_cli(vector_indexes)
+                assert code == 0 and outcome['created'] == 1
+                runtime_index_db.initialize()
+                record(STEP)
+            finally:
+                runtime_index_db.close()
+        finally:
+            index_owner.dispose()
 
         STEP = 'contract_and_source_pin_rejection'
         runtime_db = Database(limited_url)

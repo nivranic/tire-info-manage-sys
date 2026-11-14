@@ -11,7 +11,7 @@ import re
 from sqlalchemy import text
 
 
-SCHEMA = 'postgres-runtime-schema@3'
+SCHEMA = 'postgres-runtime-schema@4'
 MAX_BYTES = 8 * 1024 * 1024
 MAX_ROWS = 20000
 OVERSIZE = '__tire_schema_value_too_large__'
@@ -185,7 +185,7 @@ def load_contract(path, expected_sha256):
             return value
         contract = json.loads(data.decode('utf-8'), object_pairs_hook=unique,
             parse_constant=lambda _: (_ for _ in ()).throw(ValueError('constant')))
-        if (type(contract) is not dict or contract.keys() != {'schema','postgres_major','source_sha256','catalog'}
+        if (type(contract) is not dict or contract.keys() != {'schema','postgres_major','source_sha256','catalog','vector_indexes'}
                 or contract['schema'] != SCHEMA or type(contract['postgres_major']) is not int
                 or contract['postgres_major'] < 17 or type(contract['catalog']) is not dict
                 or contract['catalog'].keys() != QUERIES.keys()):
@@ -196,6 +196,17 @@ def load_contract(path, expected_sha256):
             for row in rows:
                 if type(row) is not list or any(type(item) not in (str,int,bool,type(None)) for item in row):
                     raise ValueError('shape')
+        from .postgres_vector_indexes import checked_indexes, index_name
+        if list(checked_indexes(contract['vector_indexes'])) != contract['vector_indexes']:
+            raise ValueError('shape')
+        if any(len(row) != 9 or any(type(row[position]) is not str for position in (0, 1, 8))
+               or any(type(flag) is not bool for flag in row[2:8]) for row in contract['catalog']['indexes']):
+            raise ValueError('shape')
+        declared = {index_name(item['model_space']) for item in contract['vector_indexes']}
+        actual = {row[1] for row in contract['catalog']['indexes']
+                  if row[0] == 'embedding_vectors' and row[1].startswith('ix_embedding_hnsw_')}
+        if declared != actual:
+            raise ValueError('shape')
         if contract['source_sha256'] != source_fingerprint():
             raise SchemaContractError('schema_contract_source_changed')
         return contract
@@ -215,15 +226,18 @@ def verify_schema(engine, path, expected_sha256):
                 raise SchemaContractError('schema_contract_mismatch')
         if expected['source_sha256'] != source_fingerprint():
             raise SchemaContractError('schema_contract_source_changed')
+        return expected
     except SchemaContractError:
         raise
     except Exception:
         raise SchemaContractError('schema_verification_failed') from None
 
 
-def build_reference(engine, output):
+def build_reference(engine, output, *, vector_indexes=()):
     """Migrate only an empty reference, then publish a new source-bound contract."""
     from .db import register_schema_models, apply_schema
+    from .postgres_vector_indexes import checked_indexes, create_reference_indexes
+    vector_indexes = checked_indexes(vector_indexes)
     output = Path(output)
     if not output.is_absolute() or output.is_symlink() or output.exists() or not output.parent.is_dir():
         raise SchemaContractError('schema_contract_output_invalid')
@@ -244,7 +258,9 @@ def build_reference(engine, output):
         connection.exec_driver_sql('SET LOCAL search_path=public,pg_catalog')
         apply_schema(connection)
         connection.exec_driver_sql('SET LOCAL search_path=pg_catalog,public')
-        contract = {'schema': SCHEMA, 'postgres_major': major, 'source_sha256': before, 'catalog': capture_schema(connection)}
+        create_reference_indexes(connection, vector_indexes)
+        contract = {'schema': SCHEMA, 'postgres_major': major, 'source_sha256': before,
+                    'catalog': capture_schema(connection), 'vector_indexes': list(vector_indexes)}
         if source_fingerprint() != before:
             raise SchemaContractError('schema_contract_source_changed')
     data = _json(contract)

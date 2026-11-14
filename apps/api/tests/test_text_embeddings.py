@@ -339,7 +339,20 @@ def test_same_host_different_embedding_endpoints_have_distinct_text_caches(setup
     assert len(provider.calls) == 2
 
 
-def verify_text_embedding_persistence(url, *, authenticate=register_admin):
+def test_verify_missing_index_refuses_build_before_provider_or_reservation(setup):
+    client, database, provider = setup
+    selected = granted(setup)
+    prepared = plan(client, selected).json()
+    database.sessions.kw['info'].update(schema_mode='verify', postgres_indexes={})
+    response = build(client, prepared['id'])
+    assert response.status_code == 503
+    assert response.json()['detail']['code'] == 'pgvector_index_maintenance_required'
+    assert not provider.calls
+    with database.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(EmbeddingRequest)) == 0
+
+
+def verify_text_embedding_persistence(url, *, authenticate=register_admin, mutation_sqlstate='P0001'):
     """Called only by the isolated PostgreSQL verifier, with real pgvector SQL."""
     checks = []
     with pytest.MonkeyPatch.context() as monkeypatch:
@@ -375,15 +388,17 @@ def verify_text_embedding_persistence(url, *, authenticate=register_admin):
                     'ORDER BY c.id'), {'query': '[1,0,0]', 'contract': TEXT_CONTRACT}).all()
                 assert len(rows) == 2 and all(float(row[3]) == 0 for row in rows)
                 vectors = [[row[0], row[1], row[2]] for row in rows]
-                with pytest.raises(DBAPIError, match='text_embedding_authorization_immutable'):
+                with pytest.raises(DBAPIError) as immutable:
                     db.execute(text('UPDATE text_embedding_authorizations SET revision = revision + 20'))
+                assert immutable.value.orig.sqlstate == mutation_sqlstate
                 db.rollback()
             checks.append('035_native_permissions_and_real_cosine_mirror')
             assert authorize(client, selected, action='revoke', expected_revision=1).status_code == 200
             assert plan(client, selected).status_code == 403
             assert len(provider.calls) == 2
             checks.append('revocation_blocks_new_plan_while_immutable_cache_is_preserved')
-            checkpoint = {'source': selected, 'pdf': pdf_selection, 'pdf_run_id': pdf_run.json()['id'], 'vectors': vectors}
+            checkpoint = {'source': selected, 'pdf': pdf_selection, 'pdf_run_id': pdf_run.json()['id'],
+                          'vectors': vectors, 'mutation_sqlstate': mutation_sqlstate}
     return {'checks': checks, 'checkpoint': checkpoint, 'provider': 'synthetic_fixed_vectors'}
 
 
@@ -411,7 +426,8 @@ def assert_text_embedding_checkpoint(url, checkpoint, *, authenticate):
                 for statement in ('UPDATE text_embedding_authorizations SET revision = revision + 20',
                                   'DELETE FROM text_embedding_authorizations',
                                   'TRUNCATE TABLE text_embedding_authorizations'):
-                    with pytest.raises(DBAPIError, match='text_embedding_authorization_immutable'):
+                    with pytest.raises(DBAPIError) as immutable:
                         db.execute(text(statement))
+                    assert immutable.value.orig.sqlstate == checkpoint.get('mutation_sqlstate', 'P0001')
                     db.rollback()
             assert not provider.calls
