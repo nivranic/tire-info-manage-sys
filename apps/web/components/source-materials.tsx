@@ -73,6 +73,9 @@ function assertPolicy(policy: SourceMaterialPolicy): void {
       throw new Error("来源策略跳转地址无效，未开放捕获。");
   }
   if (policy.robots_redirect_urls === null) throw new Error("robots 跳转声明无效。");
+  if (policy.capture_timeout_seconds !== undefined && (!Number.isSafeInteger(policy.capture_timeout_seconds)
+    || policy.capture_timeout_seconds < 1 || policy.capture_timeout_seconds > 70))
+    throw new Error("材料捕获总期限声明无效。");
   const attribution = policy.source_attribution;
   if (attribution !== undefined && (!attribution || !plain(attribution.source_class, 80)
     || attribution.region !== null && !plain(attribution.region, 40)
@@ -159,6 +162,7 @@ function PolicyDetails({ policy }: { policy: SourceMaterialPolicy }) {
       </> : null}
       <div><dt>配置的引用页</dt><dd><Reference value={policy.source_reference_url} /></dd></div>
       <div><dt>实际初始 PDF 地址</dt><dd><Reference value={policy.download_url} /></dd></div>
+      <div><dt>捕获总期限</dt><dd>{policy.capture_timeout_seconds ?? 45} 秒</dd></div>
       <div><dt>许可权利人声明</dt><dd>{policy.rights.rights_holder}</dd></div>
       <div><dt>许可 / 留存依据</dt><dd>{policy.rights.basis}</dd></div>
       <div><dt>许可引用</dt><dd>{policy.rights.license_url ? <Reference value={policy.rights.license_url} /> : "未提供许可链接；仍须人工核对依据"}</dd></div>

@@ -30,6 +30,7 @@ export interface SourceMaterialPolicy {
   download_url: string;
   redirect_urls: string[];
   robots_redirect_urls?: string[];
+  capture_timeout_seconds?: number;
   rights: SourceMaterialRights;
   policy_fingerprint: string;
   source_attribution?: SourceMaterialAttribution;

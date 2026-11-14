@@ -102,6 +102,40 @@ def test_legacy_policy_fingerprint_omits_absent_or_null_source_attribution():
     assert canonical_policy(POLICY) == expected
     assert canonical_policy({**POLICY, 'source_attribution': None}) == expected
     assert canonical_policy({**POLICY, 'robots_redirect_urls': []}) == expected
+    assert canonical_policy({**POLICY, 'capture_timeout_seconds': 45}) == expected
+
+
+@pytest.mark.parametrize('seconds', [None, False, 0, 71, 1.5, '70'])
+def test_capture_timeout_requires_a_bounded_integer(seconds):
+    from pydantic import ValidationError
+    from tire_api.material_source_policy import canonical_policy
+    with pytest.raises(ValidationError):
+        canonical_policy({**POLICY, 'capture_timeout_seconds': seconds})
+
+
+def test_capture_timeout_is_frozen_by_policy_and_replayed_without_network(material_app, monkeypatch):
+    from tire_api.material_source_policy import PolicyCatalog, canonical_policy
+    client, app, _ = material_app
+    configured = canonical_policy({**POLICY, 'capture_timeout_seconds': 70})
+    assert configured['capture_timeout_seconds'] == 70
+    assert configured['policy_fingerprint'] != canonical_policy(POLICY)['policy_fingerprint']
+    app.state.material_policies = PolicyCatalog([configured])
+    observed = []
+    async def fetch(policy):
+        observed.append(policy)
+        return obtained(policy)
+    monkeypatch.setattr(app.state.material_transport, 'fetch', fetch)
+    body = payload(client)
+    assert client.post('/v1/source-materials/captures', json={**body, 'capture_timeout_seconds': 70}).status_code == 422
+    assert observed == []
+    response = client.post('/v1/source-materials/captures', json=body)
+    assert response.status_code == 201, response.text
+    first = response.json()
+    assert first['state'] == 'succeeded' and first['policy'] == configured
+    app.state.material_policies = PolicyCatalog([])
+    replay = client.post('/v1/source-materials/captures', json=body)
+    assert replay.status_code == 201 and replay.json()['replayed']
+    assert replay.json()['policy'] == configured and len(observed) == 1
 
 
 @pytest.mark.parametrize('urls', [None, ['http://example.com/robots'],

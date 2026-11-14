@@ -96,6 +96,7 @@ class MaterialPolicy(StrictModel):
     download_url: str
     redirect_urls: list[str] = Field(max_length=3)
     robots_redirect_urls: list[str] = Field(default_factory=list, max_length=3)
+    capture_timeout_seconds: int = Field(default=45, ge=1, le=70)
     rights: MaterialRights
     source_attribution: MaterialSourceAttribution | None = None
 
@@ -109,6 +110,8 @@ class MaterialPolicy(StrictModel):
             value.pop('source_attribution', None)
         if not self.robots_redirect_urls:
             value.pop('robots_redirect_urls', None)
+        if self.capture_timeout_seconds == 45:
+            value.pop('capture_timeout_seconds', None)
         return value
 
     @field_validator('edition')

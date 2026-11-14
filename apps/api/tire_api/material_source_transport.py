@@ -65,7 +65,7 @@ class MaterialSourceTransport:
             self._active += 1
         claimed = set()
         try:
-            async with asyncio.timeout(TOTAL_SECONDS):
+            async with asyncio.timeout(policy.get('capture_timeout_seconds', TOTAL_SECONDS)):
                 return await self._fetch(policy, claimed)
         except MaterialTransportError:
             raise
@@ -169,7 +169,7 @@ class MaterialSourceTransport:
         connector = aiohttp.TCPConnector(resolver=PublicResolver(hosts), use_dns_cache=False, limit=2,
             family=0)
         async with aiohttp.ClientSession(connector=connector, trust_env=False, auto_decompress=False,
-                timeout=aiohttp.ClientTimeout(total=TOTAL_SECONDS, connect=4, sock_read=8),
+                timeout=aiohttp.ClientTimeout(total=policy.get('capture_timeout_seconds', TOTAL_SECONDS), connect=4, sock_read=8),
                 headers={'User-Agent': USER_AGENT, 'Accept': 'application/pdf', 'Accept-Encoding': 'identity'},
                 cookie_jar=aiohttp.DummyCookieJar()) as session:
             # aiohttp 3.x retries idempotent methods after a disconnected pooled

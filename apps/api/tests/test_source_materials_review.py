@@ -245,6 +245,44 @@ def test_transport_rejects_unsafe_or_partial_pdf(monkeypatch, response, code):
     assert len(http.requests) == 2
 
 
+def test_configured_deadline_covers_both_asyncio_and_http_session(monkeypatch):
+    observed = []
+    original_timeout = transport_module.asyncio.timeout
+    def timeout(seconds):
+        observed.append(seconds)
+        return original_timeout(seconds)
+    monkeypatch.setattr(transport_module.asyncio, 'timeout', timeout)
+    result, http = transport_fetch(monkeypatch, [robots(), MemoryResponse()],
+        {**POLICY, 'capture_timeout_seconds': 70})
+    assert result['body'] == PDF
+    assert observed == [70] and http.session_options['timeout'].total == 70
+
+
+def test_configured_deadline_allows_longer_transfer_and_releases_capacity(monkeypatch):
+    original_timeout = transport_module.asyncio.timeout
+    deadlines = []
+    def accelerated_timeout(seconds):
+        deadlines.append(seconds)
+        return original_timeout(seconds / 100)
+    monkeypatch.setattr(transport_module.asyncio, 'timeout', accelerated_timeout)
+    async def exercise():
+        transport = MaterialSourceTransport()
+        async def transfer(_policy, claimed):
+            claimed.add('example.com')
+            transport._hosts.add('example.com')
+            await asyncio.sleep(0.55)
+            return {'body': PDF}
+        monkeypatch.setattr(transport, '_fetch', transfer)
+        with pytest.raises(MaterialTransportError, match='source_material_timeout'):
+            await transport.fetch(canonical_policy(POLICY))
+        assert transport._active == 0 and transport._hosts == set()
+        result = await transport.fetch(canonical_policy({**POLICY, 'capture_timeout_seconds': 70}))
+        assert result['body'] == PDF
+        assert transport._active == 0 and transport._hosts == set()
+    run(exercise())
+    assert deadlines == [45, 70]
+
+
 def test_exact_eight_mib_and_identity_encoding_are_accepted(monkeypatch):
     body = PDF + b'\x80' * (8 * 1024 * 1024 - len(PDF))
     result, _ = transport_fetch(monkeypatch, [robots(), MemoryResponse(body=body, headers={'Content-Encoding': 'identity'})])
