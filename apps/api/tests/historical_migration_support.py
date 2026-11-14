@@ -14,7 +14,7 @@ from version_registry import EXPECTED_SCHEMA_VERSIONS
 
 
 # Fixed review contract for 013, 019-023 and 025-026, plus every later additive
-# guard family (through 032) that milestone predecessors already build via
+# guard family (through 035) that milestone predecessors already build via
 # create_all on current shapes. These declarations are test-owned,
 # including exact conflict predicates and failure policies, not product outputs.
 _TRIGGER_CONTRACT = {
@@ -87,6 +87,8 @@ _TRIGGER_CONTRACT = {
         'id = NEW.id OR verification_id = NEW.verification_id'),
     'source_page_url_move_notifications': ('after_create', 'FAIL', 'source_page_url_notification_immutable',
         'id = NEW.id OR (rule_id = NEW.rule_id AND event_id = NEW.event_id)', 'notification'),
+    'text_embedding_authorizations': ('after_create', 'FAIL', 'text_embedding_authorization_immutable',
+        'id = NEW.id OR (scope_hash = NEW.scope_hash AND revision = NEW.revision)'),
 }
 
 # Fixed columns of delivery-notification rows; only read_at may ever change.

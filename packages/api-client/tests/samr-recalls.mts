@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiError, setApiTransport, tireApi } from "@tire/api-client";
-import type { SamrRecallDocument, SamrRecallEvidence, SamrRecallQuery, SamrRecallResult } from "@tire/domain-types";
+import type { SamrMonitorQuery, SamrRecallDocument, SamrRecallEvidence, SamrRecallQuery, SamrRecallResult } from "@tire/domain-types";
 
 const search = { operation: "search", keyword: "轮胎 & 召回", page: "4" } as const;
 const notice = { operation: "notice", reference: "/zhxx/jdczh/jdczh/art/2021/art_" + "a".repeat(32) + ".html?type=nFZcuWzfh2c41ylKrWj7k" } as const;
@@ -118,4 +118,64 @@ test("SAMR article history has bounded defaults and path-encodes its identity", 
   });
   try { assert.equal((await tireApi.samrNoticeHistory("synthetic/id?")).data_state, "local_snapshot"); }
   finally { restore(); }
+});
+
+test("SAMR monitor writes preserve scope, revision, idempotency and cancellation", async () => {
+  const query: SamrMonitorQuery = { operation: "search", keyword: "轮胎", page_limit: 4, notice_limit: 60, text: "批次" };
+  const controller = new AbortController();
+  const settings = { name: "Synthetic monitor", enabled: true, interval_seconds: 3600 };
+  const calls: { path: string; body: unknown }[] = [];
+  const restore = setApiTransport(async (path, init) => {
+    assert.equal(init.method, "POST");
+    assert.equal(init.signal, controller.signal);
+    assert.equal(new Headers(init.headers).get("Idempotency-Key"), "synthetic-key");
+    calls.push({ path, body: JSON.parse(String(init.body)) });
+    return Response.json({ id: "synthetic-rule", write_result: { revision_id: "revision", revision: 2 } });
+  });
+  try {
+    await tireApi.createSamrRule(query, settings, "synthetic-key", controller.signal);
+    await tireApi.reviseSamrRule("rule/id?", 1, { ...settings, archived: true }, "synthetic-key", controller.signal);
+    assert.deepEqual(calls, [
+      { path: "/v1/samr-recall-monitor-rules", body: { query, ...settings } },
+      { path: "/v1/samr-recall-monitor-rules/rule%2Fid%3F/revisions", body: { expected_revision: 1, ...settings, archived: true } },
+    ]);
+  } finally { restore(); }
+});
+
+test("SAMR monitor readers preserve explicit history, filters and nullable running-run linkage", async () => {
+  const controller = new AbortController();
+  const paths: string[] = [];
+  const restore = setApiTransport(async (path, init) => {
+    paths.push(path);
+    assert.equal(init.signal, controller.signal);
+    return Response.json({ items: [{ run_id: null, attempt_id: "synthetic-attempt", lag_seconds: 0.5 }] });
+  });
+  try {
+    await tireApi.samrRules(true, 20, controller.signal);
+    await tireApi.samrRule("rule/id?", controller.signal);
+    await tireApi.samrMonitorRuns("rule/id?", 10, controller.signal);
+    const values = await tireApi.samrNotifications(true, 20, controller.signal);
+    assert.equal(values.items[0].run_id, null);
+    assert.deepEqual(paths, [
+      "/v1/samr-recall-monitor-rules?archived=true&offset=20&limit=20",
+      "/v1/samr-recall-monitor-rules/rule%2Fid%3F?mode=history",
+      "/v1/samr-recall-monitor-rules/rule%2Fid%3F/runs?mode=history&offset=10&limit=10",
+      "/v1/samr-recall-notifications?mode=history&unread=true&offset=20&limit=20",
+    ]);
+  } finally { restore(); }
+});
+
+test("SAMR notification read-state and generic task reader use their normal routes", async () => {
+  const paths: string[] = [];
+  const restore = setApiTransport(async (path, init) => {
+    paths.push(path);
+    if (init.method === "PUT") assert.deepEqual(JSON.parse(String(init.body)), { read: true });
+    return Response.json({ id: "synthetic", read_at: null });
+  });
+  try {
+    await tireApi.markSamrNotification("notice/id?", true);
+    await tireApi.monitorTask("samr", "job/id?");
+    assert.equal(paths[0], "/v1/samr-recall-notifications/notice%2Fid%3F/read");
+    assert.ok(paths[1].startsWith("/v1/monitor-tasks/samr/job%2Fid%3F?"));
+  } finally { restore(); }
 });

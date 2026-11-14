@@ -41,6 +41,8 @@ safety_gate_monitor_rules safety_gate_monitor_runs safety_gate_notifications
 safety_gate_rule_revisions safety_gate_snapshots safety_gate_task_attempts safety_gate_task_events
 safety_gate_verifications samr_recall_snapshots samr_recall_verifications
 samr_notice_revisions samr_notice_observations samr_notice_changes
+samr_monitor_jobs samr_monitor_rules samr_rule_revisions samr_task_attempts
+samr_task_events samr_monitor_checks samr_monitor_runs samr_notifications
 saved_comparison_revisions saved_comparisons snapshots
 source_material_outcomes source_material_requests source_material_stops source_page_changes
 source_page_notifications source_page_url_move_notifications source_page_url_moves
@@ -71,10 +73,12 @@ UPDATE_COLUMNS = {
     'recall_monitor_jobs': ('next_due_at', 'lease_token', 'lease_until', 'last_finished_at'),
     'recall_discovery_jobs': ('next_due_at', 'lease_token', 'lease_until', 'last_finished_at'),
     'safety_gate_monitor_jobs': ('next_due_at', 'lease_token', 'lease_until', 'last_finished_at'),
+    'samr_monitor_jobs': ('next_due_at', 'lease_token', 'lease_until', 'last_finished_at'),
     'notification_deliveries': ('read_at',),
     'recall_notifications': ('read_at',),
     'recall_discovery_notifications': ('read_at',),
     'safety_gate_notifications': ('read_at',),
+    'samr_notifications': ('read_at',),
     'interest_notifications': ('read_at',),
     'source_page_notifications': ('read_at',),
     'source_page_url_move_notifications': ('read_at',),

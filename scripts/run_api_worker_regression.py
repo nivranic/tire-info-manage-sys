@@ -83,6 +83,7 @@ TEST_MODULES = (
     'apps/api/tests/test_samr.py',
     'apps/api/tests/test_samr_recalls.py',
     'apps/api/tests/test_samr_notice_history.py',
+    'apps/api/tests/test_samr_monitoring.py',
     'apps/api/tests/test_safety_gate.py',
     'apps/api/tests/test_safety_gate_alerts.py',
     'apps/api/tests/test_safety_gate_monitoring.py',
@@ -744,7 +745,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--phase', required=True, choices=('selfcheck', 'collect', 'run'))
     parser.add_argument('--output-root', type=Path, default=None)
-    parser.add_argument('--targets', nargs='+', help='Only registered file paths or nodeids; default explicit 192 modules')
+    parser.add_argument('--targets', nargs='+', help=f'Only registered file paths or nodeids; default explicit {len(TEST_MODULES)} modules')
     parser.add_argument('--actual-dir', type=Path, help='One existing explicit r76-* actual run, never latest')
     options = parser.parse_args(argv)
     targets = selected_targets(options.targets)

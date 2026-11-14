@@ -7,6 +7,7 @@ import { DataTree } from "./reparse-review";
 import QueryFallbackPolicy from "./query-fallback-policy";
 import { useSourceAccess } from "./source-status";
 import SamrNoticeHistoryPanel from "./samr-notice-history";
+import { SamrMonitoring } from "./samr-monitoring";
 
 const sourceId = "samr-cn-recalls";
 const states: Record<SamrRecallResult["data_state"], string> = {
@@ -194,6 +195,7 @@ export default function SamrRecallPanel({ sessionReady }: { sessionReady: boolea
       <QueryFallbackPolicy kind="samr_recall_search" sourceIds={[sourceId]} sessionReady={sessionReady} />
       <QueryFallbackPolicy kind="samr_recall_notice" sourceIds={[sourceId]} sessionReady={sessionReady} />
     </> : null}
+    <SamrMonitoring sessionReady={sessionReady} onEvidence={id => void showEvidence(id)} />
     {historyArticle ? <SamrNoticeHistoryPanel key={historyArticle} articleId={historyArticle} sessionReady={sessionReady} onClose={() => setHistoryArticle(null)} onEvidence={id => void showEvidence(id)} /> : null}
     {evidence ? <section className="recall-evidence" aria-label="中国召回历史原件">
       <h4>历史原件 · {evidence.content_type}</h4>

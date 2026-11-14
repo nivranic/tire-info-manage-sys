@@ -18,6 +18,8 @@ from tire_api.recall_models import (RecallMonitorJob, RecallMonitorRun, RecallMo
                                     RecallRuleRevision, SOURCE_ID)
 from tire_api.recall_discovery_monitor_models import RecallDiscoveryJob, RecallDiscoveryPage
 from tire_api.knowledge_models import initialize_search
+from tire_api.source_text_models import initialize_source_text_search
+from tire_api.document_text_models import initialize_document_text_search
 
 from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
     assert_trigger_contract, initialize_observing_version)
@@ -55,6 +57,8 @@ def predecessor(tmp_path, monkeypatch):
         for version in OLD_VERSIONS:
             connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'), {'version': version})
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
     owner, histories = uid(), []
     with database.sessions() as db:
         db.add(UserSession(id=owner, expires_at=utcnow() + timedelta(days=1)))

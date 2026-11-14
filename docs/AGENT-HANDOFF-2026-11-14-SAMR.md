@@ -1,5 +1,7 @@
 # 胎迹中国召回阶段接手卡
 
+后台检索发现／指定公告监控、即时变化通知、任务SSE、SDK与Web已进一步交付，当前179张模型表。最新状态、验证与后续顺序见[中国召回监控接手卡](AGENT-HANDOFF-2026-11-14-SAMR-MONITOR.md)及[监控验收](assurance/evidence/samr-cn-monitoring-2026-11-14.md)。
+
 更新于 2026-11-14。完整 V1 持续进行。本卡补充中国市场监管召回来源，整体需求清单继续参照前序总表。
 
 前一阶段已交付专用 DTO、3 个 SDK 方法与 Web 正常入口。新增 SDK 8 项、既有 SDK 3 项、Web 59 项、三端及 native-client 类型检查、Web 生产构建通过。浏览器 31 项通过，其中 6 次真实官方 live 查询，两类持续策略、单次授权、独立历史与取消均已核对。四批 11 个直接进程记录、5 个端口及 Parser 临时目录已检查。[SDK 与工作台验收](assurance/evidence/samr-cn-web-2026-11-14.md)

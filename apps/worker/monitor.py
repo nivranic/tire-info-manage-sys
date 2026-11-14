@@ -31,9 +31,9 @@ def observed_cycle(function):
             result = await function(*args, **kwargs)
             rows = result["results"]
             outcome = "completed" if rows else "idle"
-            for state in ("worker_error", "lease_lost", "source_unavailable", "discovery_incomplete", "local_snapshot", "consent_required"):
+            for state in ("worker_error", "lease_lost", "source_unavailable", "discovery_incomplete", "samr_incomplete", "local_snapshot", "consent_required"):
                 if any(row["state"] == state for row in rows):
-                    outcome = 'source_unavailable' if state == 'discovery_incomplete' else state
+                    outcome = 'source_unavailable' if state in {'discovery_incomplete', 'samr_incomplete'} else state
                     break
             else:
                 if any(row.get("finalized") is False for row in rows):
@@ -111,9 +111,10 @@ async def run_scheduled_cycle(database: Database, *, max_jobs: int = 100) -> dic
     recalls = await run_recall_cycle(database, max_jobs=max_jobs)
     discovery = await run_recall_discovery_cycle(database, max_jobs=max_jobs)
     safety_gate = await run_safety_gate_cycle(database, max_jobs=max_jobs)
+    samr = await run_samr_cycle(database, max_jobs=max_jobs)
     webhooks = await run_webhook_cycle(database, max_jobs=max_jobs)
-    return {"checked_at": utcnow().isoformat(), "jobs": len(results) + recalls["jobs"] + discovery['jobs'] + safety_gate['jobs'] + webhooks['jobs'],
-            "results": results + recalls["results"] + discovery['results'] + safety_gate['results'] + webhooks['results']}
+    return {"checked_at": utcnow().isoformat(), "jobs": len(results) + recalls["jobs"] + discovery['jobs'] + safety_gate['jobs'] + samr['jobs'] + webhooks['jobs'],
+            "results": results + recalls["results"] + discovery['results'] + safety_gate['results'] + samr['results'] + webhooks['results']}
 
 
 @observed_cycle
@@ -231,6 +232,43 @@ async def run_safety_gate_cycle(database: Database, *, max_jobs: int = 100, adap
                 state, reason = claim['final_result']['state'], claim['final_result']['reason']
             span.finish('completed' if finalized and state == 'safety_gate_complete' else state if finalized else 'stale')
             results.append({'job_id': claim['id'], 'source': claim['source_id'], 'kind': 'safety_gate',
+                'state': state, 'reason': reason, 'finalized': finalized})
+    return {'checked_at': utcnow().isoformat(), 'jobs': len(results), 'results': results}
+
+
+@observed_cycle
+async def run_samr_cycle(database: Database, *, max_jobs: int = 100, adapter=None) -> dict:
+    from tire_api import samr_monitoring as queue
+    results = []
+    for index in range(max_jobs):
+        if index:
+            await asyncio.sleep(queue.SOURCE_INTERVAL)
+        claim = queue.claim_job(database)
+        if claim is None:
+            break
+        with observe('worker.job', component='worker', source=claim['source_id']) as span:
+            span.finish('unknown', queue_lag_seconds=claim['queue_lag_seconds'])
+            try:
+                begin_attempt(database, claim, queue.guard_claim)
+                state, reason = await queue.execute_scan(database, claim, adapter)
+            except asyncio.CancelledError:
+                queue.finish_job(database, claim, 'lease_lost', 'worker_cancelled')
+                raise
+            except LeaseLost as error:
+                state, reason = 'lease_lost', str(error)
+            except SourceAccessBlocked as error:
+                state, reason = 'source_unavailable', error.code
+            except queue.ScanChanged as error:
+                state, reason = 'samr_incomplete', str(error)
+            except TimeoutError:
+                state, reason = 'source_unavailable', 'samr_monitor_timeout'
+            except Exception:
+                state, reason = 'worker_error', 'samr_monitor_execution_failed'
+            finalized = queue.finish_job(database, claim, state, reason)
+            if finalized:
+                state, reason = claim['final_result']['state'], claim['final_result']['reason']
+            span.finish('completed' if finalized and state == 'samr_complete' else state if finalized else 'stale')
+            results.append({'job_id': claim['id'], 'source': claim['source_id'], 'kind': 'samr',
                 'state': state, 'reason': reason, 'finalized': finalized})
     return {'checked_at': utcnow().isoformat(), 'jobs': len(results), 'results': results}
 

@@ -1,7 +1,8 @@
 import type { RecallDiscoveryQuery, RecallQuery, TireQuery } from "./index";
 import type { SafetyGateMonitorQuery } from "./safety-gate";
+import type { SamrMonitorQuery } from "./samr-monitoring";
 
-export type MonitorTaskKind = "tire" | "recall" | "recall_discovery" | "safety_gate";
+export type MonitorTaskKind = "tire" | "recall" | "recall_discovery" | "safety_gate" | "samr";
 export type MonitorTaskScope = "local_workspace" | "session";
 export type MonitorTaskPhase = "claimed" | "running" | "finished";
 export type MonitorAttemptState = "running" | "succeeded" | "failed" | "blocked" | "interrupted";
@@ -19,7 +20,7 @@ export interface MonitorTaskEvent {
 }
 export interface MonitorTaskLegacyRun { id: string; state: string; reason: string | null; started_at: string | null; finished_at: string | null; legacy: true }
 export interface MonitorTask {
-  kind: MonitorTaskKind; job_id: string; scope: MonitorTaskScope; source_id: string; query: TireQuery | RecallQuery | RecallDiscoveryQuery | SafetyGateMonitorQuery;
+  kind: MonitorTaskKind; job_id: string; scope: MonitorTaskScope; source_id: string; query: TireQuery | RecallQuery | RecallDiscoveryQuery | SafetyGateMonitorQuery | SamrMonitorQuery;
   rules: { id: string; name: string; revision: number; enabled: boolean; archived: boolean }[];
   rule_count: number; rules_truncated: boolean; next_due_at: string | null; lease_until: string | null;
   state: MonitorTaskState; terminal: boolean; phase: MonitorTaskPhase | null; last_event_at: string | null;

@@ -106,6 +106,7 @@ export type { RecallQuery, RecallRecord, RecallRevision, RecallResult, RecallHis
 export type { RecallSearchQuery, RecallSearchCampaign, RecallSearchProduct, RecallSearchResult, RecallSearchEvidence } from "./recalls";
 export type { SafetyGateQuery, SafetyGateReport, SafetyGateAlert, SafetyGateDocument, SafetyGateProvenance, SafetyGateResult, SafetyGateEvidence, SafetyGateAlertObservation, SafetyGateAlertHistory } from "./safety-gate";
 export type { SafetyGateMonitorQuery, SafetyGateRuleSettings, SafetyGateMonitorRun, SafetyGateMonitorRule, SafetyGateRuleDetail, SafetyGateRuleWrite, SafetyGateNotification, SafetyGatePage } from "./safety-gate";
+export type { SamrMonitorQuery, SamrRuleSettings, SamrMonitorCoverage, SamrMonitorRun, SamrMonitorRule, SamrRuleDetail, SamrRuleWrite, SamrNotification, SamrPage } from "./samr-monitoring";
 export type { SafetyGateAnalysisReference, SafetyGateAnalysisTarget, SafetyGateAnalysisBoundary } from "./safety-gate";
 export type { SamrRecallQuery, SamrRecallNoticeSummary, SamrRecallNotice, SamrRecallAsset, SamrRecallDocument, SamrRecallProvenance, SamrRecallResult, SamrRecallEvidence } from "./samr-recalls";
 export type { SamrNoticeHistory, SamrNoticeObservation } from "./samr-recalls";

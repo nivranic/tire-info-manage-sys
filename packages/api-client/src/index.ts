@@ -189,7 +189,7 @@ const syncHeaders = (owner: string) => {
 };
 
 type TaskStreamMessage = import("@tire/domain-types").MonitorTaskStreamMessage;
-const taskKinds = new Set(["tire", "recall", "recall_discovery", "safety_gate"]);
+const taskKinds = new Set(["tire", "recall", "recall_discovery", "safety_gate", "samr"]);
 const taskPhases = new Set(["claimed", "running", "finished"]);
 const taskOutcomes = new Set(["running", "succeeded", "failed", "blocked", "interrupted"]);
 const boundedCursor = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 512 && !/[\r\n\0]/.test(value);
@@ -599,6 +599,20 @@ export const tireApi = {
   },
   safetyGateRules: (archived = false, offset = 0, signal?: AbortSignal) =>
     request<import("@tire/domain-types").SafetyGatePage<import("@tire/domain-types").SafetyGateMonitorRule>>(`/v1/safety-gate-monitor-rules?archived=${archived}&offset=${offset}&limit=20`, { signal }),
+  samrRules: (archived = false, offset = 0, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SamrPage<import("@tire/domain-types").SamrMonitorRule>>(`/v1/samr-recall-monitor-rules?archived=${archived}&offset=${offset}&limit=20`, { signal }),
+  samrRule: (id: string, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SamrRuleDetail>(`/v1/samr-recall-monitor-rules/${encodeURIComponent(id)}?mode=history`, { signal }),
+  createSamrRule: (query: import("@tire/domain-types").SamrMonitorQuery, settings: Omit<import("@tire/domain-types").SamrRuleSettings, "archived">, key: string, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SamrRuleWrite>("/v1/samr-recall-monitor-rules", { method: "POST", body: JSON.stringify({ query, ...settings }), headers: { "Idempotency-Key": key }, signal }),
+  reviseSamrRule: (id: string, revision: number, settings: import("@tire/domain-types").SamrRuleSettings, key: string, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SamrRuleWrite>(`/v1/samr-recall-monitor-rules/${encodeURIComponent(id)}/revisions`, { method: "POST", body: JSON.stringify({ expected_revision: revision, ...settings }), headers: { "Idempotency-Key": key }, signal }),
+  samrMonitorRuns: (id: string, offset = 0, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SamrPage<import("@tire/domain-types").SamrMonitorRun>>(`/v1/samr-recall-monitor-rules/${encodeURIComponent(id)}/runs?mode=history&offset=${offset}&limit=10`, { signal }),
+  samrNotifications: (unread = false, offset = 0, signal?: AbortSignal) =>
+    request<import("@tire/domain-types").SamrPage<import("@tire/domain-types").SamrNotification>>(`/v1/samr-recall-notifications?mode=history&unread=${unread}&offset=${offset}&limit=20`, { signal }),
+  markSamrNotification: (id: string, read: boolean, signal?: AbortSignal) =>
+    request<{ id: string; read_at: string | null }>(`/v1/samr-recall-notifications/${encodeURIComponent(id)}/read`, { method: "PUT", body: JSON.stringify({ read }), signal }),
   safetyGateRule: (id: string, signal?: AbortSignal) =>
     request<import("@tire/domain-types").SafetyGateRuleDetail>(`/v1/safety-gate-monitor-rules/${encodeURIComponent(id)}?mode=history`, { signal }),
   createSafetyGateRule: (query: import("@tire/domain-types").SafetyGateMonitorQuery, settings: Omit<import("@tire/domain-types").SafetyGateRuleSettings, "archived">, key: string, signal?: AbortSignal) =>

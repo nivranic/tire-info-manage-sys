@@ -1,5 +1,7 @@
 # 胎迹 Agent 接手卡
 
+中国召回后台监控、即时变化通知、任务SSE、SDK和Web已交付，当前179张模型表、18项可信Parser。受管回归117／192项、SDK13项、Web62项、生产浏览器22项及实际旧库6项通过，独立PG／TLS真实Worker完成4次官方live查询并保存2条通知，16条越权SQL被拒绝。接手先读[中国召回监控卡](AGENT-HANDOFF-2026-11-14-SAMR-MONITOR.md)和[阶段验收](assurance/evidence/samr-cn-monitoring-2026-11-14.md)，再推进自然长周期、SKU／批次、人工Golden、许可、AI引用和其余V1 Gate。
+
 最新交付中国召回逐公告版本、观察与变化事件，以及 SDK／Web 历史分页和前后原件。当前171张模型表、18项Parser。受管回归三批96／158／77项，浏览器42项，实际旧库与非拥有者PG／TLS已验；新增表6条越权SQL拒绝。下一步后台发现／公告监控、变化通知及任务SSE。先读[最新中国召回接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)和[逐公告版本验收](assurance/evidence/samr-cn-notice-history-2026-11-14.md)。
 
 中国召回专用 DTO、SDK 和 Web 已补齐，最终正常浏览器 31 项通过，含 6 次真实官方 live 查询、独立持续回退策略及来源代次取消。SDK 8 项、既有 SDK 3 项、Web 59 项、完整类型与生产构建通过。接续后台监控、逐公告历史与变化通知，详见[当前中国召回接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)和[工作台验收](assurance/evidence/samr-cn-web-2026-11-14.md)。下文保留此前交付时点。

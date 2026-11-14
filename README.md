@@ -1,6 +1,8 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手先读[中国召回阶段交接卡](docs/AGENT-HANDOFF-2026-11-14-SAMR.md)，整体需求继续参照[进度总表](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)的12个核心模块、10项发布Gate、13项SLO与15项决策。当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、168张模型表，完整V1持续进行。
+当前接手先读[中国召回监控交接卡](docs/AGENT-HANDOFF-2026-11-14-SAMR-MONITOR.md)，整体需求继续参照[进度总表](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)的12个核心模块、10项发布Gate、13项SLO与15项决策。当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、179张模型表，完整V1持续进行。
+
+中国召回后台发现／指定公告监控、即时应用内通知、任务SSE与SDK／Web已接通。受管回归117／192项、SDK13项、Web62项和正常浏览器22项通过，实际旧SQLite升级6项及独立PG／TLS真实官方Worker已验，16条越权SQL被拒绝。后续建立自然长周期和通知SLO证据，并推进SKU／批次、人工Golden、许可和AI引用。[监控阶段验收](docs/assurance/evidence/samr-cn-monitoring-2026-11-14.md)
 
 中国市场监管召回已接通官方检索、公告正文、原生文章身份、独立日期、原件、304和回退授权。最终108项受管回归、独立HTTP／非拥有者PG／TLS专项12项、正常ASGI真实来源27项及三端类型检查通过，子进程等价路径误判已修正。四批48个服务记录、58个进程ID、28个端口及临时密码／私钥文件已核对。专用SDK／Web、后台监控、批次／SKU、许可及间歇Parser超时继续推进。[中国来源验收](docs/assurance/evidence/samr-cn-source-2026-11-14.md)
 
