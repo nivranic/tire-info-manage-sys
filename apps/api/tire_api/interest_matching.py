@@ -229,8 +229,9 @@ def _contexts(side, domain):
     if 'source_contexts' in side:
         return deepcopy(side['source_contexts'])
     if domain == 'test_event':
+        from .test_events import participant_tested_size
         payload = side.get('event', {})
-        return [{'identity': {**person, 'size': payload['tested_size']}, 'facts': {},
+        return [{'identity': {**person, 'size': participant_tested_size(payload, person)}, 'facts': {},
                  'organization': payload.get('organization'), 'participant_only': True,
                  'evidence_valid': side.get('evidence_valid', True)}
                 for person in payload.get('participants', [])]

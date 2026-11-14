@@ -190,13 +190,14 @@ def _filtered_statement(filters):
             statement = statement.where(exists(select(KnowledgeFacet.document_id).where(
                 KnowledgeFacet.document_id == KnowledgeDocument.id,
                 KnowledgeFacet.name == name, KnowledgeFacet.value == key)))
-    if filters.get('brand') and filters.get('model'):
-        # One event can contain several brands/models: do not join brand from
-        # participant A to model from participant B.
-        pair = normalized(filters['brand']) + ' | ' + normalized(filters['model'])
+    participant_fields = [name for name in ('brand', 'model', 'size') if filters.get(name)]
+    if len(participant_fields) > 1:
+        # Every selected identity field must belong to the same participant.
+        pair = ' | '.join(size_key(filters[name]) if name == 'size' else normalized(filters[name])
+                          for name in participant_fields)
         statement = statement.where(or_(KnowledgeDocument.kind != 'test_event', exists(
             select(KnowledgeFacet.document_id).where(KnowledgeFacet.document_id == KnowledgeDocument.id,
-                KnowledgeFacet.name == 'brand_model', KnowledgeFacet.value == pair))))
+                KnowledgeFacet.name == '_'.join(participant_fields), KnowledgeFacet.value == pair))))
     return statement
 
 

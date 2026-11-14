@@ -355,7 +355,7 @@ def tail_change(case, monkeypatch, change):
     return response
 
 
-def test_review_tail_rereads_actual_actor_even_when_preference_and_evidence_are_equal(candidate_case, monkeypatch):
+def test_review_tail_rejects_actor_rebound_against_persistent_session_owner(candidate_case, monkeypatch):
     case = candidate_case
     reviewer_session = case.reviewer.cookies['tire_local_session']
     with case.database.sessions() as db:
@@ -364,10 +364,9 @@ def test_review_tail_rereads_actual_actor_even_when_preference_and_evidence_are_
         with case.database.engine.begin() as connection:
             connection.execute(text('UPDATE local_sessions SET user_id=:actor WHERE id=:session'),
                 {'actor': reviewer_actor, 'session': case.session})
-    # Preference belongs to this same session, so it follows the rebind. The
-    # response must fail because actor_user_id changed, even if all other
-    # signature inputs and request bindings remain byte-for-byte identical.
-    assert_error(tail_change(case, monkeypatch, switch_actor), 409, 'test_candidate_binding_changed')
+    # The second read observes the committed identity mutation. Migration 036
+    # retains the data owner, so this session is inactive and requires login.
+    assert_error(tail_change(case, monkeypatch, switch_actor), 401, 'test_candidate_actor_required')
 
 
 def test_review_tail_rereads_preference_from_a_committed_second_connection(candidate_case, monkeypatch):

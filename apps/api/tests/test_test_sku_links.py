@@ -33,6 +33,29 @@ def test_manual_bridge_preview_is_available_without_promoting_unverified_identit
     assert result['boundary']['origin_verification'] == 'unverified'
 
 
+def test_mixed_event_bridge_checks_the_selected_participant_size(bridge):
+    client, _, _, payload = bridge
+    event_id = payload['selection']['event_id']
+    event = client.get('/v1/test-events/' + event_id, params={'mode': 'history'}).json()
+    data = deepcopy(event['event'])
+    data['tested_size'] = None
+    data['participants'][0]['tested_size'] = '245/40R20'
+    data['participants'][1]['tested_size'] = '205/55R16'
+    revised = client.put('/v1/test-events/' + event_id, json={'event': data,
+        'expected_revision': event['revision'], 'operator': 'Synthetic reviewer',
+        'reason': 'Synthetic mixed-size bridge coverage'}).json()
+    payload['selection']['event_revision_id'] = revised['revision_id']
+    first = client.post('/v1/test-sku-links/preview', json=payload)
+    assert first.status_code == 200, first.text
+    scope = next(row for row in first.json()['checks'] if row['field'] == 'test_size_scope')
+    assert scope['status'] == 'match' and scope['material_value'] == '245/40R20'
+    payload['selection']['participant_key'] = 'b'
+    second = client.post('/v1/test-sku-links/preview', json=payload)
+    assert second.status_code == 200, second.text
+    scope = next(row for row in second.json()['checks'] if row['field'] == 'test_size_scope')
+    assert scope['status'] == 'conflict' and scope['material_value'] == '205/55R16'
+
+
 def test_bridge_empty_shared_history_requires_explicit_mode(bridge):
     client, _, _, _ = bridge
     assert client.get('/v1/test-sku-links?mode=history').status_code == 200

@@ -636,6 +636,31 @@ pub fn package(bytes: &[u8], descriptor: &Descriptor) -> NativeResult<Envelope> 
             {
                 return Err("OFFLINE_PACK_INVALID");
             }
+            if doc.kind == "test_event" {
+                let event = &member.payload["event"];
+                let index = doc.record_index.ok_or("OFFLINE_PACK_INVALID")? as usize;
+                let participant = &event["participants"][index];
+                let brand = participant["brand"]
+                    .as_str()
+                    .ok_or("OFFLINE_PACK_INVALID")?;
+                let model = participant["model"]
+                    .as_str()
+                    .ok_or("OFFLINE_PACK_INVALID")?;
+                let size = participant
+                    .get("tested_size")
+                    .filter(|value| !value.is_null())
+                    .unwrap_or(&event["tested_size"])
+                    .as_str()
+                    .ok_or("OFFLINE_PACK_INVALID")?;
+                if size.is_empty()
+                    || doc.facets.brand.as_deref() != Some(brand)
+                    || doc.facets.model.as_deref() != Some(model)
+                    || doc.facets.size.as_deref() != Some(size)
+                    || doc.facets.campaign_number.is_some()
+                {
+                    return Err("OFFLINE_PACK_INVALID");
+                }
+            }
         } else {
             let context = doc
                 .context_id

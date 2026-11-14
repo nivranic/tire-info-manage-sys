@@ -612,6 +612,7 @@ def documents(contexts, members, *, preview_byte_limit=None):
                 add(id=prefix, category='evidence', kind=kind, member=item,
                     title='NHTSA 搜索空观察 · ' + payload['query']['search'], text=stable_json(payload))
         elif kind == 'test_event':
+            from .test_events import participant_tested_size
             event = payload['event']
             for index, participant in enumerate(event['participants']):
                 scoped = {key: value for key, value in event.items() if key not in {'participants', 'measurements'}}
@@ -620,7 +621,7 @@ def documents(contexts, members, *, preview_byte_limit=None):
                 add(id=prefix + ':record:' + str(index), category='evidence', kind=kind, member=item,
                     record_index=index, title=event['title'] + ' · ' + participant['brand'] + ' ' + participant['model'],
                     text=stable_json(scoped), facets={'brand': participant['brand'], 'model': participant['model'],
-                    'size': event['tested_size']})
+                    'size': participant_tested_size(event, participant)})
         else:
             value = payload.get('variant') or payload.get('vehicle') or payload['evidence']
             facets = {'brand': value.get('brand') or value.get('manufacturer', {}).get('name'),

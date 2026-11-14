@@ -158,7 +158,7 @@ def test_append_only_sql_replace_cannot_destroy_any_unique_history(candidate_ai_
 
 @pytest.fixture
 def candidate_ai_predecessor(tmp_path, monkeypatch):
-    """A real pre-021 file schema and synthetic business history, never normal DB."""
+    """Current-shape file fixture with pre-021 ledger and synthetic history."""
     parent = Path(os.environ.get('R77_TEST_STORAGE_ROOT', str(tmp_path)))
     url = configured_environment(monkeypatch, parent / uuid4().hex[:8])
     monkeypatch.setenv('TI_AI_ENABLED', '0')
@@ -168,6 +168,8 @@ def candidate_ai_predecessor(tmp_path, monkeypatch):
     from tire_api.webhook_models import MODELS as WEBHOOK_MODELS
     from tire_api.external_api_models import TABLES as EXTERNAL_TABLES
     from tire_api.knowledge_models import initialize_search
+    from tire_api.source_text_models import initialize_source_text_search
+    from tire_api.document_text_models import initialize_document_text_search
     from test_identity_migration import seed_legacy
     from version_registry import EXPECTED_SCHEMA_VERSIONS
     database = create_app(url).state.database
@@ -180,6 +182,8 @@ def candidate_ai_predecessor(tmp_path, monkeypatch):
         for version in EXPECTED_SCHEMA_VERSIONS[:20]:
             connection.execute(text('INSERT INTO tire_schema_versions (version) VALUES (:version)'), {'version': version})
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
     with database.sessions() as db:
         seed_legacy(db, namespace='SYNTHETIC-R77', product_code='SYNTHETIC-PRE021', watch=True)
     try:

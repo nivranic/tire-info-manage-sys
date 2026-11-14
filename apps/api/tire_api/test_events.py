@@ -22,8 +22,21 @@ class Participant(StrictModel):
     brand: DescriptionText = Field(min_length=1, max_length=120)
     model: DescriptionText = Field(min_length=1, max_length=200)
     source_designation: DescriptionText = Field(default='', max_length=300)
+    tested_size: str | None = Field(default=None, max_length=24)
     # A Participant is sufficient when the publication cannot identify an exact SKU.
     # No name/size-based automatic linkage to TireVariant is performed.
+
+    @field_validator('tested_size')
+    @classmethod
+    def normalize_tested_size(cls, value):
+        return parse_size(value) if value is not None else None
+
+    @model_serializer(mode='wrap')
+    def serialize_participant(self, handler):
+        value = handler(self)
+        if self.tested_size is None:
+            value.pop('tested_size', None)
+        return value
 
 
 class MetricDefinition(StrictModel):
@@ -64,7 +77,7 @@ class EventPayload(StrictModel):
     publication: TestPublication | None = None
     source_url: str = Field(min_length=1, max_length=2048)
     rights_basis: DescriptionText = Field(min_length=5, max_length=1000)
-    tested_size: str = Field(max_length=24)
+    tested_size: str | None = Field(max_length=24)
     vehicle: DescriptionText | None = Field(default=None, max_length=200)
     surface: DescriptionText | None = Field(default=None, max_length=200)
     conditions: DescriptionText = Field(min_length=3, max_length=2000)
@@ -89,10 +102,16 @@ class EventPayload(StrictModel):
     @field_validator('tested_size')
     @classmethod
     def size(cls, value):
-        return parse_size(value)
+        return parse_size(value) if value is not None else None
 
     @model_validator(mode='after')
     def consistent_event(self):
+        sizes = {person.tested_size for person in self.participants}
+        if self.tested_size is None:
+            if None in sizes or len(sizes) < 2:
+                raise ValueError('混合尺寸场次须为每个参测胎提供尺寸，并包含至少两种尺寸')
+        elif sizes - {None, self.tested_size}:
+            raise ValueError('参测胎尺寸与本场共同尺寸不一致，请核对或选择混合尺寸')
         people = {row.key for row in self.participants}
         metrics = {row.key for row in self.metrics}
         if len(people) != len(self.participants) or len(metrics) != len(self.metrics):
@@ -131,6 +150,10 @@ class SaveEvent(StrictModel):
 
 class ReviseEvent(SaveEvent):
     expected_revision: StrictInt = Field(ge=1)
+
+
+def participant_tested_size(payload, participant):
+    return participant.get('tested_size') or payload['tested_size']
 
 
 class EventStateRequest(StrictModel):
@@ -242,7 +265,8 @@ def compare_revision(row, participant_ids, metric_keys):
             'participants': [{**people[k], 'id': k} for k in participant_ids],
             'metrics': [metrics[k] for k in metric_keys], 'measurements': measurements,
             'ranking': 'source_reported_only',
-            'notice': '人工录入的历史测试记录，未经在线核验；不同事件不可直接排名，缺少成绩不等于零。'}
+            'notice': '人工录入的历史测试记录，未经在线核验；不同事件不可直接排名，缺少成绩不等于零。'
+                + ('本场参测尺寸不同，须结合逐胎尺寸和原试验目的解读。' if row.payload['tested_size'] is None else '')}
 
 
 def register_test_event_routes(app: FastAPI):

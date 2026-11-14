@@ -712,7 +712,7 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
                 if event.state == 'revoked':
                     raise HTTPException(409, '已撤销测试事件不参与 AI 分析')
                 data = event.payload
-                values = {'发布日期': data['publication_date'], '测试尺寸': data['tested_size'],
+                values = {'发布日期': data['publication_date'], '测试尺寸': data['tested_size'] or '混合尺寸，见逐参测胎记录',
                           '条件': data['conditions'], '车辆': data['vehicle'], '路面': data['surface'],
                           '覆盖范围': data['coverage'], '来源参测总数': data['reported_participants']}
                 for i, measurement in enumerate(data['measurements']):

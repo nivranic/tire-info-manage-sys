@@ -139,6 +139,62 @@ fn garage_package_accepts_account_scope_and_preserves_legacy_scope() {
 }
 
 #[test]
+fn mixed_test_sizes_bind_participant_facets_and_keep_legacy_bytes_readable() {
+    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../mobile/android/app/src/androidTest/assets/offline-producer-v2");
+    let bytes = fs::read(directory.join("valid-envelope.json")).unwrap();
+    let descriptor: wire::Descriptor =
+        serde_json::from_slice(&fs::read(directory.join("valid-descriptor.json")).unwrap())
+            .unwrap();
+    assert!(wire::package(&bytes, &descriptor).is_ok());
+    let mut raw: Value = serde_json::from_slice(&bytes).unwrap();
+    let member = raw["members"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|member| member["reference"]["kind"] == "test_event")
+        .unwrap();
+    member["payload"]["event"]["tested_size"] = Value::Null;
+    for (index, person) in member["payload"]["event"]["participants"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .enumerate()
+    {
+        person["tested_size"] = json!(if index == 0 { "225/50R17" } else { "205/55R16" });
+    }
+    for document in raw["documents"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .filter(|doc| doc["kind"] == "test_event")
+    {
+        document["facets"]["size"] = json!(if document["record_index"] == 0 {
+            "225/50R17"
+        } else {
+            "205/55R16"
+        });
+    }
+    let (mixed_bytes, mixed_descriptor) = rehash(raw.clone(), &descriptor);
+    assert!(wire::package(&mixed_bytes, &mixed_descriptor).is_ok());
+    for field in ["brand", "model", "size"] {
+        let mut damaged = raw.clone();
+        let document = damaged["documents"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|doc| doc["kind"] == "test_event" && doc["record_index"] == 0)
+            .unwrap();
+        document["facets"][field] = json!("foreign participant");
+        let (damaged_bytes, damaged_descriptor) = rehash(damaged, &descriptor);
+        assert!(
+            wire::package(&damaged_bytes, &damaged_descriptor).is_err(),
+            "{field}"
+        );
+    }
+}
+
+#[test]
 fn encrypted_store_reopens_searches_han_and_retains_tombstones() {
     let root = TestRoot::new();
     let keys = FakeKeys::default();

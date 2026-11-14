@@ -318,6 +318,28 @@ def test_all_domains_exact_revision_origin_empty_recall_and_per_record_search(se
     assert 'documents' not in vehicle['payload']
 
 
+@pytest.mark.parametrize('version', ['offline-pack@1', 'offline-pack@2'])
+def test_mixed_test_sizes_export_separate_participant_facets(setup, version):
+    from test_test_events import PAYLOAD, create
+    client, _, _database = setup
+    payload = deepcopy(PAYLOAD)
+    payload['event']['tested_size'] = None
+    for person, size in zip(payload['event']['participants'], ('225/50R17', '205/55R16')):
+        person['tested_size'] = size
+    event = create(client, payload)
+    scope = deepcopy(EMPTY_SCOPE)
+    scope['references'] = [{'kind': 'test_event', 'event_id': event['id'], 'event_revision': 1}]
+    prepared = plan(client, scope, supported_pack_schemas=[version])
+    response = confirm(client, prepared)
+    assert response.status_code == 201, response.text
+    _, envelope = download(client, response.json())
+    member = next(row for row in envelope['members'] if row['reference']['kind'] == 'test_event')
+    assert member['payload']['event'] == event['event']
+    documents = [row for row in envelope['documents'] if row['member_key'] == member['key']]
+    assert [(row['facets']['brand'], row['facets']['size']) for row in documents] == [
+        ('Fixture A', '225/50R17'), ('Fixture B', '205/55R16')]
+
+
 def test_concurrent_same_uuid_creates_exactly_one_package(setup):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier

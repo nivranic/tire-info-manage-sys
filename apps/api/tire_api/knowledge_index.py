@@ -13,7 +13,7 @@ from .service import QueryService, timestamp
 from .test_events import TireTestRevision
 from .vehicles import VehicleSnapshot, VehicleVerification
 
-INDEX_VERSION = 'accepted-heads-fts@6'
+INDEX_VERSION = 'accepted-heads-fts@7'
 OMIT_FACTS = {'evidence_spans', 'source_field_conflicts'}
 IDENTITY_FIELDS = ('brand', 'model', 'region', 'size', 'manufacturer_product_code', 'load_index',
                    'speed_rating', 'xl', 'hl', 'oe_mark', 'acoustic_technology', 'run_flat')
@@ -316,6 +316,7 @@ def check_vehicle_document_use(db, documents, purpose='local_structured'):
 
 
 def _event_documents(db, heads):
+    from .test_events import participant_tested_size
     ids = {head['id'] for head in heads if head['state'] == 'active'}
     rows = db.execute(select(TireTestRevision.event_id, TireTestRevision.revision, TireTestRevision.payload,
                              TireTestRevision.created_at, TireTestRevision.fingerprint).where(TireTestRevision.id.in_(ids))) if ids else []
@@ -330,14 +331,21 @@ def _event_documents(db, heads):
         values['measurements'] = [{key: value for key, value in item.items() if key != 'evidence_locator'}
                                   for item in data['measurements']]
         label = '人工测试记录 · ' + data['title']
-        excerpt = f'{data["tested_size"]}；{data["conditions"]}；' + '；'.join(
+        sizes = list(dict.fromkeys(participant_tested_size(data, person) for person in data['participants']))
+        excerpt = f'{" / ".join(sizes)}；{data["conditions"]}；' + '；'.join(
             f'{person["brand"]} {person["model"]}' for person in data['participants'])
         document = _document(kind='test_event', reference={'kind': 'test_event', 'event_id': row.event_id, 'event_revision': row.revision},
             label=label, excerpt=excerpt, source_id=None, source_url=data['source_url'], region=None,
             observed_at=row.created_at, verified_at=None, source_class='manual_test', values=values,
             facets=_facets(brand=[p['brand'] for p in data['participants']], model=[p['model'] for p in data['participants']],
                            brand_model=[normalized(p['brand']) + ' | ' + normalized(p['model']) for p in data['participants']],
-                           size=data['tested_size']))
+                           brand_size=[normalized(p['brand']) + ' | ' + size_key(participant_tested_size(data, p))
+                                       for p in data['participants']],
+                           model_size=[normalized(p['model']) + ' | ' + size_key(participant_tested_size(data, p))
+                                       for p in data['participants']],
+                           brand_model_size=[normalized(p['brand']) + ' | ' + normalized(p['model']) + ' | '
+                                             + size_key(participant_tested_size(data, p)) for p in data['participants']],
+                           size=sizes))
         if data.get('publication') is not None:
             document['payload']['test_publication'] = {**data['publication'], 'event_fingerprint': row.fingerprint}
         docs.append(document)

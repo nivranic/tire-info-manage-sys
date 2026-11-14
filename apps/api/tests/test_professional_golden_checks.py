@@ -48,6 +48,24 @@ def test_every_frozen_case_has_a_closed_independent_graph(cases):
         assert checks.load_case(case).case_id == case['case_id']
 
 
+def test_mixed_sizes_are_preserved_by_independent_literals(cases):
+    event = deepcopy(cases['synthetic-exact-two']['input']['event'])
+    legacy = checks.EventLiteral.model_validate(event).model_dump()
+    assert all('tested_size' not in person for person in legacy['participants'])
+    event['tested_size'] = None
+    for person, size in zip(event['participants'], ('225/50R17', '205/55R16')):
+        person['tested_size'] = size
+    assert checks.EventLiteral.model_validate(event).model_dump() == event
+    for common, sizes in [(None, [None, '205/55R16']), (None, ['205/55R16', '205/55R16']),
+                          ('225/50R17', ['225/50R17', '205/55R16'])]:
+        invalid = deepcopy(event)
+        invalid['tested_size'] = common
+        for person, size in zip(invalid['participants'], sizes):
+            person['tested_size'] = size
+        with pytest.raises(ValueError):
+            checks.EventLiteral.model_validate(invalid)
+
+
 @pytest.mark.parametrize('field,value', [('store_original', 1), ('workspace_reopen', 'true'),
     ('quote_identifiers', None), ('provider_use', 0), ('export', 'false')])
 def test_license_flags_cannot_use_pydantic_literal_coercion(cases, field, value):

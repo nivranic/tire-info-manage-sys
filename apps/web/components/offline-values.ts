@@ -213,6 +213,10 @@ export async function validateOfflineBytes(bytes: Uint8Array, descriptorValue: u
         const record = object(records[Number(document.record_index)]);
         equal(facets.brand, member.reference.kind === "recall" ? record.make : record.brand); equal(facets.model, member.reference.kind === "recall_search" ? record.tireline : record.model);
         if (member.reference.kind === "recall_search") equal(facets.size, record.size);
+        if (member.reference.kind === "test_event") {
+          const size = record.tested_size ?? object(member.payload.event).tested_size;
+          id(size); equal(facets.size, size);
+        }
       } else { equal(document.record_index, null); equal(document.id, `member:${member.key}`); }
     } else {
       oneOf(document.category, ["garage", "watchlist"]); equal(document.member_key, null); equal(document.record_index, null);

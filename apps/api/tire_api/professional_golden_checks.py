@@ -5,7 +5,7 @@ authenticate current HTTP execution, authorization, representative data or peopl
 """
 from typing import Annotated, Literal
 
-from pydantic import ConfigDict, Field, JsonValue, model_validator
+from pydantic import ConfigDict, Field, JsonValue, model_serializer, model_validator
 
 from .domain import StrictModel
 
@@ -84,6 +84,14 @@ class ParticipantLiteral(Closed):
     brand: str = Field(min_length=1, max_length=120)
     model: str = Field(min_length=1, max_length=200)
     source_designation: str = Field(max_length=300)
+    tested_size: str | None = Field(default=None, min_length=1, max_length=24)
+
+    @model_serializer(mode='wrap')
+    def serialize_participant(self, handler):
+        value = handler(self)
+        if self.tested_size is None:
+            value.pop('tested_size', None)
+        return value
 
 
 class MetricLiteral(Closed):
@@ -111,7 +119,7 @@ class EventLiteral(Closed):
     publication_date: str | None = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
     source_url: str = Field(min_length=1, max_length=2048)
     rights_basis: str = Field(min_length=5, max_length=1000)
-    tested_size: str = Field(min_length=1, max_length=24)
+    tested_size: str | None = Field(min_length=1, max_length=24)
     vehicle: str | None = Field(max_length=200)
     surface: str | None = Field(max_length=200)
     conditions: str = Field(min_length=3, max_length=2000)
@@ -120,6 +128,16 @@ class EventLiteral(Closed):
     participants: list[ParticipantLiteral] = Field(min_length=1, max_length=60)
     metrics: list[MetricLiteral] = Field(min_length=1, max_length=24)
     measurements: list[MeasurementLiteral] = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode='after')
+    def consistent_test_sizes(self):
+        sizes = {person.tested_size for person in self.participants}
+        if self.tested_size is None:
+            if None in sizes or len(sizes) < 2:
+                raise ValueError('Mixed events require explicit, different participant sizes')
+        elif sizes - {None, self.tested_size}:
+            raise ValueError('Participant size conflicts with the common event size')
+        return self
 
 
 class VariantLiteral(Closed):
@@ -1164,7 +1182,7 @@ def _bridge_body(case, attempt, actual, body, failures, path, *, preview=False):
             'unknown' if value is None or assertion is None else
             'match' if type(claimed) is type(value) and claimed == value else 'conflict')
         expected_checks.append({'field': field, 'status': state, 'material_value': claimed, 'sku_value': value})
-    for field, value, key in [('test_size_scope', event['tested_size'], 'size'),
+    for field, value, key in [('test_size_scope', participant.get('tested_size') or event['tested_size'], 'size'),
             ('test_participant_brand', participant['brand'], 'brand'), ('test_participant_model', participant['model'], 'model')]:
         expected_checks.append({'field': field, 'status': 'match' if type(value) is type(identity[key]) and value == identity[key] else 'conflict',
             'material_value': value, 'sku_value': identity[key]})

@@ -17,7 +17,7 @@ from .identity_models import IdentityRevision
 from .interest_events import _catalog_memberships, _tire_side
 from .object_store import ObjectStoreError
 from .service import QueryService, provenance, timestamp
-from .test_events import EventPayload, TireTestRevision, latest as latest_event
+from .test_events import EventPayload, TireTestRevision, latest as latest_event, participant_tested_size
 from .test_sku_link_models import TestSkuLink, TestSkuLinkRevision
 
 SCHEMA = 'test-sku-link@1'
@@ -234,7 +234,7 @@ def validate_assertions(assertions, identity, materials):
 
 
 def cross_side_checks(test, tire):
-    pairs = [('test_size_scope', test['event']['tested_size'], tire['identity'].get('size')),
+    pairs = [('test_size_scope', participant_tested_size(test['event'], test['participant']), tire['identity'].get('size')),
         ('test_participant_brand', test['participant']['brand'], tire['identity'].get('brand')),
         ('test_participant_model', test['participant']['model'], tire['identity'].get('model'))]
     return [{'field': field, 'status': 'match' if type(value) is type(expected) and value == expected else 'conflict',
@@ -356,7 +356,7 @@ def assess_link(frozen, binding, *, prior_binding=None, review_state='pending_re
             blockers.append('identity_assertions_incomplete')
         if contract['identity_status'] != 'complete':
             blockers.append('complete_identity_required')
-        if test['event']['tested_size'] != tire['identity'].get('size'):
+        if participant_tested_size(test['event'], test['participant']) != tire['identity'].get('size'):
             blockers.append('test_size_scope_mismatch')
     if prior_binding is not None:
         stale = [key + '_changed' for key in binding if digest(prior_binding.get(key)) != digest(binding[key])]

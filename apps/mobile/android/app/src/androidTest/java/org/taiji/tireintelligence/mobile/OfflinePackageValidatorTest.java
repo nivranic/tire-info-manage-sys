@@ -74,6 +74,44 @@ public final class OfflinePackageValidatorTest {
         invalidEnvelope(new JSONObject(envelope.toString()).put("contexts", validated));
         assertNotNull(OfflinePackageValidator.envelope(asset("valid-envelope.json"), descriptor()));
     }
+    @Test public void mixedTestSizesBindEachParticipantFacetAndKeepLegacyBytesReadable() throws Exception {
+        JSONObject envelope = OfflinePackageValidator.parse(asset("valid-envelope.json"));
+        JSONArray members = envelope.getJSONArray("members"), documents = envelope.getJSONArray("documents");
+        boolean found = false;
+        for (int i = 0; i < members.length(); i++) {
+            JSONObject member = members.getJSONObject(i);
+            if (!member.getJSONObject("reference").getString("kind").equals("test_event")) continue;
+            JSONObject event = member.getJSONObject("payload").getJSONObject("event");
+            event.put("tested_size", JSONObject.NULL);
+            JSONArray participants = event.getJSONArray("participants");
+            for (int j = 0; j < participants.length(); j++) {
+                participants.getJSONObject(j).put("tested_size", j == 0 ? "225/50R17" : "205/55R16");
+            }
+            found = true;
+        }
+        assertTrue(found);
+        for (int i = 0; i < documents.length(); i++) {
+            JSONObject document = documents.getJSONObject(i);
+            if (document.getString("kind").equals("test_event")) {
+                document.getJSONObject("facets").put("size", document.getInt("record_index") == 0 ? "225/50R17" : "205/55R16");
+            }
+        }
+        byte[] bytes = envelope.toString().getBytes(StandardCharsets.UTF_8);
+        JSONObject bound = descriptor().put("sha256", OfflineCipher.sha256(bytes)).put("byte_count", bytes.length);
+        assertNotNull(OfflinePackageValidator.envelope(bytes, bound));
+        for (String field : new String[]{"brand", "model", "size"}) {
+            JSONObject damaged = new JSONObject(envelope.toString());
+            JSONArray docs = damaged.getJSONArray("documents");
+            for (int i = 0; i < docs.length(); i++) {
+                JSONObject doc = docs.getJSONObject(i);
+                if (doc.getString("kind").equals("test_event") && doc.getInt("record_index") == 0) {
+                    doc.getJSONObject("facets").put(field, "foreign participant"); break;
+                }
+            }
+            invalidEnvelope(damaged);
+        }
+        assertNotNull(OfflinePackageValidator.envelope(asset("valid-envelope.json"), descriptor()));
+    }
     @Test public void malformedTransportBindingStorageConsentAndBooleanNumbersAreRejected() throws Exception {
         JSONObject descriptor = descriptor(), request = request(descriptor);
         invalid(() -> OfflinePackageValidator.installRequest(new JSONObject(request.toString()).put("allow_device_storage", 1)));

@@ -70,6 +70,22 @@ def test_review_pure_first_observation_retains_exact_fact_path_filtering():
     assert match_event(event, criteria)['state'] == 'matched'
 
 
+def test_review_mixed_test_sizes_do_not_cross_participant_identity():
+    from tire_api.interest_matching import InterestCriteria, match_event
+    payload = deepcopy(PAYLOAD['event'])
+    payload['tested_size'] = None
+    payload['participants'][0]['tested_size'] = '225/50R17'
+    payload['participants'][1]['tested_size'] = '205/55R16'
+    event = {'domain': 'test_event', 'before': None,
+        'after': {'event': payload, 'evidence_valid': True}, 'changed_paths': []}
+    matching = InterestCriteria.model_validate({'conditions': [condition('brand', 'Fixture B'),
+        condition('size', '205/55R16')], 'metric_keys': [], 'changed_fields': []})
+    foreign_size = InterestCriteria.model_validate({'conditions': [condition('brand', 'Fixture A'),
+        condition('size', '205/55R16')], 'metric_keys': [], 'changed_fields': []})
+    assert match_event(event, matching)['state'] == 'matched'
+    assert match_event(event, foreign_size)['state'] != 'matched'
+
+
 @pytest.mark.parametrize('domain,after,criterion', [
     ('test_event', {'event': deepcopy(PAYLOAD['event']), 'evidence_valid': False},
      {'kind': 'test_organization', 'values': ['Fixture Test Lab']}),

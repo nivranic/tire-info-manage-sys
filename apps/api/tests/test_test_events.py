@@ -68,6 +68,43 @@ def pdf_measurement_payload(client):
     return payload, document
 
 
+def test_mixed_test_sizes_roundtrip_compare_and_old_payload_remain_exact(setup):
+    client, _database = setup
+    legacy = create(client)
+    assert all('tested_size' not in row for row in legacy['event']['participants'])
+    payload = deepcopy(PAYLOAD)
+    payload['event']['tested_size'] = None
+    for person, size in zip(payload['event']['participants'], ('225/50 R17', '205/55R16')):
+        person['tested_size'] = size
+    row = create(client, payload)
+    assert row['tested_size'] is None
+    assert [person['tested_size'] for person in row['participants']] == ['225/50R17', '205/55R16']
+    comparison = compare(client, row)
+    assert comparison.status_code == 200
+    assert comparison.json()['event']['tested_size'] is None
+    assert [person['tested_size'] for person in comparison.json()['participants']] == ['225/50R17', '205/55R16']
+    restored = client.get('/v1/test-events/' + row['id'], params={'mode': 'history'}).json()
+    assert restored['event'] == row['event'] and restored['fingerprint'] == row['fingerprint']
+    old = client.get('/v1/test-events/' + legacy['id'], params={'mode': 'history'}).json()
+    assert old['event'] == legacy['event'] and old['fingerprint'] == legacy['fingerprint']
+
+
+@pytest.mark.parametrize('common,sizes', [
+    (None, [None, '205/55R16']),
+    (None, ['205/55R16', '205/55R16']),
+    ('225/50R17', ['205/55R16', None]),
+    (None, ['195R14C', '205/55R16']),
+])
+def test_mixed_test_sizes_reject_missing_conflicting_or_unsupported_sizes(setup, common, sizes):
+    client, database = setup
+    payload = deepcopy(PAYLOAD)
+    payload['event']['tested_size'] = common
+    for person, size in zip(payload['event']['participants'], sizes):
+        person['tested_size'] = size
+    assert client.post('/v1/test-events', json=payload).status_code == 422
+    assert count(database, TireTestEvent) == 0
+
+
 def test_legacy_measurements_omit_pdf_reference_and_keep_payload_fingerprint(setup):
     from tire_api.domain import digest
     from tire_api.test_events import EventPayload

@@ -692,7 +692,7 @@ export interface WatchItem { id: string; variant_id: string; created_at?: string
 export interface ChangeItem { id: string; variant_id?: string; field?: string; observed_at?: string; kind?: string; identity_contract?: import("./identity-contract").IdentityContract; [key: string]: unknown }
 export interface Health { status: string; mode: string; database: string }
 
-export interface TestParticipant { key: string; brand: string; model: string; source_designation: string }
+export interface TestParticipant { key: string; brand: string; model: string; source_designation: string; tested_size?: string }
 export interface TestMetricDefinition { key: string; label: string; unit: string; protocol: string; direction: "lower" | "higher" | "unspecified" }
 export interface TestMeasurement {
   participant_key: string; metric_key: string; raw_value: string; source_rank: number | null;
@@ -705,7 +705,7 @@ export interface TestPublication {
 }
 export interface TestEventPayload {
   title: string; organization: string; relationship: "independent" | "manufacturer_commissioned" | "unknown";
-  publication_date: string | null; source_url: string; rights_basis: string; tested_size: string;
+  publication_date: string | null; source_url: string; rights_basis: string; tested_size: string | null;
   publication?: TestPublication;
   vehicle: string | null; surface: string | null; conditions: string;
   coverage: "selected_results" | "full_event"; reported_participants: number | null;
@@ -713,7 +713,7 @@ export interface TestEventPayload {
 }
 export interface TestEventRecord {
   id: string; revision: number; revision_id: string; state: "active" | "revoked";
-  title: string; organization: string; tested_size: string; publication_date: string | null;
+  title: string; organization: string; tested_size: string | null; publication_date: string | null;
   relationship: TestEventPayload["relationship"]; coverage: TestEventPayload["coverage"];
   participant_count: number; metric_count: number; recorded_at: string; fingerprint: string;
   record_kind: "manual_transcription"; verification_status: "unverified"; verified_at: null;

@@ -44,6 +44,28 @@ test("account garage scope validates with all member reasons while legacy bytes 
   await assert.rejects(changed(data => { data.contexts.find(row => row.kind === "garage").scope = "another_account"; }), { code: "OFFLINE_INVALID_PACK" });
 });
 
+test("mixed test sizes bind each search facet to its participant and preserve legacy packages", async () => {
+  const mixed = data => {
+    const member = data.members.find(row => row.reference.kind === "test_event");
+    member.payload.event.tested_size = null;
+    member.payload.event.participants.forEach((person, index) => { person.tested_size = index === 0 ? "225/50R17" : "205/55R16"; });
+    for (const document of data.documents.filter(row => row.kind === "test_event")) {
+      document.facets.size = member.payload.event.participants[document.record_index].tested_size;
+    }
+  };
+  const validated = await changed(mixed);
+  const request = { slot_id: slot.slot_id, expected_generation: 1, kind: "test_event", query: "Fixture B 205/55R16", offset: 0, limit: 20 };
+  assert.equal(values.searchOfflineEnvelope(validated, slot, request).total, 1);
+  assert.equal(values.searchOfflineEnvelope(validated, slot, { ...request, query: "Fixture A 205/55R16" }).total, 0);
+  for (const field of ["brand", "model", "size"]) {
+    await assert.rejects(changed(data => {
+      mixed(data);
+      data.documents.find(row => row.kind === "test_event" && row.record_index === 0).facets[field] = "foreign participant";
+    }), { code: "OFFLINE_INVALID_PACK" });
+  }
+  assert.equal((await values.validateOfflineBytes(bytes, descriptor)).package_id, descriptor.id);
+});
+
 test("original bytes are hashed before parsing; whitespace is not silently canonicalized", async () => {
   const altered = new Uint8Array([...bytes, 32]);
   await assert.rejects(values.validateOfflineBytes(altered, descriptor), { code: "OFFLINE_HASH_MISMATCH" });

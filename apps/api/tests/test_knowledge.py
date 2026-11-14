@@ -210,6 +210,32 @@ def test_latest_before_region_filter_and_lifecycle_revocation(setup):
     assert search(client, filters={'variant_id': identity}).json()['total'] == 1
 
 
+def test_mixed_event_size_filters_stay_on_one_participant_and_rebuild_old_index(setup):
+    client, _, database = setup
+    data = deepcopy(PAYLOAD)
+    data['event']['tested_size'] = None
+    data['event']['participants'][0].update(tested_size='225/50R17', model='First model')
+    data['event']['participants'][1].update(tested_size='205/55R16', model='Second model')
+    record = create(client, data)
+    for text in ('', 'Synthetic'):
+        for selected in ({'size': '205/55R16'}, {'brand': 'Fixture B', 'size': '205/55R16'},
+                         {'model': 'Second model', 'size': '205/55R16'},
+                         {'brand': 'Fixture B', 'model': 'Second model', 'size': '205/55R16'}):
+            assert search(client, text, {'kind': 'test_event', **selected}).json()['total'] == 1
+        for selected in ({'brand': 'Fixture A', 'size': '205/55R16'},
+                         {'model': 'First model', 'size': '205/55R16'},
+                         {'brand': 'Fixture A', 'model': 'First model', 'size': '205/55R16'}):
+            assert search(client, text, {'kind': 'test_event', **selected}).json()['total'] == 0
+    with database.sessions() as db:
+        state = db.get(KnowledgeIndexState, 'accepted')
+        state.version = 'accepted-heads-fts@6'
+        db.commit()
+    restored = search(client, filters={'kind': 'test_event', 'brand': 'Fixture B', 'size': '205/55R16'}).json()
+    assert restored['items'][0]['reference']['event_id'] == record['id']
+    with database.sessions() as db:
+        assert db.get(KnowledgeIndexState, 'accepted').version == 'accepted-heads-fts@7'
+
+
 def test_event_latest_revision_before_matching_revoke_and_participant_pair(setup):
     client, _, _ = setup
     data = deepcopy(PAYLOAD)

@@ -236,8 +236,11 @@ final class OfflinePackageValidator {
                                 java.util.Objects.equals(row.opt("size"), facets.opt("size")) && facets.isNull("campaign_number"));
                         } else {
                             JSONObject row = at(records, record);
+                            Object size = row.isNull("tested_size") ? object(payload, "event").opt("tested_size") : row.opt("tested_size");
+                            require(size instanceof String && !((String) size).isEmpty());
                             require(java.util.Objects.equals(row.opt("brand"), facets.opt("brand")) &&
-                                java.util.Objects.equals(row.opt("model"), facets.opt("model")) && facets.isNull("campaign_number"));
+                                java.util.Objects.equals(row.opt("model"), facets.opt("model")) &&
+                                java.util.Objects.equals(size, facets.opt("size")) && facets.isNull("campaign_number"));
                         }
                     }
                 } else require(doc.isNull("record_index"));
