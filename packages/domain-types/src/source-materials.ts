@@ -29,6 +29,7 @@ export interface SourceMaterialPolicy {
   source_reference_url: string;
   download_url: string;
   redirect_urls: string[];
+  robots_redirect_urls?: string[];
   rights: SourceMaterialRights;
   policy_fingerprint: string;
   source_attribution?: SourceMaterialAttribution;
@@ -82,6 +83,8 @@ export interface SourceMaterialRedirect {
 
 export interface SourceMaterialRobots {
   url: string;
+  final_url?: string;
+  redirects?: SourceMaterialRedirect[];
   status: number;
   raw_hash: string | null;
   byte_count: number;
@@ -91,7 +94,7 @@ export interface SourceMaterialRobots {
 }
 
 export interface SourceMaterialReceipt {
-  schema: "source-material-receipt@1";
+  schema: "source-material-receipt@1" | "source-material-receipt@2";
   request_id: string;
   policy_fingerprint: string;
   source_reference_url: string;

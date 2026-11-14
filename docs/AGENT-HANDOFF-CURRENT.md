@@ -1,5 +1,7 @@
 # 胎迹 Agent 接手卡
 
+本阶段完成robots精确HTTPS跳转、@2来源凭证与Web消费，并通过正常捕获接口取得首份可恢复专业研究PDF。15页原件、CC BY 4.0、正文索引／引用及完整下载摘要已核对，精确SKU和真人Golden继续待验。接手先读[许可原件接手卡](AGENT-HANDOFF-2026-11-14-MATERIAL.md)和[阶段验收](assurance/evidence/material-robots-original-2026-11-14.md)，继续完整V1。
+
 中国召回公告 AI 证据、同步／流式、SDK／Web、原件引用及报告导出已完成本阶段验收。最终519项受管回归、SDK14项、Web66项、生产浏览器15项通过，独立非拥有者PG／TLS取得真实公告live，合成Provider生成与三种导出通过。接手先读[中国召回AI交接卡](AGENT-HANDOFF-2026-11-14-SAMR-AI.md)和[阶段验收](assurance/evidence/samr-cn-ai-evidence-2026-11-14.md)。真实OpenAI／Embeddings、EPREL、自然长周期、SKU／批次、人工Golden、许可及其余V1 Gate继续待验。下文保留前序交付时点。
 
 中国召回后台监控、即时变化通知、任务SSE、SDK和Web已交付，当前179张模型表、18项可信Parser。受管回归117／192项、SDK13项、Web62项、生产浏览器22项及实际旧库6项通过，独立PG／TLS真实Worker完成4次官方live查询并保存2条通知，16条越权SQL被拒绝。接手先读[中国召回监控卡](AGENT-HANDOFF-2026-11-14-SAMR-MONITOR.md)和[阶段验收](assurance/evidence/samr-cn-monitoring-2026-11-14.md)，再推进自然长周期、SKU／批次、人工Golden、许可、AI引用和其余V1 Gate。

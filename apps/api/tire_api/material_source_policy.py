@@ -95,6 +95,7 @@ class MaterialPolicy(StrictModel):
     source_reference_url: str
     download_url: str
     redirect_urls: list[str] = Field(max_length=3)
+    robots_redirect_urls: list[str] = Field(default_factory=list, max_length=3)
     rights: MaterialRights
     source_attribution: MaterialSourceAttribution | None = None
 
@@ -106,6 +107,8 @@ class MaterialPolicy(StrictModel):
         value = handler(self)
         if self.source_attribution is None:
             value.pop('source_attribution', None)
+        if not self.robots_redirect_urls:
+            value.pop('robots_redirect_urls', None)
         return value
 
     @field_validator('edition')
@@ -120,7 +123,7 @@ class MaterialPolicy(StrictModel):
             raise ValueError('出版日期须为 ISO 日期')
         return value
 
-    @field_validator('redirect_urls')
+    @field_validator('redirect_urls', 'robots_redirect_urls')
     @classmethod
     def redirects(cls, value):
         if len(set(value)) != len(value):

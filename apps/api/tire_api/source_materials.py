@@ -24,7 +24,7 @@ NOTICE = ('按可信本地许可配置从固定 HTTPS 地址取得原字节；�
           '传输记录不认证出版来源、内容真伪或精确 SKU，不开放 AI、Provider 或导出用途。')
 FAILURE_CODES = frozenset('source_material_' + suffix for suffix in (
     'busy', 'timeout', 'address_blocked', 'network_failed', 'rate_limited', 'encoding_rejected',
-    'too_large', 'incomplete_body', 'robots_invalid', 'robots_unavailable', 'robots_disallowed',
+    'too_large', 'incomplete_body', 'robots_invalid', 'robots_unavailable', 'robots_disallowed', 'robots_redirect_rejected',
     'redirect_rejected', 'http_rejected', 'content_type_rejected', 'pdf_marker_missing',
     'authorization_changed', 'policy_changed', 'storage_failed', 'cancelled', 'capture_failed'))
 
@@ -200,7 +200,7 @@ def checked_transport(db, policy, receipt):
     from datetime import datetime
     from .adapters.robots import RobotsPolicy
     from .adapters.transport import USER_AGENT
-    if (receipt['schema'] != 'source-material-receipt@1' or receipt['source_reference_url'] != policy['source_reference_url']
+    if (receipt['schema'] not in {'source-material-receipt@1', 'source-material-receipt@2'} or receipt['source_reference_url'] != policy['source_reference_url']
             or receipt['initial_url'] != policy['download_url'] or receipt['content_type'] != 'application/pdf'
             or receipt['content_encoding'] != 'identity' or receipt['transport_verification'] != 'https_transport_observed'
             or receipt['content_authenticity'] != 'unverified' or receipt['source_reference_relation'] != 'operator_configured'):
@@ -218,11 +218,28 @@ def checked_transport(db, policy, receipt):
         targets.append(redirect['to_url'])
     if receipt['final_url'] != targets[-1] or len(receipt['robots']) != len(targets):
         raise ValueError('robots chain mismatch')
+    redirected_robots = False
     for target, robot in zip(targets, receipt['robots'], strict=True):
         parsed = urlsplit(target)
         if (robot['target_url'] != target or robot['url'] != f'https://{parsed.netloc}/robots.txt'
                 or robot['allowed'] is not True):
             raise ValueError('robots target mismatch')
+        if 'redirects' in robot or 'final_url' in robot:
+            chain = robot['redirects']
+            if (receipt['schema'] != 'source-material-receipt@2' or not isinstance(chain, list)
+                    or not 1 <= len(chain) <= 3):
+                raise ValueError('robots redirect limit')
+            robot_targets = [robot['url']]
+            for redirect in chain:
+                if (set(redirect) != {'from_url', 'to_url', 'status'}
+                        or redirect['from_url'] != robot_targets[-1]
+                        or redirect['to_url'] not in policy.get('robots_redirect_urls', [])
+                        or redirect['to_url'] in robot_targets or redirect['status'] not in (301, 302, 303, 307, 308)):
+                    raise ValueError('robots redirect mismatch')
+                robot_targets.append(redirect['to_url'])
+            if robot['final_url'] != robot_targets[-1]:
+                raise ValueError('robots final URL mismatch')
+            redirected_robots = True
         if robot['status'] == 200:
             if type(robot['byte_count']) is not int or not 0 <= robot['byte_count'] <= 64 * 1024:
                 raise ValueError('robots size invalid')
@@ -241,6 +258,8 @@ def checked_transport(db, policy, receipt):
         elif (robot['status'] not in (404, 410) or robot['raw_hash'] is not None or robot['byte_count'] != 0
                 or robot['minimum_interval'] != 2.0):
             raise ValueError('robots absence mismatch')
+    if (receipt['schema'] == 'source-material-receipt@2') != redirected_robots:
+        raise ValueError('robots receipt version mismatch')
 
 
 def refreshed_request(db, request_id, fingerprint, actor_id):
@@ -410,7 +429,8 @@ def register_source_material_routes(app: FastAPI):
             db.flush()
             metadata = document_metadata(doc, len(body))
             receipt = {key: deepcopy(obtained[key]) for key in ('initial_url', 'final_url', 'redirects', 'robots', 'started_at', 'completed_at')}
-            receipt.update(schema='source-material-receipt@1', request_id=row.id,
+            schema = 'source-material-receipt@2' if any('redirects' in robot for robot in receipt['robots']) else 'source-material-receipt@1'
+            receipt.update(schema=schema, request_id=row.id,
                 policy_fingerprint=row.policy['policy_fingerprint'], source_reference_url=row.policy['source_reference_url'],
                 raw_hash=raw_hash, byte_count=len(body), content_type='application/pdf', content_encoding='identity',
                 document_id=doc.id, document_metadata_hash=digest({**metadata, 'actor_session_id': doc.actor_session_id}),

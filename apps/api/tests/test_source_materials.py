@@ -101,6 +101,49 @@ def test_legacy_policy_fingerprint_omits_absent_or_null_source_attribution():
     expected = {**deepcopy(POLICY), 'policy_fingerprint': digest(POLICY)}
     assert canonical_policy(POLICY) == expected
     assert canonical_policy({**POLICY, 'source_attribution': None}) == expected
+    assert canonical_policy({**POLICY, 'robots_redirect_urls': []}) == expected
+
+
+@pytest.mark.parametrize('urls', [None, ['http://example.com/robots'],
+    ['https://127.0.0.1/robots'], ['https://example.com/robots?token=value'],
+    ['https://example.com/robots'] * 2, [f'https://example.com/robots/{i}' for i in range(4)]])
+def test_robots_redirect_policy_rejects_ambiguous_or_unbounded_config(urls):
+    from pydantic import ValidationError
+    from tire_api.material_source_policy import canonical_policy
+    with pytest.raises(ValidationError):
+        canonical_policy({**POLICY, 'robots_redirect_urls': urls})
+
+
+def test_robots_redirect_receipt_replay_and_frozen_catalog_reopen(material_app, monkeypatch):
+    from tire_api.material_source_policy import PolicyCatalog, canonical_policy
+    client, app, _ = material_app
+    destination = 'https://cdn.example.org/missing-robots'
+    configured = canonical_policy({**POLICY, 'robots_redirect_urls': [destination]})
+    app.state.material_policies = PolicyCatalog([configured])
+    calls = []
+    async def fetch(policy):
+        calls.append(policy)
+        result = obtained(policy)
+        robot = result['robots'][0]
+        robot.update(final_url=destination, redirects=[{'from_url': robot['url'], 'to_url': destination, 'status': 301}])
+        return result
+    monkeypatch.setattr(app.state.material_transport, 'fetch', fetch)
+    body = payload(client)
+    assert configured['policy_fingerprint'] != canonical_policy(POLICY)['policy_fingerprint']
+    rejected = client.post('/v1/source-materials/captures', json={**body, 'robots_redirect_urls': [destination]})
+    assert rejected.status_code == 422 and not calls
+    response = client.post('/v1/source-materials/captures', json=body)
+    assert response.status_code == 201, response.text
+    result = response.json()
+    assert result['state'] == 'succeeded'
+    assert result['receipt']['schema'] == 'source-material-receipt@2'
+    assert result['receipt']['robots'][0]['final_url'] == destination
+    app.state.material_policies = PolicyCatalog([])
+    assert client.post('/v1/source-materials/captures', json=body).json()['receipt'] == result['receipt']
+    assert len(calls) == 1
+    reopened = client.get('/v1/source-materials/documents/' + result['document']['id'] + '?mode=history')
+    assert reopened.status_code == 200 and reopened.json()['receipt'] == result['receipt']
+    assert client.get('/v1/documents/' + result['document']['id'] + '/content?mode=history').content == PDF
 
 
 @pytest.mark.parametrize('source_class', ['regulatory', 'manufacturer_official', 'oem_fitment',

@@ -5,6 +5,7 @@ import { ApiError, tireApi } from "@tire/api-client";
 import type {
   EvidenceDocument, SourceMaterialCaptureRequest, SourceMaterialPolicies, SourceMaterialPolicy,
   SourceMaterialPreview, SourceMaterialRequestView, SourceMaterialRequests, SourceMaterialStopRequest,
+  SourceMaterialRedirect,
 } from "@tire/domain-types";
 import { useWorkbenchAuth } from "./auth";
 import { useWorkbenchPlatform, type WorkbenchPlatform } from "./workbench-platform";
@@ -35,14 +36,43 @@ const date = (value: string | null) => value && Number.isFinite(Date.parse(value
 const errorText = (cause: unknown) => cause instanceof Error ? cause.message : "来源材料操作未完成，请保留原请求标识核对。";
 const stateLabel = { processing_unconfirmed: "结果尚未确认", stopped_unconfirmed: "已停止采纳 · 网络结果未确认", succeeded: "原件已捕获", failed: "捕获失败" } as const;
 
+function materialUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 2048 || /[^\x21-\x7e]|[?#\\]/.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && ["", "443"].includes(url.port)
+      && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/.test(url.hostname)
+      && !/^[0-9.]+$|\.(?:local|localhost|internal)$/.test(url.hostname)
+      && value.startsWith(`https://${url.hostname}`)
+      && !value.slice(8).split("/").slice(1).some(segment => segment === "." || segment === "..");
+  } catch { return false; }
+}
+
+function redirectTargets(initial: string, chain: SourceMaterialRedirect[], allowed: string[]): string[] {
+  if (!Array.isArray(chain) || chain.length > 3) throw new Error("来源跳转链超出范围。");
+  const targets = [initial];
+  for (const row of chain) {
+    if (!row || row.from_url !== targets[targets.length - 1] || !allowed.includes(row.to_url)
+      || targets.includes(row.to_url) || ![301, 302, 303, 307, 308].includes(row.status)
+      || Object.keys(row).length !== 3) throw new Error("来源跳转链与冻结策略不符。");
+    targets.push(row.to_url);
+  }
+  return targets;
+}
+
 function assertPolicy(policy: SourceMaterialPolicy): void {
   if (!policy || !policy.policy_id || !policy.title || !policy.publisher || !hash(policy.policy_fingerprint)
-    || typeof policy.source_reference_url !== "string" || typeof policy.download_url !== "string"
+    || !materialUrl(policy.source_reference_url) || !materialUrl(policy.download_url)
     || !Array.isArray(policy.redirect_urls) || policy.redirect_urls.length > 3
     || !policy.rights || !policy.rights.rights_holder || !policy.rights.basis
     || policy.rights.store_original !== true || policy.rights.workspace_reopen !== true
     || policy.rights.quote_identifiers !== true || policy.rights.provider_use !== false || policy.rights.export !== false)
     throw new Error("来源策略或许可边界响应不完整，未开放捕获。");
+  for (const urls of [policy.redirect_urls, policy.robots_redirect_urls ?? []]) {
+    if (!Array.isArray(urls) || urls.length > 3 || new Set(urls).size !== urls.length || !urls.every(materialUrl))
+      throw new Error("来源策略跳转地址无效，未开放捕获。");
+  }
+  if (policy.robots_redirect_urls === null) throw new Error("robots 跳转声明无效。");
   const attribution = policy.source_attribution;
   if (attribution !== undefined && (!attribution || !plain(attribution.source_class, 80)
     || attribution.region !== null && !plain(attribution.region, 40)
@@ -78,7 +108,7 @@ function assertView(view: SourceMaterialRequestView, key?: string, documentId?: 
   if (!doc || !receipt || (documentId && doc.id !== documentId) || !hash(doc.raw_hash)
     || !Number.isInteger(doc.byte_count) || doc.byte_count < 1 || doc.byte_count > 8 * 1024 * 1024
     || doc.content_type !== "application/pdf" || doc.status !== "unparsed_receipt" || doc.accepted_as_facts !== false
-    || doc.source_url !== view.policy.source_reference_url || receipt.schema !== "source-material-receipt@1"
+    || doc.source_url !== view.policy.source_reference_url || !["source-material-receipt@1", "source-material-receipt@2"].includes(receipt.schema)
     || receipt.request_id !== view.request_id || receipt.policy_fingerprint !== view.policy_fingerprint
     || receipt.document_id !== doc.id || receipt.raw_hash !== doc.raw_hash || receipt.byte_count !== doc.byte_count
     || !hash(receipt.document_metadata_hash) || !hash(receipt.fingerprint)
@@ -90,6 +120,26 @@ function assertView(view: SourceMaterialRequestView, key?: string, documentId?: 
     || receipt.robots.some(row => row.allowed !== true || ![200, 404, 410].includes(row.status)
       || (row.status === 200 ? !hash(row.raw_hash) : row.raw_hash !== null)))
     throw new Error("来源凭证、原件或未核验边界不一致，未提供文件或来源结论。");
+  const targets = redirectTargets(receipt.initial_url, receipt.redirects, view.policy.redirect_urls);
+  if (receipt.final_url !== targets[targets.length - 1] || receipt.robots.length !== targets.length)
+    throw new Error("原件终点与 robots 检查链不符。");
+  let redirectedRobots = false;
+  receipt.robots.forEach((row, index) => {
+    if (row.target_url !== targets[index] || row.url !== `${targets[index].match(/^https:\/\/[^/]+/)![0]}/robots.txt`
+      || !Number.isInteger(row.byte_count) || row.byte_count < 0 || row.byte_count > 64 * 1024
+      || !Number.isFinite(row.minimum_interval) || row.minimum_interval < 2
+      || (row.status !== 200 && (row.byte_count !== 0 || row.minimum_interval !== 2)))
+      throw new Error("robots 检查与实际原件目标不符。");
+    if ("redirects" in row || "final_url" in row) {
+      if (receipt.schema !== "source-material-receipt@2" || !Array.isArray(row.redirects) || row.redirects.length === 0)
+        throw new Error("robots 跳转与凭证版本不符。");
+      const robotsTargets = redirectTargets(row.url, row.redirects, view.policy.robots_redirect_urls ?? []);
+      if (row.final_url !== robotsTargets[robotsTargets.length - 1]) throw new Error("robots 终点与逐跳记录不符。");
+      redirectedRobots = true;
+    }
+  });
+  if ((receipt.schema === "source-material-receipt@2") !== redirectedRobots)
+    throw new Error("robots 跳转与凭证版本不符。");
 }
 
 function Reference({ value }: { value: string }) {
@@ -117,6 +167,7 @@ function PolicyDetails({ policy }: { policy: SourceMaterialPolicy }) {
     <p className="source-material-boundary">引用页与 PDF 的关系来自操作者配置，许可也是配置声明。系统不认证版权、出版者或 PDF 内容，不自动读取引用页及许可链接。</p>
     <details className="source-material-technical"><summary>允许的精确跳转与策略指纹</summary>
       {policy.redirect_urls.length ? <ul>{policy.redirect_urls.map(url => <li key={url}><Reference value={url} /></li>)}</ul> : <p>不允许跳转到其他地址。</p>}
+      {policy.robots_redirect_urls?.length ? <><h5>允许的 robots 精确跳转</h5><ul>{policy.robots_redirect_urls.map(url => <li key={url}><Reference value={url} /></li>)}</ul></> : null}
       <p className="source-material-hash">策略 SHA-256 {policy.policy_fingerprint}</p>
     </details>
   </div>;
@@ -157,6 +208,7 @@ function ReceiptDetails({ view, busy, onDownload }: { view: SourceMaterialReques
       {receipt.redirects.length ? <ol>{receipt.redirects.map((row, index) => <li key={index}>HTTP {row.status}：<Reference value={row.from_url} /> → <Reference value={row.to_url} /></li>)}</ol> : <p>没有发生重定向。</p>}
       {receipt.robots.map((row, index) => <article className="source-material-robot" key={index}>
         <p>robots：<Reference value={row.url} /> · HTTP {row.status} · {row.status === 200 ? "规则允许该目标" : "明确未提供规则（404/410）"}</p>
+        {row.redirects?.length ? <><p>robots 实际终点 <Reference value={row.final_url!} /></p><ol>{row.redirects.map((hop, hopIndex) => <li key={hopIndex}>HTTP {hop.status} <Reference value={hop.from_url} /> → <Reference value={hop.to_url} /></li>)}</ol></> : null}
         <p>实际核对目标：<Reference value={row.target_url} /></p>
         <p>{row.byte_count.toLocaleString()} 字节 · 最小间隔 {row.minimum_interval} 秒</p>
         <p className="source-material-hash">robots SHA-256：{row.raw_hash ?? "无正文"}</p>

@@ -14,7 +14,7 @@ from .adapters.transport import PublicResolver, SourceAccessError, USER_AGENT
 from .material_source_policy import checked_url
 from .object_store import MAX_OBJECT_BYTES
 
-TOTAL_SECONDS = 20
+TOTAL_SECONDS = 45
 
 
 class MaterialTransportError(Exception):
@@ -113,25 +113,43 @@ class MaterialSourceTransport:
             raise MaterialTransportError('source_material_incomplete_body')
         return bytes(body)
 
-    async def _robots(self, session, target, claimed):
+    async def _robots(self, session, target, claimed, allowed_redirects=()):
         parsed = urlsplit(target)
         host = parsed.hostname
         robots_url = f'https://{parsed.netloc}/robots.txt'
-        await self._pace(host, claimed)
-        async with session.get(URL(robots_url, encoded=True), allow_redirects=False,
-                headers={'Accept': 'text/plain'}) as response:
-            status = response.status
-            if status in (404, 410):
-                body, rules = b'', RobotsPolicy('', USER_AGENT)
-            elif status == 200:
-                if not has_content_type(response, 'text/plain'):
-                    raise MaterialTransportError('source_material_robots_invalid')
-                body = await self._body(response, 64 * 1024)
-                rules = RobotsPolicy(body.decode('utf-8', errors='strict'), USER_AGENT)
-            else:
-                error = MaterialTransportError('source_material_robots_unavailable')
-                error.phase, error.http_status = 'robots_http_status', status
-                raise error
+        current, visited, redirects = robots_url, {robots_url}, []
+        for hop in range(4):
+            await self._pace(urlsplit(current).hostname, claimed)
+            async with session.get(URL(current, encoded=True), allow_redirects=False,
+                    headers={'Accept': 'text/plain'}) as response:
+                status = response.status
+                if status in (301, 302, 303, 307, 308) and allowed_redirects:
+                    locations = header_values(response.headers, 'Location')
+                    if len(locations) != 1 or hop == 3 or any(ord(char) <= 32 for char in locations[0]):
+                        raise MaterialTransportError('source_material_robots_redirect_rejected')
+                    next_url = urljoin(current, locations[0])
+                    try:
+                        checked_url(next_url)
+                    except ValueError:
+                        raise MaterialTransportError('source_material_robots_redirect_rejected') from None
+                    if next_url not in allowed_redirects or next_url in visited:
+                        raise MaterialTransportError('source_material_robots_redirect_rejected')
+                    redirects.append({'from_url': current, 'to_url': next_url, 'status': status})
+                    visited.add(next_url)
+                    current = next_url
+                    continue
+                if status in (404, 410):
+                    body, rules = b'', RobotsPolicy('', USER_AGENT)
+                elif status == 200:
+                    if not has_content_type(response, 'text/plain'):
+                        raise MaterialTransportError('source_material_robots_invalid')
+                    body = await self._body(response, 64 * 1024)
+                    rules = RobotsPolicy(body.decode('utf-8', errors='strict'), USER_AGENT)
+                else:
+                    error = MaterialTransportError('source_material_robots_unavailable')
+                    error.phase, error.http_status = 'robots_http_status', status
+                    raise error
+                break
         if not rules.can_fetch(target):
             raise MaterialTransportError('source_material_robots_disallowed')
         interval = max(2.0, rules.minimum_interval)
@@ -139,12 +157,15 @@ class MaterialSourceTransport:
             self._interval[host] = interval
         entry = {'url': robots_url, 'status': status, 'raw_hash': hashlib.sha256(body).hexdigest() if status == 200 else None,
             'byte_count': len(body), 'allowed': True, 'minimum_interval': interval, 'target_url': target}
+        if redirects:
+            entry.update(final_url=current, redirects=redirects)
         return entry, body
 
     async def _fetch(self, policy, claimed):
         started = now()
         allowed = {checked_url(policy['download_url']), *[checked_url(url) for url in policy['redirect_urls']]}
-        hosts = frozenset(urlsplit(url).hostname for url in allowed)
+        robots_redirects = tuple(checked_url(url) for url in policy.get('robots_redirect_urls', []))
+        hosts = frozenset(urlsplit(url).hostname for url in (*allowed, *robots_redirects))
         connector = aiohttp.TCPConnector(resolver=PublicResolver(hosts), use_dns_cache=False, limit=2,
             family=0)
         async with aiohttp.ClientSession(connector=connector, trust_env=False, auto_decompress=False,
@@ -161,7 +182,7 @@ class MaterialSourceTransport:
                     raise MaterialTransportError('source_material_redirect_rejected')
                 visited.add(target)
                 checked_url(target)
-                entry, robot_body = await self._robots(session, target, claimed)
+                entry, robot_body = await self._robots(session, target, claimed, robots_redirects)
                 robots.append(entry)
                 if robot_body:
                     robot_objects.append({'raw_hash': entry['raw_hash'], 'body': robot_body})

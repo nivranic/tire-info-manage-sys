@@ -214,6 +214,7 @@ def test_production_transport_preserves_original_bytes_and_safe_session(monkeypa
     assert options['headers']['Accept-Encoding'] == 'identity'
     assert isinstance(options['cookie_jar'], aiohttp.DummyCookieJar)
     assert options['timeout'].connect == 4 and options['timeout'].sock_read == 8
+    assert options['timeout'].total == transport_module.TOTAL_SECONDS == 45
     assert http.connector_options['use_dns_cache'] is False
     resolver = http.connector_options['resolver']
     assert isinstance(resolver, PublicResolver) and resolver.allow_loopback is False
@@ -294,6 +295,107 @@ def test_empty_successful_robots_is_observed_empty_bytes_not_missing(monkeypatch
     assert result['robots'][0]['status'] == 200 and result['robots'][0]['byte_count'] == 0
     assert result['robots'][0]['raw_hash'] == hashlib.sha256(b'').hexdigest()
     assert result['robot_objects'] == []
+
+
+@pytest.mark.parametrize('redirect_status', [301, 302, 303, 307, 308])
+@pytest.mark.parametrize('final_status', [200, 404, 410])
+def test_declared_robots_redirect_preserves_target_and_final_rules(monkeypatch, redirect_status, final_status):
+    destination = 'https://cdn.example.org/robots-final'
+    policy = {**POLICY, 'robots_redirect_urls': [destination]}
+    body = ROBOTS if final_status == 200 else b''
+    result, http = transport_fetch(monkeypatch, [robots(redirect_status, headers={'Location': destination}),
+        robots(final_status, body), MemoryResponse()], policy)
+    entry = result['robots'][0]
+    assert entry['url'] == 'https://example.com/robots.txt' and entry['final_url'] == destination
+    assert entry['redirects'] == [{'from_url': entry['url'], 'to_url': destination, 'status': redirect_status}]
+    assert entry['target_url'] == POLICY['download_url'] and entry['status'] == final_status
+    assert result['body'] == PDF
+    assert [url for url, _ in http.requests] == [entry['url'], destination, POLICY['download_url']]
+    resolver = http.connector_options['resolver']
+    assert resolver.hosts == frozenset({'example.com', 'cdn.example.org'}) and not resolver.allow_loopback
+
+
+@pytest.mark.parametrize('location', ['http://cdn.example.org/robots', 'https://unknown.example/robots',
+    'https://example.com/robots.txt', 'https://127.0.0.1/robots', '/robots-final?token=value',
+    '/robots-final#fragment', '/robot\ns-final'])
+def test_declared_robots_redirect_rejects_unsafe_unknown_or_cyclic_target(monkeypatch, location):
+    http = MemoryHTTP(monkeypatch, [robots(301, headers={'Location': location})])
+    transport = MaterialSourceTransport()
+    with pytest.raises(MaterialTransportError, match='^source_material_robots_redirect_rejected$'):
+        run(transport.fetch(canonical_policy({**POLICY, 'robots_redirect_urls': ['https://example.com/robots-final']})))
+    assert len(http.requests) == 1 and transport._active == 0 and not transport._hosts
+
+
+def test_robots_redirect_relative_three_hops_and_fourth_rejected(monkeypatch):
+    chain = [f'https://example.com/robots-{i}' for i in range(3)]
+    responses = [robots(302, headers={'Location': f'/robots-{i}'}) for i in range(3)]
+    result, http = transport_fetch(monkeypatch, [*responses, robots(), MemoryResponse()],
+        {**POLICY, 'robots_redirect_urls': chain})
+    assert result['robots'][0]['final_url'] == chain[-1] and len(http.requests) == 5
+    http = MemoryHTTP(monkeypatch, [*responses, robots(302, headers={'Location': '/robots-0'})])
+    with pytest.raises(MaterialTransportError, match='source_material_robots_redirect_rejected'):
+        run(MaterialSourceTransport().fetch(canonical_policy({**POLICY, 'robots_redirect_urls': chain})))
+    assert len(http.requests) == 4
+
+
+@pytest.mark.parametrize('locations', [[], ['/robots-final', '/robots-other']])
+def test_robots_redirect_requires_one_location_header(monkeypatch, locations):
+    response = robots(301)
+    response.headers = CIMultiDict([('Location', value) for value in locations])
+    http = MemoryHTTP(monkeypatch, [response])
+    with pytest.raises(MaterialTransportError, match='source_material_robots_redirect_rejected'):
+        run(MaterialSourceTransport().fetch(canonical_policy({**POLICY,
+            'robots_redirect_urls': ['https://example.com/robots-final']})))
+    assert len(http.requests) == 1
+
+
+@pytest.mark.parametrize('response,code', [
+    (robots(body=b'User-agent: *\nDisallow: /original.pdf\n'), 'source_material_robots_disallowed'),
+    (robots(403), 'source_material_robots_unavailable'),
+    (robots(headers={'Content-Type': 'text/html'}), 'source_material_robots_invalid')])
+def test_redirected_robots_still_applies_original_target_rules(monkeypatch, response, code):
+    destination = 'https://cdn.example.org/robots-final'
+    http = MemoryHTTP(monkeypatch, [robots(301, headers={'Location': destination}), response])
+    with pytest.raises(MaterialTransportError, match='^' + code + '$'):
+        run(MaterialSourceTransport().fetch(canonical_policy({**POLICY, 'robots_redirect_urls': [destination]})))
+    assert len(http.requests) == 2
+
+
+def test_redirected_robots_public_resolver_rejects_private_answer_and_cancellation_releases(monkeypatch):
+    async def exercise():
+        destination = 'https://cdn.example.org/robots-final'
+        policy = canonical_policy({**POLICY, 'robots_redirect_urls': [destination]})
+        transport = MaterialSourceTransport()
+        http = MemoryHTTP(monkeypatch, [robots(301, headers={'Location': destination})])
+        original_pace = transport._pace
+        loop = asyncio.get_running_loop()
+        async def lookup(_host, port, **_kwargs):
+            return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, '', ('127.0.0.1', port))]
+        monkeypatch.setattr(loop, 'getaddrinfo', lookup)
+        async def resolve_redirect(host, claimed):
+            await original_pace(host, claimed)
+            if host == 'cdn.example.org':
+                await http.connector_options['resolver'].resolve(host, 443)
+        monkeypatch.setattr(transport, '_pace', resolve_redirect)
+        with pytest.raises(MaterialTransportError, match='source_material_address_blocked'):
+            await transport.fetch(policy)
+        assert len(http.requests) == 1 and transport._active == 0 and not transport._hosts
+        http.clock += 2
+        http.responses = [robots(301, headers={'Location': destination})]
+        entered = asyncio.Event()
+        async def block_redirect(host, claimed):
+            await original_pace(host, claimed)
+            if host == 'cdn.example.org':
+                entered.set()
+                await asyncio.Event().wait()
+        monkeypatch.setattr(transport, '_pace', block_redirect)
+        task = asyncio.create_task(transport.fetch(policy))
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert transport._active == 0 and not transport._hosts and len(http.requests) == 2
+    run(exercise())
 
 
 @pytest.mark.parametrize('location', [
@@ -752,6 +854,65 @@ def test_semantically_impossible_receipt_is_rejected_even_if_rehashed(case, fiel
         db.rollback()
     raw_change(case, SourceMaterialOutcome, captured['request_id'], receipt=changed, fingerprint=fingerprint)
     assert lookup(case, body['idempotency_key']).status_code == 503
+
+
+@pytest.mark.parametrize('damage', ['downgrade', 'no-metadata', 'no-chain', 'no-final', 'empty-chain',
+    'unknown-target', 'wrong-from', 'cycle', 'wrong-status', 'wrong-final', 'extra-field', 'over-limit'])
+def test_rehashed_robots_redirect_corruption_is_rejected_on_all_reopen_paths(case, damage):
+    from tire_api.material_source_policy import PolicyCatalog
+    from tire_api.source_materials import outcome_fingerprint
+    destination = 'https://cdn.example.org/robots-final'
+    configured = canonical_policy({**POLICY, 'robots_redirect_urls': [destination]})
+    case.app.state.material_policies = PolicyCatalog([configured])
+    async def fetch(policy):
+        value = acquired(policy)
+        robot = value['robots'][0]
+        robot.update(final_url=destination, redirects=[{'from_url': robot['url'], 'to_url': destination, 'status': 308}])
+        return value
+    case.monkeypatch.setattr(case.app.state.material_transport, 'fetch', fetch)
+    body, captured = capture(case)
+    assert captured['receipt']['schema'] == 'source-material-receipt@2'
+    assert lookup(case, body['idempotency_key']).status_code == 200
+    changed = deepcopy(captured['receipt'])
+    robot = changed['robots'][0]
+    if damage == 'downgrade':
+        changed['schema'] = 'source-material-receipt@1'
+    elif damage == 'no-metadata':
+        del robot['redirects'], robot['final_url']
+    elif damage == 'no-chain':
+        del robot['redirects']
+    elif damage == 'no-final':
+        del robot['final_url']
+    elif damage == 'empty-chain':
+        robot['redirects'] = []
+    elif damage == 'wrong-final':
+        robot['final_url'] = robot['url']
+    elif damage == 'over-limit':
+        robot['redirects'] *= 4
+    else:
+        field, value = {'unknown-target': ('to_url', 'https://other.example/robots'),
+            'wrong-from': ('from_url', destination), 'cycle': ('to_url', robot['url']),
+            'wrong-status': ('status', 200), 'extra-field': ('extra', True)}[damage]
+        robot['redirects'][0][field] = value
+    changed['fingerprint'] = digest({key: value for key, value in changed.items() if key != 'fingerprint'})
+    with case.database.sessions() as db:
+        row = db.get(SourceMaterialOutcome, captured['request_id'])
+        row.receipt = changed
+        fingerprint = outcome_fingerprint(row)
+        db.rollback()
+    raw_change(case, SourceMaterialOutcome, captured['request_id'], receipt=changed, fingerprint=fingerprint)
+    assert lookup(case, body['idempotency_key']).status_code == 503
+    assert case.client.post(BASE + '/captures', json=body).status_code == 503
+    assert case.client.get(BASE + '/documents/' + captured['document']['id'] + '?mode=history').status_code == 503
+
+
+def test_legacy_receipt_cannot_claim_v2_without_observed_robots_redirect(case):
+    from tire_api.source_materials import checked_transport
+    _, captured = capture(case)
+    assert captured['receipt']['schema'] == 'source-material-receipt@1'
+    changed = {**captured['receipt'], 'schema': 'source-material-receipt@2'}
+    with case.database.sessions() as db, pytest.raises(ValueError, match='robots receipt version mismatch'):
+        checked_transport(db, captured['policy'], changed)
 
 
 @pytest.mark.parametrize('field,value', [('raw_hash', '0' * 64), ('byte_count', 1)])
