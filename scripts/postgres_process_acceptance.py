@@ -70,17 +70,82 @@ def wait_for(check, *, timeout=30, interval=0.1):
     raise AssertionError('process_observation_deadline')
 
 
+def interrupt_console(process):
+    """Signal only this run's newly created console, retaining actual process handles."""
+    import ctypes
+    from ctypes import wintypes as w
+    assert sys.platform == 'win32' and process.poll() is None
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.FreeConsole.argtypes, kernel.FreeConsole.restype = [], w.BOOL
+    kernel.AttachConsole.argtypes, kernel.AttachConsole.restype = [w.DWORD], w.BOOL
+    kernel.SetConsoleCtrlHandler.argtypes, kernel.SetConsoleCtrlHandler.restype = [ctypes.c_void_p, w.BOOL], w.BOOL
+    kernel.GenerateConsoleCtrlEvent.argtypes, kernel.GenerateConsoleCtrlEvent.restype = [w.DWORD, w.DWORD], w.BOOL
+    kernel.GetConsoleProcessList.argtypes = [ctypes.POINTER(w.DWORD), w.DWORD]
+    kernel.GetConsoleProcessList.restype = w.DWORD
+    kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [w.DWORD, w.BOOL, w.DWORD], w.HANDLE
+    kernel.WaitForSingleObject.argtypes, kernel.WaitForSingleObject.restype = [w.HANDLE, w.DWORD], w.DWORD
+    kernel.GetExitCodeProcess.argtypes, kernel.GetExitCodeProcess.restype = [w.HANDLE, ctypes.POINTER(w.DWORD)], w.BOOL
+    kernel.TerminateProcess.argtypes, kernel.TerminateProcess.restype = [w.HANDLE, w.UINT], w.BOOL
+    kernel.CloseHandle.argtypes, kernel.CloseHandle.restype = [w.HANDLE], w.BOOL
+    handles, exits = [], []
+    completed = False
+    # The tool host can have a console without a visible window. Detach only
+    # this verifier before attaching the console created for its own child.
+    assert kernel.FreeConsole(), 'verifier_console_detach_failed'
+    assert kernel.AttachConsole(process.pid), 'service_console_attach_failed'
+    try:
+        assert kernel.SetConsoleCtrlHandler(None, True), 'verifier_console_ignore_failed'
+        pids = (w.DWORD * 16)()
+        count = kernel.GetConsoleProcessList(pids, len(pids))
+        assert 1 < count <= len(pids) and process.pid in pids[:count] and os.getpid() in pids[:count]
+        for pid in pids[:count]:
+            if pid == os.getpid():
+                continue
+            handle = kernel.OpenProcess(0x00100000 | 0x1000 | 0x1, False, pid)
+            assert handle, 'service_process_handle_unavailable'
+            handles.append((pid, handle))
+        started = time.monotonic()
+        assert kernel.GenerateConsoleCtrlEvent(0, 0), 'service_console_interrupt_failed'
+        for pid, handle in handles:
+            assert kernel.WaitForSingleObject(handle, 30_000) == 0, 'service_graceful_exit_deadline'
+            code = w.DWORD()
+            assert kernel.GetExitCodeProcess(handle, ctypes.byref(code)), 'service_exit_code_unavailable'
+            exits.append({'pid': pid, 'code': code.value})
+        process.wait(timeout=5)
+        completed = True
+        return {'signal': 'CTRL_C_EVENT', 'process_exit_codes': exits,
+                'elapsed_seconds': time.monotonic() - started}
+    finally:
+        for _pid, handle in handles:
+            if not completed and kernel.WaitForSingleObject(handle, 0) == 258:
+                kernel.TerminateProcess(handle, 1)
+                kernel.WaitForSingleObject(handle, 10_000)
+            kernel.CloseHandle(handle)
+        kernel.FreeConsole()
+        kernel.SetConsoleCtrlHandler(None, False)
+
+
 @contextmanager
-def child(slot, label, arguments, environment):
+def child(slot, label, arguments, environment, *, console=False):
+    startup = None
+    flags = subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
+    if console:
+        assert sys.platform == 'win32', 'console_acceptance_requires_windows'
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = 0
+        flags = subprocess.CREATE_NEW_CONSOLE
     with (slot / (label + '.stdout.log')).open('wb') as stdout, \
             (slot / (label + '.stderr.log')).open('wb') as stderr:
         process = subprocess.Popen([sys.executable, '-X', 'utf8', '-B', *arguments], cwd=ROOT,
             env=environment, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0)
+            creationflags=flags, startupinfo=startup)
         receipt = {'label': label, 'pid': process.pid, 'reaped': False}
         REPORT['processes'].append(receipt)
         try:
             yield process
+            if console:
+                receipt['graceful_exit'] = interrupt_console(process)
         finally:
             if process.poll() is None:
                 process.terminate()
@@ -93,25 +158,54 @@ def child(slot, label, arguments, environment):
 
 
 @contextmanager
-def http_service(slot, label, environment, *, cookies=None):
+def http_service(slot, label, environment, *, cookies=None, graceful=False):
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0))
         port = reservation.getsockname()[1]
     REPORT['ports'].append(port)
     arguments = ['-m', 'uvicorn', 'tire_api.main:app', '--host', '127.0.0.1',
-                 '--port', str(port), '--workers', '1', '--no-access-log', '--log-level', 'warning']
-    with child(slot, label, arguments, environment) as process, \
+                 '--port', str(port), '--workers', '1', '--no-access-log', '--log-level', 'info' if graceful else 'warning']
+    with child(slot, label, arguments, environment, console=graceful) as process, \
             httpx.Client(base_url=f'http://127.0.0.1:{port}', trust_env=False,
                          timeout=45, cookies=cookies) as client:
         def ready():
             assert process.poll() is None, 'api_exited_before_ready'
             try:
                 return accepted(client.get('/health'))
-            except httpx.ConnectError:
+            except (httpx.ConnectError, httpx.TimeoutException):
                 return None
         health = wait_for(ready)
         assert health['database'] == 'postgresql'
         yield client
+
+
+def graceful_worker(slot, environment):
+    with socket.socket() as reservation:
+        reservation.bind(('127.0.0.1', 0))
+        port = reservation.getsockname()[1]
+    REPORT['ports'].append(port)
+    label = 'worker-graceful'
+    arguments = [str(ROOT / 'apps/worker/monitor.py'), '--interval', '10', '--metrics-port', str(port)]
+    with child(slot, label, arguments, environment, console=True) as process, \
+            httpx.Client(base_url=f'http://127.0.0.1:{port}', trust_env=False, timeout=2) as client:
+        def ready():
+            assert process.poll() is None, 'worker_exited_before_ready'
+            try:
+                response = client.get('/v1/observability/metrics')
+            except (httpx.ConnectError, httpx.TimeoutException):
+                return False
+            lines = (slot / (label + '.stdout.log')).read_text(encoding='utf-8').splitlines()
+            return response.status_code == 200 and len(lines) >= 2
+        wait_for(ready)
+        lines = (slot / (label + '.stdout.log')).read_text(encoding='utf-8').splitlines()
+        endpoint, cycle = json.loads(lines[0]), json.loads(lines[1])
+        assert endpoint == {'address': '127.0.0.1', 'port': port, 'metrics_path': '/v1/observability/metrics'}
+        assert cycle['jobs'] == 0 and cycle['results'] == []
+    receipt = REPORT['processes'][-1]
+    assert receipt['returncode'] == 0xC000013A
+    assert all(item['code'] == 0xC000013A for item in receipt['graceful_exit']['process_exit_codes'])
+    errors = (slot / (label + '.stderr.log')).read_text(encoding='utf-8')
+    assert 'asyncio.exceptions.CancelledError' in errors and 'KeyboardInterrupt' in errors
 
 
 def run_worker(slot, label, environment, *, live_source=False):
@@ -478,6 +572,21 @@ def run(*, live_source=False, natural_lease=False):
             assert detail['attempts_total'] == 4 and all(item['terminal'] for item in detail['attempts'])
             if live_source:
                 live_execution(client, detail['attempts'][0]['query_id'])
+        wait_for_runtime_disconnect()
+        record(STEP)
+
+        STEP = 'normal_http_ctrl_c_completes_lifespan_and_closes_runtime_sessions'
+        with http_service(slot, 'api-graceful', restored_environment, cookies=cookies, graceful=True) as client:
+            assert accepted(client.get(path))['attempts_total'] == 4
+        receipt = REPORT['processes'][-1]
+        assert receipt['returncode'] == 0
+        assert all(item['code'] == 0 for item in receipt['graceful_exit']['process_exit_codes'])
+        assert 'Application shutdown complete.' in (slot / 'api-graceful.stderr.log').read_text(encoding='utf-8')
+        wait_for_runtime_disconnect()
+        record(STEP)
+
+        STEP = 'normal_worker_ctrl_c_cancels_idle_loop_and_closes_metrics_and_sessions'
+        graceful_worker(slot, restored_environment)
         wait_for_runtime_disconnect()
         record(STEP)
 

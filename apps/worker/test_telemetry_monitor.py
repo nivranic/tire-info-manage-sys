@@ -84,7 +84,7 @@ def test_idle_cycles_do_not_create_jobs_or_start_external_work(worker_context):
     assert registry.calls == 0
     assert worker_spans(runtime, "worker.job") == []
     cycles = worker_spans(runtime, "worker.cycle")
-    assert len(cycles) == 3  # Scheduled root plus campaign and discovery queues.
+    assert len(cycles) == 4  # Scheduled root plus campaign, discovery and Safety Gate queues.
     assert all(row["attributes"]["outcome"] == "idle" for row in cycles)
     root = next(row for row in cycles if row["parent_span_id"] is None)
     assert all(row["trace_id"] == root["trace_id"] for row in cycles)

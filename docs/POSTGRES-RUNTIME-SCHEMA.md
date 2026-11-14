@@ -79,3 +79,5 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 ```
 
 该模式使用已登记Hankook来源进行正常HTTP查询及Worker消费，并实际观察600秒租约到期。9项检查通过，61次自然状态记录后成功恢复，数据库和原件／Parser资产独立恢复后继续在线消费。录制模式9项及相关回归55项亦通过。自然长周期、多规则真实变化、优雅停机、远端部署和生产SLO继续验收。[真实进程与自然租约记录](assurance/evidence/postgres-live-process-2026-11-14.md)
+
+后续正式入口增加Windows隐藏控制台的两项Ctrl+C停机检查，真实来源和录制模式各11项通过，相关回归75项通过。API完成lifespan清理，空闲Worker进入取消退出路径，启动器与实际服务进程句柄、PG后端和端口逐项核对。运行中任务、活动HTTP／AI流、服务管理器及远端继续验收。[Windows控制台停机记录](assurance/evidence/windows-service-shutdown-2026-11-14.md)
