@@ -2,6 +2,8 @@
 
 当前接手先读[进度与 Agent 交接卡](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)，汇总12个核心模块、10项发布Gate、13项SLO、15项决策及本次Dunlop交付。当前13个轮胎区域目录、9个厂商品牌、17项可信Parser，完整V1持续进行。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留阶段记录。
 
+Dunlop欧洲SPORT MAXX RT2已补齐独立HTTP／非拥有者PG／TLS专项12项验收，两次官网查询均live，两个SKU的ID与事实版本稳定，原件及历史观察时间可核对。三批服务、进程、端口和临时秘密已核对，私有脚本换行转换及原文动态变化的原始失败分别保留。EPREL监管绑定、长期来源稳定性与完整V1继续验收。[Dunlop来源验收](docs/assurance/evidence/dunlop-eu-source-2026-11-14.md)
+
 Windows Parser已修正启动器缺省架构变量时的启动失败，缺省值由bundle环境声明采用的platform.machine派生。8次原入口（含修改前封存bundle）、125项受管回归、60项PG／TLS专项通过。部署须重建批准@4源码合同，OS文件打开延迟继续待查。[启动修正](docs/assurance/evidence/parser-host-architecture-2026-11-14.md)
 
 运行角色权限专项已补齐23项缺权与漂移反例、部分GRANT后检查回滚及完整重授幂等。正式PG／TLS专项60项、相关受管回归45项通过，842输入稳定。后续优先推进Parser性能取证和真实部署。[权限验收](docs/assurance/evidence/postgres-runtime-permissions-2026-11-14.md)

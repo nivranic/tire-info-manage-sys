@@ -65,13 +65,14 @@
 | 前序受管回归 | Dunlop、导入边界、来源设置 3 模块 79/79 通过，847 项输入稳定、资源关闭、非自检拒绝 0 |
 | 正式在线 canary | `dunlop-eu`、SPORT MAXX RT2、235/55R19 首次与重复读取均 ok，匹配 2 条，隔离 Parser exit 0、reaped=true |
 | 正常 ASGI 入口 | 原注册与 live-query 路由 17 项检查通过，两次 live、1 份快照、2 个 variant、2 次 verification，证据重开及哈希核对通过 |
+| 后续独立 HTTP/PG/TLS | 12 项通过，两次真实官网查询均 live，两个 SKU 的 ID 和事实版本稳定，相同原文保留原观察时间，历史证据可重开 |
 | 精确身份示例 | Material Code `543000` 为 101Y、XL=null，`544985` 为 105Y XL，两个 variant ID 独立，重复读取版本稳定 |
 | 条件核验 | 本批服务端未给出 ETag/Last-Modified，重复查询走完整在线读取，回执为 live |
 | 本次扩展回归首批 | 13 模块 371 项实际执行，360 通过、11 失败，跳过及不完整为 0，847 项输入稳定、资源关闭、非自检拒绝 0 |
 | 失败项对照 | 普通宿主权限、相同源码及正式受管入口复跑 16/16 通过，覆盖首批全部 11 个失败项所属用例族，847 项输入稳定、资源关闭、非自检拒绝 0 |
 | 本次静态及交付检查 | 19 个变更 Python 文件语法通过，20 个新增或修改段落的相对链接有效，差异空白及新增内容隐私扫描通过，原始需求和封存尾文核对通过 |
 
-本次 Dunlop 的独立 uvicorn/非拥有者 PG/TLS 来源消费尚待执行。其余来源的 PG 结果见各自阶段回执。
+后续已补齐 Dunlop 的独立 uvicorn/非拥有者 PG/TLS 来源消费。12 项通过，847 项输入稳定。原文变化时保留对应新快照且 SKU 事实版本稳定，同原文重复读取保留原始观察时间。三批共 36 个服务记录、43 个进程 ID、19 个端口及临时秘密已核对。前两批分别发现私有脚本换行转换和强制复用快照的校验问题，回执均保留。[Dunlop 完整验收](assurance/evidence/dunlop-eu-source-2026-11-14.md)
 
 扩展回归首批的失败包括原件存储相关断言、封存包硬链接反例及长路径 Parser 执行。硬链接反例明确得到 PermissionError，独立最小 os.link 探针在沙箱内复现 errno13/WinError5。对照批次采用普通宿主权限、相同源码和既有回归护栏，全部 16 项通过。两批回执及最小探针分别保留，首批长路径 Parser 失败的具体错误码尚未采集，历史 Windows 延迟继续待查。
 
@@ -114,7 +115,7 @@ SLO 持续跟踪结构化查询 P95≤300ms、设备检索 P95≤200ms、输入�
 ## 下一位 Agent 的执行顺序
 
 1. 核对本地与实时远端、当前工作区及本文绑定的源码。复用既有通过回执，对新失败保存错误码、调用入口、SQLSTATE 和日志。
-2. 优先补 Dunlop 独立 HTTP/非拥有者 PG/TLS 来源消费，生成并批准匹配当前源码的 @4 合同，核对两条同尺寸编码、原件、版本、观察时间、重复在线读取及服务资源回收。服务端提供验证器时继续核对条件读取。
+2. 复用已通过的 Dunlop 独立 HTTP/非拥有者 PG/TLS、同尺寸编码、原件、版本及观察时间验收，继续其他 P0 来源、地区和更多型号。部署使用与实际源码和环境匹配的批准 @4 空参考合同，服务端提供验证器时核对条件读取。
 3. 继续其他 P0 来源、代表性精确 SKU 与监管绑定、专业原件许可和人工 Golden。真实 Responses/Embeddings 验收凭据齐备后优先执行，启动时显式指定 `TI_AI_PROVIDER=openai_responses` 并核对 `/v1/ai/status`。
 4. 复用 Web 恢复及本机 Webhook HTTPS 证据，继续公网接收端、自然长周期真实变化、通知 lag、多规则、Linux/服务管理器与远端部署。
 5. Parser 原间歇超时与 Windows 新文件打开延迟继续从原始证据定位。已观察到 ParserRunError 的批次补具体固定错误码，监督器当前 8 秒限制沿既有配置执行。[性能取证](assurance/evidence/parser-file-open-2026-11-14.md)
@@ -130,10 +131,10 @@ git log --oneline origin/main..HEAD
 git -c http.proxy= -c https.proxy= ls-remote origin refs/heads/main
 python -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root .artifacts/<fresh-regression-slot> --targets apps/api/tests/test_dunlop.py apps/api/tests/test_adapter_import_behavior.py apps/api/tests/test_source_settings.py apps/api/tests/test_parser_bundles.py apps/api/tests/test_parser_releases.py
 python -X utf8 -B scripts/canary.py --source dunlop-eu --model "SPORT MAXX RT2" --size 235/55R19 --revalidate
-pwsh -NoProfile -File scripts/verify-postgres.ps1 -Suite runtime-process
+pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <postgres-bin-dir> -Suite runtime-process -CliTls
 ```
 
-canary 运行环境需能导入 `apps/api` 包。`runtime-process` 提供通用进程验收，Dunlop 来源扩展继续沿既有正常 API 入口补齐。
+canary 运行环境需能导入 `apps/api` 包。PG 入口要求显式提供已安装的 PostgreSQL bin 目录并启用 CliTls，使用空闲环回端口。`runtime-process` 提供通用进程验收，来源专项通过相同正常 API 入口核对，Dunlop 的已观察范围见上述专项验收。
 
 ## 资料、授权与封存
 
@@ -144,4 +145,4 @@ canary 运行环境需能导入 `apps/api` 包。`runtime-process` 提供通用�
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md、原始需求及对应阶段验收，核对 main、工作区、本地提交和实时远端。当前有 13 个轮胎区域目录、9 个厂商品牌、17 项可信 Parser。本次新增 Dunlop 欧洲 SPORT MAXX RT2，原页 27 条规格，保留 Material Code、GTIN、逐行载重速度/XL、厂商 EU 标签和 EPREL 引用。已有 canary、ASGI 与受管回归，独立 PG/TLS/HTTP 来源消费继续待验。当前源码摘要需要匹配新批准的 @4 空参考合同。首个真实 AI 接入按用户决定采用 OpenAI Responses，缺少凭据期间推进独立工程。继续精确 SKU、人工 Golden、正式许可、其他来源、长期监控、公网 Webhook、Native/无障碍、真实部署与 SLO。保留 Parser 原始失败和 KIT C2 封存，按 12 模块、10 Gate、13 SLO、15 决策逐项推进，提交后核对远端 SHA 及工作区。
+> 继续实施胎迹完整 V1。先读 docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md、原始需求及 Dunlop 专项验收，核对 main、工作区、本地提交和实时远端。当前有 13 个轮胎区域目录、9 个厂商品牌、17 项可信 Parser。Dunlop 欧洲 SPORT MAXX RT2 原页 27 条规格，保留 Material Code、GTIN、逐行载重速度/XL、厂商 EU 标签和 EPREL 引用。canary、ASGI、受管回归及独立 PG/TLS/HTTP 已有验收，最后进程专项 12 项通过，两次 live，SKU 和事实版本稳定。保留前两批私有验收脚本失败及正文动态变化证据。当前源码使用匹配批准的 @4 空参考合同。首个真实 AI 接入按用户决定采用 OpenAI Responses，缺少凭据期间推进独立工程。继续精确 SKU、监管绑定、人工 Golden、正式许可、其他来源、长期监控、公网 Webhook、Native/无障碍、真实部署与 SLO。保留 Parser 原始失败和 KIT C2 封存，按 12 模块、10 Gate、13 SLO、15 决策逐项推进，提交后核对远端 SHA 及工作区。

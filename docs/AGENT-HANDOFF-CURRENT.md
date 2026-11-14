@@ -1,6 +1,6 @@
 # 胎迹 Agent 接手卡
 
-更新于 2026-11-14。完整 V1 持续进行。先读[本次进度与交接卡](AGENT-HANDOFF-2026-11-14-PUBLISH.md)，其中汇总需求、本次Dunlop欧洲来源、验证范围、未完成项及接手顺序。当前13个轮胎区域目录、9个厂商品牌、17项可信Parser。独立PG/TLS/HTTP的Dunlop来源消费继续待验。下文保留此前阶段的原始交付时点，历史实现与验收详见[阶段总表](AGENT-HANDOFF-2026-11-13.md)，需求以[原始规格](requirements/2026-09-26-tire-intelligence-original.md)为准。
+更新于 2026-11-14。完整 V1 持续进行。先读[本次进度与交接卡](AGENT-HANDOFF-2026-11-14-PUBLISH.md)，其中汇总需求、本次Dunlop欧洲来源、验证范围、未完成项及接手顺序。当前13个轮胎区域目录、9个厂商品牌、17项可信Parser。Dunlop独立PG/TLS/HTTP专项12项通过，两次live，SKU及事实版本稳定，原件与历史观察时间可核对，三个集群及36个服务记录、43个进程ID、19个端口和临时秘密已核对。前两批私有脚本失败及正文动态变化证据保留，见[Dunlop验收](assurance/evidence/dunlop-eu-source-2026-11-14.md)。下文保留此前阶段的原始交付时点，历史实现与验收详见[阶段总表](AGENT-HANDOFF-2026-11-13.md)，需求以[原始规格](requirements/2026-09-26-tire-intelligence-original.md)为准。
 
 本轮以已发布 `0e67752` 为基线接入横滨欧洲ADVAN Sport V107，当前12个轮胎区域目录、8个厂商品牌、16项Parser。正常ASGI验收13项及实际HTTP／非拥有者PG／TLS进程12项通过，在线查询取得live与live_verified_304，原件、快照、版本与部署修订保持可核对。EPREL链接来自厂商页面，监管绑定仍待验。新API源码摘要为 `b14a29364b6b86fb29170d7ffa2245f4ee49b0d2d4f586bfc795835a490b8de3`，部署须重建并批准匹配@4合同。相关检查分批323项通过、5项可选夹具跳过，最后护栏参数专项34项通过。12个服务记录、15个进程ID、7个端口及临时秘密已核对，详见[横滨来源验收](assurance/evidence/yokohama-eu-source-2026-11-14.md)。
 
