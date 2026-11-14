@@ -339,6 +339,7 @@ export interface AIPack {
   safety_gate_policy?: { version: "safety-gate-fact-selection@1"; digest: string };
   safety_gate_boundary?: import("./safety-gate").SafetyGateAnalysisBoundary;
   original_text_policy?: "original-text-grounding@1";
+  test_pdf_policy?: "test-pdf-original@1";
   test_boundary?: TestAnalysisBoundary;
   recall_policy?: { version: "recall-fact-selection@1"; digest: string };
   recall_boundary?: import("./recalls").RecallBoundary;
@@ -367,6 +368,7 @@ export interface AIAnalysis {
     samr_boundary?: import("./samr-recalls").SamrRecallAnalysisBoundary;
     safety_gate_boundary?: import("./safety-gate").SafetyGateAnalysisBoundary;
     original_text_policy?: "original-text-grounding@1";
+    test_pdf_policy?: "test-pdf-original@1";
     test_boundary?: TestAnalysisBoundary;
     recall_boundary?: import("./recalls").RecallBoundary;
     claims: AIClaim[];
@@ -422,6 +424,7 @@ export interface ReportExport {
 }
 export interface EvidenceReportDetail extends EvidenceReportRecord {
   body: {
+    test_pdf_policy?: "test-pdf-original@1";
     schema_version?: "research-report@1" | "research-report@2" | "research-report@3" | "research-report@4" | "research-report@5" | "research-report@6";
     samr_policy?: AIPack["samr_policy"];
     samr_boundary?: import("./samr-recalls").SamrRecallAnalysisBoundary;
@@ -691,7 +694,11 @@ export interface Health { status: string; mode: string; database: string }
 
 export interface TestParticipant { key: string; brand: string; model: string; source_designation: string }
 export interface TestMetricDefinition { key: string; label: string; unit: string; protocol: string; direction: "lower" | "higher" | "unspecified" }
-export interface TestMeasurement { participant_key: string; metric_key: string; raw_value: string; source_rank: number | null; evidence_span: string; evidence_locator: string }
+export interface TestMeasurement {
+  participant_key: string; metric_key: string; raw_value: string; source_rank: number | null;
+  evidence_span: string; evidence_locator: string;
+  pdf_reference?: DocumentTextReference;
+}
 export interface TestPublication {
   role: "original_report" | "secondary_report" | "unknown";
   basis: string;

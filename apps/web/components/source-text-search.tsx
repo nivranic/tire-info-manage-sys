@@ -7,7 +7,7 @@ import TextEmbeddingPurposeDialog from "./text-embedding-purpose";
 
 type TextSearchItem = SourceTextSearchItem | DocumentTextSearchItem | OriginalTextSearchItem;
 type TextSearchResult = Omit<SourceTextSearchResult, "items" | "index"> & { items: TextSearchItem[] };
-type TextSearchProps = { automatic: boolean; selected: TextEmbeddingSelection[]; onToggle: (selection: TextEmbeddingSelection) => void } & (
+type TextSearchProps = { automatic: boolean; selected: TextEmbeddingSelection[]; onToggle: (selection: TextEmbeddingSelection) => void; selectionHint?: string } & (
   { origin?: "source"; search: SourceTextSearchRequest } |
   { origin: "document"; search: DocumentTextSearchRequest }
 );
@@ -155,7 +155,7 @@ export default function SourceTextSearch(props: TextSearchProps) {
 
   return <section className="knowledge-results" aria-label={`${contentLabel}检索`} aria-busy={busy}>
     <h3>已保存{contentLabel}</h3>
-    <p>勾选正文后，可在“向量与混合检索”中预览所选正文的索引计划，每批最多32段。</p>
+    <p>{props.selectionHint || "勾选正文后，可在“向量与混合检索”中预览所选正文的索引计划，每批最多32段。"}</p>
     <p>{origin === "document" ? "按关键词检索已建立索引的PDF文字层，引用记录文档页码和页内位置。具体SKU身份与适用性需要对应的结构化证据。" : `按关键词${source_id ? `及来源 ${source_id}` : ""}检索轮胎页面正文。摘录保留页面范围，具体SKU身份与适用性需要对应的结构化证据。`}</p>
     <div className="knowledge-form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => void load()}>{result || error ? `重新检索${contentLabel}` : `检索已保存${contentLabel}`}</button>{busy ? <button type="button" className="text-button" onClick={cancel}>取消正文检索</button> : null}</div>
     <p role="status" aria-live="polite">{busy ? "正在读取保存原件与正文索引…" : status}</p>

@@ -86,6 +86,8 @@ def owned_report(db, report_id, scope):
 def canonical_facts(payload, *, frozen=False):
     from .ai_original_text import original_items
     original_items(payload)
+    from .test_measurement_originals import pdf_fact_items
+    pdf_fact_items(payload)
     validate_recall_payload(payload, require_purpose=not frozen, frozen=frozen)
     safety_gate_contract.validate_payload(payload, require_purpose=not frozen, frozen=frozen)
     samr_contract.validate_payload(payload, require_purpose=not frozen)
@@ -129,10 +131,13 @@ def freeze_body(db, pack, analysis_id, session_id):
                                  purpose='local_structured', pack_id=pack.id)
         from .ai_evidence import frozen_field_resolutions
         field_contract = {}
-        if pack.payload.get('original_text_policy') is not None:
+        if pack.payload.get('original_text_policy') is not None or pack.payload.get('test_pdf_policy') is not None:
             from .ai_original_text import require_originals
             require_originals(db, pack.payload)
-            field_contract['original_text_policy'] = pack.payload['original_text_policy']
+            if pack.payload.get('original_text_policy') is not None:
+                field_contract['original_text_policy'] = pack.payload['original_text_policy']
+            if pack.payload.get('test_pdf_policy') is not None:
+                field_contract['test_pdf_policy'] = pack.payload['test_pdf_policy']
         if 'field_resolutions' in pack.payload:
             field_contract['field_resolutions'] = frozen_field_resolutions(pack.payload)
         if 'field_policy' in pack.payload:

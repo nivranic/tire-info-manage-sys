@@ -762,6 +762,9 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
     if any(ref.kind in {'source_text', 'document_text'} for ref in payload.references):
         from .ai_original_text import POLICY
         content.update(original_text_policy=POLICY, retrieval='selected_original_and_structured_evidence')
+    from .test_measurement_originals import POLICY as TEST_PDF_POLICY, pdf_fact_items
+    if pdf_fact_items(content, require_policy=False):
+        content['test_pdf_policy'] = TEST_PDF_POLICY
     if any(reference.kind == 'change_event' for reference in payload.references):
         content['purpose'] = 'monitor_explanation'
     if any(item.get('evidence_type') == 'recall' for item in builder.evidence):
@@ -786,6 +789,9 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
         validate_payload(content)
     if len(stable_json(content).encode('utf-8')) > 44000:
         raise HTTPException(422, '证据包过大，请缩小版本或场次范围；不会静默截断证据')
+    if content.get('test_pdf_policy') is not None:
+        from .ai_original_text import require_originals
+        await asyncio.to_thread(require_originals, db, content)
     if payload.mode == 'current':
         shared = QueryService(db, registry)
         shared.lock_ingestion()

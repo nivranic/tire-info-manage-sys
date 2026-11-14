@@ -1,3 +1,7 @@
+## 测试成绩 PDF 原件引用交付（2026-11-14）
+
+先读[最新交接卡](AGENT-HANDOFF-2026-11-14-TEST-PDF.md)及[阶段验收](assurance/evidence/test-measurement-pdf-2026-11-14.md)。短摘录绑定保存PDF的页码与Unicode码点区间，贯通录入、修订、比较、AI及报告，复用既有具体用途授权。完整V1持续实施，真实SKU、真人Golden和实际OpenAI继续验收。下文保留历史交付时点。
+
 ## 2026-11-14 进度与推送交接
 
 先读[最新 Agent 交接卡](AGENT-HANDOFF-2026-11-14-SAMR-AI.md)及[整体需求进度](AGENT-HANDOFF-2026-11-14-PUBLISH.md)。中国召回公告已接通AI证据、同步／流式、原件引用和报告，519项受管回归及正常Web／非拥有者PG／TLS专项通过。当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、179张模型表。首个真实AI采用OpenAI Responses API，真实模型与完整V1继续待验。下文保留此前交付时点。

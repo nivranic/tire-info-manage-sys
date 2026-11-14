@@ -1,6 +1,7 @@
 """Original-bound text through normal AI, stream and report entry points."""
 import json
 import asyncio
+import time
 from datetime import timedelta
 from copy import deepcopy
 from uuid import uuid4
@@ -54,6 +55,179 @@ def prepared(client, selected):
 
 def prepare(client, selected):
     return client.post('/v1/ai/evidence-packs', json={'mode': 'history', 'references': [selected]})
+
+
+def prepared_test_pdf(setup, *, granted=False):
+    from test_test_events import create, pdf_measurement_payload
+    client, _registry, model, _database = setup
+    model.mutation = lambda answer: answer.update(uncertainty='')
+    payload, document = pdf_measurement_payload(client)
+    event = create(client, payload)
+    selected = {'kind': 'document_text', 'reference': event['event']['measurements'][0]['pdf_reference']}
+    if granted:
+        response = authorize(client, selected)
+        assert response.status_code == 200, response.text
+    response = prepare(client, {'kind': 'test_event', 'event_id': event['id'], 'event_revision': 1})
+    assert response.status_code == 200, response.text
+    pack = response.json()['pack']
+    assert pack['test_pdf_policy'] == 'test-pdf-original@1'
+    return pack, selected, event, document
+
+
+def test_test_pdf_original_needs_its_purpose_grant_before_any_model_reservation(setup):
+    client, _registry, model, database = setup
+    pack, _selected, _event, _document = prepared_test_pdf(setup)
+    response = analyze(client, pack)
+    assert response.status_code == 403, response.text
+    assert response.json()['detail']['code'] == 'ai_original_text_use_not_allowed'
+    assert not model.calls
+    with database.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(AIRequest)) == 0
+
+
+def test_test_pdf_original_grant_binds_analysis_and_three_export_formats(setup):
+    client, _registry, model, _database = setup
+    pack, selected, event, _document = prepared_test_pdf(setup, granted=True)
+    response = analyze(client, pack)
+    assert response.status_code == 200, response.text
+    run = response.json()
+    assert run['state'] == 'completed' and run['answer']['test_pdf_policy'] == 'test-pdf-original@1'
+    assert run['request_contract']['test_pdf_policy'] == 'test-pdf-original@1'
+    assert len(model.calls) == 1
+    report = client.post('/v1/reports', json={'mode': 'history', 'pack_id': pack['id'],
+        'analysis_id': run['id'], 'title': 'Synthetic PDF-bound measurement', 'notes': ''},
+        headers={'Idempotency-Key': str(uuid4())})
+    assert report.status_code == 201, report.text
+    report = report.json()
+    assert report['body']['test_pdf_policy'] == 'test-pdf-original@1'
+    rejected = client.post('/v1/reports/' + report['id'] + '/exports', json={'revision': 1, 'format': 'markdown'})
+    assert rejected.status_code == 403, rejected.text
+    grant = authorize(client, selected, purpose=EXPORT_PURPOSE)
+    assert grant.status_code == 200, grant.text
+    import hashlib
+    for format in ('markdown', 'html', 'pdf'):
+        exported = client.post('/v1/reports/' + report['id'] + '/exports', json={'revision': 1, 'format': format})
+        assert exported.status_code == 201, exported.text
+        raw = client.get(exported.json()['content_url'])
+        assert raw.status_code == 200 and hashlib.sha256(raw.content).hexdigest() == exported.json()['sha256']
+    revoked = authorize(client, selected, purpose=EXPORT_PURPOSE, action='revoke', expected_revision=1)
+    assert revoked.status_code == 200
+    assert client.get(exported.json()['content_url']).status_code == 403
+    assert client.get('/v1/reports/' + report['id'], params={'mode': 'history'}).json()['body'] == report['body']
+    fact = next(item for item in report['body']['facts'] if isinstance(item['value'], dict)
+        and item['value'].get('pdf_reference'))
+    assert fact['value']['pdf_reference'] == event['event']['measurements'][0]['pdf_reference']
+
+
+def test_test_pdf_original_revocation_between_reservation_and_dispatch_blocks_provider(setup, monkeypatch):
+    from tire_api import ai_execution
+    client, _registry, model, _database = setup
+    pack, selected, _event, _document = prepared_test_pdf(setup, granted=True)
+    original = ai_execution.require_evidence_dispatch
+    def changed(*args, **kwargs):
+        revoked = authorize(client, selected, action='revoke', expected_revision=1)
+        assert revoked.status_code == 200, revoked.text
+        return original(*args, **kwargs)
+    monkeypatch.setattr(ai_execution, 'require_evidence_dispatch', changed)
+    response = analyze(client, pack)
+    assert response.status_code == 200, response.text
+    assert response.json()['state'] == 'failed' and response.json()['error_code'] == 'ai_original_text_use_not_allowed'
+    assert not model.calls
+
+
+@pytest.mark.parametrize('revoke', [False, True])
+def test_test_pdf_stream_freezes_original_and_rechecks_permission_at_terminal(setup, revoke):
+    from test_ai_stream_api import accept, read
+    client, _registry, model, _database = setup
+    pack, selected, _event, _document = prepared_test_pdf(setup, granted=True)
+    async def stream(config, body, on_text):
+        receipt = await model.generate(config, body)
+        await on_text(receipt['text'])
+        if revoke:
+            revoked = await asyncio.to_thread(authorize, client, selected, action='revoke', expected_revision=1)
+            assert revoked.status_code == 200
+        return receipt
+    model.stream = stream
+    key = str(uuid4())
+    accepted = accept(client, pack, key)
+    assert accepted.status_code == 202, accepted.text
+    identity = accepted.json()['analysis']['id']
+    # PDF restoration runs again before dispatch and terminal adoption. Keep the
+    # production owner deadline unchanged while allowing this fixture to finish.
+    deadline = time.monotonic() + 90
+    while True:
+        detail = read(client, identity)
+        if detail['execution']['terminal']:
+            break
+        assert time.monotonic() < deadline, detail['execution']
+        time.sleep(0.05)
+    run = detail['analysis']
+    assert len(model.calls) == 1 and run['usage']['total_tokens'] == 600
+    if revoke:
+        assert run['state'] == 'failed' and run['answer'] is None
+        assert run['error_code'] == 'ai_original_text_use_not_allowed'
+    else:
+        assert run['state'] == 'completed' and run['answer']['test_pdf_policy'] == 'test-pdf-original@1'
+    assert accept(client, pack, key).json()['analysis']['id'] == identity and len(model.calls) == 1
+
+
+@pytest.mark.parametrize('change', ['revoke', 'revision', 'original', 'marker'])
+def test_test_pdf_changes_after_dispatch_reject_answer_and_retain_actual_usage(setup, change):
+    from tire_api.ai_models import AIEvidencePack
+    from tire_api.domain import digest
+    client, _registry, model, database = setup
+    pack, selected, event, document = prepared_test_pdf(setup, granted=True)
+    generate = model.generate
+    async def changed(config, body):
+        receipt = await generate(config, body)
+        if change == 'revoke':
+            assert authorize(client, selected, action='revoke', expected_revision=1).status_code == 200
+        elif change == 'revision':
+            payload = {**event['event'], 'conditions': 'Synthetic changed conditions after dispatch'}
+            revised = client.put('/v1/test-events/' + event['id'], json={'event': payload, 'expected_revision': 1,
+                'operator': 'Synthetic reviewer', 'reason': 'Exercise post-dispatch revision'})
+            assert revised.status_code == 200, revised.text
+        elif change == 'original':
+            with database.sessions() as db:
+                path = db.info['object_store'].path(document['raw_hash'])
+            path.write_bytes(b'synthetic corrupted original')
+        else:
+            with database.sessions() as db:
+                row = db.get(AIEvidencePack, pack['id'])
+                damaged = deepcopy(row.payload)
+                del damaged['test_pdf_policy']
+                db.execute(text('UPDATE ai_evidence_packs SET payload=:payload, fingerprint=:fingerprint WHERE id=:id'),
+                    {'payload': json.dumps(damaged), 'fingerprint': digest(damaged), 'id': row.id})
+                db.commit()
+        return receipt
+    model.generate = changed
+    run = analyze(client, pack).json()
+    assert run['state'] == 'failed' and run['answer'] is None
+    assert run['usage']['total_tokens'] == 600 and len(model.calls) == 1
+
+
+@pytest.mark.parametrize('damage', ['marker', 'reference', 'quote', 'participant', 'field'])
+def test_test_pdf_frozen_contract_rejects_rehashed_structural_damage(setup, damage):
+    from types import SimpleNamespace
+    from tire_api.ai_analysis import grounded_answer
+    client, _registry, _model, _database = setup
+    pack, _selected, _event, _document = prepared_test_pdf(setup)
+    payload = deepcopy(pack)
+    fact = next(item for item in payload['facts'] if isinstance(item['value'], dict)
+        and item['value'].get('pdf_reference'))
+    if damage == 'marker':
+        del payload['test_pdf_policy']
+    elif damage == 'reference':
+        fact['value']['pdf_reference']['raw_hash'] = True
+    elif damage == 'quote':
+        fact['value']['evidence_span'] = None
+    elif damage == 'participant':
+        fact['value']['unexpected_participant'] = 'unbound'
+    else:
+        fact['field_code'] = 'unbound.field'
+    output = {'claims': [], 'uncertainty': ''}
+    with pytest.raises((ValueError, TypeError)):
+        grounded_answer(json.dumps(output), SimpleNamespace(payload=payload, data_state='local_snapshot'))
 
 
 def test_selected_source_text_prepares_locally_without_model_call(setup):

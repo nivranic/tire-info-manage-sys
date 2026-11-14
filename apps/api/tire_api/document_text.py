@@ -9,6 +9,7 @@ from sqlalchemy import Float, String, delete, func, select, text
 from .db import EvidenceDocument, EvidenceObject, utcnow
 from .document_pdf import (MAX_PAGE_CHARACTERS, MAX_PAGES, MAX_TEXT_CHARACTERS,
                            PARSER_VERSION, SOURCE_ID, extractor_version)
+from .document_text_contract import DocumentTextReference
 from .document_text_models import DocumentTextChunk, DocumentTextIndex, DocumentTextPage
 from .documents import DocumentMetadata, document_metadata
 from .domain import StrictModel, digest
@@ -79,17 +80,6 @@ class DocumentTextSearch(HistoryMode):
         if not self.text.strip() or any(ord(character) < 32 for character in self.text):
             raise ValueError('请提供有界的历史PDF检索文本')
         return self
-
-
-class DocumentTextReference(StrictModel):
-    document_id: str = Field(min_length=1, max_length=64)
-    document_fingerprint: str = Field(pattern=r'^[a-f0-9]{64}$')
-    raw_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
-    extractor_version: str = Field(min_length=1, max_length=100)
-    page: StrictInt = Field(ge=1, le=MAX_PAGES)
-    start: StrictInt = Field(ge=0, le=MAX_PAGE_CHARACTERS)
-    end: StrictInt = Field(ge=1, le=MAX_PAGE_CHARACTERS)
-    chunk_id: str = Field(pattern=r'^[a-f0-9]{64}$')
 
 
 class ResolveDocumentText(HistoryMode):

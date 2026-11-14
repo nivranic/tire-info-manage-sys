@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
 import type { TestEventDetail, TestEventPayload, TestMeasurement } from "@tire/domain-types";
+import TestPdfPicker from "./test-pdf-picker";
 
 const empty = (): TestEventPayload => ({ title: "", organization: "", relationship: "unknown", publication_date: null,
   source_url: "", rights_basis: "", tested_size: "", vehicle: null, surface: null, conditions: "",
@@ -85,6 +86,7 @@ export default function TestEventEditor({ initial, onSaved, onClose }: {
               <label><span>来源名次（未知或未录入请留空）</span><input type="number" min={1} max={10000} value={value.source_rank ?? ""} onChange={e => measurement(person.key, metric.key, { source_rank: e.target.value ? Number(e.target.value) : null })} /></label>
               <label><span>证据短摘录（最多 300 字）</span><textarea required={!!value.raw_value} maxLength={300} value={value.evidence_span} onChange={e => measurement(person.key, metric.key, { evidence_span: e.target.value })} /></label>
               <label><span>原文定位（章节、表格或页码）</span><input required={!!value.raw_value} maxLength={300} value={value.evidence_locator} onChange={e => measurement(person.key, metric.key, { evidence_locator: e.target.value })} /></label>
+              <TestPdfPicker reference={value.pdf_reference} onChange={pdf_reference => measurement(person.key, metric.key, { pdf_reference })} />
             </div>;
           })}
           <button type="button" className="text-button" disabled={draft.metrics.length < 2} onClick={() => setDraft(previous => ({ ...previous, metrics: previous.metrics.filter(m => m.key !== metric.key), measurements: previous.measurements.filter(m => m.metric_key !== metric.key) }))}>移除此指标</button>

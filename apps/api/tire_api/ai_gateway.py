@@ -256,6 +256,12 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
         from .ai_original_text import NOTICE, original_items
         original_items(evidence)
         system_prompt += '\n\n' + NOTICE + '\n事实引用原文摘录时，text保持为空，由服务器呈现原文。'
+    from .test_measurement_originals import pdf_fact_items
+    try:
+        if pdf_fact_items(evidence):
+            system_prompt += '\n\n测试成绩中的PDF引用绑定保存原件区间；数值解释、参测身份与方法仍按人工转录的测试事实边界处理。'
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise GatewayError('ai_grounding_validation_failed') from None
     if config.provider == 'anthropic':
         # Anthropic has no native response_format; the output contract rides in the system
         # prompt (ADR-2026-055 D-2). Appended before measurement so the byte gate and token
@@ -311,6 +317,9 @@ def analysis_contract(payload):
         contract = {'prompt_version': PROMPT_VERSION, 'purpose': payload.get('purpose', 'analysis')}
     if payload.get('original_text_policy') is not None:
         contract['original_text_policy'] = payload['original_text_policy']
+    from .test_measurement_originals import pdf_fact_items
+    if pdf_fact_items(payload):
+        contract['test_pdf_policy'] = payload['test_pdf_policy']
     boundary = test_boundary(payload)
     if boundary:
         if contains_recall(payload):

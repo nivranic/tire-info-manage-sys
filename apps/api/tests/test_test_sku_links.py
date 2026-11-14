@@ -341,6 +341,8 @@ def pre019(tmp_path, monkeypatch):
     from sqlalchemy import text
     from tire_api.db import Base, UserSession, uid, utcnow
     from tire_api.knowledge_models import initialize_search
+    from tire_api.source_text_models import initialize_source_text_search
+    from tire_api.document_text_models import initialize_document_text_search
     from tire_api.main import create_app
     from tire_api.migrations import DEVICE_AI_LEDGER_TRIGGERS_SQLITE
     from test_fitment_relations import NoNetworkRegistry
@@ -359,6 +361,8 @@ def pre019(tmp_path, monkeypatch):
         for sql in DEVICE_AI_LEDGER_TRIGGERS_SQLITE:
             connection.exec_driver_sql(sql)
         initialize_search(connection)
+        initialize_source_text_search(connection)
+        initialize_document_text_search(connection)
         connection.exec_driver_sql('CREATE TABLE preserved_bridge_marker (value TEXT NOT NULL)')
         connection.exec_driver_sql("INSERT INTO preserved_bridge_marker VALUES ('synthetic predecessor')")
     try:

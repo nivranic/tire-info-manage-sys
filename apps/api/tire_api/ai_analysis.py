@@ -115,6 +115,8 @@ class ModelAnswer(StrictModel):
 def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
     from .ai_original_text import POLICY, NOTICE as ORIGINAL_NOTICE, original_items
     originals = original_items(pack.payload)
+    from .test_measurement_originals import pdf_fact_items
+    test_originals = pdf_fact_items(pack.payload)
     from sqlalchemy.orm import object_session
     if isinstance(pack, AIEvidencePack):
         attached = object_session(pack)
@@ -192,6 +194,8 @@ def grounded_answer(text: str, pack: AIEvidencePack) -> dict:
     if originals:
         result['original_text_policy'] = POLICY
         result['notice'] += '\n' + ORIGINAL_NOTICE
+    if test_originals:
+        result['test_pdf_policy'] = pack.payload['test_pdf_policy']
     if recall:
         result['recall_boundary'] = recall_boundary(pack.payload)
         result['notice'] = result['recall_boundary']['notice']

@@ -56,6 +56,93 @@ def compare(client, row, **changes):
         'metric_keys': ['wet', 'noise'], **changes})
 
 
+def pdf_measurement_payload(client):
+    from test_document_text import indexed_document, search
+    quote = 'Fixture A: 38.00 m, rank 3'
+    document, _ = indexed_document(client, pages=(quote + ' Fixture B: 40.0 m, rank 5',))
+    response = search(client, 'Fixture', document_id=document['id'])
+    assert response.status_code == 200, response.text
+    reference = response.json()['items'][0]['reference']
+    payload = deepcopy(PAYLOAD)
+    payload['event']['measurements'][0]['pdf_reference'] = reference
+    return payload, document
+
+
+def test_legacy_measurements_omit_pdf_reference_and_keep_payload_fingerprint(setup):
+    from tire_api.domain import digest
+    from tire_api.test_events import EventPayload
+    client, _database = setup
+    payload = EventPayload.model_validate(PAYLOAD['event']).model_dump(mode='json')
+    assert all('pdf_reference' not in item for item in payload['measurements'])
+    row = create(client)
+    assert row['event'] == payload and row['fingerprint'] == digest(payload)
+    explicit_null = deepcopy(PAYLOAD)
+    explicit_null['event']['measurements'][0]['pdf_reference'] = None
+    assert create(client, explicit_null)['event'] == payload
+
+
+def test_pdf_measurement_saves_exact_reference_in_detail_history_and_comparison(setup):
+    client, database = setup
+    payload, document = pdf_measurement_payload(client)
+    row = create(client, payload)
+    reference = payload['event']['measurements'][0]['pdf_reference']
+    assert row['event']['measurements'][0]['pdf_reference'] == reference
+    assert row['event']['measurements'][0]['raw_value'] == '38.00'
+    assert row['verification_status'] == 'unverified'
+    assert all(person['identity_status'] == 'participant_only' for person in row['participants'])
+    assert compare(client, row).json()['measurements'][0]['pdf_reference'] == reference
+    revised = client.put('/v1/test-events/' + row['id'], json={**payload, 'expected_revision': 1,
+        'reason': 'Retain the original citation in a new revision',
+        'event': {**payload['event'], 'conditions': 'Revised synthetic conditions'}})
+    assert revised.status_code == 200, revised.text
+    historical = client.get('/v1/test-events/' + row['id'], params={'mode': 'history', 'revision': 1})
+    assert historical.json()['event'] == row['event'] and revised.json()['revision'] == 2
+    assert reference['document_id'] == document['id']
+    assert all(count(database, model) == 0 for model in (Snapshot, TireVariant, FactVersion, Verification))
+
+
+@pytest.mark.parametrize('field,value', [('raw_hash', '0' * 64), ('document_fingerprint', '0' * 64),
+    ('document_id', 'missing-document'), ('page', 2), ('start', 1), ('end', 2),
+    ('chunk_id', '0' * 64), ('extractor_version', 'unavailable-extractor@1')])
+def test_pdf_measurement_rejects_wrong_original_or_location_without_an_event(setup, field, value):
+    client, database = setup
+    payload, _document = pdf_measurement_payload(client)
+    payload['event']['measurements'][0]['pdf_reference'][field] = value
+    response = client.post('/v1/test-events', json=payload)
+    assert response.status_code == 409, response.text
+    assert response.json()['detail']['code'] == 'test_measurement_pdf_reference_invalid'
+    assert count(database, TireTestEvent) == count(database, TireTestRevision) == 0
+
+
+def test_pdf_measurement_rejects_rewritten_quote_and_preserves_previous_revision(setup):
+    client, database = setup
+    payload, _document = pdf_measurement_payload(client)
+    row = create(client, payload)
+    payload['event']['measurements'][0]['evidence_span'] = 'Fixture A: 37.00 m, rank 1'
+    response = client.put('/v1/test-events/' + row['id'], json={**payload, 'expected_revision': 1})
+    assert response.status_code == 409, response.text
+    assert response.json()['detail']['code'] == 'test_measurement_pdf_quote_mismatch'
+    assert count(database, TireTestRevision) == 1
+    assert client.get('/v1/test-events/' + row['id'], params={'mode': 'history'}).json()['event'] == row['event']
+
+
+def test_pdf_measurement_checks_revision_again_after_original_extraction(setup, monkeypatch):
+    from tire_api import text_embeddings
+    client, database = setup
+    row = create(client)
+    payload, _document = pdf_measurement_payload(client)
+    original = text_embeddings.original_excerpt
+    def competing_revision(db, selected, pdfs):
+        result = original(db, selected, pdfs)
+        changed = client.put('/v1/test-events/' + row['id'], json={**deepcopy(PAYLOAD),
+            'expected_revision': 1, 'event': {**PAYLOAD['event'], 'conditions': 'Concurrent synthetic update'}})
+        assert changed.status_code == 200, changed.text
+        return result
+    monkeypatch.setattr(text_embeddings, 'original_excerpt', competing_revision)
+    response = client.put('/v1/test-events/' + row['id'], json={**payload, 'expected_revision': 1})
+    assert response.status_code == 409 and count(database, TireTestRevision) == 2
+
+
 def test_event_preserves_conditions_decimal_source_rank_and_unknown_identity_without_product_facts(setup):
     client, database = setup
     row = create(client)

@@ -94,8 +94,10 @@ def _validate(document):
     evidence, facts = body.get('evidence'), body.get('facts')
     from fastapi import HTTPException
     from .ai_original_text import original_items
+    from .test_measurement_originals import pdf_fact_items
     try:
         original_items(body)
+        pdf_fact_items(body)
     except (HTTPException, ValueError, TypeError, KeyError, AttributeError):
         raise ReportRenderError('invalid_original_text_citation') from None
     if not isinstance(evidence, list) or not evidence or not isinstance(facts, list) or not facts:

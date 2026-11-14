@@ -1,6 +1,8 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手先读[中国召回 AI 交接卡](docs/AGENT-HANDOFF-2026-11-14-SAMR-AI.md)，本阶段已接通精确公告证据、同步／流式、原件引用与报告。最终519项受管回归、SDK14项、Web66项、生产浏览器15项和非拥有者PG／TLS专项通过，Provider采用合成适配器，真实OpenAI继续待验。整体需求见[进度总表](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)，当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、179张模型表，完整V1持续进行。
+当前接手先读[测试成绩PDF原件交接卡](docs/AGENT-HANDOFF-2026-11-14-TEST-PDF.md)及[阶段验收](docs/assurance/evidence/test-measurement-pdf-2026-11-14.md)。本阶段把短摘录绑定到保存PDF的精确区间，并贯通录入、修订、比较、AI用途核验与报告导出。此前已取得首份完整许可研究PDF，真实SKU、真人Golden、实际OpenAI与完整V1继续验收。复核发现同浏览器切换账户时报告归属随原会话转移，已列为优先修复项。[全部需求与Gate](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)
+
+中国召回 AI 阶段见[中国召回 AI 交接卡](docs/AGENT-HANDOFF-2026-11-14-SAMR-AI.md)，该阶段已接通精确公告证据、同步／流式、原件引用与报告。最终519项受管回归、SDK14项、Web66项、生产浏览器15项和非拥有者PG／TLS专项通过，Provider采用合成适配器，真实OpenAI继续待验。整体需求见[进度总表](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)，当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、179张模型表，完整V1持续进行。
 
 中国召回后台发现／指定公告监控、即时应用内通知、任务SSE与SDK／Web已接通。受管回归117／192项、SDK13项、Web62项和正常浏览器22项通过，实际旧SQLite升级6项及独立PG／TLS真实官方Worker已验，16条越权SQL被拒绝。后续建立自然长周期和通知SLO证据，并推进SKU／批次、人工Golden、许可和AI引用。[监控阶段验收](docs/assurance/evidence/samr-cn-monitoring-2026-11-14.md)
 

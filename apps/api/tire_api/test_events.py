@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, Session, load_only, mapped_column
 from .auth import session_scope
 from .db import Base, uid, utcnow
 from .documents import DocumentMetadata
+from .document_text_contract import DocumentTextReference
 from .domain import StrictModel, digest, parse_size, stable_json
 from .research import DescriptionText, preference_state
 from .service import QueryService, timestamp
@@ -40,6 +41,14 @@ class Measurement(StrictModel):
     source_rank: StrictInt | None = Field(default=None, ge=1, le=10000)
     evidence_span: DescriptionText = Field(min_length=1, max_length=300)
     evidence_locator: DescriptionText = Field(min_length=1, max_length=300)
+    pdf_reference: DocumentTextReference | None = None
+
+    @model_serializer(mode='wrap')
+    def serialize_measurement(self, handler):
+        value = handler(self)
+        if self.pdf_reference is None:
+            value.pop('pdf_reference', None)
+        return value
 
 
 class TestPublication(StrictModel):
@@ -107,6 +116,8 @@ class EventPayload(StrictModel):
             raise ValueError('来源名次不得超过来源声明的参测总数')
         if sum(len(row.evidence_span) for row in self.measurements) > 8000:
             raise ValueError('仅留存有界证据短摘录，不接受全文或整篇文章镜像')
+        if len({digest(row.pdf_reference.model_dump()) for row in self.measurements if row.pdf_reference}) > 32:
+            raise ValueError('单场最多关联32段不同的PDF原件引用')
         if len(stable_json(self.model_dump(mode='json'))) > 500_000:
             raise ValueError('本次事件记录超过大小限制')
         return self
@@ -241,7 +252,11 @@ def register_test_event_routes(app: FastAPI):
 
     @app.post('/v1/test-events', status_code=201)
     def create(payload: SaveEvent, request: Request, db: Session = Depends(get_db)):
+        from .test_measurement_originals import check_measurement_sources, recheck_documents
+        documents = check_measurement_sources(db, payload.event.model_dump(mode='json'))
+        db.rollback()
         QueryService(db, None).lock_ingestion()
+        recheck_documents(db, documents)
         item = TireTestEvent(id=uid())
         db.add(item)
         db.flush()
@@ -272,8 +287,13 @@ def register_test_event_routes(app: FastAPI):
 
     @app.put('/v1/test-events/{event_id}')
     def revise(event_id: str, payload: ReviseEvent, request: Request, db: Session = Depends(get_db)):
+        from .test_measurement_originals import check_measurement_sources, recheck_documents
+        latest(db, event_id, payload.expected_revision)
+        documents = check_measurement_sources(db, payload.event.model_dump(mode='json'))
+        db.rollback()
         QueryService(db, None).lock_ingestion()
         old = latest(db, event_id, payload.expected_revision)
+        recheck_documents(db, documents)
         if old.state == 'revoked':
             raise HTTPException(409, '测试事件已撤销，请先明确恢复后再修订')
         value = payload.event.model_dump(mode='json')

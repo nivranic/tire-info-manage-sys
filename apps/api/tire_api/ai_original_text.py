@@ -139,7 +139,25 @@ def original_items(payload):
     return result
 
 
+def require_text_permission(db, selection, value, purpose, config):
+    if purpose is None:
+        return
+    row, view = permission(db, selection, purpose, recipient(purpose, config))
+    if view['state'] != 'granted':
+        fail('ai_original_text_use_not_allowed', 403)
+    request = row.payload['request']
+    if row.payload['text_hash'] != digest(value) or request['privacy_class'] not in {'public', 'private'}:
+        fail()
+    if purpose == AI_PURPOSE and request['privacy_class'] == 'private' and not config.allow_private:
+        fail('ai_original_text_use_not_allowed', 403)
+
+
 def require_originals(db, payload, *, purpose=None, config=None):
+    from .test_measurement_originals import check_frozen_measurement, pdf_fact_items
+    try:
+        test_items = pdf_fact_items(payload)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        fail()
     pdfs = {}
     for item, selection, value in original_items(payload):
         excerpt = excerpt_for(db, selection, pdfs)
@@ -148,23 +166,24 @@ def require_originals(db, payload, *, purpose=None, config=None):
         if (excerpt['text'] != value or set(item) != {'id', *current}
                 or any(item[key] != expected for key, expected in current.items() if key != 'verified_at')):
             fail()
-        if purpose is None:
-            continue
-        receiving = recipient(purpose, config)
-        row, view = permission(db, selection, purpose, receiving)
-        if view['state'] != 'granted':
-            fail('ai_original_text_use_not_allowed', 403)
-        request = row.payload['request']
-        if row.payload['text_hash'] != digest(value) or request['privacy_class'] not in {'public', 'private'}:
+        require_text_permission(db, selection, value, purpose, config)
+    for source, fact, reference, quote in test_items:
+        try:
+            check_frozen_measurement(db, source, fact)
+        except HTTPException:
             fail()
-        if purpose == AI_PURPOSE and request['privacy_class'] == 'private' and not config.allow_private:
-            fail('ai_original_text_use_not_allowed', 403)
+        selection = selection_adapter.validate_python({'kind': 'document_text', 'reference': reference.model_dump()})
+        excerpt = excerpt_for(db, selection, pdfs)
+        if quote not in excerpt['text']:
+            fail()
+        require_text_permission(db, selection, excerpt['text'], purpose, config)
 
 
 def require_dispatch(database, request_id, config, body, pack=None):
     from .ai_execution import _vehicle_dispatch_input
     from .ai_models import AIEvidencePack, AIRequest
     from .auth import session_scope
+    from .test_measurement_originals import pdf_fact_items
     try:
         with database.sessions() as db:
             request = db.get(AIRequest, request_id)
@@ -176,10 +195,15 @@ def require_dispatch(database, request_id, config, body, pack=None):
             outbound = _vehicle_dispatch_input(body)
             marked = (request.request_contract.get('original_text_policy') is not None
                 or frozen.payload.get('original_text_policy') is not None
-                or outbound is not None and outbound['untrusted_evidence_pack'].get('original_text_policy') is not None)
+                or request.request_contract.get('test_pdf_policy') is not None
+                or frozen.payload.get('test_pdf_policy') is not None
+                or outbound is not None and (outbound['untrusted_evidence_pack'].get('original_text_policy') is not None
+                    or outbound['untrusted_evidence_pack'].get('test_pdf_policy') is not None)
+                or any(isinstance(fact.get('value'), dict) and 'pdf_reference' in fact['value']
+                    for fact in frozen.payload.get('facts', [])))
             if not marked:
                 return
-            if (not original_items(frozen.payload)
+            if (not (original_items(frozen.payload) or pdf_fact_items(frozen.payload))
                     or frozen.actor_session_id not in session_scope(db, request.actor_session_id)
                     or request.provider != config.provider or request.model != config.model
                     or digest(frozen.payload) != frozen.fingerprint

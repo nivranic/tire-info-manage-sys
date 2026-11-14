@@ -11,6 +11,7 @@ import { SamrAnalysisBoundary, SamrCitation, SamrEvidenceMeta } from "./samr-ai-
 import { isSamrEvidence } from "./samr-ai-values";
 import { RecallAnalysisBoundary, RecallEvidenceMeta, RecallFactScope } from "./recall-evidence-meta";
 import OriginalTextCitation from "./original-text-citation";
+import TestPdfCitation from "./test-pdf-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { useWorkbenchPlatform } from "./workbench-platform";
 import { useToast } from "./toast";
@@ -119,7 +120,7 @@ function FrozenReportBody({ report }: { report: EvidenceReportDetail }) {
       {source.raw_hash ? <p>来源 SHA-256 <code>{source.raw_hash}</code></p> : null}
       <p>{sourceLink(source.source_url) ? <a href={sourceLink(source.source_url)} target="_blank" rel="noopener noreferrer">打开原始来源</a> : "来源链接不可安全打开"}</p>
       {source.kind === "change_event" ? <div className="ai-change-provenance"><p>历史变化记录于 {stamp(source.change_observed_at)}；首次观察不代表产品新发布。</p>{source.previous_snapshot_id ? <><p>变化前快照 <code>{source.previous_snapshot_id}</code> · 观察 {stamp(source.previous_observed_at)}</p><p>变化前 SHA-256 <code>{source.previous_raw_hash || "未记录"}</code></p>{sourceLink(source.previous_source_url) ? <a href={sourceLink(source.previous_source_url)} target="_blank" rel="noopener noreferrer">打开变化前来源</a> : null}</> : <p>此前没有已采纳快照。</p>}</div> : null}
-      <details open><summary>引用字段</summary><dl>{body.facts.filter(fact => fact.evidence_id === source.id).map(fact => <div key={fact.id} id={`report-${report.id}-fact-${fact.id}`} tabIndex={-1}><dt>{fact.id} · {fact.field}<RecallFactScope fact={fact} evidence={source} /></dt><dd>{fact.text}</dd></div>)}</dl></details>
+      <details open><summary>引用字段</summary><dl>{body.facts.filter(fact => fact.evidence_id === source.id).map(fact => <div key={fact.id} id={`report-${report.id}-fact-${fact.id}`} tabIndex={-1}><dt>{fact.id} · {fact.field}<RecallFactScope fact={fact} evidence={source} /></dt><dd>{fact.text}<TestPdfCitation value={fact.value} /></dd></div>)}</dl></details>
     </section>)}
     <FrozenFieldResolutions resolutions={body.field_resolutions} policy={body.field_policy} context="saved" />
     {body.conflicts.length ? <section className="source-conflict"><h3>来源冲突 · 未裁定</h3><p>这些冲突随正文冻结保存；模型解释不会自动裁定。</p><details><summary>原始冲突记录</summary><pre>{JSON.stringify(body.conflicts, null, 2)}</pre></details></section> : <p className="review-boundary">所保存的证据包没有记录来源冲突。</p>}

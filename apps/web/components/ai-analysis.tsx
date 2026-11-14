@@ -14,6 +14,7 @@ import AiBudgetMeter, { aiProviderLabel } from "./ai-budget";
 import { SafetyGateAnalysisBoundary, SafetyGateCitation, SafetyGateEvidenceMeta } from "./safety-gate-ai-evidence";
 import { isSafetyGateEvidence, safetyGateAnalysisNotice, safetyGateCurrentRequest } from "./safety-gate-ai-values";
 import OriginalTextCitation from "./original-text-citation";
+import TestPdfCitation from "./test-pdf-citation";
 import { containsTestEvidence, TestAnalysisScope } from "./test-analysis-boundary";
 import { SamrAnalysisBoundary, SamrCitation, SamrEvidenceMeta } from "./samr-ai-evidence";
 import { isSamrEvidence, samrAnalysisNotice, samrCurrentRequest } from "./samr-ai-values";
@@ -269,7 +270,7 @@ export default function AIAnalysisDialog({ target, onClose, onOpenReport }: { ta
             <div><dt>变化前快照</dt><dd>{e.previous_snapshot_id ? <><code>{e.previous_snapshot_id}</code><br />观察 {stamp(e.previous_observed_at)}{e.previous_source_url && sourceLink(e.previous_source_url) ? <> · <a href={sourceLink(e.previous_source_url)} target="_blank" rel="noopener noreferrer">打开变化前来源</a></> : null}<br /><span>SHA-256 {e.previous_raw_hash || "未记录"}</span></> : "此前没有已采纳快照，不能据此推断厂商刚发布。"}</dd></div>
             <div><dt>变化后快照</dt><dd><code>{e.snapshot_id}</code><br />观察 {stamp(e.observed_at)}<br /><span>SHA-256 {e.raw_hash || "未记录"}</span></dd></div>
           </dl></div> : null}
-          <details><summary>证据字段</summary><dl>{pack.facts.filter(f => f.evidence_id === e.id).map(f => <div key={f.id} id={`ai-fact-${f.id}`} tabIndex={-1}><dt>{f.id} · {f.field}<RecallFactScope fact={f} evidence={e} />{f.domain === "samr_recall" ? <small>公告 {f.record_key} 的原始字段</small> : null}{f.domain === "safety_gate" ? <small>告警 {f.record_key} 的原始字段</small> : null}</dt><dd>{f.text}</dd></div>)}</dl></details></section>)}</details>
+          <details><summary>证据字段</summary><dl>{pack.facts.filter(f => f.evidence_id === e.id).map(f => <div key={f.id} id={`ai-fact-${f.id}`} tabIndex={-1}><dt>{f.id} · {f.field}<RecallFactScope fact={f} evidence={e} />{f.domain === "samr_recall" ? <small>公告 {f.record_key} 的原始字段</small> : null}{f.domain === "safety_gate" ? <small>告警 {f.record_key} 的原始字段</small> : null}</dt><dd>{f.text}<TestPdfCitation value={f.value} /></dd></div>)}</dl></details></section>)}</details>
         <FrozenFieldResolutions resolutions={pack.field_resolutions} policy={pack.field_policy} context="prepared" />
         {pack.conflicts.length ? <section className="source-conflict"><strong>所选证据存在 {pack.conflicts.length} 项未解决冲突</strong><details><summary>原始冲突记录</summary><pre>{JSON.stringify(pack.conflicts, null, 2)}</pre></details></section> : null}
         <div className="variant-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => setReportSave({ pack })}>保存证据报告</button>{canExportAIAnalysis(run) && run.pack_id === pack.id ? <button type="button" className="secondary-button" disabled={busy} onClick={() => setReportSave({ pack, analysis: run })}>保存含分析的报告</button> : null}</div>
