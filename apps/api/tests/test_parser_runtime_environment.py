@@ -33,8 +33,22 @@ def test_windows_child_rejects_unrecognized_machine_metadata(monkeypatch, tmp_pa
     assert error.value.code == 'parser_isolation_unavailable'
 
 
-def test_windows_child_requires_machine_metadata(monkeypatch, tmp_path):
+@pytest.mark.parametrize('machine', ['AMD64', 'x86', 'ARM64', 'ARM', 'IA64'])
+def test_windows_child_derives_missing_machine_metadata_from_manifest_platform(monkeypatch, tmp_path, machine):
     windows_environment(monkeypatch, tmp_path)
+    monkeypatch.setattr(runtime.platform, 'machine', lambda: machine)
+    monkeypatch.setenv('TI_SYNTHETIC_ENV_CANARY', 'must-not-reach-child')
+    monkeypatch.setenv('PYTHONPATH', 'synthetic-import-path')
+    result = runtime._environment(str(tmp_path / 'child'))
+    assert result['PROCESSOR_ARCHITECTURE'] == machine.upper()
+    assert set(result) == {'PYTHONIOENCODING', 'PYTHONUTF8', 'TEMP', 'TMP', 'SystemRoot', 'WINDIR',
+                           'PROCESSOR_ARCHITECTURE'}
+
+
+@pytest.mark.parametrize('machine', ['', 'unknown', 'AMD64 extra'])
+def test_windows_child_rejects_unrecognized_derived_machine_metadata(monkeypatch, tmp_path, machine):
+    windows_environment(monkeypatch, tmp_path)
+    monkeypatch.setattr(runtime.platform, 'machine', lambda: machine)
     with pytest.raises(runtime.ParserRunError) as error:
         runtime._environment(str(tmp_path / 'child'))
     assert error.value.code == 'parser_isolation_unavailable'

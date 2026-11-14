@@ -108,14 +108,23 @@ def test_actual_child_transports_only_fixed_pdf_errors(installation):
     assert caught.value.receipt['reaped'] and caught.value.receipt['exit_code'] == 0
 
 
-def test_pdf_capability_requires_the_complete_reviewed_catalog(installation):
-    manifest = runtime._deployed_manifest()
-    assert set(manifest['parsers']) == set(bundles._DOCUMENT_SOURCES)
+@pytest.mark.parametrize('historical', [False, True])
+def test_pdf_capability_requires_the_complete_reviewed_catalog(installation, historical):
+    if historical:
+        from test_parser_bundles import pre_bridgestone_install
+        catalog = {key: value for key, value in runtime.source_catalog().items()
+                   if key in bundles._DOCUMENT_SOURCES}
+        pre_bridgestone_install(installation)
+        manifest = bundles.snapshot_manifest(installation, catalog, runtime.PROTOCOL, runtime.limits())
+    else:
+        manifest = runtime._deployed_manifest()
+    expected = bundles._DOCUMENT_SOURCES if historical else bundles._SAFETY_GATE_SOURCES
+    assert set(manifest['parsers']) == set(expected)
     for missing in ('workspace-pdf-text', 'document_pdf.py'):
         changed = deepcopy(manifest)
         del changed['parsers' if missing == 'workspace-pdf-text' else 'files'][missing]
         changed['bundle_id'] = bundles.digest({key: value for key, value in changed.items() if key != 'bundle_id'})
-        if missing == 'workspace-pdf-text':
+        if missing == 'workspace-pdf-text' and historical:
             assert bundles.checked_manifest(changed, protocol=runtime.PROTOCOL, limits=runtime.limits()) == changed
             with pytest.raises(runtime.ParserRunError, match='^parser_source_not_allowed$'):
                 runtime.descriptor_for_manifest(changed, document_pdf.SOURCE_ID)

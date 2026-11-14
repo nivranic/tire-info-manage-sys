@@ -76,6 +76,16 @@ def test_saved_real_source_excerpts_roundtrip_child(source, filename, parser):
     assert execute(source, body)['payload'] == parser(body, {})
 
 
+@pytest.mark.skipif(sys.platform != 'win32', reason='Windows child architecture environment')
+def test_real_child_derives_architecture_when_launcher_omits_environment(monkeypatch):
+    monkeypatch.delenv('PROCESSOR_ARCHITECTURE', raising=False)
+    monkeypatch.delenv('PROCESSOR_ARCHITEW6432', raising=False)
+    body = hankook_body()
+    result = execute('hankook-us', body)
+    assert result['payload'] == hankook.parse_html(body, {})
+    assert result['receipt']['exit_code'] == 0 and result['receipt']['reaped']
+
+
 PROBE = r'''
 import json,os,sys,time
 from pathlib import Path

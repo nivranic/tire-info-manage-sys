@@ -2,6 +2,8 @@
 
 当前接手先读[2026-11-14 Agent交接卡](docs/AGENT-HANDOFF-2026-11-14.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、进度与接手顺序。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留历史记录。
 
+Windows Parser已修正启动器缺省架构变量时的启动失败，缺省值由bundle环境声明采用的platform.machine派生。8次原入口（含修改前封存bundle）、125项受管回归、60项PG／TLS专项通过。部署须重建批准@4源码合同，OS文件打开延迟继续待查。[启动修正](docs/assurance/evidence/parser-host-architecture-2026-11-14.md)
+
 运行角色权限专项已补齐23项缺权与漂移反例、部分GRANT后检查回滚及完整重授幂等。正式PG／TLS专项60项、相关受管回归45项通过，842输入稳定。后续优先推进Parser性能取证和真实部署。[权限验收](docs/assurance/evidence/postgres-runtime-permissions-2026-11-14.md)
 
 Parser性能取证新增54组文件系统样本及16次原入口复验，主要耗时已收敛到Windows新文件打开链路。系统目录与项目私槽的监督器回执分别约3.94–4.78秒、2.02–2.55秒，OS归因与原间歇超时继续待查。原始范围及既有TEMP／TMP配置见[Parser取证](docs/assurance/evidence/parser-file-open-2026-11-14.md)。

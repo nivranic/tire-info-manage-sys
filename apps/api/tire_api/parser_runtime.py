@@ -11,6 +11,7 @@ import json
 import math
 import os
 from pathlib import Path
+import platform
 import signal
 import subprocess
 import sys
@@ -149,18 +150,21 @@ def _environment(directory):
         if not system_root or not Path(system_root).is_dir():
             raise ParserRunError('parser_isolation_unavailable')
         environment.update(SystemRoot=system_root, WINDIR=system_root)
-        # platform.machine() reads these on Windows. The bundle manifest binds
-        # that value, so stripping it made every isolated child look like an
-        # incompatible machine. Retain only known architecture identifiers,
-        # never the parent's general environment or executable search path.
+        # Bind the child's machine identity to the same platform.machine()
+        # value used by the bundle manifest, including hosts that omit the
+        # optional Windows architecture environment variables.
+        allowed_architectures = {'AMD64', 'X86', 'ARM64', 'ARM', 'IA64'}
         for name in ('PROCESSOR_ARCHITECTURE', 'PROCESSOR_ARCHITEW6432'):
             architecture = os.environ.get(name)
             if architecture is not None:
-                if architecture.upper() not in {'AMD64', 'X86', 'ARM64', 'ARM', 'IA64'}:
+                if architecture.upper() not in allowed_architectures:
                     raise ParserRunError('parser_isolation_unavailable')
                 environment[name] = architecture
         if not any(name in environment for name in ('PROCESSOR_ARCHITECTURE', 'PROCESSOR_ARCHITEW6432')):
-            raise ParserRunError('parser_isolation_unavailable')
+            architecture = platform.machine().upper()
+            if architecture not in allowed_architectures:
+                raise ParserRunError('parser_isolation_unavailable')
+            environment['PROCESSOR_ARCHITECTURE'] = architecture
     elif sys.platform == 'linux':
         environment['LANG'] = 'C.UTF-8'
     else:
