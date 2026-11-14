@@ -32,6 +32,7 @@ _TELEMETRY_SOURCES = {
     'www.continental-tires.cn': 'continental-cn',
     'www.goodyear.com.sg': 'goodyear-sg',
     'www.yokohama.eu': 'yokohama-eu',
+    'www.dunloptyres.com': 'dunlop-eu',
 }
 
 

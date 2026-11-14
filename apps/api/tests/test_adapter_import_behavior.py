@@ -30,7 +30,7 @@ def fresh_import(script, *arguments):
 
 @pytest.mark.parametrize('adapter,parser', [
     ('pirelli', 'parse_html'), ('toyo', 'parse_html'),
-    ('hankook', 'parse_html'), ('michelin', 'parse_michelin_html'), ('yokohama', 'parse_html'),
+    ('hankook', 'parse_html'), ('michelin', 'parse_michelin_html'), ('yokohama', 'parse_html'), ('dunlop', 'parse_html'),
 ])
 def test_leaf_parser_import_does_not_load_online_or_database_dependencies(adapter, parser):
     observed = fresh_import('''
@@ -91,12 +91,12 @@ def test_registry_access_forms_load_the_same_complete_registry(first_access):
     assert observed['initial_registry_loaded'] is False
     assert observed['same_module'] and observed['pirelli_requires_size']
     assert observed['sources'] == [
-        'bridgestone-jp', 'continental-cn', 'goodyear-sg', 'hankook-us',
+        'bridgestone-jp', 'continental-cn', 'dunlop-eu', 'goodyear-sg', 'hankook-us',
         'michelin-cn', 'michelin-de', 'michelin-fr', 'michelin-uk',
         'michelin-us', 'pirelli-us', 'toyo-us', 'yokohama-eu',
     ]
     assert observed['advertised_sources'] == [
-        'bridgestone-jp', 'continental-cn', 'eprel', 'eu-safety-gate', 'goodyear-sg',
+        'bridgestone-jp', 'continental-cn', 'dunlop-eu', 'eprel', 'eu-safety-gate', 'goodyear-sg',
         'hankook-us', 'michelin-cn', 'michelin-de', 'michelin-fr', 'michelin-uk',
         'michelin-us', 'nhtsa-us-recalls', 'pirelli-us', 'toyo-us', 'yokohama-eu',
     ]

@@ -33,7 +33,7 @@ def test_complete_catalog_is_read_only_and_does_not_promote_pending_source(setup
     assert set(items) == {
         'michelin-us', 'michelin-cn', 'michelin-uk', 'michelin-fr', 'michelin-de',
         'toyo-us', 'hankook-us', 'pirelli-us', 'bridgestone-jp', 'continental-cn',
-        'goodyear-sg', 'yokohama-eu', 'eprel', 'xiaomi-cn-vehicles',
+        'goodyear-sg', 'yokohama-eu', 'dunlop-eu', 'eprel', 'xiaomi-cn-vehicles',
         'nhtsa-us-recalls', 'eu-safety-gate',
     }
     assert items['xiaomi-cn-vehicles']['target_kind'] == 'vehicle'

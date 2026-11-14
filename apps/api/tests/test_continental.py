@@ -107,7 +107,7 @@ def test_reconstructed_twelve_entry_archive_keeps_own_execution(tmp_path, monkey
     assert 'adapters/continental.py' not in old['files']
     trusted_copy(tmp_path, monkeypatch)
     current = bundles.seal_deployed_bundle()
-    assert set(current['parsers']) == set(bundles._YOKOHAMA_SOURCES)
+    assert set(current['parsers']) == set(bundles._DUNLOP_SOURCES)
     parsed = asyncio.run(execute_bundle(old))
     assert len(parsed['payload']) == 2
     assert parsed['receipt']['bundle_id'] == old['bundle_id']

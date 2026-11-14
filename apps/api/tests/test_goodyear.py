@@ -124,7 +124,7 @@ def test_thirteen_entry_archive_executes_own_source_after_install(tmp_path, monk
     trusted_copy(tmp_path, monkeypatch)
     current = bundles.seal_deployed_bundle()
     assert set(old['parsers']) == set(bundles._CONTINENTAL_SOURCES)
-    assert set(current['parsers']) == set(bundles._YOKOHAMA_SOURCES)
+    assert set(current['parsers']) == set(bundles._DUNLOP_SOURCES)
     assert 'adapters/goodyear.py' not in old['files']
     result = asyncio.run(execute_bundle(old))
     assert len(result['payload']) == 2 and result['receipt']['exit_code'] == 0 and result['receipt']['reaped']

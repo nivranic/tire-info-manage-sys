@@ -15,7 +15,7 @@ import aiohttp
 
 from .michelin import parse_michelin_html
 from .michelin_regions import MICHELIN_REGIONS
-from . import hankook, toyo, pirelli, bridgestone, continental, goodyear, yokohama
+from . import hankook, toyo, pirelli, bridgestone, continental, goodyear, yokohama, dunlop
 from .robots import RobotsPolicy
 from .transport import SafeHttpClient, SourceAccessError, USER_AGENT
 from ..captures import CaptureWriteError, parser_failure_reason
@@ -115,7 +115,7 @@ for region_source_id, region_config in MICHELIN_REGIONS.items():
     register_source({**region_config, "id": region_source_id},
                     partial(parse_michelin_html, region=region_config["region"]))
 
-for brand_adapter in (toyo, hankook, pirelli, bridgestone, continental, goodyear, yokohama):
+for brand_adapter in (toyo, hankook, pirelli, bridgestone, continental, goodyear, yokohama, dunlop):
     register_source(brand_adapter.SOURCE_CONFIG, brand_adapter.parse_html)
 
 PENDING_SOURCES = [

@@ -26,8 +26,8 @@ class ChildDenied(PermissionError):
 # Public source bytes, never runtime arguments or credential-derived digests.
 REVIEWED = {
     'apps/api/tests/test_parser_runtime.py': '4d352c8036a8b189406d8cb00a22b3b53f85f20bb05979f33c96d57e283e19a8',
-    'apps/api/tests/test_parser_bundles.py': '79419533af8dba14f9ef8add863a0db089ee08be9219199be6ca8dcdc9577b62',
-    'apps/api/tests/test_adapter_import_behavior.py': '516462ac9e57f69b2cbf05fe045b9982bc36a4b9ab030dbd34ec72876c4224cf',
+    'apps/api/tests/test_parser_bundles.py': '5902652868fedffeb62a9afe00d6c02593ef64caea85b82916302907375ec6d3',
+    'apps/api/tests/test_adapter_import_behavior.py': '794a457c8c8c10217b4c6d9b7b000f21d9ba2a10dd13679e5092b3148c811d54',
     'apps/api/tests/test_auth_governance.py': '5a23fe46ccd753e72cfa97df7e6f274673ec60d977c5474e1e03a5430e63acb7',
     'apps/api/tests/test_auth_lifecycle.py': 'fc15caa941f3ec8fa89086ea51864fe01878552bd34319794305329a516af61a',
     'apps/api/tests/test_identity_migration.py': '592bbbfe9d0068a511b5c9c7e355f1ac43494e4bc7e1c84f16c988b203a1c650',
@@ -35,9 +35,9 @@ REVIEWED = {
     'apps/api/tests/test_raw_captures.py': '85cfcd2f6d66f453983ba3b1c5c610d4f44598df989839ce26a896b1289ff321',
     'apps/api/tests/test_device_ai_public_contract.py': '54d0bf931d0b08abdf3e8e8312d77f6ae937f6c9d0c3d35d1c6b7102e12f2312',
     'apps/api/tests/test_device_ai_routes_prepare.py': 'b2b2d8bd1dafae78307382ad9197652518908f0a524ae4eba5492488ca944c67',
-    'apps/api/tire_api/parser_child.py': 'be3e229dc2185a6f170dcd9f7c30afac6e9035e819258a171c913bb12243b61a',
+    'apps/api/tire_api/parser_child.py': '99fa18f06d9527f932b707f2e914de016d2f5592d35242d19848dd22257625d1',
     'apps/api/tire_api/parser_limits.py': 'af8b43d7e352e4b35126e743a3e63e16c5c54fcb9ac3e8e7853dc8bc1cc1adf6',
-    'apps/api/tire_api/parser_runtime.py': '8db8d7d2d2fb58b5c1edf4cb47b4c21852e3eca41177e32dc75d37f0fe105777',
+    'apps/api/tire_api/parser_runtime.py': 'd2526aef41fb3b84dcebd5eafeb9152a258f2408ea0592e7161feb5e417ebf29',
     'apps/api/tire_api/manage.py': '78d8598a3ce35e07b682415fb250a8c21583ddd363248c95ab8bd817c2c71bfd',
     'scripts/identity_contract.py': 'd518bf77981005c7808279119326f9c05eb77643a10cdb9e4e26b3939623ea05',
     'packages/api-client/tests/device-ai/json-esm-hook.mjs': 'f4327b15575b1f82f5bbc48469f84990a6b9127f6eb17ff4973b7a7fa6e5404d',
@@ -330,7 +330,7 @@ class ChildPolicy:
                 category, mode, payload, rest, database = 'capture_crash', 'code', self.crash, [argv[3]], argv[3]
             elif len(argv) >= 6 and argv[1:4] == ['-I', '-B', '-c'] and argv[4] in self.import_scripts and argv[5] == str(self.repo / 'apps/api'):
                 index, supplied = self.import_scripts.index(argv[4]), argv[6:]
-                valid = (index == 0 and supplied in [['pirelli', 'parse_html'], ['toyo', 'parse_html'], ['hankook', 'parse_html'], ['michelin', 'parse_michelin_html'], ['yokohama', 'parse_html']]
+                valid = (index == 0 and supplied in [['pirelli', 'parse_html'], ['toyo', 'parse_html'], ['hankook', 'parse_html'], ['michelin', 'parse_michelin_html'], ['yokohama', 'parse_html'], ['dunlop', 'parse_html']]
                          or index == 1 and supplied in [['attribute'], ['from_import'], ['star_import']]
                          or index == 2 and not supplied)
                 if not valid:

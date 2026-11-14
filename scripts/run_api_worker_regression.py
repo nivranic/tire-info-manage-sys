@@ -79,6 +79,7 @@ TEST_MODULES = (
     'apps/api/tests/test_continental.py',
     'apps/api/tests/test_goodyear.py',
     'apps/api/tests/test_yokohama.py',
+    'apps/api/tests/test_dunlop.py',
     'apps/api/tests/test_safety_gate.py',
     'apps/api/tests/test_safety_gate_alerts.py',
     'apps/api/tests/test_safety_gate_monitoring.py',
