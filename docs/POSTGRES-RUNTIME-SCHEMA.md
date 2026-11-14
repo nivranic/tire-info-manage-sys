@@ -81,3 +81,7 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 该模式使用已登记Hankook来源进行正常HTTP查询及Worker消费，并实际观察600秒租约到期。9项检查通过，61次自然状态记录后成功恢复，数据库和原件／Parser资产独立恢复后继续在线消费。录制模式9项及相关回归55项亦通过。自然长周期、多规则真实变化、优雅停机、远端部署和生产SLO继续验收。[真实进程与自然租约记录](assurance/evidence/postgres-live-process-2026-11-14.md)
 
 后续正式入口增加Windows隐藏控制台的两项Ctrl+C停机检查，真实来源和录制模式各11项通过，相关回归75项通过。API完成lifespan清理，空闲Worker进入取消退出路径，启动器与实际服务进程句柄、PG后端和端口逐项核对。运行中任务、活动HTTP／AI流、服务管理器及远端继续验收。[Windows控制台停机记录](assurance/evidence/windows-service-shutdown-2026-11-14.md)
+
+最新增加运行中Worker的Ctrl+C与重启检查。四类监控队列取消后记录中断终态，保留原到期时间并释放自身租约，后来接手者的租约由既有fencing保护。真实来源模式12项、录制模式串行复跑11项、八模块159项受管回归通过。活动边界为本轮数据库INSERT表锁等待，活动HTTP／AI流、Webhook取消、服务管理器和远端部署继续验收。[活动Worker验收](assurance/evidence/active-worker-shutdown-2026-11-14.md)
+
+该修正更新包内API源码，部署需要重新生成并批准空参考@4合同。本轮两模式源码SHA-256均为 `cbbbb5de20e1a5bec37a8a6843da0f5fdf6e727a906ee62912b7c9640a85a061`，隔离PG18合同SHA-256均为 `24edf9519b28945cf934353eb8d52dce500c430335228af9ede731f6aa200b30`。实际目标环境继续独立构建与审查合同。录制首批出现原件已保存、Parser尚未启动的source_fetch_failed，具体原始异常根因继续按验收记录跟踪。

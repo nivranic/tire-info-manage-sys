@@ -3,6 +3,7 @@ import importlib.util
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
 from sqlalchemy import func, select
 
 from tire_api.db import Database, FactVersion, QueryRun, UserSession, WatchItem, utcnow
@@ -31,6 +32,72 @@ class FixtureSource:
                 "variants": [{"brand": "Fixture", "model": "Synthetic Tire", "size": "265/40R20",
                               "region": "TEST", "manufacturer_product_code": "00001", "load_index": "104",
                               "speed_rating": "Y", "facts": {"synthetic_metric": 1}}]}
+
+
+@pytest.mark.parametrize('kind', ['tire', 'recall', 'recall_discovery', 'safety_gate'])
+@pytest.mark.parametrize('replaced', [False, True])
+def test_cancelled_claim_is_terminal_without_clearing_replacement_lease(tmp_path, monkeypatch, kind, replaced):
+    from tire_api import recall_discovery_monitoring, safety_gate_monitoring
+    from tire_api.db import uid, utc
+    from tire_api.monitor_tasks import _models
+    from tire_api.recalls import RecallService
+
+    cases = {
+        'tire': ('/v1/alert-rules', {'source_id': 'fixture', 'query': {'model': 'Synthetic Tire'}},
+                 QueryService, 'execute', monitor.run_scheduled_cycle),
+        'recall': ('/v1/recall-monitor-rules', {'query': {'campaign_number': '23T001000'}},
+                   RecallService, 'execute', monitor.run_recall_cycle),
+        'recall_discovery': ('/v1/recall-discovery-rules', {'query': {'search': 'SYNTHETIC DEMO'}},
+                             recall_discovery_monitoring, 'execute_scan', monitor.run_recall_discovery_cycle),
+        'safety_gate': ('/v1/safety-gate-monitor-rules', {'query': {'report_limit': 2, 'text': 'tyre'}},
+                        safety_gate_monitoring, 'execute_scan', monitor.run_safety_gate_cycle),
+    }
+    route, payload, target, method, cycle = cases[kind]
+    fixture = FixtureSource()
+    fixture.sources = lambda: [{'id': 'fixture', 'status': 'ready', 'supported_models': ['Synthetic Tire']}]
+    monkeypatch.setattr(monitor, 'registry', fixture)
+    app = create_app('sqlite:///' + (tmp_path / 'cancelled-worker.db').as_posix(), fixture)
+    job_model, run_model = _models(kind)
+    replacement = uid()
+    with TestClient(app) as client:
+        response = client.post(route, json={'name': 'Synthetic cancellation rule', 'enabled': True, **payload})
+        assert response.status_code == 201, response.text
+        job_id = response.json()['job']['id']
+        with app.state.database.sessions() as db:
+            expected_due = utc(db.get(job_model, job_id).next_due_at)
+
+        async def exercise():
+            entered = asyncio.Event()
+
+            async def paused(*_args, **_kwargs):
+                entered.set()
+                await asyncio.Event().wait()
+            monkeypatch.setattr(target, method, paused)
+            task = asyncio.create_task(cycle(app.state.database, max_jobs=1))
+            await asyncio.wait_for(entered.wait(), timeout=5)
+            if replaced:
+                with app.state.database.sessions() as db:
+                    db.get(job_model, job_id).lease_token = replacement
+                    db.commit()
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        asyncio.run(exercise())
+        detail = client.get('/v1/monitor-tasks/' + kind + '/' + job_id).json()
+        attempt = detail['attempts'][0]
+        assert attempt['terminal'] and attempt['state'] == 'interrupted'
+        with app.state.database.sessions() as db:
+            job = db.get(job_model, job_id)
+            runs = db.scalars(select(run_model).where(run_model.job_id == job_id)).all()
+            assert utc(job.next_due_at) == expected_due
+            if replaced:
+                assert job.lease_token == replacement and job.lease_until is not None
+                assert not runs
+            else:
+                assert job.lease_token is None and job.lease_until is None
+                assert attempt['reason'] == 'worker_cancelled'
+                assert len(runs) == 1 and runs[0].state == 'lease_lost' and runs[0].reason == 'worker_cancelled'
 
 
 def test_worker_refresh_is_online_only_and_deduplicates_watchers(monkeypatch):

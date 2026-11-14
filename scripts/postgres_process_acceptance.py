@@ -19,6 +19,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 import traceback
 from unittest.mock import patch
@@ -589,6 +590,69 @@ def run(*, live_source=False, natural_lease=False):
         graceful_worker(slot, restored_environment)
         wait_for_runtime_disconnect()
         record(STEP)
+
+        if live_source:
+            STEP = 'active_worker_ctrl_c_finalizes_attempt_and_allows_restart'
+            with http_service(slot, 'api-active-worker', restored_environment, cookies=cookies) as client:
+                owned = create_engine(url(restored))
+                try:
+                    with owned.begin() as connection:
+                        connection.execute(MonitorJob.__table__.update().where(MonitorJob.id == job_id)
+                            .values(next_due_at=utcnow() - timedelta(seconds=1)))
+                finally:
+                    owned.dispose()
+                time.sleep(2.2)
+                release_errors = []
+                with psycopg.connect(host='127.0.0.1', port=port, user=owner, password=owner_secret,
+                                     dbname=restored, **transport) as lock:
+                    lock.execute('LOCK TABLE public.query_runs IN SHARE MODE')
+                    active_environment = {**restored_environment,
+                        'TIRE_DATABASE_URL': url(restored, limited=True, label='process-active-cancel-worker')}
+                    release = None
+                    try:
+                        with child(slot, 'worker-active-graceful', [str(ROOT / 'apps/worker/monitor.py'), '--once'],
+                                   active_environment, console=True) as process:
+                            def blocked_active():
+                                assert process.poll() is None, 'active_worker_exited_before_observation'
+                                return admin.execute("SELECT pid FROM pg_stat_activity WHERE application_name=%s "
+                                    "AND wait_event_type='Lock' AND state='active'",
+                                    ('process-active-cancel-worker',)).fetchone()
+                            wait_for(blocked_active)
+                            before = accepted(client.get(path))
+                            assert before['attempts_total'] == 5 and before['attempts'][0]['phase'] == 'running'
+
+                            def unlock():
+                                try:
+                                    lock.commit()
+                                except Exception as error:
+                                    release_errors.append(type(error).__name__)
+                            release = threading.Timer(0.5, unlock)
+                            release.start()
+                    finally:
+                        if release is not None:
+                            release.join(timeout=5)
+                            assert not release.is_alive() and not release_errors
+                receipt = REPORT['processes'][-1]
+                assert receipt['returncode'] == 0xC000013A
+                after = accepted(client.get(path))
+                REPORT['active_worker_attempt'] = {'before': before['attempts'][0], 'after': after['attempts'][0],
+                    'due_before': before['task']['next_due_at'], 'due_after': after['task']['next_due_at'],
+                    'lease_until_after': after['task']['lease_until']}
+                assert after['attempts'][0]['terminal'] and after['attempts'][0]['state'] == 'interrupted'
+                assert after['attempts'][0]['reason'] == 'worker_cancelled'
+                assert after['task']['lease_until'] is None
+                assert after['task']['next_due_at'] == before['task']['next_due_at']
+                time.sleep(2.2)
+                resumed = run_worker(slot, 'worker-active-restarted', restored_environment, live_source=True)
+                assert resumed['jobs'] == 1 and resumed['results'][0]['finalized']
+                assert resumed['results'][0]['state'] in success_states
+                detail = accepted(client.get(path))
+                assert detail['attempts_total'] == 6 and all(item['terminal'] for item in detail['attempts'])
+                assert detail['attempts'][0]['state'] == 'succeeded'
+                live_execution(client, detail['attempts'][0]['query_id'])
+                REPORT['active_worker_restart'] = resumed['results'][0]
+            wait_for_runtime_disconnect()
+            record(STEP)
 
 
 if __name__ == '__main__':

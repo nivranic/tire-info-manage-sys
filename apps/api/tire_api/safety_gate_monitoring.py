@@ -210,7 +210,8 @@ def finish_job(database, claim, state, reason=None, now=None):
             db.rollback()
             return False
         job.last_finished_at, job.lease_token, job.lease_until = now, None, None
-        reschedule(db, job)
+        if state != 'lease_lost' or reason != 'worker_cancelled':
+            reschedule(db, job)
         QueryService(db, None).audit(claim['session_id'], 'safety_gate_monitor_finished',
             run_id=run.id, attempt_id=claim['attempt_id'], state=state, notifications=run.notification_count)
         db.commit()

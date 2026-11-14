@@ -93,6 +93,9 @@ async def run_scheduled_cycle(database: Database, *, max_jobs: int = 100) -> dic
                         "scheduled-monitor-worker", audience='background_monitor')
                 state, reason = response["data_state"], response.get("reason")
                 query_id = response.get('query_id')
+            except asyncio.CancelledError:
+                finish_job(database, claim, 'lease_lost', 'worker_cancelled')
+                raise
             except LeaseLost as error:
                 interrupt_attempt(database, claim, error)
                 span.finish("lease_lost")
@@ -141,6 +144,9 @@ async def run_recall_cycle(database: Database, *, max_jobs: int = 100, adapter=N
                             audience='background_monitor')
                 state, reason = response["data_state"], response.get("reason")
                 query_id = response.get('query_id')
+            except asyncio.CancelledError:
+                finish_recall(database, claim, 'lease_lost', 'worker_cancelled')
+                raise
             except LeaseLost as error:
                 interrupt_recall(database, claim, str(error))
                 span.finish("lease_lost")
@@ -173,6 +179,9 @@ async def run_recall_discovery_cycle(database: Database, *, max_jobs: int = 100,
                 begin_attempt(database, claim, queue.guard_claim)
                 response = await queue.execute_scan(database, claim, adapter)
                 state, reason, usage = response['state'], response['reason'], response['usage']
+            except asyncio.CancelledError:
+                queue.finish_job(database, claim, 'lease_lost', 'worker_cancelled', usage=usage)
+                raise
             except LeaseLost as error:
                 queue.interrupt_job(database, claim, str(error))
                 span.finish('lease_lost')

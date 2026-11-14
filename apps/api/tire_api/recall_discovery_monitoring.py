@@ -461,7 +461,8 @@ def _finish_job_once(database, claim, state, reason, now, usage, elapsed):
             return False
         check_budget()
         job.last_finished_at, job.lease_token, job.lease_until = now, None, None
-        reschedule(db, job)
+        if state != 'lease_lost' or reason != 'worker_cancelled':
+            reschedule(db, job)
         db.flush()
         check_budget()
         db.commit()

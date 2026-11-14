@@ -4,7 +4,7 @@
 
 ## 接手基线
 
-- 既有分支为 `main`，真实来源与自然租约验收已在 `26747b9` 交付，本轮Windows控制台停机验收以该提交为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
+- 既有分支为 `main`，空闲服务控制台停机已在 `c8b1aac` 交付，本轮活动Worker取消与重启修正以该提交为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
 - 用户已授权持续实施、复核优化、总结、提交、push 全部改动和编写交接文档。沿既有分支工作，新分支、worktree 及代理操作须另有明确授权。
 - [原始需求](requirements/2026-09-26-tire-intelligence-original.md)保持原字节。[当前入口](AGENT-HANDOFF-CURRENT.md)与[此前阶段总表](AGENT-HANDOFF-2026-11-13.md)保留历史验收范围。
 - `.artifacts/`、`data/`、原件、私库、凭据、依赖及构建产物留在 Git 忽略范围。新 clone 需要重建依赖、材料和隔离验收环境。
@@ -25,7 +25,7 @@
 | 证据浏览 | 快照、哈希、Parser、原件、HTML／PDF 正文、引用恢复 | 部署旧库切换、完整许可治理、生产对象存储 |
 | 个性化 | 车库、关注、偏好、保存比较、非 SKU 兴趣 | 跨设备、长期运行、真实推荐质量 |
 | AI 研究 | grounding、流式、报告、正文证据包、FTS／向量／融合检索、离线评估 | 真实 Responses 和 Embeddings 语义、代表性质量、模型治理 |
-| 对外能力 | REST、SSE、SDK、Webhook、Key、SQLite／PG 受许可事实读取和许可 CLI | 完整 DML 最小权限、吞吐、公网接收端、SDK 产品化、完整 WebSocket |
+| 对外能力 | REST、SSE、SDK、Webhook、Key、SQLite／PG 受许可事实读取、许可 CLI及运行角色策略 | 实际部署DML权限、吞吐、公网接收端、SDK 产品化、完整 WebSocket |
 | 管理后台 | Parser 健康、发布回滚、隔离、失败任务、纠错、审计 | 生产 IAM、租户、RLS、完整角色治理及发布验收 |
 
 此前阶段总表记录了 11 个轮胎区域目录、7 个厂商品牌和 15 项可信 Parser，并包含 NHTSA、EU Safety Gate 及小米车型来源。本轮收尾聚焦数据库角色，没有重新执行全部来源在线验收。
@@ -110,6 +110,16 @@
 
 四模块相关回归75／75通过。首批74／75中的旧遥测断言遗漏Safety Gate周期，独立诊断确认4个idle span后修正为4，保留父子trace、无任务和空指标检查。API及进程验收脚本与PG批次一致，最终843输入稳定，原探针及回归失败保留。运行中任务、活动HTTP／AI流、服务管理器及远端继续验收。[停机记录](assurance/evidence/windows-service-shutdown-2026-11-14.md)
 
+### 最新活动Worker取消与重启
+
+基线 `c8b1aac`。正式PG反例证实运行中Worker收到Ctrl+C后，进程已退出而尝试和租约仍占用。现补轮胎、召回和召回发现的取消收尾，四类队列取消时保留原到期时间，复用既有fencing保护后来接手者。八例参数化专项覆盖自身与替换租约。
+
+最终八模块159／159受管回归通过，843输入稳定、资源关闭、非自检拒绝0。真实来源PG／TLS12项、录制模式串行复跑11项通过。第5次尝试在数据库INSERT锁等待期间取消，记录interrupted／worker_cancelled并释放租约；第6次尝试按原到期时间重启成功。共5次真实Hankook业务结果为live，Parser回执均完成回收。两模式分别恢复166张表、197个Parser资产及3／1个原件。
+
+本轮四个集群、20个端口和临时口令／TLS私钥已核对收尾，成功两批25个受管服务及10个实际控制台进程句柄已核对。新API源码SHA-256为 `cbbbb5de20e1a5bec37a8a6843da0f5fdf6e727a906ee62912b7c9640a85a061`，两份新空参考@4合同摘要一致，部署需要重新生成并批准匹配合同。
+
+首轮受限回归122／159、正常权限硬链接对照和最终159项回执分别保留。录制PG首批种子查询为source_fetch_failed，单用户只读诊断取得1条原件及Parser not_started；具体原始异常根因待查，随后同源码串行11项通过。活动网络／AI流、Webhook取消、服务管理器、Linux信号、远端与长周期继续验收。[活动Worker验收与原始失败](assurance/evidence/active-worker-shutdown-2026-11-14.md)
+
 ## 运行角色阶段验证
 
 此前运行角色阶段七模块受管回归124／124通过，841输入稳定、资源关闭、非自检拒绝0。真实PG／TLS结构与权限检查31项、拥有者核心兼容58项、旧许可操作员兼容9场景均通过。该阶段运行角色综合验收前37项后遇到HNSW失败，后续由上述显式维护处理。
@@ -120,7 +130,7 @@
 
 1. 核对 `main`、HEAD、工作区和实时远端，读取本文、原规格、运行角色阶段验收、[运行 schema 方案](POSTGRES-RUNTIME-SCHEMA.md)与[024 维护说明](POSTGRES-VEHICLE-MIGRATION.md)。复用已有证据，先取新失败的 SQLSTATE、调用入口和日志。
 2. 复用已通过的23项运行角色反例及部分GRANT回滚检查，依据新失败补充专项。HNSW维护采用显式清单与@4合同，运行角色使用已审查DML策略。接续推进Parser性能取证、实际终端及远端部署。
-3. 复用Windows控制台两模式各11项PG／TLS、75项回归和此前自然600秒租约证据，继续运行中任务／活动流的停机、服务管理器、自然长周期真实变化、多规则提醒和远端部署。OS打开链路继续按54组文件系统及16次原入口取证定位，监督器采用8秒期限，原始失败和生产尾延迟独立跟踪。
+3. 复用活动Worker真实12项／录制11项PG／TLS、159项回归和此前自然600秒租约证据，继续活动HTTP／AI流、Webhook取消、服务管理器、Linux信号、自然长周期真实变化、多规则提醒和远端部署。对录制首批source_fetch_failed补原异常取证。OS打开链路继续按54组文件系统及16次原入口取证定位，监督器采用8秒期限，原始失败和生产尾延迟独立跟踪。
 4. 完善部署操作说明，验证实际终端、远端角色、对象／Parser 全资产恢复，再推进 IAM／RLS、吞吐及灾备指标。
 5. 凭据齐备时，先执行真实 OpenAI Responses 和 Embeddings 的 API、外发同意、Provider、引用恢复和 Web 语义验收。无凭据期间推进独立工程。
 6. 继续真实精确 SKU、人工 Golden、专业材料正式许可、更多来源与车型、自然长周期监控、实际 Native 宿主与设备、无障碍和其余发布 Gate。
@@ -147,4 +157,4 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读本卡、原规格及独立进程验收，核对main、HEAD、工作区和实时远端。复用PG角色、024迁移、HNSW维护、@4合同、23项权限反例及Parser缺省架构证据。独立HTTP／Worker真实与录制模式各11项PG／TLS、四模块75项回归通过，覆盖Windows控制台API正常收尾及空闲Worker的Ctrl+C退出。真实4次业务结果为live，600秒租约经61次观察后成功恢复，166张表／原件／Parser包独立恢复后继续在线消费。接续运行中任务／活动流停机、服务管理器、自然长周期真实变化和远端部署。Parser原8秒限制与全部核验保留，沿54组文件系统及16次原入口证据继续OS归因。首个真实AI使用OpenAI Responses，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续真实SKU、人工Golden、专业许可、长周期监控、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪。沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，推送后核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读本卡、原规格及活动Worker停机验收，核对main、HEAD、工作区和实时远端。本轮基线c8b1aac，八模块159项回归、真实12项／录制11项PG／TLS通过，四类队列取消终态、原到期时间和替换租约保护已验，真实Worker重启后成功消费。5次真实业务为live，166张表／原件／Parser资产独立恢复通过。部署重建并批准匹配新源码的@4合同。录制首批source_fetch_failed已留原件与Parser not_started证据，原异常根因待查。接续活动HTTP／AI流、Webhook取消、服务管理器、Linux信号、自然长周期真实变化和远端部署。复用此前600秒租约61次观察、23项权限反例、024迁移、HNSW维护与Parser54组文件系统／16次原入口证据。首个真实AI使用OpenAI Responses，Gemini为此前agent提前排期的可选适配器，缺凭据期间推进独立工程。保留KIT C2与历史封存，继续真实SKU、人工Golden、专业许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，推送后核对远端SHA与工作区。

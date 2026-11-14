@@ -141,7 +141,8 @@ def finish_job(database, claim, state, reason=None, now=None, *, query_id=None):
             db.rollback()
             return False
         job.last_finished_at, job.lease_token, job.lease_until = now, None, None
-        reschedule(db, job)
+        if state != 'lease_lost' or reason != 'worker_cancelled':
+            reschedule(db, job)
         db.commit()
         return True
 

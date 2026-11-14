@@ -245,14 +245,16 @@ def finish_job(database, claim: dict, state: str, reason: str | None = None, now
                          reason=reason, started_at=claim["started_at"], finished_at=now)
         db.add(run)
         db.flush()
-        if claim.get('attempt_id') and not finish_attempt_locked(db, claim, state, reason,
-                query_id=query_id, finished_at=now, run_id=run.id):
+        terminal = (interrupt_attempt_locked(db, claim, reason, now=now, run_id=run.id) if state == 'lease_lost' else
+                    finish_attempt_locked(db, claim, state, reason, query_id=query_id, finished_at=now, run_id=run.id))
+        if claim.get('attempt_id') and not terminal:
             db.rollback()
             return False
         job.last_finished_at = now
         job.lease_token = None
         job.lease_until = None
-        reschedule(db, job)
+        if state != 'lease_lost' or reason != 'worker_cancelled':
+            reschedule(db, job)
         db.commit()
         return True
 
