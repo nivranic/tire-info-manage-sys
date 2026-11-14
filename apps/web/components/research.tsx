@@ -27,22 +27,36 @@ function ResearchDialog({ title, busy = false, onClose, children }: { title: str
   </dialog>;
 }
 
-export function SaveComparisonDialog({ selection, onClose, onSaved, onRefresh }: {
+type SaveComparisonProps = {
   selection: Omit<SaveComparisonRequest, "title" | "notes">; onClose: () => void; onSaved: () => void; onRefresh: () => void;
-}) {
+};
+
+export function SaveComparisonDialog(props: SaveComparisonProps) {
+  const auth = useWorkbenchAuth();
+  if (!auth.ready) return <p role="status">正在确认当前账户，保存比较暂不可用。</p>;
+  return <OwnerSaveComparisonDialog key={auth.ownerEpoch} {...props} />;
+}
+
+function OwnerSaveComparisonDialog({ selection, onClose, onSaved, onRefresh }: SaveComparisonProps) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [stale, setStale] = useState(false);
   const controller = useRef<AbortController | null>(null);
-  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    const cancel = () => controller.current?.abort();
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); };
+  }, [auth.ownerSignal]);
   async function save() {
-    if (busy || stale) return;
+    if (busy || stale || !auth.isCurrentOwner(ownerEpoch)) return;
     const request = new AbortController(); controller.current = request; setBusy(true); setError("");
-    try { await tireApi.saveComparison({ ...selection, title: title.trim(), notes: notes.trim() }, request.signal); if (!request.signal.aborted) onSaved(); }
-    catch (cause) { if (!request.signal.aborted) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
-    finally { if (!request.signal.aborted) setBusy(false); }
+    try { await tireApi.saveComparison({ ...selection, title: title.trim(), notes: notes.trim() }, request.signal); if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) onSaved(); }
+    catch (cause) { if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
+    finally { if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   return <ResearchDialog title="保存本次比较" busy={busy} onClose={onClose}>
     <p className="review-boundary">固定保存本次已核对的参数、证据版本和{selection.include_manual ? "所选人工修订" : "来源值"}。以后打开保持保存时内容，不会自动替换为新参数。</p>
@@ -57,6 +71,8 @@ export function SaveComparisonDialog({ selection, onClose, onSaved, onRefresh }:
 }
 
 function SavedComparisonDialog({ id, onClose, onChanged, renderComparison }: { id: string; onClose: () => void; onChanged: () => void; renderComparison: ComparisonRenderer }) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [data, setData] = useState<SavedComparisonDetail | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [title, setTitle] = useState("");
@@ -70,12 +86,16 @@ function SavedComparisonDialog({ id, onClose, onChanged, renderComparison }: { i
   const mutation = useRef<AbortController | null>(null);
   const evidenceRequest = useRef<AbortController | null>(null);
   const evidencePanel = useRef<HTMLDivElement>(null);
-  useEffect(() => () => { mutation.current?.abort(); evidenceRequest.current?.abort(); }, []);
+  useEffect(() => {
+    const cancel = () => { mutation.current?.abort(); evidenceRequest.current?.abort(); };
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); };
+  }, [auth.ownerSignal]);
   function accept(value: SavedComparisonDetail) { setData(value); setTitle(value.title); setNotes(value.notes); setStale(false); }
   useEffect(() => {
     const controller = new AbortController(); setData(null); setError("");
-    void tireApi.savedComparison(id, controller.signal).then(value => { if (!controller.signal.aborted) accept(value); })
-      .catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+    void tireApi.savedComparison(id, controller.signal).then(value => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) accept(value); })
+      .catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); });
     return () => controller.abort();
   }, [id, attempt]);
   async function mutate(action: "edit" | "archive" | "restore") {
@@ -85,9 +105,9 @@ function SavedComparisonDialog({ id, onClose, onChanged, renderComparison }: { i
       if (action === "edit") await tireApi.editSavedComparison(id, data.revision, title, notes, controller.signal);
       else await tireApi.savedComparisonState(id, data.revision, action, controller.signal);
       const value = await tireApi.savedComparison(id, controller.signal);
-      if (!controller.signal.aborted) { accept(value); onChanged(); }
-    } catch (cause) { if (!controller.signal.aborted) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
-    finally { if (!controller.signal.aborted) setBusy(false); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { accept(value); onChanged(); }
+    } catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   async function showEvidence(snapshotId: string) {
     evidenceRequest.current?.abort();
@@ -95,9 +115,9 @@ function SavedComparisonDialog({ id, onClose, onChanged, renderComparison }: { i
     setEvidence(null); setEvidenceError(""); setEvidenceLoading(true);
     try {
       const value = await tireApi.evidence(snapshotId, controller.signal);
-      if (!controller.signal.aborted) { setEvidence(value); requestAnimationFrame(() => evidencePanel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }
-    } catch (cause) { if (!controller.signal.aborted) setEvidenceError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setEvidenceLoading(false); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setEvidence(value); requestAnimationFrame(() => evidencePanel.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }
+    } catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setEvidenceError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setEvidenceLoading(false); }
   }
   const nowRevoked = data?.comparison.variants.filter(row => data.current_lifecycle[row.id]?.state === "revoked") || [];
   const savedEvidence = data ? [...new Map(data.comparison.provenance.map(item => [item.snapshot_id, item])).values()] : [];
@@ -123,7 +143,17 @@ function SavedComparisonDialog({ id, onClose, onChanged, renderComparison }: { i
   </ResearchDialog>;
 }
 
-export function SavedComparisonsPanel({ sessionReady, refreshVersion, renderComparison }: { sessionReady: boolean; refreshVersion: number; renderComparison: ComparisonRenderer }) {
+type SavedComparisonsProps = { sessionReady: boolean; refreshVersion: number; renderComparison: ComparisonRenderer };
+
+export function SavedComparisonsPanel(props: SavedComparisonsProps) {
+  const auth = useWorkbenchAuth();
+  if (!props.sessionReady || !auth.ready) return <p role="status">正在确认当前账户，保存比较暂不显示。</p>;
+  return <OwnerSavedComparisonsPanel key={auth.ownerEpoch} {...props} />;
+}
+
+function OwnerSavedComparisonsPanel({ sessionReady, refreshVersion, renderComparison }: SavedComparisonsProps) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [items, setItems] = useState<SavedComparisonRecord[] | null>(null);
   const [total, setTotal] = useState(0);
   const [archived, setArchived] = useState(false);
@@ -135,20 +165,20 @@ export function SavedComparisonsPanel({ sessionReady, refreshVersion, renderComp
   useEffect(() => {
     if (!sessionReady) return;
     const controller = new AbortController(); request.current?.abort(); request.current = controller; setItems(null); setError(""); setLoadingMore(false);
-    void tireApi.savedComparisons(archived, controller.signal).then(value => { if (!controller.signal.aborted) { setItems(value.items); setTotal(value.total); } })
-      .catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+    void tireApi.savedComparisons(archived, controller.signal).then(value => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setItems(value.items); setTotal(value.total); } })
+      .catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); });
     return () => request.current?.abort();
   }, [sessionReady, refreshVersion, revision, archived]);
   async function more() {
     if (!items || loadingMore) return;
     const controller = new AbortController(); request.current = controller; setLoadingMore(true);
-    try { const value = await tireApi.savedComparisons(archived, controller.signal, items.length); if (!controller.signal.aborted) { setItems([...new Map([...items, ...value.items].map(item => [item.id, item])).values()]); setTotal(value.total); } }
-    catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setLoadingMore(false); }
+    try { const value = await tireApi.savedComparisons(archived, controller.signal, items.length); if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setItems([...new Map([...items, ...value.items].map(item => [item.id, item])).values()]); setTotal(value.total); } }
+    catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setLoadingMore(false); }
   }
   return <section className="quarantine-panel saved-comparisons-panel" aria-labelledby="saved-comparisons-title">
-    <div className="panel-title"><span id="saved-comparisons-title" tabIndex={-1}>已保存的比较</span><span className="tag quiet">本地工作区</span></div>
-    <p className="quality-intro">保存时的参数和证据固定保留；列表只读取记录信息，点击后再打开内容。</p>
+    <div className="panel-title"><span id="saved-comparisons-title" tabIndex={-1}>已保存的比较</span><span className="tag quiet">本人可见</span></div>
+    <p className="quality-intro">保存时的参数和证据固定保留；登录账户内共享本人记录，匿名按会话隔离。列表只读取记录信息，点击后再打开内容。</p>
     <div className="quarantine-filter"><label><span>比较记录范围</span><select value={archived ? "archived" : "active"} onChange={event => setArchived(event.target.value === "archived")}><option value="active">使用中的比较</option><option value="archived">已归档比较</option></select></label><button className="secondary-button" disabled={!sessionReady} onClick={() => setRevision(value => value + 1)}>刷新保存记录</button></div>
     {error ? <p role="alert" className="inline-error">{error}</p> : null}
     {!items ? !error ? <p className="quality-empty" role="status">正在读取保存记录…</p> : null : items.length ? <><p className="quarantine-list-count">已显示 {items.length} / {total} 条</p>{items.map(item => <article className="quarantine-item" key={item.id}><div className="quality-item-heading"><h3>{item.title}</h3><time>{stamp(item.created_at)}</time></div><p className="quarantine-comparison">{item.variant_count} 项精确规格 · {item.include_manual ? "含保存时人工修订" : "来源原值"}</p><button className="secondary-button" onClick={() => setSelected(item.id)}>打开保存的比较</button></article>)}{items.length < total ? <button className="secondary-button" disabled={loadingMore} onClick={() => void more()}>加载更多记录</button> : null}</> : <p className="quality-empty">{archived ? "暂无归档比较。" : "尚未保存比较。核对当前比较后，可保存固定版本。"}</p>}

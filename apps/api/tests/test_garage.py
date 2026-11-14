@@ -4,7 +4,7 @@ from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 
 from tire_api.db import GarageRevision, GarageVehicle, Snapshot, TireVariant
 from tire_api.main import create_app
@@ -23,6 +23,35 @@ def create(client, **fields):
     response = client.post('/v1/garage', json={**PROFILE, **fields})
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_garage_account_scope_covers_lists_writes_history_and_login_rotation(setup):
+    from admin_support import ADMIN_PASSWORD
+    from test_auth_accounts import PASSWORD, login, register
+    client, _, _ = setup
+    owner = client.get('/v1/auth/me').json()['user']
+    car = create(client)
+    other = TestClient(client.app)
+    assert register(other, username='other_garage_owner').status_code == 200
+    listing = other.get('/v1/garage').json()
+    assert listing['items'] == [] and listing['total'] == 0 and listing['scope'] == 'actor'
+    path = '/v1/garage/' + car['id']
+    assert other.get(path, params={'mode': 'history'}).status_code == 404
+    for endpoint, payload in [('', {'expected_revision': 1, 'profile': car['profile']}),
+            ('/tires', {'expected_revision': 1, 'axle': 'front', 'variant_id': None}),
+            ('/state', {'expected_revision': 1, 'action': 'archive'})]:
+        method = other.put if not endpoint else other.post
+        assert method(path + endpoint, json=payload).status_code == 404
+    second = TestClient(client.app)
+    assert login(second, owner['username'], ADMIN_PASSWORD).status_code == 200
+    assert second.get(path, params={'mode': 'history'}).status_code == 200
+    assert second.put(path, json={'expected_revision': 1, 'profile': {**car['profile'], 'nickname': 'Owner revision'}}).status_code == 200
+    assert client.post('/v1/auth/logout').status_code == 200
+    assert login(client, 'other_garage_owner', PASSWORD).status_code == 200
+    assert client.get('/v1/garage').json()['total'] == 0
+    assert login(client, owner['username'], ADMIN_PASSWORD).status_code == 200
+    restored = client.get(path, params={'mode': 'history'}).json()
+    assert restored['revision'] == 2 and restored['history'][-1]['profile'] == car['profile']
 
 
 def test_garage_create_edit_archive_restore_is_append_only_and_does_not_fetch(setup):
@@ -57,14 +86,44 @@ def test_garage_create_edit_archive_restore_is_append_only_and_does_not_fetch(se
         with pytest.raises(ValueError, match='只能追加'): db.commit()
 
 
-def test_local_workspace_garage_survives_session_change_and_restart(tmp_path):
+def test_legacy_shared_garage_keeps_creator_and_original_revisions_on_anonymous_claim(setup):
+    from test_auth_accounts import PASSWORD, login, register
+    client, _, database = setup
+    creator = TestClient(client.app)
+    car = create(creator)
+    editor = TestClient(client.app)
+    editor.get('/health')
+    with database.sessions() as db:
+        db.add(GarageRevision(vehicle_id=car['id'], revision=2, operation='edit',
+            archived=False, profile={**car['profile'], 'nickname': 'Legacy shared edit'},
+            basis='user_entry', fitment_reference=None,
+            actor_session_id=editor.cookies['tire_local_session']))
+        db.commit()
+        original = db.execute(text('SELECT * FROM garage_revisions ORDER BY id')).all()
+    path = '/v1/garage/' + car['id']
+    assert creator.get(path, params={'mode': 'history'}).json()['revision'] == 2
+    assert editor.get(path, params={'mode': 'history'}).status_code == 404
+    assert register(creator, username='claimed_garage_owner').status_code == 200
+    assert creator.get(path, params={'mode': 'history'}).json()['profile']['nickname'] == 'Legacy shared edit'
+    assert creator.post('/v1/auth/logout').status_code == 200
+    assert creator.get('/v1/garage').json()['total'] == 0
+    assert login(creator, 'claimed_garage_owner', PASSWORD).status_code == 200
+    assert creator.get('/v1/garage').json()['total'] == 1
+    assert editor.post(path + '/state', json={'expected_revision': 2, 'action': 'archive'}).status_code == 404
+    with database.sessions() as db:
+        assert db.execute(text('SELECT * FROM garage_revisions ORDER BY id')).all() == original
+
+
+def test_personal_garage_survives_owner_session_and_restart(tmp_path):
     url = f"sqlite:///{(tmp_path/'persistent-garage.db').as_posix()}"
     with TestClient(create_app(url, FixtureRegistry())) as first:
         created = create(first)
-    # Deliberately no old cookies: this is one local workspace, not a cloud account.
-    with TestClient(create_app(url, FixtureRegistry())) as second:
+        cookies = dict(first.cookies)
+    app = create_app(url, FixtureRegistry())
+    with TestClient(app, cookies=cookies) as second:
         response = second.get('/v1/garage').json()
-        assert response['scope'] == 'local_workspace' and response['items'][0]['id'] == created['id']
+        assert response['scope'] == 'actor' and response['items'][0]['id'] == created['id']
+        assert TestClient(app).get('/v1/garage').json()['total'] == 0
 
 
 def test_current_tires_have_exact_axle_sizes_and_revocation_is_not_hidden(setup):

@@ -1,5 +1,7 @@
 # 胎迹 Agent 接手卡
 
+最新阶段已完成个人Garage与保存比较的账户归属、全部读写和离线导出过滤，以及Web换号代次与新旧离线包兼容。先读[个人资料交接卡](AGENT-HANDOFF-2026-11-15-PERSONAL-RECORDS.md)和[阶段验收](assurance/evidence/personal-records-2026-11-15.md)。API269项、生产浏览器13项、非拥有者PG／TLS8项通过，旧共享资料归创建者的agent决策及Native待验边界已记录。完整V1继续进行，下文保留历史交付时点。
+
 最新阶段已实施账户持久归属、登录／注册／退出轮换及报告／AI账户代次隔离。先读[账户归属交接卡](AGENT-HANDOFF-2026-11-15-ACCOUNT-OWNERSHIP.md)和[阶段验收](assurance/evidence/session-data-ownership-2026-11-15.md)，其中列出12个模块、未完成Gate、迁移策略和下一步。完整V1继续进行。下文保留历史阶段的交付时点。
 
 最新阶段先读[测试成绩PDF原件交接卡](AGENT-HANDOFF-2026-11-14-TEST-PDF.md)及[阶段验收](assurance/evidence/test-measurement-pdf-2026-11-14.md)。成绩短摘录已绑定保存PDF区间，录入、修订、比较、AI与报告沿同一原件和用途授权检查。正常链路采用合成成绩／Responses，真实SKU、真人Golden、真实模型及完整V1继续待验。账户切换复现已有报告归属隔离缺陷，优先修复并复验相关AuthZ Gate。下文保留历史阶段的交付时点。

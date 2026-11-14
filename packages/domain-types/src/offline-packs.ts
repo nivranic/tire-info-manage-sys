@@ -24,7 +24,7 @@ export interface OfflineCapacity {
 export interface OfflineCounts { garage_profiles: number; watch_items: number; recent_queries: number; distinct_evidence: number; searchable_documents: number }
 export interface OfflineMemberReason {
   selector: "garage" | "watchlist" | "recent" | "explicit";
-  scope: "local_workspace" | "current_session" | "explicit";
+  scope: "local_workspace" | "actor" | "current_session" | "explicit";
   object_id: string | null; revision: number | null; axle: "front" | "rear" | null;
 }
 export interface OfflineResolvedMember {
@@ -50,7 +50,7 @@ export interface OfflinePackDescriptor {
   download_path: string; data_state: "local_snapshot"; source_refresh_performed: false;
 }
 export type OfflineContext = { id: string; privacy_class: "private"; evidence_keys: string[] } & (
-  { kind: "garage"; scope: "local_workspace"; payload: {
+  { kind: "garage"; scope: "local_workspace" | "actor"; payload: {
     vehicle_id: string; revision: number; basis: GarageRecord["basis"]; profile: GarageProfile;
     fitment_reference: GarageRecord["fitment_reference"]; created_at: string;
   } } |

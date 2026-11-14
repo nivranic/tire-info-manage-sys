@@ -126,6 +126,19 @@ fn rehash(raw: Value, descriptor: &wire::Descriptor) -> (Vec<u8>, wire::Descript
 }
 
 #[test]
+fn garage_package_accepts_account_scope_and_preserves_legacy_scope() {
+    let (_, descriptor, bytes) = sample();
+    assert!(wire::package(&bytes, &descriptor).is_ok());
+    let mut raw: Value = serde_json::from_slice(&bytes).unwrap();
+    raw["contexts"][0]["scope"] = json!("actor");
+    let (scoped_bytes, scoped_descriptor) = rehash(raw.clone(), &descriptor);
+    assert!(wire::package(&scoped_bytes, &scoped_descriptor).is_ok());
+    raw["contexts"][0]["scope"] = json!("another_account");
+    let (invalid_bytes, invalid_descriptor) = rehash(raw, &descriptor);
+    assert!(wire::package(&invalid_bytes, &invalid_descriptor).is_err());
+}
+
+#[test]
 fn encrypted_store_reopens_searches_han_and_retains_tombstones() {
     let root = TestRoot::new();
     let keys = FakeKeys::default();

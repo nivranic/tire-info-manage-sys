@@ -1112,7 +1112,7 @@ export interface GarageDetail extends GarageRecord {
   history_truncated: boolean;
   history: { revision: number; operation: string; archived: boolean; profile: GarageProfile; basis: string; created_at: string }[];
 }
-export interface GarageList { data_state: "local_snapshot"; scope: "local_workspace"; items: GarageRecord[]; limit: number; offset: number; total: number }
+export interface GarageList { data_state: "local_snapshot"; scope: "local_workspace" | "actor"; items: GarageRecord[]; limit: number; offset: number; total: number }
 
 export type { IdentityResolution, IdentityEndpoint, IdentityDifference, IdentityBinding, IdentityPreview, IdentityDecision,
   IdentityRevision, IdentityReview, IdentityMapping, IdentityCandidates, IdentityDecisionResult } from "./identity";
@@ -1130,6 +1130,10 @@ export interface SaveComparisonRequest {
 export interface SavedComparisonRecord {
   id: string; title: string; notes: string; revision: number; archived: boolean;
   created_at: string; updated_at: string; fingerprint: string; variant_count: number; include_manual: boolean;
+}
+export interface SavedComparisonList {
+  data_state: "local_snapshot"; scope: "local_workspace" | "actor";
+  items: SavedComparisonRecord[]; total: number; offset: number; limit: number;
 }
 export interface SavedComparisonDetail extends SavedComparisonRecord {
   current_identity_resolutions?: Record<string, IdentityResolution>;

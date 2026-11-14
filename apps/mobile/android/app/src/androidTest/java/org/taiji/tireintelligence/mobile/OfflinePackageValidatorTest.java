@@ -44,6 +44,36 @@ public final class OfflinePackageValidatorTest {
         assertEquals(5, envelope.getJSONArray("members").length()); assertEquals(9, envelope.getJSONArray("documents").length());
         assertEquals(2, envelope.getJSONArray("contexts").length());
     }
+    @Test public void accountGarageScopeAndLegacyGarageScopeRemainReadable() throws Exception {
+        JSONObject envelope = OfflinePackageValidator.parse(asset("valid-envelope.json"));
+        JSONArray contexts = envelope.getJSONArray("contexts"), members = envelope.getJSONArray("members");
+        for (int i = 0; i < contexts.length(); i++) {
+            JSONObject context = contexts.getJSONObject(i);
+            if (context.getString("kind").equals("garage")) context.put("scope", "actor");
+        }
+        for (int i = 0; i < members.length(); i++) {
+            JSONArray reasons = members.getJSONObject(i).getJSONArray("member_reasons");
+            for (int j = 0; j < reasons.length(); j++) {
+                JSONObject reason = reasons.getJSONObject(j);
+                if (reason.getString("selector").equals("garage")) reason.put("scope", "actor");
+            }
+        }
+        byte[] bytes = envelope.toString().getBytes(StandardCharsets.UTF_8);
+        JSONObject bound = descriptor().put("sha256", OfflineCipher.sha256(bytes)).put("byte_count", bytes.length);
+        JSONArray validated = OfflinePackageValidator.envelope(bytes, bound).getJSONArray("contexts");
+        boolean garageFound = false;
+        for (int i = 0; i < validated.length(); i++) {
+            JSONObject context = validated.getJSONObject(i);
+            if (context.getString("kind").equals("garage")) {
+                assertEquals("actor", context.getString("scope"));
+                garageFound = true;
+                context.put("scope", "another_account");
+            }
+        }
+        assertTrue(garageFound);
+        invalidEnvelope(new JSONObject(envelope.toString()).put("contexts", validated));
+        assertNotNull(OfflinePackageValidator.envelope(asset("valid-envelope.json"), descriptor()));
+    }
     @Test public void malformedTransportBindingStorageConsentAndBooleanNumbersAreRejected() throws Exception {
         JSONObject descriptor = descriptor(), request = request(descriptor);
         invalid(() -> OfflinePackageValidator.installRequest(new JSONObject(request.toString()).put("allow_device_storage", 1)));

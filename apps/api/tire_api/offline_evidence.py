@@ -16,7 +16,7 @@ from .field_authority import resolve_fields
 from .field_evidence import complete_missing_candidates, latest_tire_heads, snapshot_field_candidates
 from .identity_contract import contract_metadata
 from .garage import (checked_fitment_reference, checked_garage_revision, checked_vehicle_reference,
-                     require_vehicle_reference_use)
+                     owned_garage_ids, require_vehicle_reference_use)
 from .recall_evidence import (canonical_recall_facts, load_recall_evidence, recall_boundary_descriptor,
                               recall_policy_descriptor)
 from .recall_models import RecallRevision, RecallSnapshot, RecallVerification
@@ -39,7 +39,7 @@ def omission(selector, object_id, reason, blocking=False):
 
 
 def reason(selector, object_id=None, revision=None, axle=None):
-    return {'selector': selector, 'scope': 'local_workspace' if selector == 'garage' else
+    return {'selector': selector, 'scope': 'actor' if selector == 'garage' else
             'explicit' if selector == 'explicit' else 'current_session',
             'object_id': object_id, 'revision': revision, 'axle': axle}
 
@@ -297,7 +297,8 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
         latest = select(GarageRevision.vehicle_id, func.max(GarageRevision.revision).label('revision')).group_by(
             GarageRevision.vehicle_id).subquery()
         statement = select(GarageRevision).join(latest, (GarageRevision.vehicle_id == latest.c.vehicle_id) &
-            (GarageRevision.revision == latest.c.revision)).where(GarageRevision.archived.is_(False))
+            (GarageRevision.revision == latest.c.revision)).where(GarageRevision.archived.is_(False),
+                GarageRevision.vehicle_id.in_(owned_garage_ids(owner_scope)))
         requested = scope['garage']['vehicle_ids']
         if requested is not None:
             statement = statement.where(GarageRevision.vehicle_id.in_(requested))
@@ -314,7 +315,7 @@ def resolve_scope(db, registry, scope, session_id, *, limits=None, pack_schema='
                 counts['garage_profiles'] -= 1
                 omissions.append(omission('garage', row.vehicle_id, _failure_reason(error), requested is not None))
                 continue
-            context = {'id': 'garage:' + row.vehicle_id, 'kind': 'garage', 'scope': 'local_workspace',
+            context = {'id': 'garage:' + row.vehicle_id, 'kind': 'garage', 'scope': 'actor',
                 'privacy_class': 'private', 'payload': {'vehicle_id': row.vehicle_id, 'revision': row.revision,
                 'basis': row.basis, 'profile': deepcopy(row.profile), 'fitment_reference': deepcopy(row.fitment_reference),
                 'created_at': timestamp(row.created_at)}, 'evidence_keys': []}

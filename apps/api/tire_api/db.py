@@ -303,7 +303,7 @@ class DrivingPreferenceRevision(Base):
 
 
 class GarageVehicle(Base):
-    """Stable identity in the single-user local workspace, independent of session TTL."""
+    """Stable identity whose immutable first revision identifies its creator."""
     __tablename__ = "garage_vehicles"
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=uid)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

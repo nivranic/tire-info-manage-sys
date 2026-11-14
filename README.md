@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手先读[测试成绩PDF原件交接卡](docs/AGENT-HANDOFF-2026-11-14-TEST-PDF.md)及[阶段验收](docs/assurance/evidence/test-measurement-pdf-2026-11-14.md)。本阶段把短摘录绑定到保存PDF的精确区间，并贯通录入、修订、比较、AI用途核验与报告导出。此前已取得首份完整许可研究PDF，真实SKU、真人Golden、实际OpenAI与完整V1继续验收。复核发现同浏览器切换账户时报告归属随原会话转移，已列为优先修复项。[全部需求与Gate](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)
+当前接手先读[个人资料交接卡](docs/AGENT-HANDOFF-2026-11-15-PERSONAL-RECORDS.md)和[阶段验收](docs/assurance/evidence/personal-records-2026-11-15.md)。个人Garage与保存比较已覆盖账户归属、读写及离线导出，Web换号会清除旧私人状态。API269项、生产浏览器13项、非拥有者PG／TLS8项通过，旧共享资料归创建者的agent决策及Native待验边界已记录。完整V1的12模块、10项发布Gate、真实SKU、真人Golden和实际OpenAI继续推进。
 
 中国召回 AI 阶段见[中国召回 AI 交接卡](docs/AGENT-HANDOFF-2026-11-14-SAMR-AI.md)，该阶段已接通精确公告证据、同步／流式、原件引用与报告。最终519项受管回归、SDK14项、Web66项、生产浏览器15项和非拥有者PG／TLS专项通过，Provider采用合成适配器，真实OpenAI继续待验。整体需求见[进度总表](docs/AGENT-HANDOFF-2026-11-14-PUBLISH.md)，当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、179张模型表，完整V1持续进行。
 

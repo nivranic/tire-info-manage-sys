@@ -55,7 +55,8 @@ function reasons(value: unknown) {
   for (const item of list(value)) {
     const row = shape(item, ["selector", "scope", "object_id", "revision", "axle"]);
     oneOf(row.selector, ["garage", "watchlist", "recent", "explicit"]);
-    equal(row.scope, row.selector === "garage" ? "local_workspace" : row.selector === "explicit" ? "explicit" : "current_session");
+    if (row.selector === "garage") oneOf(row.scope, ["local_workspace", "actor"]);
+    else equal(row.scope, row.selector === "explicit" ? "explicit" : "current_session");
     text(row.object_id, true); if (row.revision !== null) number(row.revision, 1); oneOf(row.axle, [null, "front", "rear"]);
   }
 }
@@ -179,7 +180,8 @@ export async function validateOfflineBytes(bytes: Uint8Array, descriptorValue: u
   for (const item of list(row.contexts)) {
     const context = shape(item, ["id", "kind", "scope", "privacy_class", "payload", "evidence_keys"]);
     if (contexts.has(String(context.id))) fail(); oneOf(context.kind, ["garage", "watchlist"]); equal(context.privacy_class, "private");
-    equal(context.scope, context.kind === "garage" ? "local_workspace" : "current_session");
+    if (context.kind === "garage") oneOf(context.scope, ["local_workspace", "actor"]);
+    else equal(context.scope, "current_session");
     const content = context.kind === "garage" ? shape(context.payload, ["vehicle_id", "revision", "basis", "profile", "fitment_reference", "created_at"])
       : shape(context.payload, ["item_id", "variant_id", "created_at"]);
     const identifierValue = context.kind === "garage" ? content.vehicle_id : content.item_id; id(identifierValue); equal(context.id, `${context.kind}:${identifierValue}`); date(content.created_at);

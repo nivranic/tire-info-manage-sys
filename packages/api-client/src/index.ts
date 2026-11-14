@@ -6,7 +6,7 @@ export type { RawEvidenceContextFence, VerifiedRawEvidenceContent } from "./raw-
 import type { ChangeItem, Evidence, Health, QuarantineEvidence, QuarantineRecord, QueryResult, Source, SourceHealthResult, SourceHealthTrends, AIUsageHistory, AuthState, AuthUser, AuthUserListItem, TireQuery, Variant, VehicleCandidate, VehicleFitmentResult, WatchItem } from "@tire/domain-types";
 import type { ExcludedVariant, FactReview, FactRevisionRequest, LifecycleRequest, LifecycleReview, RawCaptureEvidence, RawCaptureRecord } from "@tire/domain-types";
 import type { GarageDetail, GarageList, GarageProfile, GarageRecord } from "@tire/domain-types";
-import type { ComparisonView, DrivingPreferenceState, DrivingWeights, SaveComparisonRequest, SavedComparisonDetail, SavedComparisonRecord } from "@tire/domain-types";
+import type { ComparisonView, DrivingPreferenceState, DrivingWeights, SaveComparisonRequest, SavedComparisonDetail, SavedComparisonList, SavedComparisonRecord } from "@tire/domain-types";
 import type { AlertRuleCreate, AlertRuleDetail, AlertRuleRecord, AlertRuleSettings, LocalNotification } from "@tire/domain-types";
 import type { EvidenceDocument, EvidenceDocumentMetadata } from "@tire/domain-types";
 import type { InterestNotification, InterestNotificationList } from "@tire/domain-types";
@@ -728,7 +728,7 @@ export const tireApi = {
   sourcePageUrlMoveNotification: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").SourcePageUrlMoveNotificationDetail>(`/v1/source-page-url-move-notifications/${encodeURIComponent(id)}?mode=history`, { signal }),
   markSourcePageUrlMoveNotification: (id: string, read: boolean, signal?: AbortSignal) => request<import("@tire/domain-types").SourcePageUrlMoveNotificationRead>(`/v1/source-page-url-move-notifications/${encodeURIComponent(id)}/read`, { method: "PUT", body: JSON.stringify({ read }), signal }),
   saveComparison: (payload: SaveComparisonRequest, signal?: AbortSignal) => post<SavedComparisonRecord>("/v1/saved-comparisons", payload, signal),
-  savedComparisons: (archived = false, signal?: AbortSignal, offset = 0) => request<{ items: SavedComparisonRecord[]; total: number; offset: number; limit: number }>(`/v1/saved-comparisons?archived=${archived}&offset=${offset}`, { signal }),
+  savedComparisons: (archived = false, signal?: AbortSignal, offset = 0) => request<SavedComparisonList>(`/v1/saved-comparisons?archived=${archived}&offset=${offset}`, { signal }),
   savedComparison: (id: string, signal?: AbortSignal) => request<SavedComparisonDetail>(`/v1/saved-comparisons/${encodeURIComponent(id)}?mode=history`, { signal }),
   editSavedComparison: (id: string, revision: number, title: string, notes: string, signal?: AbortSignal) => request<SavedComparisonRecord>(`/v1/saved-comparisons/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ expected_revision: revision, title, notes }), signal }),
   savedComparisonState: (id: string, revision: number, action: "archive" | "restore", signal?: AbortSignal) => post<SavedComparisonRecord>(`/v1/saved-comparisons/${encodeURIComponent(id)}/state`, { expected_revision: revision, action }, signal),

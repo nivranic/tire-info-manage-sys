@@ -6,7 +6,7 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 
 from tire_api.db import DrivingPreferenceRevision, FactVersion, SavedComparison, SavedComparisonRevision, Snapshot
 from tire_api.main import create_app
@@ -16,10 +16,59 @@ from test_lifecycle import request_for
 WEIGHTS = {'dry': 20, 'wet': 25, 'quiet': 20, 'comfort': 10, 'wear': 15, 'energy': 5, 'appearance': 5}
 
 
+def test_saved_comparison_account_scope_covers_all_read_and_revision_routes(setup):
+    from admin_support import ADMIN_PASSWORD
+    from test_auth_accounts import login, register
+    client, _, _ = setup
+    owner = client.get('/v1/auth/me').json()['user']
+    record = save(client, preview(client, live(client).json()['variants'][0]['id'])).json()
+    other = TestClient(client.app)
+    assert register(other, username='other_comparison_owner').status_code == 200
+    listing = other.get('/v1/saved-comparisons').json()
+    assert listing['items'] == [] and listing['total'] == 0 and listing['scope'] == 'actor'
+    path = '/v1/saved-comparisons/' + record['id']
+    assert other.get(path, params={'mode': 'history'}).status_code == 404
+    assert other.put(path, json={'expected_revision': 1, 'title': 'Other title', 'notes': ''}).status_code == 404
+    assert other.post(path + '/state', json={'expected_revision': 1, 'action': 'archive'}).status_code == 404
+    assert login(other, owner['username'], ADMIN_PASSWORD).status_code == 200
+    assert other.get(path, params={'mode': 'history'}).status_code == 200
+    assert other.put(path, json={'expected_revision': 1, 'title': 'Owner title', 'notes': ''}).status_code == 200
+
+
 def preview(client, vid, manual=False):
     response = client.post('/v1/compare', json={'variant_ids': [vid], 'include_manual': manual})
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def test_legacy_shared_comparison_keeps_creator_and_frozen_rows_on_anonymous_claim(setup):
+    from test_auth_accounts import PASSWORD, login, register
+    client, _, database = setup
+    variant_id = live(client).json()['variants'][0]['id']
+    creator = TestClient(client.app)
+    record = save(creator, preview(creator, variant_id)).json()
+    editor = TestClient(client.app)
+    editor.get('/health')
+    with database.sessions() as db:
+        db.add(SavedComparisonRevision(comparison_id=record['id'], revision=2,
+            title='Legacy shared title', notes='Original shared notes', archived=False,
+            operation='edit', actor_session_id=editor.cookies['tire_local_session']))
+        db.commit()
+        original = {table: db.execute(text('SELECT * FROM ' + table + ' ORDER BY id')).all()
+            for table in ('saved_comparisons', 'saved_comparison_revisions')}
+    path = '/v1/saved-comparisons/' + record['id']
+    assert creator.get(path, params={'mode': 'history'}).json()['revision'] == 2
+    assert editor.get(path, params={'mode': 'history'}).status_code == 404
+    assert register(creator, username='claimed_comparison_owner').status_code == 200
+    assert creator.get(path, params={'mode': 'history'}).json()['title'] == 'Legacy shared title'
+    assert creator.post('/v1/auth/logout').status_code == 200
+    assert creator.get('/v1/saved-comparisons').json()['total'] == 0
+    assert login(creator, 'claimed_comparison_owner', PASSWORD).status_code == 200
+    assert creator.get('/v1/saved-comparisons').json()['total'] == 1
+    assert editor.put(path, json={'expected_revision': 2, 'title': 'Denied', 'notes': ''}).status_code == 404
+    with database.sessions() as db:
+        for table, rows in original.items():
+            assert db.execute(text('SELECT * FROM ' + table + ' ORDER BY id')).all() == rows
 
 
 def save(client, compared, **changes):
@@ -217,14 +266,18 @@ def test_invalid_weights_are_not_silently_normalized(setup, weights):
     assert count(database, DrivingPreferenceRevision) == 0
 
 
-def test_workspace_research_persists_across_sessions_and_restart(tmp_path):
+def test_personal_research_persists_for_its_original_session_after_restart(tmp_path):
     url = f"sqlite:///{(tmp_path/'research.db').as_posix()}"
     with TestClient(create_app(url, FixtureRegistry())) as client:
         compared = preview(client, live(client).json()['variants'][0]['id'])
         saved = save(client, compared).json()
+        cookies = dict(client.cookies)
         assert client.put('/v1/driving-preferences', json={'expected_revision': 0, 'weights': WEIGHTS}).status_code == 200
     with TestClient(create_app(url, FixtureRegistry())) as restarted:
-        assert restarted.get('/v1/saved-comparisons').json()['items'][0]['id'] == saved['id']
+        assert restarted.get('/v1/saved-comparisons').json()['items'] == []
+        restored = TestClient(restarted.app, cookies=cookies)
+        assert restored.get('/v1/saved-comparisons').json()['items'][0]['id'] == saved['id']
+        assert restored.get('/v1/driving-preferences').json()['weights'] == WEIGHTS
         # 偏好按行为主体隔离：重启后的新匿名会话（未携带原 cookie）看不到原会话的偏好
         fresh_preferences = restarted.get('/v1/driving-preferences').json()
         assert fresh_preferences['weights'] is None and fresh_preferences['revision'] == 0

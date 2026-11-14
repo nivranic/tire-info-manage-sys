@@ -124,8 +124,9 @@ def saved_metadata(saved: SavedComparison, row: SavedComparisonRevision) -> dict
             "fingerprint": saved.fingerprint, "variant_count": saved.variant_count, "include_manual": saved.include_manual}
 
 
-def latest_saved(db: Session, comparison_id: str, expected_revision: int | None = None) -> tuple:
-    saved = db.get(SavedComparison, comparison_id)
+def latest_saved(db: Session, comparison_id: str, session_id: str, expected_revision: int | None = None) -> tuple:
+    saved = db.scalar(select(SavedComparison).where(SavedComparison.id == comparison_id,
+        SavedComparison.actor_session_id.in_(session_scope(db, session_id))))
     if saved is None:
         raise HTTPException(404, "未找到保存的比较")
     row = db.scalar(select(SavedComparisonRevision).where(SavedComparisonRevision.comparison_id == comparison_id)
@@ -194,22 +195,23 @@ def register_research_routes(app: FastAPI) -> None:
         return saved_metadata(saved, row)
 
     @app.get("/v1/saved-comparisons")
-    def listing(archived: bool = False, offset: int = Query(0, ge=0), db: Session = Depends(get_db)) -> dict:
+    def listing(request: Request, archived: bool = False, offset: int = Query(0, ge=0), db: Session = Depends(get_db)) -> dict:
         latest = select(SavedComparisonRevision.comparison_id, func.max(SavedComparisonRevision.revision).label("revision")).group_by(SavedComparisonRevision.comparison_id).subquery()
         statement = (select(SavedComparison, SavedComparisonRevision)
             .join(SavedComparisonRevision, SavedComparisonRevision.comparison_id == SavedComparison.id)
             .join(latest, (latest.c.comparison_id == SavedComparison.id) & (latest.c.revision == SavedComparisonRevision.revision))
-            .where(SavedComparisonRevision.archived == archived))
+            .where(SavedComparisonRevision.archived == archived,
+                SavedComparison.actor_session_id.in_(session_scope(db, request.state.session_id))))
         total = db.scalar(select(func.count()).select_from(statement.with_only_columns(SavedComparison.id).subquery())) or 0
         rows = db.execute(statement.options(load_only(SavedComparison.id, SavedComparison.fingerprint,
             SavedComparison.variant_count, SavedComparison.include_manual, SavedComparison.created_at))
             .order_by(desc(SavedComparison.created_at), desc(SavedComparison.id)).offset(offset).limit(50)).all()
-        return {"data_state": "local_snapshot", "scope": "local_workspace", "items": [saved_metadata(saved, row) for saved, row in rows],
+        return {"data_state": "local_snapshot", "scope": "actor", "items": [saved_metadata(saved, row) for saved, row in rows],
                 "offset": offset, "limit": 50, "total": total}
 
     @app.get("/v1/saved-comparisons/{comparison_id}")
     def detail(comparison_id: str, request: Request, mode: Literal["history"] = Query(...), db: Session = Depends(get_db)) -> dict:
-        saved, row = latest_saved(db, comparison_id)
+        saved, row = latest_saved(db, comparison_id, request.state.session_id)
         history = db.scalars(select(SavedComparisonRevision).where(SavedComparisonRevision.comparison_id == saved.id)
                             .order_by(desc(SavedComparisonRevision.revision)).limit(51)).all()
         current_ids = list(dict.fromkeys(saved.payload['variant_ids'] + [item['id'] for item in saved.payload['variants']]))
@@ -229,7 +231,7 @@ def register_research_routes(app: FastAPI) -> None:
                notes: str | None = None, archived: bool | None = None) -> dict:
         service = QueryService(db, None)
         service.lock_ingestion()
-        saved, before = latest_saved(db, comparison_id, expected)
+        saved, before = latest_saved(db, comparison_id, session_id, expected)
         new_title = before.title if title is None else title
         new_notes = before.notes if notes is None else notes
         new_state = before.archived if archived is None else archived

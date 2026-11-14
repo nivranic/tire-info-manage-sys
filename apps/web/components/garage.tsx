@@ -1,5 +1,6 @@
 "use client";
 
+import { useWorkbenchAuth } from "./auth";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, tireApi } from "@tire/api-client";
 import type { GarageDetail, GarageProfile, GarageRecord, LifecycleReview, Variant } from "@tire/domain-types";
@@ -29,6 +30,8 @@ function GarageDialog({ title, busy = false, onClose, children }: { title: strin
 }
 
 function GarageEditor({ record, onClose, onSaved }: { record: GarageRecord | null; onClose: () => void; onSaved: () => void }) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [base, setBase] = useState(record);
   const [profile, setProfile] = useState<GarageProfile>(() => record ? structuredClone(record.profile) : emptyProfile());
   const [wheels, setWheels] = useState(record?.profile.optional_wheels.join("\n") || "");
@@ -36,29 +39,33 @@ function GarageEditor({ record, onClose, onSaved }: { record: GarageRecord | nul
   const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState(false);
   const controller = useRef<AbortController | null>(null);
-  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    const cancel = () => controller.current?.abort();
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); };
+  }, [auth.ownerSignal]);
   function setField<K extends keyof GarageProfile>(key: K, value: GarageProfile[K]) { setProfile(previous => ({ ...previous, [key]: value })); }
   async function save() {
-    if (busy || stale) return;
+    if (busy || stale || !auth.isCurrentOwner(ownerEpoch)) return;
     const request = new AbortController(); controller.current = request; setBusy(true); setError("");
     const value = { ...profile, optional_wheels: wheels.split("\n").map(item => item.trim()).filter(Boolean) };
     try {
       if (base) await tireApi.updateGarage(base.id, base.revision, value, request.signal);
       else await tireApi.createGarage(value, request.signal);
-      if (!request.signal.aborted) onSaved();
-    } catch (cause) { if (!request.signal.aborted) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
-    finally { if (!request.signal.aborted) setBusy(false); }
+      if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) onSaved();
+    } catch (cause) { if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
+    finally { if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   async function reload() {
     if (!base || busy) return;
     const request = new AbortController(); controller.current = request; setBusy(true);
     try {
       const value = await tireApi.garageDetail(base.id, request.signal);
-      if (request.signal.aborted) return;
+      if (request.signal.aborted || !auth.isCurrentOwner(ownerEpoch)) return;
       setBase(value); setProfile(structuredClone(value.profile)); setWheels(value.profile.optional_wheels.join("\n"));
       setError(value.archived ? "此记录已归档，请先在归档列表恢复。" : ""); setStale(value.archived);
-    } catch (cause) { if (!request.signal.aborted) setError(errorText(cause)); }
-    finally { if (!request.signal.aborted) setBusy(false); }
+    } catch (cause) { if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (!request.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   const textFields = [["nickname", "车辆昵称"], ["manufacturer", "车辆品牌"], ["model", "车型"], ["generation", "代际（可留空）"], ["trim", "配置版本（可留空）"], ["wheel_option", "当前轮毂（可留空）"]] as const;
   return <GarageDialog title={base ? "编辑车库车辆" : "添加车库车辆"} busy={busy} onClose={onClose}>
@@ -77,13 +84,15 @@ function GarageEditor({ record, onClose, onSaved }: { record: GarageRecord | nul
 }
 
 function GarageHistory({ id, onClose }: { id: string; onClose: () => void }) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [data, setData] = useState<GarageDetail | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController(); setData(null); setError("");
-    void tireApi.garageDetail(id, controller.signal).then(result => { if (!controller.signal.aborted) setData(result); })
-      .catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+    void tireApi.garageDetail(id, controller.signal).then(result => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setData(result); })
+      .catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); });
     return () => controller.abort();
   }, [id, attempt]);
   return <GarageDialog title="车库记录历史" onClose={onClose}>
@@ -91,11 +100,21 @@ function GarageHistory({ id, onClose }: { id: string; onClose: () => void }) {
   </GarageDialog>;
 }
 
-export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEvidence, onVariant, lifecycleReview }: {
+type GarageWorkspaceProps = {
   sessionReady: boolean; onQuerySize: (size: string, context: string) => void;
   onVehicleEvidence: (id: string) => void; onVariant: (id: string) => void;
   lifecycleReview: LifecycleReview | null;
-}) {
+};
+
+export default function GarageWorkspace(props: GarageWorkspaceProps) {
+  const auth = useWorkbenchAuth();
+  if (!props.sessionReady || !auth.ready) return <p role="status">正在确认当前账户，车库暂不显示。</p>;
+  return <OwnerGarageWorkspace key={auth.ownerEpoch} {...props} />;
+}
+
+function OwnerGarageWorkspace({ sessionReady, onQuerySize, onVehicleEvidence, onVariant, lifecycleReview }: GarageWorkspaceProps) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [records, setRecords] = useState<GarageRecord[] | null>(null);
   const [total, setTotal] = useState(0);
   const [archived, setArchived] = useState(false);
@@ -115,13 +134,17 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
       return { ...record, current_tires: { front: update(record.current_tires.front), rear: update(record.current_tires.rear) } };
     }) || null);
   }, [lifecycleReview]);
-  useEffect(() => () => { mutation.current?.abort(); pageRequest.current?.abort(); }, []);
+  useEffect(() => {
+    const cancel = () => { mutation.current?.abort(); pageRequest.current?.abort(); };
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); };
+  }, [auth.ownerSignal]);
   useEffect(() => {
     if (!sessionReady) return;
     const controller = new AbortController(); pageRequest.current = controller; setRecords(null); setError("");
     void tireApi.garage(archived, controller.signal).then(result => {
-      if (!controller.signal.aborted) { setRecords(result.items); setTotal(result.total); }
-    }).catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setRecords(result.items); setTotal(result.total); }
+    }).catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); });
     return () => controller.abort();
   }, [sessionReady, archived, revision]);
   async function more() {
@@ -129,9 +152,9 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
     const controller = new AbortController(); pageRequest.current = controller; setBusy("page");
     try {
       const result = await tireApi.garage(archived, controller.signal, records.length);
-      if (!controller.signal.aborted) { setRecords([...new Map([...records, ...result.items].map(item => [item.id, item])).values()]); setTotal(result.total); }
-    } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setBusy(""); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setRecords([...new Map([...records, ...result.items].map(item => [item.id, item])).values()]); setTotal(result.total); }
+    } catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(""); }
   }
   async function change(record: GarageRecord, axle?: "front" | "rear") {
     if (busy) return;
@@ -139,12 +162,12 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
     try {
       if (axle) await tireApi.garageTire(record.id, record.revision, axle, null, controller.signal);
       else await tireApi.garageState(record.id, record.revision, record.archived ? "restore" : "archive", controller.signal);
-      if (!controller.signal.aborted) { setRevision(value => value + 1); toast(axle ? "已取消此轴的当前轮胎记录。" : record.archived ? "车辆已恢复使用。" : "车辆已移入归档。", "success"); }
-    } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setBusy(""); }
+      if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setRevision(value => value + 1); toast(axle ? "已取消此轴的当前轮胎记录。" : record.archived ? "车辆已恢复使用。" : "车辆已移入归档。", "success"); }
+    } catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(""); }
   }
   return <div className="garage-workspace">
-    <div className="snapshot-banner"><strong>本地工作区 · 我的车库</strong><span>记录保存在当前服务，重启后仍保留；不同浏览器访问此本机服务共享车库。车辆与当前轮胎由你确认，不等于官方适配认证。</span></div>
+    <div className="snapshot-banner"><strong>个人车库</strong><span>记录保存在当前服务，重启后可恢复；登录账户内共享本人车库，匿名按会话隔离。车辆与当前轮胎由你确认，不等于官方适配认证。</span></div>
     <section className="vehicle-query-panel"><div className="panel-title"><span><Icon name="vehicle" size={18} />{archived ? "归档车辆" : "我的车辆"}</span><button className="primary-button compact" disabled={!sessionReady || !!busy} onClick={() => setEditor("new")}>添加车辆</button></div>
       <div className="quarantine-filter"><label><span>记录范围</span><select value={archived ? "archived" : "active"} disabled={!!busy} onChange={event => { pageRequest.current?.abort(); setArchived(event.target.value === "archived"); }}><option value="active">使用中的车辆</option><option value="archived">已归档车辆</option></select></label><button className="secondary-button" disabled={!!busy || !sessionReady} onClick={() => setRevision(value => value + 1)}>刷新车库</button></div>
       {error ? <div className="inline-error" role="alert">{error} 请刷新后核对当前记录。</div> : null}
@@ -174,7 +197,17 @@ export default function GarageWorkspace({ sessionReady, onQuerySize, onVehicleEv
   </div>;
 }
 
-export function AssignTireDialog({ variant, onClose, onSaved }: { variant: Variant; onClose: () => void; onSaved: () => void }) {
+type AssignTireProps = { variant: Variant; onClose: () => void; onSaved: () => void };
+
+export function AssignTireDialog(props: AssignTireProps) {
+  const auth = useWorkbenchAuth();
+  if (!auth.ready) return <p role="status">正在确认当前账户，车库操作暂不可用。</p>;
+  return <OwnerAssignTireDialog key={auth.ownerEpoch} {...props} />;
+}
+
+function OwnerAssignTireDialog({ variant, onClose, onSaved }: AssignTireProps) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [cars, setCars] = useState<GarageRecord[] | null>(null);
   const [total, setTotal] = useState(0);
   const [carId, setCarId] = useState("");
@@ -186,26 +219,30 @@ export function AssignTireDialog({ variant, onClose, onSaved }: { variant: Varia
   const request = useRef<AbortController | null>(null);
   useEffect(() => {
     const controller = new AbortController(); request.current = controller; setCars(null); setError(""); setStale(false);
-    void tireApi.garage(false, controller.signal).then(result => { if (!controller.signal.aborted) { setCars(result.items); setTotal(result.total); setCarId(result.items[0]?.id || ""); } })
-      .catch(cause => { if (!controller.signal.aborted) setError(errorText(cause)); });
+    void tireApi.garage(false, controller.signal).then(result => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setCars(result.items); setTotal(result.total); setCarId(result.items[0]?.id || ""); } })
+      .catch(cause => { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); });
     return () => controller.abort();
   }, [attempt]);
-  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    const cancel = () => request.current?.abort();
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); };
+  }, [auth.ownerSignal]);
   const car = cars?.find(row => row.id === carId);
   const mismatch = !!car?.profile[axle].size && car.profile[axle].size !== variant.size;
   async function more() {
     if (!cars || busy) return;
     const controller = new AbortController(); request.current = controller; setBusy(true);
-    try { const result = await tireApi.garage(false, controller.signal, cars.length); if (!controller.signal.aborted) { setCars([...new Map([...cars, ...result.items].map(item => [item.id, item])).values()]); setTotal(result.total); } }
-    catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setBusy(false); }
+    try { const result = await tireApi.garage(false, controller.signal, cars.length); if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setCars([...new Map([...cars, ...result.items].map(item => [item.id, item])).values()]); setTotal(result.total); } }
+    catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   async function save() {
     if (!car || busy || stale || mismatch) return;
     const controller = new AbortController(); request.current = controller; setBusy(true); setError("");
-    try { await tireApi.garageTire(car.id, car.revision, axle, variant.id, controller.signal); if (!controller.signal.aborted) onSaved(); }
-    catch (cause) { if (!controller.signal.aborted) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
-    finally { if (!controller.signal.aborted) setBusy(false); }
+    try { await tireApi.garageTire(car.id, car.revision, axle, variant.id, controller.signal); if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) onSaved(); }
+    catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) { setError(errorText(cause)); if (cause instanceof ApiError && cause.status === 409) setStale(true); } }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   return <GarageDialog title="记录当前轮胎" busy={busy} onClose={onClose}>
     <p className="review-boundary">{variant.brand} {variant.model} · {variant.size} · {variant.manufacturer_product_code || "代码未知"} · {variant.region}</p><IdentityContractBadge contract={variant.identity_contract} />
@@ -222,18 +259,32 @@ export function AssignTireDialog({ variant, onClose, onSaved }: { variant: Varia
   </GarageDialog>;
 }
 
-export function SaveFitmentDialog({ snapshotId, fitmentId, label, onClose, onSaved }: { snapshotId: string; fitmentId: string; label: string; onClose: () => void; onSaved: () => void }) {
+type SaveFitmentProps = { snapshotId: string; fitmentId: string; label: string; onClose: () => void; onSaved: () => void };
+
+export function SaveFitmentDialog(props: SaveFitmentProps) {
+  const auth = useWorkbenchAuth();
+  if (!auth.ready) return <p role="status">正在确认当前账户，车库操作暂不可用。</p>;
+  return <OwnerSaveFitmentDialog key={auth.ownerEpoch} {...props} />;
+}
+
+function OwnerSaveFitmentDialog({ snapshotId, fitmentId, label, onClose, onSaved }: SaveFitmentProps) {
+  const auth = useWorkbenchAuth();
+  const ownerEpoch = auth.ownerEpoch;
   const [nickname, setNickname] = useState(label.slice(0, 80));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef<AbortController | null>(null);
-  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    const cancel = () => request.current?.abort();
+    auth.ownerSignal.addEventListener("abort", cancel, { once: true });
+    return () => { auth.ownerSignal.removeEventListener("abort", cancel); cancel(); };
+  }, [auth.ownerSignal]);
   async function save() {
     if (busy) return;
     const controller = new AbortController(); request.current = controller; setBusy(true); setError("");
-    try { await tireApi.garageFromFitment(snapshotId, fitmentId, nickname.trim(), controller.signal); if (!controller.signal.aborted) onSaved(); }
-    catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
-    finally { if (!controller.signal.aborted) setBusy(false); }
+    try { await tireApi.garageFromFitment(snapshotId, fitmentId, nickname.trim(), controller.signal); if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) onSaved(); }
+    catch (cause) { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setError(errorText(cause)); }
+    finally { if (!controller.signal.aborted && auth.isCurrentOwner(ownerEpoch)) setBusy(false); }
   }
   return <GarageDialog title="将所选配置存入车库" busy={busy} onClose={onClose}>
     <p className="review-boundary">保存所选车型、配置、轮毂与前后轴尺寸，并保留此时的来源证据。未知年款保持未知，不自动指定当前轮胎或 OE SKU。</p>

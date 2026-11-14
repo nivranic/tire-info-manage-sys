@@ -1,4 +1,4 @@
-"""Persistent local-workspace garage, separate from authoritative vehicle fitments."""
+"""Creator-owned garage records with frozen vehicle-fitment references."""
 from copy import deepcopy
 from typing import Literal
 
@@ -8,6 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from .db import GarageRevision, GarageVehicle, TireVariant, uid
+from .auth import session_scope
 from .domain import StrictModel, parse_size
 from .lifecycle import annotate_variants
 from .service import QueryService, timestamp
@@ -171,8 +172,15 @@ class GarageTireRequest(StrictModel):
     variant_id: str | None = Field(None, min_length=1, max_length=64)
 
 
-def current(db: Session, vehicle_id: str, expected_revision: int | None = None) -> GarageRevision:
-    row = db.scalar(select(GarageRevision).where(GarageRevision.vehicle_id == vehicle_id)
+def owned_garage_ids(scope: list[str]):
+    """The immutable first revision identifies the creator across later edits."""
+    return select(GarageRevision.vehicle_id).where(
+        GarageRevision.revision == 1, GarageRevision.actor_session_id.in_(scope))
+
+
+def current(db: Session, vehicle_id: str, session_id: str, expected_revision: int | None = None) -> GarageRevision:
+    row = db.scalar(select(GarageRevision).where(GarageRevision.vehicle_id == vehicle_id,
+        GarageRevision.vehicle_id.in_(owned_garage_ids(session_scope(db, session_id))))
                     .order_by(desc(GarageRevision.revision)).limit(1))
     if row is None:
         raise HTTPException(404, "未找到车库记录")
@@ -241,17 +249,18 @@ def register_garage_routes(app: FastAPI) -> None:
             yield db
 
     @app.get("/v1/garage")
-    def garage(archived: bool = False, offset: int = Query(0, ge=0), db: Session = Depends(get_db)) -> dict:
+    def garage(request: Request, archived: bool = False, offset: int = Query(0, ge=0), db: Session = Depends(get_db)) -> dict:
         latest = select(GarageRevision.vehicle_id, func.max(GarageRevision.revision).label("revision")).group_by(GarageRevision.vehicle_id).subquery()
         statement = (select(GarageRevision).join(latest,
             (GarageRevision.vehicle_id == latest.c.vehicle_id) & (GarageRevision.revision == latest.c.revision))
-            .where(GarageRevision.archived == archived))
+            .where(GarageRevision.archived == archived,
+                GarageRevision.vehicle_id.in_(owned_garage_ids(session_scope(db, request.state.session_id)))))
         total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
         rows = db.scalars(statement.order_by(desc(GarageRevision.created_at), desc(GarageRevision.id)).offset(offset).limit(100)).all()
         for row in rows:
             checked_garage_revision(db, row)
         tires = tire_identities(db, [row.profile for row in rows])
-        return {"data_state": "local_snapshot", "scope": "local_workspace", "items": [representation(row, tires) for row in rows],
+        return {"data_state": "local_snapshot", "scope": "actor", "items": [representation(row, tires) for row in rows],
                 "limit": 100, "offset": offset, "total": total}
 
     @app.post("/v1/garage", status_code=201)
@@ -295,8 +304,8 @@ def register_garage_routes(app: FastAPI) -> None:
                       basis="copied_fitment", reference=reference)
 
     @app.get("/v1/garage/{vehicle_id}")
-    def detail(vehicle_id: str, mode: Literal["history"] = Query(...), db: Session = Depends(get_db)) -> dict:
-        row = current(db, vehicle_id)
+    def detail(vehicle_id: str, request: Request, mode: Literal["history"] = Query(...), db: Session = Depends(get_db)) -> dict:
+        row = current(db, vehicle_id, request.state.session_id)
         history = db.scalars(select(GarageRevision).where(GarageRevision.vehicle_id == vehicle_id)
                             .order_by(desc(GarageRevision.revision)).limit(51)).all()
         for item in history[:50]:
@@ -308,7 +317,7 @@ def register_garage_routes(app: FastAPI) -> None:
     @app.put("/v1/garage/{vehicle_id}")
     def update(vehicle_id: str, payload: GarageUpdate, request: Request, db: Session = Depends(get_db)) -> dict:
         QueryService(db, None).lock_ingestion()
-        row = current(db, vehicle_id, payload.expected_revision)
+        row = current(db, vehicle_id, request.state.session_id, payload.expected_revision)
         if row.archived:
             raise HTTPException(409, "请先恢复已归档的车库记录")
         profile = validate_tires(db, payload.profile.model_dump(), row.profile)
@@ -320,7 +329,7 @@ def register_garage_routes(app: FastAPI) -> None:
     @app.post("/v1/garage/{vehicle_id}/tires")
     def set_tire(vehicle_id: str, payload: GarageTireRequest, request: Request, db: Session = Depends(get_db)) -> dict:
         QueryService(db, None).lock_ingestion()
-        row = current(db, vehicle_id, payload.expected_revision)
+        row = current(db, vehicle_id, request.state.session_id, payload.expected_revision)
         if row.archived:
             raise HTTPException(409, "请先恢复已归档的车库记录")
         profile = deepcopy(row.profile)
@@ -334,7 +343,7 @@ def register_garage_routes(app: FastAPI) -> None:
     @app.post("/v1/garage/{vehicle_id}/state")
     def state(vehicle_id: str, payload: GarageStateRequest, request: Request, db: Session = Depends(get_db)) -> dict:
         QueryService(db, None).lock_ingestion()
-        row = current(db, vehicle_id, payload.expected_revision)
+        row = current(db, vehicle_id, request.state.session_id, payload.expected_revision)
         archived = payload.action == "archive"
         if row.archived == archived:
             raise HTTPException(409, "记录已经处于该状态")

@@ -469,7 +469,7 @@ pub fn package(bytes: &[u8], descriptor: &Descriptor) -> NativeResult<Envelope> 
                 "garage" | "watchlist" | "recent" | "explicit"
             ) || !matches!(
                 reason.scope.as_str(),
-                "local_workspace" | "current_session" | "explicit"
+                "local_workspace" | "actor" | "current_session" | "explicit"
             ) || reason
                 .axle
                 .as_deref()
@@ -486,7 +486,7 @@ pub fn package(bytes: &[u8], descriptor: &Descriptor) -> NativeResult<Envelope> 
             || context.privacy_class != "private"
             || !matches!(
                 (context.kind.as_str(), context.scope.as_str()),
-                ("garage", "local_workspace") | ("watchlist", "current_session")
+                ("garage", "local_workspace" | "actor") | ("watchlist", "current_session")
             )
             || context
                 .id

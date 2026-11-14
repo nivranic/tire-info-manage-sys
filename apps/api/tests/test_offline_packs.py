@@ -50,6 +50,25 @@ def download(client, descriptor):
     return response.content, response.json()
 
 
+def test_offline_garage_selection_counts_and_explicit_ids_are_account_private(setup):
+    from test_auth_accounts import register
+    client, _, _ = setup
+    assert register(client, username='offline_garage_owner').status_code == 200
+    own = client.post('/v1/garage', json=PROFILE).json()
+    other = TestClient(client.app)
+    assert register(other, username='offline_garage_other').status_code == 200
+    foreign = other.post('/v1/garage', json={**PROFILE, 'nickname': 'Other account private garage'}).json()
+    scope = {**EMPTY_SCOPE, 'garage': {'include': True}}
+    prepared = plan(client, scope)
+    assert prepared['counts']['garage_profiles'] == 1
+    assert [item['payload']['vehicle_id'] for item in prepared['contexts']] == [own['id']]
+    assert prepared['contexts'][0]['scope'] == 'actor'
+    blocked = plan(client, {**scope, 'garage': {'include': True, 'vehicle_ids': [foreign['id']]}})
+    assert blocked['counts']['garage_profiles'] == 0 and blocked['contexts'] == []
+    assert not blocked['can_confirm']
+    assert any(item['object_id'] == foreign['id'] and item['blocking'] for item in blocked['omissions'])
+
+
 def test_confirm_freezes_exact_reviewed_bytes_and_receipt_no_latest_reresolution(setup):
     client, registry, database = setup
     original = live(client).json()
@@ -98,7 +117,7 @@ def test_owner_expiry_fingerprint_storage_consent_and_uuid_replay(setup, monkeyp
         assert db.scalar(select(func.count()).select_from(OfflinePack)) == 1
 
 
-def test_default_keeps_workspace_garage_but_watch_and_recent_are_session_scoped(setup):
+def test_default_filters_personal_garage_watch_and_recent_by_actor(setup):
     client, _, database = setup
     data = live(client).json()
     variant_id = data['variants'][0]['id']
@@ -113,12 +132,13 @@ def test_default_keeps_workspace_garage_but_watch_and_recent_are_session_scoped(
     assert not any('actor_session_id' in json.dumps(row) for row in first['contexts'])
     other = TestClient(client.app)
     second = plan(other)
-    assert second['counts']['garage_profiles'] == 1
+    assert second['counts']['garage_profiles'] == 0
+    assert second['contexts'] == []
     assert second['counts']['watch_items'] == second['counts']['recent_queries'] == 0
-    _, envelope = download(other, confirm(other, second).json())
-    assert second['contexts'] == envelope['contexts'] and second['documents'] == envelope['documents']
+    _, envelope = download(client, confirm(client, first).json())
+    assert first['contexts'] == envelope['contexts'] and first['documents'] == envelope['documents']
     assert envelope['contexts'][0]['payload']['vehicle_id'] == garage['id']
-    assert envelope['contexts'][0]['scope'] == 'local_workspace'
+    assert envelope['contexts'][0]['scope'] == 'actor'
 
 
 def test_recent_failed_query_does_not_borrow_historical_snapshot(setup):

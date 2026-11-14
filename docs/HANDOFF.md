@@ -1,3 +1,7 @@
+## 个人Garage与保存比较交付（2026-11-15）
+
+先读[当前个人资料交接卡](AGENT-HANDOFF-2026-11-15-PERSONAL-RECORDS.md)和[阶段验收](assurance/evidence/personal-records-2026-11-15.md)。账户归属、读写、离线导出及Web换号代次已实施，API269项、生产浏览器13项、非拥有者PG／TLS8项通过。旧共享资料归创建者的agent决策、原始失败、Native及完整V1余项均已记录。下文保留历史交付时点。
+
 ## 测试成绩 PDF 原件引用交付（2026-11-14）
 
 先读[最新交接卡](AGENT-HANDOFF-2026-11-14-TEST-PDF.md)及[阶段验收](assurance/evidence/test-measurement-pdf-2026-11-14.md)。短摘录绑定保存PDF的页码与Unicode码点区间，贯通录入、修订、比较、AI及报告，复用既有具体用途授权。完整V1持续实施，真实SKU、真人Golden和实际OpenAI继续验收。下文保留历史交付时点。

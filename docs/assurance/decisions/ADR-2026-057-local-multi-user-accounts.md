@@ -191,3 +191,9 @@ require_admin 在 (e) 列出的四类端点内调用。账户家族行为验收�
    私有通知使用原规则会话的持久owner，并要求同一账户存在有效登录后进入已授权Webhook订阅。同账户轮换登录可以继续投递。报告与AI窗口采用既有ready／ownerEpoch／ownerSignal，在身份重验时销毁旧状态并阻止迟到结果。报告不确定保存按账户分区，AI恢复指针按账户保存；匿名恢复指针位于当前代次内存，页面刷新后从服务端历史核对。
 
    车库、保存比较等仍有local_workspace范围。完整个人账户及团队范围须另行设计和验收。治理审计已有会话owner可供追溯，独立actor_user_id快照、生产IAM和远端部署仍列入后续。阶段回归与正常进程证据见[会话归属验收](../evidence/session-data-ownership-2026-11-15.md)。
+
+11. **个人车库与保存比较（2026-11-15）**
+
+   车库以不可变revision=1的actor_session_id确定创建者，保存比较以根记录actor_session_id确定创建者，复用036的持久会话owner。旧共享记录归创建者私有，后续共同编辑历史继续保留。该策略由agent根据既有创建证据制定。
+
+   列表、计数、分页、详情、全部修订和离线导出先过滤本人范围。新离线车库context与reason使用actor，各客户端保留历史local_workspace读取。Web复用账户ready、代次和取消信号，身份重验时销毁私人状态。具体回归、正常Web／PG／TLS验证及Native未验边界见[个人资料验收](../evidence/personal-records-2026-11-15.md)。

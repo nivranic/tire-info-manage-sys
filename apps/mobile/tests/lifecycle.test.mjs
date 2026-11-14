@@ -62,7 +62,7 @@ async function shell() {
   const modules = {
     react,
     "react/jsx-runtime": { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
-    "react-dom/client": { createRoot: () => ({ render: tree => { component = tree.props.children.type; } }) },
+    "react-dom/client": { createRoot: () => ({ render: tree => { component = tree.props.children.props.children.type; } }) },
     "@capacitor/core": { Capacitor: { isNativePlatform: () => true, getPlatform: () => "android" }, registerPlugin: () => native },
     "@tire/api-client": { setApiTransport: value => { transport = value; }, tireApi: { health: signal => transport("/health", { signal }) } },
     "@tire/native-client": shared,
@@ -72,6 +72,8 @@ async function shell() {
     "./device-ai-panel": { MobileDeviceAiEntry() {} },
     "../../web/components/workbench": { default() {} },
     "../../web/components/offline-library": { OfflineLibraryEntry() {} },
+    "../../web/components/theme-preference-control": { default() {} },
+    "../../web/components/theme-preferences": { ThemeProvider() {} },
     "../../web/app/globals.css": {},
     "./styles.css": {},
   };
@@ -88,6 +90,7 @@ async function shell() {
   // Supersede the mount check deliberately, as StrictMode and a resume event may do.
   await checkConnection();
   assert.equal(phases.at(-1), "ready");
+  ownerEvents.length = 0;
   return { request: (...args) => transport(...args), checkConnection, writes, phases, cleanup, ownerEvents, resetCount: () => resets };
 }
 
@@ -98,7 +101,7 @@ test("late old-session write failure cannot close the newly reset mobile connect
     const rejected = assert.rejects(oldWrite, error => error.code === "SESSION_CHANGED");
     await app.checkConnection(true);
     assert.equal(app.resetCount(), 1);
-    assert.deepEqual(app.ownerEvents, ["tire-offline-owner-changed"]);
+    assert.deepEqual(app.ownerEvents, ["tire-session-unavailable", "tire-offline-owner-changed", "tire-session-revalidate"]);
     app.writes[0].reject("SESSION_CHANGED");
     await rejected;
     assert.equal(app.phases.at(-1), "ready");
@@ -118,7 +121,7 @@ test("ordinary connection rechecks also ignore delayed errors from the previous 
     assert.equal(app.phases.at(-1), "ready");
     assert.equal((await app.request("/v1/sources", {})).status, 200);
     assert.equal(app.resetCount(), 0);
-    assert.deepEqual(app.ownerEvents, []);
+    assert.deepEqual(app.ownerEvents, ["tire-session-unavailable", "tire-session-revalidate"]);
     assert.equal(app.writes.length, 1, "resume must not replay pending writes");
   } finally { app.cleanup(); }
 });

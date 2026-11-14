@@ -187,7 +187,10 @@ final class OfflinePackageValidator {
             keys(context, "id", "kind", "scope", "privacy_class", "payload", "evidence_keys");
             String kind = text(context, "kind", 16), id = text(context, "id", 80);
             require(kind.equals("garage") || kind.equals("watchlist"));
-            equal(context, "scope", kind.equals("garage") ? "local_workspace" : "current_session");
+            String contextScope = text(context, "scope", 24);
+            require(kind.equals("garage")
+                ? Arrays.asList("local_workspace", "actor").contains(contextScope)
+                : contextScope.equals("current_session"));
             equal(context, "privacy_class", "private"); object(context, "payload");
             if (kind.equals("garage")) garages++; else watches++;
             require(id.startsWith(kind + ":") && contextMap.put(id, context) == null);
@@ -290,7 +293,7 @@ final class OfflinePackageValidator {
         for (int i=0;i<reasons.length();i++) {
             JSONObject reason=at(reasons,i); keys(reason,"selector","scope","object_id","revision","axle");
             require(Arrays.asList("garage","watchlist","recent","explicit").contains(text(reason,"selector",16)));
-            require(Arrays.asList("local_workspace","current_session","explicit").contains(text(reason,"scope",24)));
+            require(Arrays.asList("local_workspace","actor","current_session","explicit").contains(text(reason,"scope",24)));
             nullableText(reason,"object_id",128); require(reason.has("revision") && reason.has("axle"));
             if (!reason.isNull("revision")) number(reason,"revision",1000000);
             String axle=nullableText(reason,"axle",8); require(axle==null||axle.equals("front")||axle.equals("rear"));

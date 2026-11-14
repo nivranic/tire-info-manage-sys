@@ -2,16 +2,16 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { loadOfflineTypeScript } from "./load_offline_typescript.mjs";
 import { loadTypeScript } from "../packages/native-client/tests/load-typescript.mjs";
-const values = await loadOfflineTypeScript("../apps/web/components/offline-values.ts", import.meta.url);
-const cryptoValues = await loadOfflineTypeScript("../apps/web/components/offline-crypto.ts", import.meta.url);
+const values = await loadTypeScript("../apps/web/components/offline-values.ts", import.meta.url);
+const cryptoValues = await loadTypeScript("../apps/web/components/offline-crypto.ts", import.meta.url);
 const native = await loadTypeScript("../packages/native-client/src/index.ts", import.meta.url);
 const mobile = await loadTypeScript("../apps/mobile/src/native-platform.ts", import.meta.url);
 const sdk = await loadTypeScript("../packages/api-client/src/index.ts", import.meta.url);
 const selection = await loadTypeScript("../apps/web/components/recall-evidence-values.ts", import.meta.url);
-const bytes = new Uint8Array(await readFile(new URL("../.artifacts/of46-wire-v2/valid-envelope.json", import.meta.url)));
-const descriptor = JSON.parse(await readFile(new URL("../.artifacts/of46-wire-v2/valid-descriptor.json", import.meta.url), "utf8"));
+const fixtureRoot = "../apps/mobile/android/app/src/androidTest/assets/offline-producer-v2/";
+const bytes = new Uint8Array(await readFile(new URL(fixtureRoot + "valid-envelope.json", import.meta.url)));
+const descriptor = JSON.parse(await readFile(new URL(fixtureRoot + "valid-descriptor.json", import.meta.url), "utf8"));
 const envelope = await values.validateOfflineBytes(bytes, descriptor);
 const slot = { slot_id: "c58a0a6b-2c34-4bc4-8f8e-19d8a51f7ec9", generation: 1, package_id: descriptor.id,
   sha256: descriptor.sha256, byte_count: descriptor.byte_count, title: "合成设备历史", created_at: descriptor.content_created_at,
@@ -32,6 +32,16 @@ test("actual four-domain producer bytes, personal contexts and per-record docume
   const recalls = envelope.members.filter(row => row.reference.kind === "recall");
   assert.equal(recalls.length, 2); assert.ok(recalls.some(row => row.reference.recall_revision_id === null));
   assert.ok(recalls.every(row => row.payload.boundary.applicability === "not_assessed"));
+});
+
+test("account garage scope validates with all member reasons while legacy bytes stay readable", async () => {
+  const personal = await changed(data => {
+    for (const context of data.contexts) if (context.kind === "garage") context.scope = "actor";
+    for (const member of data.members) for (const reason of member.member_reasons) if (reason.selector === "garage") reason.scope = "actor";
+  });
+  assert.equal(personal.contexts.find(row => row.kind === "garage").scope, "actor");
+  assert.equal((await values.validateOfflineBytes(bytes, descriptor)).package_id, descriptor.id);
+  await assert.rejects(changed(data => { data.contexts.find(row => row.kind === "garage").scope = "another_account"; }), { code: "OFFLINE_INVALID_PACK" });
 });
 
 test("original bytes are hashed before parsing; whitespace is not silently canonicalized", async () => {
