@@ -25,6 +25,7 @@
 - 首个真实 AI 接口始终是用户指定的 **OpenAI Responses API**。Gemini 是此前 agent 按原规格多模型备选表提前实现的可选适配器，提交为 `d5fded1`；没有用户改选 Gemini 的指令，也没有真实 Google 调用验收。
 - 最新收尾以已发布 `f42e587` 为基线，复核配置、工厂及状态默认均为OpenAI Responses。新增Parser固定错误码及六字段诊断，5项新增专项与既有回归合计75项通过。沙箱首批67／75的硬链接WinError5取证及普通权限75／75对照均保留。真实Web恢复待验，两批分别遇到ParserRunError和私有驱动合成登录装配错误；服务、PG、三个端口及临时秘密已核对关闭。下一步先修正私有驱动凭据，再进行页面停机恢复。[Provider与交接收尾](assurance/evidence/provider-handoff-review-2026-11-14.md)
 - 后续真实Web恢复以 `4a54531` 为基线完成。正常登录、页面证据选择与外发同意、实际POST／SSE草稿、API停机隐藏草稿、同库重启后的手动只读恢复及刷新恢复通过，保留47,433 tokens预留且pending=false，重启Provider调用0次。三种视口无横向溢出，PG12项通过，14个服务记录与8个端口及临时秘密已核对。模型端采用合成Responses，短断线自动恢复和真实模型网络继续验收。[真实Web停机恢复](assurance/evidence/web-ai-stream-recovery-2026-11-14.md)
+- 最新Webhook HTTPS验收以 `285a5f1` 为基线，142项受管回归及12项PG进程检查通过。测试进程注入本机目标及CA，独立Worker经实际TLS1.3发送3次，HMAC核对通过。Worker取消后连接关闭，原30秒租约及60秒退避自然经历，普通投递attempt2／204成功，用户取消保持cancelled，旧token保护通过。20个服务记录、8个端口及临时秘密已核对；核验器跨时钟误断言及原样本保留。公网DNS／TLS、接收端部署和生产通知SLO待验。[Webhook HTTPS恢复](assurance/evidence/webhook-https-recovery-2026-11-14.md)
 
 ## 用户已确定的边界
 
@@ -256,4 +257,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及真实Web停机恢复记录，核对main、HEAD、工作区和实时远端。最新Web验收以4a54531为基线，PG12项通过，843输入匹配既有75项回归，422项生产构建输入匹配。私有驱动已从本轮实际注册请求取得合成登录凭据。页面完成外发同意、单次分析POST202及SSE草稿，2秒API停机后隐藏草稿，较长停机后手动只读恢复outcome_unknown及47,433 tokens保守预算，pending=false。刷新重开窗口继续恢复原请求，cursor序号1推进至4，新增分析POST与重启Provider调用均为0。三种视口核对通过，14个服务记录、8个端口、PG与临时秘密均已收尾。模型端为合成Responses，首个真实AI继续采用OpenAI Responses。接续Webhook实际网络取消及自然租约、短断线自动恢复、真实OpenAI与Embeddings、其他停机配置、Linux、远端部署和自然长周期监控。保留此前220项回归、真实13项／录制12项PG、600秒租约61次观察、23项权限反例、024迁移及HNSW／@4合同证据。录制source_fetch_failed的ParserRunError具体错误码与OS间歇延迟继续取证，维持当前8秒期限。保留KIT C2与历史封存，继续SKU、人工Golden、专业许可、Native、无障碍和其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree和代理遵循既有授权边界，发布后核对远端SHA与工作区。
+> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格及Webhook HTTPS自然恢复记录，核对main、HEAD、工作区和实时远端。最新验收以285a5f1为基线，142项受管回归及12项PG进程检查通过，843输入稳定。实际API通知与outbox、独立webhooks-once Worker及实际TLS1.3接收端完成3次HMAC核对，测试进程注入精确loopback目标与测试CA，生产公网DNS／TLS与部署仍待验。Worker Ctrl+C后连接关闭，原30秒租约和60秒退避自然经历，普通投递以同ID／正文完成attempt2及204；用户取消保持cancelled，旧token无法释放新slot。20个服务记录、8个端口及临时秘密已核对。核验器跨时钟严格比较的误断言已修正，原UTC／单调时钟差异保留。接续短断线Web自动恢复、公网Webhook接收端、通知生产SLO、真实OpenAI Responses／Embeddings、其他停机配置、Linux、远端部署和长期真实监控。复用生产Web较长停机手动恢复与刷新恢复、2秒宽限下SSE／草稿失效、47,433 tokens预算及Provider调用0次、三种视口、600秒租约61次观察、23项权限反例、024迁移及HNSW／@4合同证据。录制ParserRunError具体错误码及OS间歇延迟继续取证，维持当前8秒期限。首个真实AI采用OpenAI Responses，缺外部凭据时继续独立工程。保留KIT C2与历史封存，继续精确SKU、人工Golden、专业许可、Native、无障碍及其余Gate。12模块、10Gate、13SLO、15决策分别跟踪，沿main及PowerShell7规则工作，分支／worktree及代理遵循既有授权边界，发布后核对远端SHA与工作区。
