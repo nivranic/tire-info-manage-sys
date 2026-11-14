@@ -82,6 +82,7 @@ TEST_MODULES = (
     'apps/api/tests/test_dunlop.py',
     'apps/api/tests/test_samr.py',
     'apps/api/tests/test_samr_recalls.py',
+    'apps/api/tests/test_samr_notice_history.py',
     'apps/api/tests/test_safety_gate.py',
     'apps/api/tests/test_safety_gate_alerts.py',
     'apps/api/tests/test_safety_gate_monitoring.py',

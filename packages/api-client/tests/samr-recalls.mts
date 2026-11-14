@@ -95,3 +95,27 @@ test("SAMR cancellation ends the current request without a fallback read", async
     assert.equal(calls, 1);
   } finally { restore(); }
 });
+
+test("SAMR article history forwards a fixed page range and cancellation", async () => {
+  const controller = new AbortController();
+  const identity = "a".repeat(32);
+  const restore = setApiTransport(async (path, init) => {
+    const url = new URL(path, "https://synthetic.invalid");
+    assert.equal(url.pathname, `/v1/samr-recalls/notices/${identity}/history`);
+    assert.deepEqual(Object.fromEntries(url.searchParams), { mode: "history", offset: "10", limit: "5", through_sequence: "23" });
+    assert.equal(init.signal, controller.signal);
+    assert.equal(init.body, undefined);
+    return Response.json({ article_id: identity, through_sequence: 23, observations: [] });
+  });
+  try { assert.equal((await tireApi.samrNoticeHistory(identity, { offset: 10, limit: 5, through_sequence: 23 }, controller.signal)).through_sequence, 23); }
+  finally { restore(); }
+});
+
+test("SAMR article history has bounded defaults and path-encodes its identity", async () => {
+  const restore = setApiTransport(async path => {
+    assert.equal(path, "/v1/samr-recalls/notices/synthetic%2Fid%3F/history?mode=history&offset=0&limit=10");
+    return Response.json({ data_state: "local_snapshot", observations: [] });
+  });
+  try { assert.equal((await tireApi.samrNoticeHistory("synthetic/id?")).data_state, "local_snapshot"); }
+  finally { restore(); }
+});

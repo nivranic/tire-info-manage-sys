@@ -382,12 +382,17 @@ class PostgresRuntimeRoleTests(unittest.TestCase):
     def test_policy_tracks_models_and_keeps_governance_writes_separate(self):
         from tire_api import postgres_runtime_roles as runtime
         runtime.validate_policy()
-        self.assertEqual(len(runtime.MODEL_TABLES), 168)
+        self.assertEqual(len(runtime.MODEL_TABLES), 171)
         self.assertEqual(set(runtime.MODEL_TABLES), set(Base.metadata.tables))
         self.assertTrue(set(runtime.GOVERNANCE_TABLES) <= set(runtime.READ_TABLES))
         self.assertFalse(set(runtime.GOVERNANCE_TABLES) & set(runtime.APPEND_TABLES))
         self.assertNotIn('tire_schema_versions', runtime.APPEND_TABLES)
         for table in ('snapshots', 'verifications', 'embedding_cache', 'audit_events'):
+            self.assertNotIn(table, runtime.UPDATE_COLUMNS)
+            self.assertNotIn(table, runtime.DELETE_TABLES)
+        for table in ('samr_notice_revisions', 'samr_notice_observations', 'samr_notice_changes'):
+            self.assertIn(table, runtime.READ_TABLES)
+            self.assertIn(table, runtime.APPEND_TABLES)
             self.assertNotIn(table, runtime.UPDATE_COLUMNS)
             self.assertNotIn(table, runtime.DELETE_TABLES)
 

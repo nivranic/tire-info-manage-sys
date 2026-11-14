@@ -179,6 +179,8 @@ def create_app(database_url: str | None = None, adapter_registry: Any = None, *,
     register_samr_recall_routes(app)
     from .safety_gate_monitor_routes import register_safety_gate_monitor_routes
     register_safety_gate_monitor_routes(app)
+    from .samr_notice_history import register_samr_notice_history_routes
+    register_samr_notice_history_routes(app)
     from .recall_discovery import register_recall_discovery_routes
     register_recall_discovery_routes(app)
     from .recall_discovery_monitor_routes import register_recall_discovery_monitor_routes

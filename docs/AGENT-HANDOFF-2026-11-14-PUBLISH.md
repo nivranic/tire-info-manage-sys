@@ -1,5 +1,7 @@
 # 胎迹进度与 Agent 交接卡
 
+中国召回逐公告版本与变化基础已补齐，当前171张模型表。正常浏览器42项、实际旧SQLite升级与非拥有者PG／TLS已验。下一步沿既有事件实施后台监控、通知和任务SSE，详见[最新接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)及[阶段验收](assurance/evidence/samr-cn-notice-history-2026-11-14.md)。下文保留前序交付时点和完整需求清单。
+
 后续已交付中国市场监管召回后端、专用 DTO／SDK 与 Web，当前18项可信Parser、168张模型表。正常浏览器31项通过，含6次真实官方live查询；下一步接通后台监控和逐公告变化。先读[中国召回阶段接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)及[工作台验收](assurance/evidence/samr-cn-web-2026-11-14.md)，再使用本文的完整模块、Gate、SLO与决策清单。本文以下保留Dunlop阶段交付时点。
 
 更新于 2026-11-14。本次交付包含 Dunlop 欧洲来源、相关 Parser 兼容变更、验证与交接。完整 V1 持续进行。

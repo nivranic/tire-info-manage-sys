@@ -90,3 +90,41 @@ export interface SamrRecallEvidence extends SamrRecallProvenance {
   content_type: "application/json" | "text/html";
   data_state: "local_snapshot";
 }
+
+export interface SamrNoticeObservation {
+  id: string;
+  sequence: number;
+  snapshot_id: string;
+  verification_id: string;
+  observed_at: string;
+  evidence_path: string;
+  revision: {
+    id: string;
+    revision: number;
+    content_hash: string;
+    notice: SamrRecallNotice;
+    first_snapshot_id: string;
+  };
+  event: {
+    id: string;
+    kind: "first_observed" | "content_changed";
+    before_revision_id: string | null;
+    after_revision_id: string;
+    previous_snapshot_id: string | null;
+    changes: Record<string, { before: unknown; after: unknown }>;
+  } | null;
+}
+
+export interface SamrNoticeHistory {
+  source_id: "samr-cn-recalls";
+  article_id: string;
+  data_state: "local_snapshot";
+  applicability: "not_assessed";
+  offset: number;
+  limit: number;
+  total: number;
+  through_sequence: number;
+  head: SamrNoticeObservation;
+  observations: SamrNoticeObservation[];
+  notices: string[];
+}

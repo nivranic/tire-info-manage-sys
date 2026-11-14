@@ -584,6 +584,11 @@ export const tireApi = {
   samrRecallQuery: (query: import("@tire/domain-types").SamrRecallQuery, options: { fallback_policy?: "ask" | "never"; consent_id?: string } = {}, signal?: AbortSignal) => post<import("@tire/domain-types").SamrRecallResult>("/v1/samr-recalls/query", { query, ...options }, signal),
   samrRecallHistory: (query: import("@tire/domain-types").SamrRecallQuery, signal?: AbortSignal) => request<import("@tire/domain-types").SamrRecallResult>(`/v1/samr-recalls/history?${new URLSearchParams({ ...query, mode: "history" })}`, { signal }),
   samrRecallEvidence: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").SamrRecallEvidence>(`/v1/samr-recalls/evidence/${encodeURIComponent(id)}?mode=history`, { signal }),
+  samrNoticeHistory: (id: string, page: { offset?: number; limit?: number; through_sequence?: number } = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ mode: "history", offset: String(page.offset ?? 0), limit: String(page.limit ?? 10) });
+    if (page.through_sequence !== undefined) query.set("through_sequence", String(page.through_sequence));
+    return request<import("@tire/domain-types").SamrNoticeHistory>(`/v1/samr-recalls/notices/${encodeURIComponent(id)}/history?${query}`, { signal });
+  },
   safetyGateQuery: (query: import("@tire/domain-types").SafetyGateQuery, options: { fallback_policy?: "ask" | "never"; consent_id?: string } = {}, signal?: AbortSignal) => post<import("@tire/domain-types").SafetyGateResult>("/v1/safety-gate/query", { query, ...options }, signal),
   safetyGateHistory: (query: import("@tire/domain-types").SafetyGateQuery, signal?: AbortSignal) => request<import("@tire/domain-types").SafetyGateResult>(`/v1/safety-gate/history?${new URLSearchParams({ ...query, mode: "history" })}`, { signal }),
   safetyGateEvidence: (id: string, signal?: AbortSignal) => request<import("@tire/domain-types").SafetyGateEvidence>(`/v1/safety-gate/evidence/${encodeURIComponent(id)}?mode=history`, { signal }),

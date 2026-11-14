@@ -108,6 +108,7 @@ export type { SafetyGateQuery, SafetyGateReport, SafetyGateAlert, SafetyGateDocu
 export type { SafetyGateMonitorQuery, SafetyGateRuleSettings, SafetyGateMonitorRun, SafetyGateMonitorRule, SafetyGateRuleDetail, SafetyGateRuleWrite, SafetyGateNotification, SafetyGatePage } from "./safety-gate";
 export type { SafetyGateAnalysisReference, SafetyGateAnalysisTarget, SafetyGateAnalysisBoundary } from "./safety-gate";
 export type { SamrRecallQuery, SamrRecallNoticeSummary, SamrRecallNotice, SamrRecallAsset, SamrRecallDocument, SamrRecallProvenance, SamrRecallResult, SamrRecallEvidence } from "./samr-recalls";
+export type { SamrNoticeHistory, SamrNoticeObservation } from "./samr-recalls";
 export type { RecallDiscoveryQuery, RecallDiscoveryBudget, RecallDiscoveryCoverage, RecallDiscoveryRun,
   RecallDiscoveryRuleSettings, RecallDiscoveryRuleRevision, RecallDiscoveryRule, RecallDiscoveryRuleDetail, RecallDiscoveryRuleWrite,
   RecallDiscoveryPage, RecallDiscoveryCandidate, RecallDiscoveryRunDetail, RecallDiscoveryNotification,

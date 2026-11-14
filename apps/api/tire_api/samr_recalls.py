@@ -363,6 +363,8 @@ class SamrRecallService:
             etag=result.get('etag'), last_modified=result.get('last_modified'),
             parser_identity=result.get('parser_identity'), verified_at=verified))
         self.db.flush()
+        from .samr_notice_history import backfill_notice_history
+        backfill_notice_history(self.db)
         return snapshot, verified
 
     def consume_consent(self, request, session_id, *, audience='internal'):
