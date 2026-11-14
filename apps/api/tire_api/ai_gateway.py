@@ -244,6 +244,14 @@ def request_body(config: OpenAIConfig, question: str, evidence: dict, *, system_
             raise GatewayError('ai_grounding_validation_failed') from None
         system_prompt += '\n\n' + safety_gate.SYSTEM_PROMPT
         output_schema, schema_name = safety_gate.OUTPUT_SCHEMA, safety_gate.SCHEMA_NAME
+    from . import ai_samr_contract as samr
+    if samr.contains(evidence):
+        try:
+            samr.validate_payload(evidence)
+        except (ValueError, TypeError, KeyError, AttributeError):
+            raise GatewayError('ai_grounding_validation_failed') from None
+        system_prompt += '\n\n' + samr.SYSTEM_PROMPT
+        output_schema, schema_name = samr.OUTPUT_SCHEMA, samr.SCHEMA_NAME
     if evidence.get('original_text_policy') is not None:
         from .ai_original_text import NOTICE, original_items
         original_items(evidence)
@@ -314,6 +322,12 @@ def analysis_contract(payload):
         contract.update(safety_gate_policy=payload['safety_gate_policy'],
                         safety_gate_prompt_version=safety_gate.PROMPT_VERSION,
                         prompt_version=safety_gate.PROMPT_VERSION)
+    from . import ai_samr_contract as samr
+    if samr.contains(payload):
+        samr.validate_payload(payload)
+        contract.update(samr_policy=payload['samr_policy'], samr_prompt_version=samr.PROMPT_VERSION)
+        if contract['prompt_version'] == PROMPT_VERSION:
+            contract['prompt_version'] = samr.PROMPT_VERSION
     return contract
 
 

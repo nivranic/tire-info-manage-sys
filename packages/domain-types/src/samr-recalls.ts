@@ -91,6 +91,27 @@ export interface SamrRecallEvidence extends SamrRecallProvenance {
   data_state: "local_snapshot";
 }
 
+export interface SamrRecallAnalysisReference {
+  kind: "samr_recall";
+  snapshot_id: string;
+  article_id: string;
+}
+
+export interface SamrRecallAnalysisTarget {
+  query: Extract<SamrRecallQuery, { operation: "notice" }>;
+  reference: SamrRecallAnalysisReference;
+}
+
+export interface SamrRecallAnalysisBoundary {
+  policy: "samr-recall-fact-selection@1";
+  applicability: "not_assessed";
+  mode: "announcement_facts_only";
+  notice: string;
+}
+
+export type SamrRecallNoticeValues = Pick<SamrRecallNotice, "article_id" | "reference" | "source_url" | "title"
+  | "published_date" | "publication_date_raw" | "deployed_at_raw" | "pub_date_raw" | "content_source_raw" | "text" | "applicability">;
+
 export interface SamrNoticeObservation {
   id: string;
   sequence: number;

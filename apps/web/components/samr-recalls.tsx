@@ -8,6 +8,8 @@ import QueryFallbackPolicy from "./query-fallback-policy";
 import { useSourceAccess } from "./source-status";
 import SamrNoticeHistoryPanel from "./samr-notice-history";
 import { SamrMonitoring } from "./samr-monitoring";
+import type { AITarget } from "./ai-analysis";
+import { samrTarget } from "./samr-ai-values";
 
 const sourceId = "samr-cn-recalls";
 const states: Record<SamrRecallResult["data_state"], string> = {
@@ -25,7 +27,7 @@ function ResultStatus({ value }: { value: SamrRecallResult }) {
   </>;
 }
 
-export default function SamrRecallPanel({ sessionReady }: { sessionReady: boolean }) {
+export default function SamrRecallPanel({ sessionReady, onAnalyze }: { sessionReady: boolean; onAnalyze?: (target: AITarget) => void }) {
   const access = useSourceAccess();
   const generation = access.get(sourceId)?.management.access_generation;
   const [history, setHistory] = useState(false);
@@ -130,6 +132,7 @@ export default function SamrRecallPanel({ sessionReady }: { sessionReady: boolea
 
   const document = catalog?.document?.operation === "search" ? catalog.document : null;
   const notice = result?.document?.operation === "notice" ? result.document.notice : null;
+  const target = result ? samrTarget(result) : null;
   const searchQuery = catalog?.query.operation === "search" ? catalog.query : null;
   const canLoad = sessionReady && !busy && (history || access.canQuery(sourceId));
   const searchPage = (page: number) => searchQuery && void load({ ...searchQuery, page: String(page) });
@@ -184,6 +187,7 @@ export default function SamrRecallPanel({ sessionReady }: { sessionReady: boolea
         <DataTree key={result.provenance[0]?.snapshot_id} label="官方公告正文纯文本" value={notice.text} />
         <DataTree label="原始元数据" value={notice.metadata} />
         <DataTree label="图片与附件来源引用 · 尚未获取" value={notice.assets} />
+        {target && onAnalyze ? <button type="button" className="secondary-button" disabled={!sessionReady || busy} onClick={() => onAnalyze({ samr: target, label: notice.title, defaultQuestion: "整理所选历史中国召回公告原文与日期字段。" })}>分析此中国召回公告</button> : null}
         <button type="button" className="text-button" disabled={!sessionReady || busy} onClick={() => { cancel(); setHistoryArticle(notice.article_id); }}>读取公告版本与变化</button>
         <a href={notice.source_url} target="_blank" rel="noreferrer">重开官方公告原文</a>
       </article> : null}
@@ -196,7 +200,7 @@ export default function SamrRecallPanel({ sessionReady }: { sessionReady: boolea
       <QueryFallbackPolicy kind="samr_recall_notice" sourceIds={[sourceId]} sessionReady={sessionReady} />
     </> : null}
     <SamrMonitoring sessionReady={sessionReady} onEvidence={id => void showEvidence(id)} />
-    {historyArticle ? <SamrNoticeHistoryPanel key={historyArticle} articleId={historyArticle} sessionReady={sessionReady} onClose={() => setHistoryArticle(null)} onEvidence={id => void showEvidence(id)} /> : null}
+    {historyArticle ? <SamrNoticeHistoryPanel key={historyArticle} articleId={historyArticle} sessionReady={sessionReady} onClose={() => setHistoryArticle(null)} onEvidence={id => void showEvidence(id)} onAnalyze={onAnalyze ? (reference, label) => onAnalyze({ references: [reference], label, defaultQuestion: "整理此历史版本中国召回公告原文与日期字段。" }) : undefined} /> : null}
     {evidence ? <section className="recall-evidence" aria-label="中国召回历史原件">
       <h4>历史原件 · {evidence.content_type}</h4>
       <p>系统观察 {evidence.observed_at} · Parser {evidence.parser_version}</p>

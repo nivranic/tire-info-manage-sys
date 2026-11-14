@@ -19,10 +19,11 @@ from .service import QueryService, provenance, timestamp
 from .source_settings import SourceAccessBlocked
 from .text_embeddings import TextSelection
 from .safety_gate import SafetyGateQuery
+from .samr_recalls import SamrRecallQuery
 
 
 class PackReference(StrictModel):
-    kind: Literal['tire', 'vehicle', 'test_event', 'change_event', 'recall', 'safety_gate']
+    kind: Literal['tire', 'vehicle', 'test_event', 'change_event', 'recall', 'safety_gate', 'samr_recall']
     snapshot_id: str | None = Field(default=None, min_length=1, max_length=64)
     variant_id: str | None = Field(default=None, min_length=1, max_length=64)
     event_id: str | None = Field(default=None, min_length=1, max_length=64)
@@ -30,10 +31,14 @@ class PackReference(StrictModel):
     change_id: str | None = Field(default=None, min_length=1, max_length=64)
     recall_revision_id: str | None = Field(default=None, min_length=1, max_length=64)
     alert_id: str | None = Field(default=None, pattern=r'^-?[1-9][0-9]{0,11}$')
+    article_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
 
     @model_validator(mode='after')
     def complete_reference(self):
-        if self.kind == 'safety_gate':
+        if self.kind == 'samr_recall':
+            valid = self.snapshot_id and self.article_id and not any((self.variant_id, self.event_id,
+                self.event_revision, self.change_id, self.recall_revision_id))
+        elif self.kind == 'safety_gate':
             valid = self.snapshot_id and self.alert_id and not any((self.variant_id, self.event_id, self.event_revision, self.change_id, self.recall_revision_id))
         elif self.kind == 'recall':
             valid = (self.snapshot_id and 'recall_revision_id' in self.model_fields_set
@@ -46,7 +51,8 @@ class PackReference(StrictModel):
             valid = self.snapshot_id and not self.event_id and not self.event_revision and not self.change_id
             valid = valid and (bool(self.variant_id) if self.kind == 'tire' else not self.variant_id)
         if (not valid or self.kind != 'recall' and self.recall_revision_id is not None
-                or self.kind != 'safety_gate' and self.alert_id is not None):
+                or self.kind != 'safety_gate' and self.alert_id is not None
+                or self.kind != 'samr_recall' and self.article_id is not None):
             raise ValueError('请提供该类证据的精确版本标识')
         return self
 
@@ -55,8 +61,8 @@ class PreparePack(StrictModel):
     mode: Literal['current', 'history']
     references: list[PackReference | TextSelection] = Field(default_factory=list, max_length=6)
     source_id: str | None = Field(default=None, max_length=80)
-    query_kind: Literal['tire', 'recall_by_campaign', 'safety_gate_report'] | None = None
-    query: TireQuery | RecallQuery | SafetyGateQuery | None = None
+    query_kind: Literal['tire', 'recall_by_campaign', 'safety_gate_report', 'samr_recall_notice'] | None = None
+    query: TireQuery | RecallQuery | SafetyGateQuery | SamrRecallQuery | None = None
     variant_ids: list[str] = Field(default_factory=list, max_length=6)
     alert_ids: list[str] = Field(default_factory=list, max_length=6)
     consent_id: str | None = Field(default=None, min_length=1, max_length=64)
@@ -66,14 +72,18 @@ class PreparePack(StrictModel):
         if self.mode == 'current':
             if not self.source_id or self.query is None or self.references:
                 raise ValueError('当前参数分析须先指定轮胎来源与在线查询，不混入历史引用')
-            if self.query_kind == 'safety_gate_report':
+            if self.query_kind == 'samr_recall_notice':
+                if (self.source_id != 'samr-cn-recalls' or not isinstance(self.query, SamrRecallQuery)
+                        or self.query.operation != 'notice' or self.variant_ids):
+                    raise ValueError('当前中国召回分析须选择明确的官方公告原生路径')
+            elif self.query_kind == 'safety_gate_report':
                 if (self.source_id != 'eu-safety-gate' or not isinstance(self.query, SafetyGateQuery)
                         or self.query.operation != 'report' or not self.alert_ids or self.variant_ids):
                     raise ValueError('当前告警分析须选择官方周报及明确告警ID')
             elif self.query_kind == 'recall_by_campaign':
                 if self.source_id != RECALL_SOURCE_ID or not isinstance(self.query, RecallQuery) or self.variant_ids:
                     raise ValueError('当前召回分析须明确按公告编号在线查询，不接受轮胎版本或名称发现查询')
-            elif not isinstance(self.query, TireQuery) or self.source_id in {RECALL_SOURCE_ID, 'eu-safety-gate'}:
+            elif not isinstance(self.query, TireQuery) or self.source_id in {RECALL_SOURCE_ID, 'eu-safety-gate', 'samr-cn-recalls'}:
                 raise ValueError('召回查询须显式指定 recall_by_campaign 类型')
         elif not self.references or self.source_id or self.query or self.query_kind or self.variant_ids or self.alert_ids or self.consent_id:
             raise ValueError('历史分析须显式选择精确证据版本')
@@ -398,6 +408,19 @@ class PackBuilder:
         self.evidence.append(evidence)
         self.facts.extend(facts)
 
+    def samr_recall(self, db, snapshot_id, article_id, *, state, consent_id=None, verification_id=None):
+        from .samr_ai_evidence import canonical_facts, load_evidence, validate_frozen_evidence
+        material = load_evidence(db, snapshot_id, article_id, verification_id=verification_id)
+        evidence_id = f'e{len(self.evidence) + 1}'
+        evidence = {**material, 'id': evidence_id, 'data_state': state, 'consent_id': consent_id}
+        facts = [{'id': f'f{len(self.facts) + index + 1}', 'evidence_id': evidence_id, **fact}
+            for index, fact in enumerate(canonical_facts(evidence))]
+        if len(self.facts) + len(facts) > 400:
+            raise HTTPException(422, '公告事实过多，请减少所选公告')
+        validate_frozen_evidence(evidence, facts)
+        self.evidence.append(evidence)
+        self.facts.extend(facts)
+
 
 def shared_field_materials(resolutions):
     """Losslessly intern frozen material; do not drop candidates to fit the limit."""
@@ -573,11 +596,29 @@ def require_frozen_field_contract(payload):
             'message': '证据包缺少准备时字段决策或字段策略已变化，请重新准备证据包并授权；旧包与完成报告保持原样'})
 
 
-async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, recall_adapter=None, safety_gate_adapter=None) -> dict:
+async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, recall_adapter=None,
+                       safety_gate_adapter=None, samr_adapter=None) -> dict:
     builder = PackBuilder()
     pdfs = {}
     state, query_result = 'local_snapshot', None
-    if payload.mode == 'current' and payload.query_kind == 'safety_gate_report':
+    if payload.mode == 'current' and payload.query_kind == 'samr_recall_notice':
+        from .samr_recalls import SamrRecallRequest, SamrRecallService, SamrRecallVerification
+        from .adapters import samr
+        query_result = await SamrRecallService(db, samr_adapter or samr, registry).execute(
+            SamrRecallRequest(query=payload.query, consent_id=payload.consent_id), session_id, audience='ai_current')
+        if query_result['data_state'] not in {'live', 'live_verified_304', 'local_snapshot'} or not query_result['document']:
+            return {'pack': None, 'query_result': query_result, 'reason': query_result.get('reason') or 'no_matching_evidence'}
+        state = query_result['data_state']
+        verification_id = None
+        if state in {'live', 'live_verified_304'}:
+            verification_id = db.scalar(select(SamrRecallVerification.id).where(
+                SamrRecallVerification.query_id == query_result['query_id']))
+            if verification_id is None:
+                raise HTTPException(409, '本次中国召回查询缺少正式核验记录')
+        builder.samr_recall(db, query_result['provenance'][0]['snapshot_id'],
+            query_result['document']['notice']['article_id'], state=state,
+            consent_id=query_result['consent_id'], verification_id=verification_id)
+    elif payload.mode == 'current' and payload.query_kind == 'safety_gate_report':
         from .safety_gate import SafetyGateRequest, SafetyGateService, SafetyGateVerification
         from .adapters import safety_gate
         query_result = await SafetyGateService(db, safety_gate_adapter or safety_gate, registry).execute(
@@ -638,6 +679,8 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
                 await asyncio.to_thread(add_original, builder, db, ref, pdfs)
             elif ref.kind == 'safety_gate':
                 builder.safety_gate(db, ref.snapshot_id, ref.alert_id, state=state)
+            elif ref.kind == 'samr_recall':
+                builder.samr_recall(db, ref.snapshot_id, ref.article_id, state=state)
             elif ref.kind == 'recall':
                 builder.recall(db, ref.snapshot_id, ref.recall_revision_id, state=state)
             elif ref.kind == 'change_event':
@@ -733,6 +776,14 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
         if content.get('purpose') != 'recall_research':
             content['purpose'] = 'safety_gate_research'
         validate_payload(content)
+    if any(item.get('evidence_type') == 'samr_recall' for item in builder.evidence):
+        from .samr_ai_evidence import frozen_contract
+        from .ai_samr_contract import validate_payload
+        contract = frozen_contract()
+        content.update(samr_policy=contract['policy'], samr_boundary=contract['boundary'])
+        if content.get('purpose') not in {'recall_research', 'safety_gate_research'}:
+            content['purpose'] = 'samr_recall_research'
+        validate_payload(content)
     if len(stable_json(content).encode('utf-8')) > 44000:
         raise HTTPException(422, '证据包过大，请缩小版本或场次范围；不会静默截断证据')
     if payload.mode == 'current':
@@ -745,6 +796,11 @@ async def prepare_pack(db, registry, payload: PreparePack, session_id: str, *, r
             shared.assert_source_access(run)
         except SourceAccessBlocked as error:
             shared.block_source_access(run, error)
+            if payload.query_kind == 'samr_recall_notice':
+                from .samr_recalls import SamrRecallService
+                result = SamrRecallService(db, None, registry).response(payload.query.canonical(), run.state,
+                    query_id=run.id, reason=error.code)
+                return {'pack': None, 'query_result': result, 'reason': error.code}
             if payload.query_kind == 'safety_gate_report':
                 from .safety_gate import SafetyGateService
                 result = SafetyGateService(db, None, registry).response(payload.query.canonical(), run.state,

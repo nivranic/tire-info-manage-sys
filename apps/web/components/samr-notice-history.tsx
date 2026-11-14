@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { tireApi } from "@tire/api-client";
-import type { SamrNoticeHistory } from "@tire/domain-types";
+import type { SamrNoticeHistory, SamrRecallAnalysisReference } from "@tire/domain-types";
 import { DataTree } from "./reparse-review";
 
-export default function SamrNoticeHistoryPanel({ articleId, sessionReady, onClose, onEvidence }: {
+export default function SamrNoticeHistoryPanel({ articleId, sessionReady, onClose, onEvidence, onAnalyze }: {
   articleId: string; sessionReady: boolean; onClose: () => void; onEvidence: (id: string) => void;
+  onAnalyze?: (reference: SamrRecallAnalysisReference, label: string) => void;
 }) {
   const [value, setValue] = useState<SamrNoticeHistory | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,6 +56,7 @@ export default function SamrNoticeHistoryPanel({ articleId, sessionReady, onClos
         <DataTree label="此观察的公告正文纯文本" value={row.revision.notice.text} />
         <DataTree label="内容摘要、版本和原件绑定" value={{ content_hash: row.revision.content_hash, revision_id: row.revision.id, first_snapshot_id: row.revision.first_snapshot_id, snapshot_id: row.snapshot_id, verification_id: row.verification_id }} />
         <button type="button" className="text-button" disabled={!sessionReady} onClick={() => onEvidence(row.snapshot_id)}>查看此观察原件</button>
+        {onAnalyze ? <button type="button" className="text-button" disabled={!sessionReady} onClick={() => onAnalyze({ kind: "samr_recall", snapshot_id: row.snapshot_id, article_id: articleId }, row.revision.notice.title)}>分析此公告历史版本</button> : null}
         {row.event?.previous_snapshot_id ? <button type="button" className="text-button" disabled={!sessionReady} onClick={() => onEvidence(row.event!.previous_snapshot_id!)}>查看变化前原件</button> : null}
       </article>)}
       {value.total > value.limit ? <div className="reparse-pages">

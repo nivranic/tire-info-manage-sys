@@ -1,6 +1,6 @@
 ## 2026-11-14 进度与推送交接
 
-先读[最新 Agent 交接卡](AGENT-HANDOFF-2026-11-14-PUBLISH.md)。本次交付Dunlop欧洲SPORT MAXX RT2来源，当前13个轮胎区域目录、9个厂商品牌、17项可信Parser。卡片包含需求全貌、受管回归、正常API与在线canary证据、待验边界及下一步。首个真实AI按用户选择采用OpenAI Responses API，完整V1持续进行。
+先读[最新 Agent 交接卡](AGENT-HANDOFF-2026-11-14-SAMR-AI.md)及[整体需求进度](AGENT-HANDOFF-2026-11-14-PUBLISH.md)。中国召回公告已接通AI证据、同步／流式、原件引用和报告，519项受管回归及正常Web／非拥有者PG／TLS专项通过。当前13个轮胎区域目录、9个厂商品牌、18项可信Parser、179张模型表。首个真实AI采用OpenAI Responses API，真实模型与完整V1继续待验。下文保留此前交付时点。
 
 以下保留各历史交付时点。
 

@@ -130,6 +130,8 @@ def append_event(database, request_id, owner_token, type, payload):
             validate_test_uncertainty(payload['text'], evidence_payload)
             from .ai_safety_gate_contract import validate_uncertainty
             validate_uncertainty(payload['text'], evidence_payload)
+            from .ai_samr_contract import validate_uncertainty as validate_samr_uncertainty
+            validate_samr_uncertainty(payload['text'], evidence_payload)
             key = 'uncertainty'
         if _append(db, request_id, type, payload, key) is None:
             return False

@@ -267,6 +267,8 @@ def require_evidence_dispatch(database, request_id, config, body, pack=None):
     require_dispatch(database, request_id, config, body, pack)
     from .ai_safety_gate_contract import require_dispatch as require_safety_gate_dispatch
     require_safety_gate_dispatch(database, request_id, config, body, pack)
+    from .ai_samr_contract import require_dispatch as require_samr_dispatch
+    require_samr_dispatch(database, request_id, config, body, pack)
 
 
 def execute_response(db, app, row, config, body, validator):
@@ -297,6 +299,8 @@ def _execute_response(db, app, row, config, body, validator):
             require_dispatch(app.state.database, row.id, config, body)
             from .ai_safety_gate_contract import require_dispatch as require_safety_gate_dispatch
             require_safety_gate_dispatch(app.state.database, row.id, config, body)
+            from .ai_samr_contract import require_dispatch as require_samr_dispatch
+            require_samr_dispatch(app.state.database, row.id, config, body)
             answer = validator(receipt['text'])
     except GatewayError as cause:
         error = safe_error(str(cause))

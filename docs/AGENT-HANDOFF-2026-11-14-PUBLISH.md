@@ -1,6 +1,8 @@
 # 胎迹进度与 Agent 交接卡
 
-中国召回后台监控与通知已补齐，当前179张模型表。正常浏览器22项、实际旧SQLite升级6项、非拥有者PG／TLS真实官方Worker和16条越权SQL拒绝已验。受管回归117／192项、SDK13项和Web62项通过。当前接手入口为[监控阶段卡](AGENT-HANDOFF-2026-11-14-SAMR-MONITOR.md)及[阶段验收](assurance/evidence/samr-cn-monitoring-2026-11-14.md)，后续推进自然长周期与完整V1验收。
+最新完成中国召回公告AI证据、同步／流式、原件引用、SDK／Web与三种报告导出。最终519项受管回归、SDK14项、Web66项及生产浏览器15项通过，非拥有者PG／TLS真实官方公告live与合成Provider链路已验。当前接手入口为[AI阶段卡](AGENT-HANDOFF-2026-11-14-SAMR-AI.md)及[阶段验收](assurance/evidence/samr-cn-ai-evidence-2026-11-14.md)，真实OpenAI／Embeddings与完整V1继续待验。
+
+中国召回后台监控与通知已补齐，当前179张模型表。正常浏览器22项、实际旧SQLite升级6项、非拥有者PG／TLS真实官方Worker和16条越权SQL拒绝已验。受管回归117／192项、SDK13项和Web62项通过。监控阶段见[交接卡](AGENT-HANDOFF-2026-11-14-SAMR-MONITOR.md)及[阶段验收](assurance/evidence/samr-cn-monitoring-2026-11-14.md)。
 
 中国召回逐公告版本与变化基础已补齐，当前171张模型表。正常浏览器42项、实际旧SQLite升级与非拥有者PG／TLS已验。下一步沿既有事件实施后台监控、通知和任务SSE，详见[最新接手卡](AGENT-HANDOFF-2026-11-14-SAMR.md)及[阶段验收](assurance/evidence/samr-cn-notice-history-2026-11-14.md)。下文保留前序交付时点和完整需求清单。
 

@@ -179,3 +179,23 @@ test("SAMR notification read-state and generic task reader use their normal rout
     assert.ok(paths[1].startsWith("/v1/monitor-tasks/samr/job%2Fid%3F?"));
   } finally { restore(); }
 });
+
+test("Chinese recall AI preparation preserves current native paths and exact historical references", async () => {
+  const article = "a".repeat(32);
+  const query = { operation: "notice", reference: `/zhxx/jdczh/jdczh/art/2021/art_${article}.html` } as const;
+  const sent: unknown[] = [];
+  const controller = new AbortController();
+  const restore = setApiTransport(async (path, init) => {
+    assert.equal(path, "/v1/ai/evidence-packs");
+    assert.equal(init.signal, controller.signal);
+    sent.push(JSON.parse(String(init.body)));
+    return Response.json({ pack: null, query_result: { source_id: "samr-cn-recalls", data_state: "consent_required" } });
+  });
+  try {
+    const current = { mode: "current", query_kind: "samr_recall_notice", source_id: "samr-cn-recalls", query } as const;
+    const history = { mode: "history", references: [{ kind: "samr_recall", snapshot_id: "synthetic", article_id: article }] } as const;
+    assert.equal((await tireApi.prepareAI(current, controller.signal)).query_result?.data_state, "consent_required");
+    await tireApi.prepareAI({ ...history, references: [...history.references] }, controller.signal);
+    assert.deepEqual(sent, [current, history]);
+  } finally { restore(); }
+});

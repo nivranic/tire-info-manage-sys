@@ -110,6 +110,7 @@ export type { SamrMonitorQuery, SamrRuleSettings, SamrMonitorCoverage, SamrMonit
 export type { SafetyGateAnalysisReference, SafetyGateAnalysisTarget, SafetyGateAnalysisBoundary } from "./safety-gate";
 export type { SamrRecallQuery, SamrRecallNoticeSummary, SamrRecallNotice, SamrRecallAsset, SamrRecallDocument, SamrRecallProvenance, SamrRecallResult, SamrRecallEvidence } from "./samr-recalls";
 export type { SamrNoticeHistory, SamrNoticeObservation } from "./samr-recalls";
+export type { SamrRecallAnalysisReference, SamrRecallAnalysisTarget, SamrRecallAnalysisBoundary, SamrRecallNoticeValues } from "./samr-recalls";
 export type { RecallDiscoveryQuery, RecallDiscoveryBudget, RecallDiscoveryCoverage, RecallDiscoveryRun,
   RecallDiscoveryRuleSettings, RecallDiscoveryRuleRevision, RecallDiscoveryRule, RecallDiscoveryRuleDetail, RecallDiscoveryRuleWrite,
   RecallDiscoveryPage, RecallDiscoveryCandidate, RecallDiscoveryRunDetail, RecallDiscoveryNotification,
@@ -135,7 +136,7 @@ export interface Source {
 export interface TireQuery { size?: string; model?: string }
 
 export type AIPackReference = { kind: "tire"; snapshot_id: string; variant_id: string } | { kind: "vehicle"; snapshot_id: string } | { kind: "test_event"; event_id: string; event_revision: number } | import("./recalls").RecallAnalysisReference;
-export type AIAnalysisReference = AIPackReference | { kind: "change_event"; change_id: string } | TextEmbeddingSelection | import("./safety-gate").SafetyGateAnalysisReference;
+export type AIAnalysisReference = AIPackReference | { kind: "change_event"; change_id: string } | TextEmbeddingSelection | import("./safety-gate").SafetyGateAnalysisReference | import("./samr-recalls").SamrRecallAnalysisReference;
 export interface KnowledgeFilters {
   kind?: "tire" | "vehicle" | "test_event" | "recall";
   brand?: string; model?: string; size?: string; region?: string; product_code?: string;
@@ -296,9 +297,12 @@ export interface TextEmbeddingPlan extends EmbeddingPlan {
 export type AIPrepareRequest = { mode: "history"; references: AIAnalysisReference[] }
   | { mode: "current"; query_kind?: "tire"; source_id: string; query: TireQuery; variant_ids: string[]; consent_id?: string }
   | { mode: "current"; query_kind: "recall_by_campaign"; source_id: "nhtsa-us-recalls"; query: import("./recalls").RecallQuery; consent_id?: string }
-  | { mode: "current"; query_kind: "safety_gate_report"; source_id: "eu-safety-gate"; query: Extract<import("./safety-gate").SafetyGateQuery, { operation: "report" }>; alert_ids: string[]; consent_id?: string };
+  | { mode: "current"; query_kind: "safety_gate_report"; source_id: "eu-safety-gate"; query: Extract<import("./safety-gate").SafetyGateQuery, { operation: "report" }>; alert_ids: string[]; consent_id?: string }
+  | { mode: "current"; query_kind: "samr_recall_notice"; source_id: "samr-cn-recalls"; query: Extract<import("./samr-recalls").SamrRecallQuery, { operation: "notice" }>; consent_id?: string };
 export interface AIEvidence {
-  evidence_type?: "recall" | "safety_gate"; source_class?: "regulatory"; region?: "US" | "EU";
+  evidence_type?: "recall" | "safety_gate" | "samr_recall"; source_class?: "regulatory"; region?: "US" | "EU" | "CN";
+  article_id?: string; reference?: string; notice_values?: import("./samr-recalls").SamrRecallNoticeValues;
+  access_basis?: import("./samr-recalls").SamrRecallProvenance["access_basis"];
   alert_id?: string; case_number?: string; alert_source_url?: string; alert_published_date?: string;
   report_id?: string; report_reference?: string; report_published_date?: string;
   document_hash?: string; content_hash?: string; alert_values?: Record<string, string | null>;
@@ -330,6 +334,8 @@ export interface TestAnalysisBoundary {
 }
 export interface AIPack {
   purpose?: string;
+  samr_policy?: { version: "samr-recall-fact-selection@1"; digest: string };
+  samr_boundary?: import("./samr-recalls").SamrRecallAnalysisBoundary;
   safety_gate_policy?: { version: "safety-gate-fact-selection@1"; digest: string };
   safety_gate_boundary?: import("./safety-gate").SafetyGateAnalysisBoundary;
   original_text_policy?: "original-text-grounding@1";
@@ -341,7 +347,7 @@ export interface AIPack {
   id: string; mode: "current" | "history"; data_state: DataState; privacy_class: "public" | "private" | "restricted";
   created_at: string; expires_at: string; fingerprint: string; evidence: AIEvidence[];
   facts: { id: string; evidence_id: string; field: string; field_code?: string; value: unknown; text: string;
-    domain?: "recall" | "safety_gate"; scope?: "observation" | "record" | "alert"; record_key?: string | null }[];
+    domain?: "recall" | "safety_gate" | "samr_recall"; scope?: "observation" | "record" | "alert" | "notice"; record_key?: string | null }[];
   conflicts: Record<string, unknown>[]; source_state: "snapshot" | "live";
   query_id: string | null; consent_id: string | null;
 }
@@ -358,6 +364,7 @@ export interface AIAnalysis {
   created_at: string; completed_at: string | null; state: "pending" | "outcome_unknown" | "failed" | "completed";
   reserved_tokens: number; usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
   error_code: string | null; answer: {
+    samr_boundary?: import("./samr-recalls").SamrRecallAnalysisBoundary;
     safety_gate_boundary?: import("./safety-gate").SafetyGateAnalysisBoundary;
     original_text_policy?: "original-text-grounding@1";
     test_boundary?: TestAnalysisBoundary;
@@ -415,7 +422,9 @@ export interface ReportExport {
 }
 export interface EvidenceReportDetail extends EvidenceReportRecord {
   body: {
-    schema_version?: "research-report@1" | "research-report@2" | "research-report@3" | "research-report@4" | "research-report@5";
+    schema_version?: "research-report@1" | "research-report@2" | "research-report@3" | "research-report@4" | "research-report@5" | "research-report@6";
+    samr_policy?: AIPack["samr_policy"];
+    samr_boundary?: import("./samr-recalls").SamrRecallAnalysisBoundary;
     safety_gate_policy?: AIPack["safety_gate_policy"];
     safety_gate_boundary?: import("./safety-gate").SafetyGateAnalysisBoundary;
     test_boundary?: TestAnalysisBoundary;

@@ -328,7 +328,7 @@ export function RecallWorkspace({ sessionReady, initialCampaign, onAnalyze }: { 
     <button type="button" className="secondary-button" aria-pressed={mode === "safety_gate"} onClick={() => changeMode("safety_gate")}>EU Safety Gate 周报</button>
     <button type="button" className="secondary-button" aria-pressed={mode === "samr"} onClick={() => changeMode("samr")}>中国市场监管召回</button>
     {mode === "safety_gate" ? <SafetyGatePanel sessionReady={sessionReady} onAnalyze={onAnalyze} /> : null}
-    {mode === "samr" ? <SamrRecallPanel sessionReady={sessionReady} /> : null}
+    {mode === "samr" ? <SamrRecallPanel sessionReady={sessionReady} onAnalyze={onAnalyze} /> : null}
     {visited.discovery_monitor ? <div hidden={mode !== "discovery_monitor"}><RecallDiscoveryMonitoring sessionReady={sessionReady} seed={seed} onSeedHandled={consumeSeed} onChoose={chooseCampaign} /></div> : null}
     {mode === "online" || mode === "history" ? <><RecallDiscovery key={`discovery-${mode}`} sessionReady={sessionReady} mode={mode} onChoose={chooseCampaign} onCreateRule={createDiscoveryRule} /><div className="recall-campaign-section"><h3>按公告编号核验</h3>{campaignNotice && mode === "online" ? <p className="review-boundary" role="status">{campaignNotice}</p> : null}<RecallQueryPanel key={mode} onAnalyze={onAnalyze} sessionReady={sessionReady} mode={mode} campaign={campaign} onCampaign={value => { setCampaign(value); setCampaignNotice(""); }} /></div></> : null}
   </div>;
