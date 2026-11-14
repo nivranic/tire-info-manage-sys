@@ -378,5 +378,93 @@ class GovernanceCliTests(unittest.TestCase):
         self.assertNotIn("synthetic-db-secret", stream.getvalue())
 
 
+class PostgresRuntimeRoleTests(unittest.TestCase):
+    def test_policy_tracks_models_and_keeps_governance_writes_separate(self):
+        from tire_api import postgres_runtime_roles as runtime
+        runtime.validate_policy()
+        self.assertEqual(len(runtime.MODEL_TABLES), 166)
+        self.assertEqual(set(runtime.MODEL_TABLES), set(Base.metadata.tables))
+        self.assertTrue(set(runtime.GOVERNANCE_TABLES) <= set(runtime.READ_TABLES))
+        self.assertFalse(set(runtime.GOVERNANCE_TABLES) & set(runtime.APPEND_TABLES))
+        self.assertNotIn('tire_schema_versions', runtime.APPEND_TABLES)
+        for table in ('snapshots', 'verifications', 'embedding_cache', 'audit_events'):
+            self.assertNotIn(table, runtime.UPDATE_COLUMNS)
+            self.assertNotIn(table, runtime.DELETE_TABLES)
+
+    def test_plan_rejects_identifiers_and_uses_atomic_explicit_grants(self):
+        from tire_api import postgres_runtime_roles as runtime
+        for value in ('', 'bad;DROP ROLE x', 'bad"name', 'x' * 64, '1bad', None):
+            with self.assertRaises(cli.GovernanceError):
+                runtime.runtime_role_sql(value, 'synthetic_db')
+            with self.assertRaises(cli.GovernanceError):
+                runtime.runtime_role_sql('synthetic_runtime', value)
+        plan = runtime.runtime_role_sql('synthetic_runtime', 'synthetic_db')
+        self.assertTrue(plan.startswith('BEGIN;'))
+        self.assertTrue(plan.rstrip().endswith('COMMIT;'))
+        self.assertIn('GRANT UPDATE (expires_at,user_id) ON public.local_sessions', plan)
+        self.assertIn('GRANT EXECUTE ON FUNCTION public.tire_lock_external_reader()', plan)
+        insert = next(line for line in plan.splitlines() if line.startswith('GRANT INSERT ON '))
+        for table in (*runtime.GOVERNANCE_TABLES, 'tire_schema_versions'):
+            self.assertNotIn('public.' + table, insert)
+        for forbidden in ('GRANT ALL', 'GRANT UPDATE ON', 'CREATE ROLE', 'ALTER DEFAULT PRIVILEGES'):
+            self.assertNotIn(forbidden, plan)
+
+    def test_audit_binds_fixed_lock_bodies_and_governance_defaults(self):
+        from tire_api import postgres_runtime_roles as runtime
+        from tire_api.external_fact_governance_roles import _audit_sql
+        query = runtime.audit_sql(require_grants=True)
+        for condition in ('p.prosrc=a.body', "p.proconfig=ARRAY['search_path=pg_catalog']",
+                          "l.lanname='plpgsql'", 'p.pronargs=0', 'required_routines',
+                          'routine_grant_options', 'column_grant_options'):
+            self.assertIn(condition, query)
+        for body in runtime.LOCK_ROUTINES.values():
+            self.assertIn(body, query)
+        governance = _audit_sql(require_grants=True)
+        self.assertIn("('users','display_name')", governance)
+        self.assertNotIn('tire_lock_external_reader', governance)
+        self.assertNotIn('password_hash', governance)
+
+    def test_plan_cli_needs_no_terminal_or_connection(self):
+        from tire_api import postgres_runtime_roles as runtime
+        output = io.StringIO()
+        with patch.object(runtime.sys, 'stdin', SimpleNamespace(isatty=lambda: False)), \
+             patch.object(runtime, 'postgres_engine') as connecting, redirect_stdout(output):
+            result = runtime.main(['plan', '--role', 'synthetic_runtime', '--database', 'synthetic_db'])
+        self.assertEqual(result, 0)
+        self.assertTrue(output.getvalue().startswith('BEGIN;'))
+        connecting.assert_not_called()
+
+    def test_check_cli_requires_terminal_before_reading_profile(self):
+        from tire_api import postgres_runtime_roles as runtime
+        output = io.StringIO()
+        with patch.object(runtime.sys, 'stdin', SimpleNamespace(isatty=lambda: False)), \
+             patch.object(runtime, '_request') as reading, \
+             patch.object(runtime, 'postgres_engine') as connecting, redirect_stdout(output):
+            result = runtime.main(['check', '--postgres-profile', 'synthetic-profile'])
+        self.assertEqual(result, 1)
+        self.assertEqual(json.loads(output.getvalue())['code'], 'interactive_authentication_required')
+        reading.assert_not_called()
+        connecting.assert_not_called()
+
+    def test_check_cli_disposes_engine_and_sanitizes_failure(self):
+        from tire_api import postgres_runtime_roles as runtime
+        for fail_cleanup in (False, True):
+            with self.subTest(fail_cleanup=fail_cleanup):
+                output, engine = io.StringIO(), Mock()
+                if fail_cleanup:
+                    engine.dispose.side_effect = RuntimeError('synthetic-private-secret')
+                with patch.object(runtime.sys, 'stdin', SimpleNamespace(isatty=lambda: True)), \
+                     patch.object(runtime, '_request', return_value={}), \
+                     patch.object(runtime, 'postgres_connect_args', return_value={}), \
+                     patch.object(runtime, '_password', return_value='synthetic-private-secret'), \
+                     patch.object(runtime, 'postgres_engine', return_value=engine), \
+                     patch.object(runtime, 'check_runtime_role', return_value={'ok': True}), redirect_stdout(output):
+                    result = runtime.main(['check', '--postgres-profile', 'synthetic-profile'])
+                self.assertEqual(result, int(fail_cleanup))
+                self.assertEqual(json.loads(output.getvalue())['ok'], not fail_cleanup)
+                self.assertNotIn('synthetic-private-secret', output.getvalue())
+                engine.dispose.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

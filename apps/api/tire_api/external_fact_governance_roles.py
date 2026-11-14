@@ -27,17 +27,36 @@ def _identifier(value):
     return value
 
 
-def _audit_sql(*, require_grants):
+def _audit_sql(*, require_grants, read_tables=READ_TABLES, append_tables=APPEND_TABLES,
+               column_updates=None, delete_tables=(), optional_tables=(), routines=None):
     """One catalog query; all identifiers/privileges are reviewed constants.
 
     Native pg_settings UPDATE is PostgreSQL's session-local SET interface,
     available to PUBLIC. Keep its built-in parameter checks; separately reject
     explicit parameter ACLs that could authorize privileged settings.
     """
-    allowed = ','.join("('%s',%s)" % (name, 'true' if name in APPEND_TABLES else 'false') for name in READ_TABLES)
+    if column_updates is None:
+        column_updates = {'users': ('display_name',)}
+    for name in (*read_tables, *append_tables, *delete_tables, *optional_tables, *column_updates):
+        _identifier(name)
+    allowed = ','.join("('%s',%s,%s,%s)" % (name, 'true' if name in append_tables else 'false',
+        'true' if name in delete_tables else 'false', 'false' if name in optional_tables else 'true') for name in read_tables)
+    update_values = ','.join("('%s','%s')" % (_identifier(table), _identifier(column))
+        for table, columns in column_updates.items() for column in columns)
+    routine_values = ','.join("('%s','%s')" % (_identifier(name), body.replace("'", "''"))
+        for name, body in (routines or {}).items()) or '(NULL::text,NULL::text)'
     query = """
 WITH target AS (SELECT * FROM pg_catalog.pg_roles WHERE rolname = :role),
-allowed(name, appendable) AS (VALUES ALLOWED_VALUES),
+allowed(name, appendable, deletable, required) AS (VALUES ALLOWED_VALUES),
+allowed_updates(table_name, column_name) AS (VALUES UPDATE_VALUES),
+allowed_routines(name, body) AS (VALUES ROUTINE_VALUES),
+approved_routines AS (
+ SELECT p.oid FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+ JOIN pg_catalog.pg_language l ON l.oid=p.prolang JOIN allowed_routines a ON a.name=p.proname
+ WHERE n.nspname='public' AND p.pronargs=0 AND p.prokind='f' AND p.prosecdef AND NOT p.proleakproof
+ AND p.prorettype='pg_catalog.void'::regtype AND p.provolatile='v' AND p.proparallel='u'
+ AND l.lanname='plpgsql' AND p.prosrc=a.body AND p.proconfig=ARRAY['search_path=pg_catalog']
+),
 relations AS (
  SELECT c.oid, c.relname, c.relkind, c.relrowsecurity, n.nspname
  FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
@@ -64,7 +83,8 @@ relations AS (
  UNION ALL SELECT 'schema_ddl', EXISTS(SELECT 1 FROM pg_catalog.pg_namespace n, target t
    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND
    (pg_catalog.has_schema_privilege(t.oid,n.oid,'CREATE') OR pg_catalog.has_schema_privilege(t.oid,n.oid,'USAGE WITH GRANT OPTION')))
- UNION ALL SELECT 'required_tables', EXISTS(SELECT 1 FROM allowed a WHERE NOT EXISTS(
+ UNION ALL SELECT 'required_tables', EXISTS(SELECT 1 FROM allowed a WHERE
+   (a.required OR EXISTS(SELECT 1 FROM relations r WHERE r.nspname='public' AND r.relname=a.name)) AND NOT EXISTS(
    SELECT 1 FROM relations r WHERE r.nspname='public' AND r.relname=a.name AND r.relkind IN ('r','p')))
  UNION ALL SELECT 'row_security_unsupported', EXISTS(SELECT 1 FROM relations r JOIN allowed a ON a.name=r.relname
    WHERE r.nspname='public' AND r.relrowsecurity)
@@ -73,7 +93,8 @@ relations AS (
    CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) p(priv)
    LEFT JOIN allowed a ON r.nspname='public' AND r.relname=a.name
    WHERE r.relkind IN ('r','p','v','m','f') AND pg_catalog.has_table_privilege(t.oid,r.oid,p.priv)
-   AND NOT (COALESCE(a.name IS NOT NULL AND p.priv='SELECT',false) OR COALESCE(a.appendable AND p.priv='INSERT',false)))
+   AND NOT (COALESCE(a.name IS NOT NULL AND p.priv='SELECT',false) OR COALESCE(a.appendable AND p.priv='INSERT',false)
+     OR COALESCE(a.deletable AND p.priv='DELETE',false)))
  UNION ALL SELECT 'table_grant_options', EXISTS(
    SELECT 1 FROM target t, relations r,
    (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER'),('MAINTAIN')) p(priv)
@@ -85,7 +106,8 @@ relations AS (
    LEFT JOIN allowed a ON r.nspname='public' AND r.relname=a.name
    WHERE r.relkind IN ('r','p','v','m','f') AND pg_catalog.has_column_privilege(t.oid,r.oid,c.attnum,p.priv)
    AND NOT (COALESCE(a.name IS NOT NULL AND p.priv='SELECT',false) OR COALESCE(a.appendable AND p.priv='INSERT',false)
-     OR (r.nspname='public' AND r.relname='users' AND c.attname='display_name' AND p.priv='UPDATE')))
+     OR (r.nspname='public' AND p.priv='UPDATE' AND EXISTS(SELECT 1 FROM allowed_updates u
+         WHERE u.table_name=r.relname AND u.column_name=c.attname))))
  UNION ALL SELECT 'column_grant_options', EXISTS(
    SELECT 1 FROM target t CROSS JOIN relations r
    JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid AND c.attnum>0 AND NOT c.attisdropped
@@ -97,7 +119,8 @@ relations AS (
  UNION ALL SELECT 'security_definer_access', EXISTS(
    SELECT 1 FROM target t, pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND p.prosecdef
-   AND pg_catalog.has_function_privilege(t.oid,p.oid,'EXECUTE'))
+   AND pg_catalog.has_function_privilege(t.oid,p.oid,'EXECUTE')
+   AND NOT EXISTS(SELECT 1 FROM approved_routines a WHERE a.oid=p.oid))
  UNION ALL SELECT 'catalog_secrets', EXISTS(
    SELECT 1 FROM target t CROSS JOIN system_relations r
    JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid AND c.attnum>0 AND NOT c.attisdropped
@@ -119,7 +142,10 @@ relations AS (
    WHERE a.grantee IN (t.oid,0))
  UNION ALL SELECT 'explicit_routine_privileges', EXISTS(
    SELECT 1 FROM target t, pg_catalog.pg_proc p, pg_catalog.aclexplode(p.proacl) a
-   WHERE a.grantee=t.oid AND a.privilege_type='EXECUTE')
+   WHERE a.grantee=t.oid AND a.privilege_type='EXECUTE'
+   AND NOT EXISTS(SELECT 1 FROM approved_routines r WHERE r.oid=p.oid))
+ UNION ALL SELECT 'routine_grant_options', EXISTS(SELECT 1 FROM target t, pg_catalog.pg_proc p
+   WHERE pg_catalog.has_function_privilege(t.oid,p.oid,'EXECUTE WITH GRANT OPTION'))
  UNION ALL SELECT 'server_file_routines', EXISTS(
    SELECT 1 FROM target t, pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
    WHERE n.nspname='pg_catalog' AND p.proname IN ('pg_read_file','pg_read_binary_file','pg_ls_dir','pg_stat_file')
@@ -127,7 +153,7 @@ relations AS (
  REQUIRED_CHECKS
 )
 SELECT code FROM checks WHERE failed ORDER BY code
-""".replace('ALLOWED_VALUES', allowed)
+""".replace('ALLOWED_VALUES', allowed).replace('UPDATE_VALUES', update_values).replace('ROUTINE_VALUES', routine_values)
     required = """
  UNION ALL SELECT 'required_access', EXISTS(SELECT 1 FROM target t WHERE
    NOT pg_catalog.has_database_privilege(t.oid,current_database(),'CONNECT') OR
@@ -135,11 +161,18 @@ SELECT code FROM checks WHERE failed ORDER BY code
  UNION ALL SELECT 'required_table_grants', EXISTS(SELECT 1 FROM target t, relations r JOIN allowed a ON a.name=r.relname
    WHERE r.nspname='public' AND r.relkind IN ('r','p') AND
    (NOT pg_catalog.has_table_privilege(t.oid,r.oid,'SELECT') OR
-    (a.appendable AND NOT pg_catalog.has_table_privilege(t.oid,r.oid,'INSERT'))))
+    (a.appendable AND NOT pg_catalog.has_table_privilege(t.oid,r.oid,'INSERT')) OR
+    (a.deletable AND NOT pg_catalog.has_table_privilege(t.oid,r.oid,'DELETE'))))
  UNION ALL SELECT 'actor_lock_grant', EXISTS(SELECT 1 FROM target t WHERE NOT EXISTS(
-   SELECT 1 FROM relations r JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid AND c.attnum>0 AND NOT c.attisdropped
-   WHERE r.nspname='public' AND r.relname='users' AND c.attname='display_name'
-   AND pg_catalog.has_column_privilege(t.oid,r.oid,c.attnum,'UPDATE')))
+   SELECT 1 FROM allowed_updates)) OR EXISTS(
+   SELECT 1 FROM target t CROSS JOIN allowed_updates u JOIN allowed a ON a.name=u.table_name
+   WHERE (a.required OR EXISTS(SELECT 1 FROM relations r WHERE r.nspname='public' AND r.relname=u.table_name))
+   AND NOT EXISTS(SELECT 1 FROM relations r JOIN pg_catalog.pg_attribute c ON c.attrelid=r.oid
+     AND c.attnum>0 AND NOT c.attisdropped WHERE r.nspname='public' AND r.relname=u.table_name
+     AND c.attname=u.column_name AND pg_catalog.has_column_privilege(t.oid,r.oid,c.attnum,'UPDATE')))
+ UNION ALL SELECT 'required_routines', EXISTS(SELECT 1 FROM target t CROSS JOIN allowed_routines a
+   WHERE a.name IS NOT NULL AND NOT EXISTS(SELECT 1 FROM approved_routines r JOIN pg_catalog.pg_proc p ON p.oid=r.oid
+     WHERE p.proname=a.name AND pg_catalog.has_function_privilege(t.oid,p.oid,'EXECUTE')))
 """ if require_grants else ''
     return query.replace('REQUIRED_CHECKS', required)
 

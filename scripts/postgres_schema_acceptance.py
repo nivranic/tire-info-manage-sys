@@ -91,14 +91,17 @@ def run():
                 password=os.environ['TIRE_PG_TEST_PASSWORD'], dbname=name, autocommit=True, connect_timeout=5)
 
         def grants(engine, name):
-            # Deliberately broad DML fixture, not a production least-privilege role policy.
-            with engine.begin() as connection:
+            from tire_api.postgres_runtime_roles import runtime_role_sql, check_runtime_role
+            with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
                 connection.exec_driver_sql('REVOKE CREATE, TEMPORARY ON DATABASE "' + name + '" FROM PUBLIC')
                 connection.exec_driver_sql('REVOKE CREATE ON SCHEMA public FROM PUBLIC')
-                connection.exec_driver_sql('GRANT CONNECT ON DATABASE "' + name + '" TO "' + runtime + '"')
-                connection.exec_driver_sql('GRANT USAGE ON SCHEMA public TO "' + runtime + '"')
-                connection.exec_driver_sql('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "' + runtime + '"')
-                connection.exec_driver_sql('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "' + runtime + '"')
+                connection.exec_driver_sql(runtime_role_sql(runtime, name))
+            checked = create_engine(url(name, limited=True))
+            try:
+                result = check_runtime_role(checked)
+                assert result['ok'], result['violations']
+            finally:
+                checked.dispose()
 
         STEP = 'reference_cli'
         reference = database()
@@ -271,6 +274,34 @@ def run():
             verify_schema(runtime_db.engine, contract_path, digest)
         finally:
             runtime_db.close()
+        record(STEP)
+
+        STEP = 'runtime_cannot_rewrite_evidence_or_approve_licenses'
+        statements = (
+            'UPDATE public.snapshots SET raw_hash=raw_hash WHERE false',
+            'DELETE FROM public.snapshots WHERE false',
+            'TRUNCATE public.raw_captures CASCADE',
+            'DELETE FROM public.audit_events WHERE false',
+            'UPDATE public.users SET id=id WHERE false',
+            'INSERT INTO public.tire_schema_versions SELECT * FROM public.tire_schema_versions WHERE false',
+            'INSERT INTO public.external_fact_grant_revisions SELECT * FROM public.external_fact_grant_revisions WHERE false',
+            'INSERT INTO public.external_fact_license_evidence SELECT * FROM public.external_fact_license_evidence WHERE false',
+        )
+        checked = create_engine(url(target_name, limited=True))
+        try:
+            for statement in statements:
+                with checked.connect() as connection:
+                    try:
+                        connection.exec_driver_sql(statement)
+                    except Exception as error:
+                        assert getattr(getattr(error, 'orig', None), 'sqlstate', None) == '42501'
+                    else:
+                        raise AssertionError('runtime_forbidden_dml_present')
+                    finally:
+                        connection.rollback()
+        finally:
+            checked.dispose()
+        REPORT['runtime_forbidden_dml_count'] = len(statements)
         record(STEP)
 
         changes = {

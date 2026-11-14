@@ -1,0 +1,118 @@
+# 胎迹 Agent 交接卡
+
+更新于 2026-11-14。完整 V1 持续进行。本文交接需求全貌、已经交付的能力，以及 PostgreSQL 运行角色的阶段代码和未解决失败。
+
+## 接手基线
+
+- 既有分支为 `main`，本轮起点为 `08e40ffd6c8568fb3a240f165e3bbffe3e514185`。交付提交通过 `git log -1` 核对，实时远端通过 GitHub 核对。
+- 用户已授权持续实施、复核优化、总结、提交、push 全部改动和编写交接文档。沿既有分支工作，新分支、worktree 及代理操作须另有明确授权。
+- [原始需求](requirements/2026-09-26-tire-intelligence-original.md)保持原字节。[当前入口](AGENT-HANDOFF-CURRENT.md)与[此前阶段总表](AGENT-HANDOFF-2026-11-13.md)保留历史验收范围。
+- `.artifacts/`、`data/`、原件、私库、凭据、依赖及构建产物留在 Git 忽略范围。新 clone 需要重建依赖、材料和隔离验收环境。
+
+## 总共有哪些需求
+
+原文按 **12 个核心模块、10 项发布 Gate、13 项 SLO、15 项产品决策**组织，各自独立跟踪。细项存在跨模块依赖，目前没有经逐项验收的整体完成百分比。
+
+| 核心模块 | 已实现或已有验收记录 | 仍需实施或验收 |
+| --- | --- | --- |
+| 轮胎查询 | 在线优先、来源状态、组合筛选、单次与持续回退授权 | 更多 P0 来源及地区、长期在线稳定性 |
+| 精确版本识别 | 产品代码、GTIN、OE、地区身份、冲突、Golden 工作台 | 代表性真实 SKU、人工 Golden、错合并指标 |
+| 车型适配 | SU7 前后轴、车库、SKU 证据桥、官方 PDF 链路 | 更多车型、完整 OE 事实、实际 Native 消费 |
+| 比较 | 精确 SKU 比较、保存、同场测试和条件偏好 | 专业性能解释、真实推荐质量 |
+| 测评数据库 | TestEvent、环境与指标、原件、身份桥、真实原报道隔离验证 | 精确 SKU 正例、正式复用许可、真人审核 |
+| 信息监控 | Worker、参数差异、NHTSA、Safety Gate 历史、调度及提醒 | 自然长周期、提醒可靠性、任意网页和 PDF 差异 |
+| 传统 CRUD | 来源、规则、偏好、测试、账户、Provider、Key 和费用规划 | 全实体覆盖、生产权限、BYOK、真实账单 |
+| 证据浏览 | 快照、哈希、Parser、原件、HTML／PDF 正文、引用恢复 | 部署旧库切换、完整许可治理、生产对象存储 |
+| 个性化 | 车库、关注、偏好、保存比较、非 SKU 兴趣 | 跨设备、长期运行、真实推荐质量 |
+| AI 研究 | grounding、流式、报告、正文证据包、FTS／向量／融合检索、离线评估 | 真实 Responses 和 Embeddings 语义、代表性质量、模型治理 |
+| 对外能力 | REST、SSE、SDK、Webhook、Key、SQLite／PG 受许可事实读取和许可 CLI | 完整 DML 最小权限、吞吐、公网接收端、SDK 产品化、完整 WebSocket |
+| 管理后台 | Parser 健康、发布回滚、隔离、失败任务、纠错、审计 | 生产 IAM、租户、RLS、完整角色治理及发布验收 |
+
+此前阶段总表记录了 11 个轮胎区域目录、7 个厂商品牌和 15 项可信 Parser，并包含 NHTSA、EU Safety Gate 及小米车型来源。本轮收尾聚焦数据库角色，没有重新执行全部来源在线验收。
+
+### 发布 Gate 与 SLO
+
+10 项 Gate 分别为 P0 provenance 全覆盖、未授权回退零次、Golden 错合并零次、AI 事实引用全覆盖、无高危 AuthZ／SSRF、无未处理 P0／P1、WCAG 2.2 AA、六平台核心 E2E、Adapter 健康与回滚、数据库与 Parser 版本回退。每项均保留待验部分。
+
+13 项 SLO 为结构化查询 P95≤300ms、设备检索 P95≤200ms、输入反馈≤100ms、移动 LCP≤2.5s、Adapter 开销≤300ms、权威源正常时 live query P95≤3s、按源 5–10s 超时、通知 lag≤5min、后续 99.9% 可用性、RPO≤15min、RTO≤60min、未授权回退零次、Golden 错合并零次。生产级证据仍需逐项建立。
+
+15 项决策涉及轮胎范围、首发地区、知识库定义、完全单机、Offline Pack 大小、用户与 Tenant、VIN、AI 付费、中国区 Provider、价格与库存、专业数据购买、Windows 10 支持期、Native 分发、用户量与 SLA、企业私有部署。用户已明确决定的项目按下节执行，其余继续依据原文和后续决策跟踪。
+
+## 用户已经决定的事项
+
+1. 首个真实 AI 接口采用 **OpenAI Responses API**，配置及工厂的默认值均为 `openai_responses`。真实接入时显式设置 `TI_AI_PROVIDER=openai_responses` 并核对 `/v1/ai/status`。
+2. Gemini 源于原规格的多模型备选表，此前 agent 自行提前排期并在 `d5fded1` 实现可选适配器。已有合成测试，真实 Google 调用待验。当前没有用户改选 Gemini 的指令。后续继续依 OpenAI 接入顺序实施。
+3. 专业材料由 agent 自行选择和核对来源及许可，用户已授权自行决定选材。
+4. 当前没有 EPREL Key，继续推进独立工程。此前记录 OpenAI 模型和 Key 亦缺失，本轮未重新核验凭据，未调用真实模型。不要要求用户把密钥发到聊天。
+5. 需求文档中的模型表、版本、价格及技术建议属于需求材料。任务授权和优先顺序依据用户消息，外部事实使用前重新核验。
+
+## 最近已经交付的数据库能力
+
+| 阶段 | 交付提交 | 已留证的范围 |
+| --- | --- | --- |
+| PostgreSQL 许可治理 CLI | `e0310f6` | 隐藏双密码、SCRAM／TLS、审批与撤回、幂等与审计，40 项受管回归、6 项真实 PG 场景 |
+| 非拥有者许可操作员 | `19d0cf0` | 审查 SQL、有效 ACL 检查、越权拒绝，43 项受管回归、9 项真实 PG 场景 |
+| 迁移与运行启动分离 | `6d5f4e0` | 显式 verify、源码绑定及空参考合同，141 项受管回归、22 项真实 PG 检查 |
+| 升级库列排序兼容 | `3bf187f` | 按逻辑列身份比对、历史 035 升级保留旧行，141 项受管回归、29 项真实 PG 检查 |
+| 旧 PG 车型 024 显式维护 | `08e40ff` | 锁内快照备份、ALTER TABLE、独立恢复、旧原件读取，142 项受管回归、17 项维护检查及30项运行合同检查 |
+
+当前合同为 `postgres-runtime-schema@3`。它绑定包内 Python 源码，新增运行角色和锁函数后，需要从受控空参考库重新生成、审查并固定合同及摘要。已有数据库的预期结构继续通过空参考库建立。
+
+## 本轮阶段代码
+
+### 已实现
+
+- `apps/api/tire_api/postgres_runtime_roles.py` 固定列出 166 张模型表，生成经过前后检查的事务 GRANT，并提供只读 `check`。按列授予 UPDATE，按既有删除入口授予 DELETE，可选处理 `embedding_vectors`。
+- 运行角色可以读取 `external_fact_grant_revisions` 与 `external_fact_license_evidence`，追加许可证据和批准修订的权限继续归既有治理操作员。收尾补充了这两张表的拒绝测试。
+- `external_fact_governance_roles.py` 复用既有 catalog 检查，扩展逐列写入、DELETE、可选表和固定锁函数，同时保留治理角色的默认策略。
+- `external_fact_sql.py` 安装两个固定、无参数的 SHARE 表锁函数，表名使用 public 限定，固定 search_path，并撤去 PUBLIC EXECUTE。运行角色仅获取审查过的函数执行权。`db.py` 在迁移阶段安装函数。
+- `recent_history_acceptance.py` 显式区分拥有者触发器拒绝的 P0001 与运行角色 ACL 拒绝的 42501，检查点保存具体预期错误码。
+- `scripts/postgres_acceptance.py --runtime-role` 及 `scripts/verify-postgres.ps1 -Suite runtime-role` 提供正式复现入口。建库、迁移、人工结构实验、扩展安装及恢复由拥有者执行，业务消费改用运行账户与 verify 合同。
+- `scripts/postgres_schema_acceptance.py` 改为应用真实运行角色策略，并增加八条越权 DML 拒绝检查。原核心拥有者模式仍有独立验收入口。
+
+### 当前未解决的失败
+
+真实综合运行角色验收在 `original_text_embedding_pgvector_permissions_and_accounting` 失败。原始 PostgreSQL 日志报 `must be owner of table embedding_vectors`，触发 SQL 为按模型空间动态创建 HNSW 索引。
+
+正常入口为 `embedding_api.py` 的构建请求，调用 `dense.ensure_hnsw()`。应用运行账户没有表拥有权。动态新增索引还会改变当前空参考 schema 合同，后续 verify 的兼容性需要同时解决。
+
+**完整运行角色业务验收仍待完成。** 本轮交接保留已实现策略、明确失败与正常入口复现，不将其标成生产角色验收完成。
+
+## 本轮验证
+
+最终七模块受管回归 **124／124** 通过，841输入稳定、资源关闭、非自检拒绝0。真实PG／TLS结构与权限检查 **31项**、拥有者核心兼容 **58项**、旧许可操作员兼容 **9场景** 均通过。运行角色综合验收在前 **37项** 通过后遇到上述HNSW失败，后续业务和恢复消费仍待验。
+
+六个本轮隔离集群已停止，临时口令、TLS私钥及端口已核对。完整范围、SHA-256和原始红批见[运行角色阶段验收记录](assurance/evidence/postgres-runtime-role-2026-11-14.md)。本轮依据用户的push与交接请求交付阶段代码，完整运行角色验收继续由接手agent推进。
+
+## 接手顺序
+
+1. 核对 `main`、HEAD、工作区和实时远端，读取本文、原规格、运行角色阶段验收、[运行 schema 方案](POSTGRES-RUNTIME-SCHEMA.md)与[024 维护说明](POSTGRES-VEHICLE-MIGRATION.md)。复用已有证据，先取新失败的 SQLSTATE、调用入口和日志。
+2. 解决 HNSW 所有者维护与 schema 合同之间的依赖。先检查 `dense.py`、`embedding_api.py`、`embedding_models.py`、`postgres_schema.py`，明确索引的审批、创建、模型空间变更、参考构建和恢复方式。运行角色继续使用审查过的 DML 权限。
+3. 通过正式 `runtime-role` 入口跑完正常业务及恢复消费，补运行角色专项反例，包括缺列权限、额外 ACL、成员与 RLS、锁函数正文／配置篡改、未批准的 definer、执行 grant option、部分 GRANT 后检查回滚。
+4. 完善部署操作说明，验证实际终端、远端角色、对象／Parser 全资产恢复，再推进 IAM／RLS、吞吐及灾备指标。
+5. 凭据齐备时，先执行真实 OpenAI Responses 和 Embeddings 的 API、外发同意、Provider、引用恢复和 Web 语义验收。无凭据期间推进独立工程。
+6. 继续真实精确 SKU、人工 Golden、专业材料正式许可、更多来源与车型、自然长周期监控、实际 Native 宿主与设备、无障碍和其余发布 Gate。
+
+### 复跑入口
+
+使用 PowerShell 7，所有输出使用全新 Git 忽略槽。PostgreSQL 二进制由本机已准备目录提供，执行期间保持受测源码稳定。
+
+```text
+python -X utf8 -B scripts/run_api_worker_regression.py --phase run --output-root <fresh-private-slot> --targets apps/api/tests/test_external_fact_governance_cli.py apps/api/tests/test_schema_startup.py apps/api/tests/test_text_embeddings.py apps/api/tests/test_embeddings.py apps/worker/test_monitor.py
+pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgres-bin> -Port <unused-port> -Suite runtime-schema -CliTls
+pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgres-bin> -Port <unused-port> -Suite runtime-role
+pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgres-bin> -Port <unused-port> -Suite core
+```
+
+`runtime-role` 当前预期会暴露上述未解决的 HNSW 权限失败。标准 wrapper 使用项目既有 uv 工作流，本轮私有 wrapper 仅改仓库定位、使用已安装 Python，并保留完整正式验收入口和参数。
+
+## 证据与封存状态
+
+- KIT C2 UUID `9539e5d2-d28e-439e-a6c0-c2d4aea2bfc0` 继续封存，继承状态 `processing_unconfirmed`。后续不重 POST、不重开私槽、不换 UUID 抓取。
+- `stopped_unconfirmed` 表示停止后续采纳且网络结果未知，来源材料和抓取状态按已有记录解释。
+- `docs/HANDOFF.md` 自 `## 当前交接入口（2026-10-26）` 起保留封存历史尾文。本机原字节 SHA-256 为 `962242b7eeccb652b27f77f07c57ad6e615e23188729b64a46e17f86ab94e4ed`，Git LF blob 的 SHA-256 为 `55e7f298d159af75eefa0bb4230a9f1193b2938223e51cf2a41c1f9c79d43bab`。
+- 阶段回执中的 Mock、合成材料、ASGI TestClient 和真实 PG 范围分别保留。生产权限、真实模型、真实材料许可及设备验收按对应证据推进。
+
+## 可复制的接手指令
+
+> 接手胎迹完整 V1。先读 docs/AGENT-HANDOFF-2026-11-14.md、原始需求和 postgres-runtime-role 阶段验收，核对 main、HEAD、工作区及实时远端。当前已交付 PG 许可 CLI、治理操作员、源码绑定 verify 合同和旧车型 024 显式备份迁移恢复。本轮另交接 API／Worker 运行角色阶段策略，治理两表仅允许读取。完整运行角色仍在向量构建时因动态 HNSW DDL 缺少表拥有权而失败，同时需要解决索引变化与空参考合同的兼容性。先取原始日志，完成拥有者索引维护方案及正常 runtime-role 全流程，再补权限反例和部署验收。首个真实 AI 依用户选择使用 OpenAI Responses API。Gemini 是此前 agent 提前实现的可选适配器，已有合成验证，真实调用待验。缺 OpenAI／EPREL 凭据时继续独立工程。保留 KIT C2 和历史证据封存。12 模块、10 Gate、13 SLO、15 决策分别跟踪，完整 V1 持续进行。使用既有 main，遵循分支／worktree、代理及 PowerShell 7 规则，提交前审查，推送后独立核对远端 SHA 与工作区。

@@ -1,6 +1,6 @@
 # 胎迹 · 轮胎情报工作台
 
-当前接手入口为[简明 Agent 交接卡](docs/AGENT-HANDOFF-CURRENT.md)：汇总需求、进度、未完成项和接手顺序。最新接通 Safety Gate AI 共享类型／SDK／页面／报告消费，官方历史卡车轮胎材料的正常 HTTP、生产页面及三种报告导出已验证，详见[消费者验收记录](docs/assurance/evidence/safety-gate-ai-consumers-2026-11-13.md)。真实 OpenAI、实际 Native、正式 PG 外部 Reader 及完整 V1 继续待验。首个真实 AI 接口保持 OpenAI Responses API；Gemini 是历史可选适配器，不是用户改选。 最新已依据篡改反例加强 Safety Gate AI 的受理合同校验，详见[合同验收记录](docs/assurance/evidence/safety-gate-ai-guards-2026-11-13.md)。
+当前接手先读[2026-11-14 Agent 交接卡](docs/AGENT-HANDOFF-2026-11-14.md)，其中汇总12个核心模块、10项发布Gate、13项SLO、15项决策、进度与接手顺序。[当前入口](docs/AGENT-HANDOFF-CURRENT.md)保留历史交付记录。最新已交付PG许可CLI、治理操作员、源码绑定verify及旧车型024显式备份迁移恢复；本轮另交接API／Worker运行角色阶段策略，完整业务验收在动态HNSW索引入口被拥有权检查拒绝，后续先解决索引维护与schema合同衔接。真实OpenAI、实际Native和完整V1继续待验。首个真实AI接口按用户选择采用OpenAI Responses API，Gemini源于此前agent提前实现的可选适配器。
 
 Safety Gate持续回退授权已接通正常查询与Web：周报索引和指定周报分开授权，支持会话、来源和查询类型范围；保持在线优先、拒绝优先、逐次持久消费及读后重核，后台监控和AI不继承。最终六模块116项、SDK7项、Web55项、三端类型、414输入生产构建、PostgreSQL34项、正常HTTP26项和生产Web45项通过。关闭后29项核对保留185表全部旧行旧列及15份原件，6份测试策略已撤销，自有资源已关闭。真实外部来源与模型调用0。[持续授权验收](docs/assurance/evidence/safety-gate-fallback-2026-11-13.md)
 

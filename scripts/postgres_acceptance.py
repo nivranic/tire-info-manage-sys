@@ -5,8 +5,11 @@ Never prints connection credentials or accepts an arbitrary production DB URL.
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from unittest.mock import patch as runtime_patch
 from copy import deepcopy
 from datetime import timedelta
 import hashlib
@@ -31,7 +34,7 @@ from sqlalchemy import select, text
 from sqlalchemy.engine import URL
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'apps/api/tests'))
+sys.path[:0] = [str(ROOT / 'apps/api'), str(ROOT / 'apps/api/tests'), str(ROOT / 'scripts')]
 from admin_support import ADMIN_PASSWORD, register_admin
 from query_evidence_assertions import assert_frozen_query_evidence
 from test_core import FixtureRegistry, QUERY, VARIANT, grant, live, success
@@ -88,7 +91,8 @@ def database_fingerprint(database: Database) -> dict:
     return result
 
 
-def run():
+def run(*, runtime_role=False):
+    os.environ['TI_OBSERVABILITY_LOGS'] = '0'
     global STEP
     if sys.platform == 'win32':
         architecture = {'win-amd64': 'AMD64', 'win-arm64': 'ARM64', 'win32': 'x86'}.get(sysconfig.get_platform())
@@ -131,6 +135,65 @@ def run():
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(initialize, range(4)))
     record(STEP)
+
+    maintenance_url = url
+    runtime_name = 'tire_runtime_' + uuid4().hex[:12]
+    runtime_password = secrets.token_hex(32)
+    if runtime_role:
+        admin.execute(sql.SQL('CREATE ROLE {} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD {}').format(
+            sql.Identifier(runtime_name), sql.Literal(runtime_password)))
+
+    @contextmanager
+    def maintenance_config():
+        with runtime_patch.dict(os.environ):
+            for key in ('TI_DATABASE_SCHEMA_MODE', 'TI_DATABASE_SCHEMA_CONTRACT', 'TI_DATABASE_SCHEMA_SHA256'):
+                os.environ.pop(key, None)
+            yield
+
+    def activate_runtime(dbname, *, vector=False):
+        from sqlalchemy import create_engine
+        from tire_api.postgres_schema import build_reference
+        from tire_api.postgres_runtime_roles import runtime_role_sql, check_runtime_role
+        own_url = URL.create('postgresql+psycopg', username=role, password=app_password,
+                             host='127.0.0.1', port=port, database=dbname).render_as_string(hide_password=False)
+        if not runtime_role:
+            return own_url
+        with maintenance_config():
+            owned = Database(own_url)
+            try:
+                owned.initialize()
+                reference_name = 'runtime_ref_' + uuid4().hex[:12]
+                reference_url = new_database(reference_name)
+                if vector:
+                    with psycopg.connect(host='127.0.0.1', port=port, user='tire_verify_admin', password=password,
+                                         dbname=reference_name) as extension_admin:
+                        extension_admin.execute('CREATE EXTENSION vector')
+                reference_engine = create_engine(reference_url)
+                contract_path = expected_data.parent / ('runtime-schema-' + uuid4().hex + '.json')
+                try:
+                    contract = build_reference(reference_engine, contract_path)
+                finally:
+                    reference_engine.dispose()
+                with owned.engine.connect().execution_options(isolation_level='AUTOCOMMIT') as connection:
+                    connection.exec_driver_sql('REVOKE CREATE,TEMPORARY ON DATABASE "' + dbname + '" FROM PUBLIC')
+                    connection.exec_driver_sql('REVOKE CREATE ON SCHEMA public FROM PUBLIC')
+                    connection.exec_driver_sql(runtime_role_sql(runtime_name, dbname))
+            finally:
+                owned.close()
+        runtime_url = URL.create('postgresql+psycopg', username=runtime_name, password=runtime_password,
+                                 host='127.0.0.1', port=port, database=dbname).render_as_string(hide_password=False)
+        checked = create_engine(runtime_url)
+        try:
+            assert check_runtime_role(checked)['ok']
+        finally:
+            checked.dispose()
+        os.environ.update(TI_DATABASE_SCHEMA_MODE='verify', TI_DATABASE_SCHEMA_CONTRACT=str(contract_path),
+                          TI_DATABASE_SCHEMA_SHA256=contract['sha256'])
+        return runtime_url
+
+    url = activate_runtime(name)
+    if runtime_role:
+        record('reviewed_nonowner_runtime_profile_active')
 
     STEP = 'api_evidence_curation_and_fallback'
     registry = FixtureRegistry()
@@ -293,42 +356,43 @@ def run():
         assert detail['body'] == rejected_body and detail['query_state'] == 'pending'
         record(STEP)
 
-    STEP = 'legacy_migration_preserves_existing_data'
-    with TestClient(create_app(url, registry)) as legacy_client:
-        legacy_rule = assert_status(legacy_client.post('/v1/alert-rules', json={
-            'name': '合成旧版无技术条件规则', 'source_id': 'fixture',
-            'query': {'model': 'Fixture Tire'}, 'enabled': False}), 201)
-    database = Database(url)
-    with database.engine.begin() as connection:
-        connection.exec_driver_sql('ALTER TABLE verifications DROP COLUMN etag, DROP COLUMN last_modified')
-        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '001_verification_validators'")
-        connection.exec_driver_sql('ALTER TABLE alert_rule_revisions DROP COLUMN conditions')
-        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '002_monitor_rule_conditions'")
-        for table in ('snapshots', 'verifications', 'raw_captures', 'rejected_observations',
-                      'source_quarantines', 'vehicle_snapshots', 'vehicle_verifications', 'vehicle_quarantines'):
-            connection.exec_driver_sql(f'ALTER TABLE {table} DROP COLUMN parser_identity')
-        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '003_parser_release_provenance'")
-        connection.exec_driver_sql('ALTER TABLE query_runs DROP COLUMN selection_filters')
-        connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '004_query_selection_filters'")
-    database.close()
-    migrated = create_app(url, registry)
-    with TestClient(migrated, cookies=cookies) as client:
-        restored_evidence = assert_status(client.get(f'/v1/evidence/{snapshot_id}'))
-        assert restored_evidence['body'] == evidence['body'] and restored_evidence['raw_hash'] == evidence['raw_hash']
-        assert len(client.get('/v1/watchlists').json()['items']) == 1
-        review = client.get(f'/v1/tire-variants/{vid}/fact-review', params={'source_id': 'fixture', 'mode': 'history'}).json()
-        assert review['revision'] == 1 and review['effective_facts']['utqg_treadwear'] == 420
-        with migrated.state.database.engine.connect() as connection:
-            assert connection.execute(text('SELECT count(*) FROM verifications WHERE etag IS NOT NULL')).scalar() == 0
-            assert connection.execute(text('SELECT count(*) FROM verifications WHERE parser_identity IS NOT NULL')).scalar() == 0
-            assert connection.execute(text('SELECT count(*) FROM query_runs WHERE selection_filters IS NOT NULL')).scalar() == 0
-            assert connection.execute(text('SELECT conditions FROM alert_rule_revisions WHERE rule_id=:id'),
-                                      {'id': legacy_rule['id']}).scalar() is None
-        migrated_rule = assert_status(client.get('/v1/alert-rules/' + legacy_rule['id'] + '?mode=history'))
-        assert migrated_rule['conditions'] == {} and migrated_rule['name'] == legacy_rule['name']
-        assert not migrated_rule['enabled'] and migrated_rule['history'][0]['conditions'] == {}
-        migrated.state.database.initialize()
-    record(STEP)
+    with maintenance_config():
+        STEP = 'legacy_migration_preserves_existing_data'
+        with TestClient(create_app(maintenance_url, registry)) as legacy_client:
+            legacy_rule = assert_status(legacy_client.post('/v1/alert-rules', json={
+                'name': '合成旧版无技术条件规则', 'source_id': 'fixture',
+                'query': {'model': 'Fixture Tire'}, 'enabled': False}), 201)
+        database = Database(maintenance_url)
+        with database.engine.begin() as connection:
+            connection.exec_driver_sql('ALTER TABLE verifications DROP COLUMN etag, DROP COLUMN last_modified')
+            connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '001_verification_validators'")
+            connection.exec_driver_sql('ALTER TABLE alert_rule_revisions DROP COLUMN conditions')
+            connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '002_monitor_rule_conditions'")
+            for table in ('snapshots', 'verifications', 'raw_captures', 'rejected_observations',
+                          'source_quarantines', 'vehicle_snapshots', 'vehicle_verifications', 'vehicle_quarantines'):
+                connection.exec_driver_sql(f'ALTER TABLE {table} DROP COLUMN parser_identity')
+            connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '003_parser_release_provenance'")
+            connection.exec_driver_sql('ALTER TABLE query_runs DROP COLUMN selection_filters')
+            connection.exec_driver_sql("DELETE FROM tire_schema_versions WHERE version = '004_query_selection_filters'")
+        database.close()
+        migrated = create_app(maintenance_url, registry)
+        with TestClient(migrated, cookies=cookies) as client:
+            restored_evidence = assert_status(client.get(f'/v1/evidence/{snapshot_id}'))
+            assert restored_evidence['body'] == evidence['body'] and restored_evidence['raw_hash'] == evidence['raw_hash']
+            assert len(client.get('/v1/watchlists').json()['items']) == 1
+            review = client.get(f'/v1/tire-variants/{vid}/fact-review', params={'source_id': 'fixture', 'mode': 'history'}).json()
+            assert review['revision'] == 1 and review['effective_facts']['utqg_treadwear'] == 420
+            with migrated.state.database.engine.connect() as connection:
+                assert connection.execute(text('SELECT count(*) FROM verifications WHERE etag IS NOT NULL')).scalar() == 0
+                assert connection.execute(text('SELECT count(*) FROM verifications WHERE parser_identity IS NOT NULL')).scalar() == 0
+                assert connection.execute(text('SELECT count(*) FROM query_runs WHERE selection_filters IS NOT NULL')).scalar() == 0
+                assert connection.execute(text('SELECT conditions FROM alert_rule_revisions WHERE rule_id=:id'),
+                                          {'id': legacy_rule['id']}).scalar() is None
+            migrated_rule = assert_status(client.get('/v1/alert-rules/' + legacy_rule['id'] + '?mode=history'))
+            assert migrated_rule['conditions'] == {} and migrated_rule['name'] == legacy_rule['name']
+            assert not migrated_rule['enabled'] and migrated_rule['history'][0]['conditions'] == {}
+            migrated.state.database.initialize()
+        record(STEP)
 
     STEP = 'api_worker_concurrent_ingestion'
     database = Database(url)
@@ -544,7 +608,7 @@ def run():
 
     STEP = 'recent_page_quality_material_stop_and_url_history'
     from recent_history_acceptance import assert_recent_history_checkpoint, verify_recent_history_persistence
-    recent_history_checkpoint = verify_recent_history_persistence(url, authenticate=login_admin)
+    recent_history_checkpoint = verify_recent_history_persistence(url, authenticate=login_admin, mutation_sqlstate='42501' if runtime_role else 'P0001')
     record(STEP)
 
     STEP = 'historical_reparse_review_and_restart'
@@ -594,6 +658,7 @@ def run():
         with psycopg.connect(host='127.0.0.1', port=port, user='tire_verify_admin', password=password,
                              dbname=name) as extension_admin:
             extension_admin.execute('CREATE EXTENSION IF NOT EXISTS vector')
+        url = activate_runtime(name, vector=True)
         from test_text_embeddings import verify_text_embedding_persistence
         text_checks = verify_text_embedding_persistence(url, authenticate=login_admin)
         text_embedding_checkpoint = text_checks.pop('checkpoint')
@@ -660,6 +725,7 @@ def run():
         assert completed.returncode == 0, 'PostgreSQL restore command failed'
     if text_embedding_checkpoint is not None:
         record('restored_extension_metadata_and_non_superuser_application_objects')
+    restored_url = activate_runtime(restore_name, vector=text_embedding_checkpoint is not None)
     restored = Database(restored_url)
     restored.initialize()
     STEP = 'restored_database_fingerprint'
@@ -753,7 +819,7 @@ def run():
     REPORT['status'] = 'passed'
 
 
-def run_observed():
+def run_observed(*, runtime_role=False):
     """Retain fixed Parser failure receipts even if a fixture returns unavailable.
 
     No bodies, stderr, environment or arbitrary exception strings are recorded.
@@ -780,15 +846,19 @@ def run_observed():
 
     try:
         with patch.object(parser_runtime, '_run_sync', observe):
-            run()
+            run(runtime_role=runtime_role)
     finally:
         REPORT['parser_failure_receipts'] = failures
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--runtime-role', action='store_true')
+    options = parser.parse_args()
+    REPORT['runtime_role'] = options.runtime_role
     status = 0
     try:
-        run_observed()
+        run_observed(runtime_role=options.runtime_role)
     except Exception as error:
         status = 1
         REPORT.update(status='failed', failure_step=STEP, error_type=type(error).__name__,

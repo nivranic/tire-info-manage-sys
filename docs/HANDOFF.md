@@ -1,3 +1,7 @@
+## PostgreSQL 运行角色阶段交接（2026-11-14）
+
+先读[2026-11-14 Agent 交接卡](AGENT-HANDOFF-2026-11-14.md)和[阶段验收](assurance/evidence/postgres-runtime-role-2026-11-14.md)。本轮交接固定166张模型表的运行DML策略、两个固定SHARE锁函数和正式runtime-role复现入口。治理两表仅允许读取，31项真实PG／TLS结构与权限检查通过，完整业务在前37项之后遇到动态HNSW索引所有权失败，后续先完成索引维护与schema合同衔接。首个真实AI采用OpenAI Responses API。完整V1持续进行，以下保留历史交付时点。
+
 ## 最新 PostgreSQL 车型 024 维护交付（2026-11-14）
 
 先读[当前 Agent 接手卡](AGENT-HANDOFF-CURRENT.md)。历史 015 代码产生的合成车型证据已通过显式 CLI 快照备份、四表 ALTER、当前升级及 verify API 读取，独立恢复保留原库。17 项 PG 维护及 30 项运行合同检查通过，失败回执均保留。@3 规范化已核对文本枚举的恢复表达，部署需重建并批准合同。操作见[PG 车型维护说明](POSTGRES-VEHICLE-MIGRATION.md)，证据见[024 验收](assurance/evidence/postgres-vehicle-024-2026-11-14.md)。下一步推进完整业务 DML 最小权限、实际终端／远端和全资产恢复，完整 V1 持续进行。下文保留各历史交付时点。

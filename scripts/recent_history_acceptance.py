@@ -237,7 +237,7 @@ def reject_statement(database, statement, values, sqlstate):
             transaction.rollback()
 
 
-def native_history_guards(database, page, quality, material):
+def native_history_guards(database, page, quality, material, *, mutation_sqlstate='P0001'):
     assert database.engine.url.get_backend_name() == 'postgresql'
     assert database.engine.url.host == '127.0.0.1'
     assert database.engine.url.database.startswith(('tire_verify_', 'tire_restore_'))
@@ -250,9 +250,9 @@ def native_history_guards(database, page, quality, material):
         table = model.__table__
         key = next(iter(table.primary_key)).name
         values = {'identity': identity, 'fingerprint': 'f' * 64}
-        reject_statement(database, text(f'UPDATE {table.name} SET fingerprint=:fingerprint WHERE {key}=:identity'), values, 'P0001')
-        reject_statement(database, text(f'DELETE FROM {table.name} WHERE {key}=:identity'), values, 'P0001')
-        reject_statement(database, text(f'TRUNCATE TABLE {table.name} CASCADE'), {}, 'P0001')
+        reject_statement(database, text(f'UPDATE {table.name} SET fingerprint=:fingerprint WHERE {key}=:identity'), values, mutation_sqlstate)
+        reject_statement(database, text(f'DELETE FROM {table.name} WHERE {key}=:identity'), values, mutation_sqlstate)
+        reject_statement(database, text(f'TRUNCATE TABLE {table.name} CASCADE'), {}, mutation_sqlstate)
         with database.engine.connect() as connection:
             row = dict(connection.execute(select(table).where(table.c[key] == identity)).mappings().one())
         if key == 'id':
@@ -286,10 +286,11 @@ def assert_recent_history_checkpoint(url, checkpoint):
         assert accepted(client.post('/v1/source-materials/captures', json=material['payload']), 201) == {
             **material['value'], 'replayed': True}
         assert not registry.calls
-        native_history_guards(app.state.database, checkpoint['page'], quality, material)
+        native_history_guards(app.state.database, checkpoint['page'], quality, material,
+                              mutation_sqlstate=checkpoint.get('mutation_sqlstate', 'P0001'))
 
 
-def verify_recent_history_persistence(url, *, authenticate):
+def verify_recent_history_persistence(url, *, authenticate, mutation_sqlstate='P0001'):
     target = make_url(url)
     assert target.get_backend_name() == 'postgresql' and target.host == '127.0.0.1'
     assert target.database.startswith('tire_verify_')
@@ -309,6 +310,7 @@ def verify_recent_history_persistence(url, *, authenticate):
         page = page_and_url_history(client, registry, app.state.database, variant)
         quality = quality_history(client, registry, app.state.database, opted, legacy, page['baseline'])
         material = stopped_material(client, app, url)
-        checkpoint = {'cookies': dict(client.cookies), 'page': page, 'quality': quality, 'material': material}
+        checkpoint = {'cookies': dict(client.cookies), 'page': page, 'quality': quality, 'material': material,
+                      'mutation_sqlstate': mutation_sqlstate}
     assert_recent_history_checkpoint(url, checkpoint)
     return checkpoint

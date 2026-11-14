@@ -17,6 +17,21 @@ READER_TABLES = (
     'variant_lifecycle_events', 'verifications',
 )
 OWNER_TABLES = ('local_sessions', 'users')
+LOCK_ROUTINES = {
+    'tire_lock_external_owner': 'BEGIN LOCK TABLE ' + ', '.join('public.' + name for name in OWNER_TABLES) + ' IN SHARE MODE; END',
+    'tire_lock_external_reader': 'BEGIN LOCK TABLE ' + ', '.join('public.' + name for name in READER_TABLES) + ' IN SHARE MODE; END',
+}
+
+
+def initialize_postgres_locks(connection):
+    """Migration-owner installation of fixed lock operations for runtime roles."""
+    if connection.dialect.name != 'postgresql':
+        return
+    for name, body in LOCK_ROUTINES.items():
+        connection.exec_driver_sql(f'CREATE OR REPLACE FUNCTION public.{name}() RETURNS void '
+            'LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog '
+            f'AS $tire_read_lock${body}$tire_read_lock$')
+        connection.exec_driver_sql(f'REVOKE ALL ON FUNCTION public.{name}() FROM PUBLIC')
 
 
 def postgres_boundary(connection, *, owner_write=False):
@@ -31,8 +46,8 @@ def postgres_boundary(connection, *, owner_write=False):
     connection.exec_driver_sql("SET LOCAL statement_timeout = '5000ms'")
     connection.exec_driver_sql("SET LOCAL idle_in_transaction_session_timeout = '15000ms'")
     connection.exec_driver_sql('SELECT pg_advisory_xact_lock(821741905)')
-    tables = OWNER_TABLES if owner_write else READER_TABLES
-    connection.exec_driver_sql('LOCK TABLE ' + ', '.join(tables) + ' IN SHARE MODE')
+    name = 'tire_lock_external_owner' if owner_write else 'tire_lock_external_reader'
+    connection.exec_driver_sql(f'SELECT public.{name}()')
 
 
 def storage_bytes(db, column):

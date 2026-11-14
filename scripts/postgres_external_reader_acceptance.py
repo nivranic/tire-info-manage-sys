@@ -933,9 +933,11 @@ def run():
 
         class RealCase(OwnedFactReaderTests):
             def make_engine(self):
+                from tire_api.external_fact_sql import initialize_postgres_locks
                 engine = create_engine(new_url())
-                with engine.connect() as connection:
+                with engine.begin() as connection:
                     assert connection.exec_driver_sql('SHOW is_superuser').scalar() == 'off'
+                    initialize_postgres_locks(connection)
                 return engine
 
         def fixture(call):

@@ -511,6 +511,7 @@ def apply_schema(connection) -> None:
     from .source_text_models import initialize_source_text_search
     from .document_text_models import initialize_document_text_search
     from .vehicle_binary_migration import preflight
+    from .external_fact_sql import initialize_postgres_locks
     preflight(connection)
     Base.metadata.create_all(connection)
     upgrade(connection)
@@ -518,6 +519,7 @@ def apply_schema(connection) -> None:
     initialize_vectors(connection)
     initialize_source_text_search(connection)
     initialize_document_text_search(connection)
+    initialize_postgres_locks(connection)
 
 
 class Database:
