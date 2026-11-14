@@ -118,7 +118,7 @@ def test_pdf_capability_requires_the_complete_reviewed_catalog(installation, his
         manifest = bundles.snapshot_manifest(installation, catalog, runtime.PROTOCOL, runtime.limits())
     else:
         manifest = runtime._deployed_manifest()
-    expected = bundles._DOCUMENT_SOURCES if historical else bundles._SAFETY_GATE_SOURCES
+    expected = bundles._DOCUMENT_SOURCES if historical else bundles._YOKOHAMA_SOURCES
     assert set(manifest['parsers']) == set(expected)
     for missing in ('workspace-pdf-text', 'document_pdf.py'):
         changed = deepcopy(manifest)

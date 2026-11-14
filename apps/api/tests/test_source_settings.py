@@ -30,7 +30,12 @@ def test_complete_catalog_is_read_only_and_does_not_promote_pending_source(setup
     response = client.get('/v1/source-settings')
     assert response.status_code == 200
     items = {row['source_id']: row for row in response.json()['items']}
-    assert len(items) == 11
+    assert set(items) == {
+        'michelin-us', 'michelin-cn', 'michelin-uk', 'michelin-fr', 'michelin-de',
+        'toyo-us', 'hankook-us', 'pirelli-us', 'bridgestone-jp', 'continental-cn',
+        'goodyear-sg', 'yokohama-eu', 'eprel', 'xiaomi-cn-vehicles',
+        'nhtsa-us-recalls', 'eu-safety-gate',
+    }
     assert items['xiaomi-cn-vehicles']['target_kind'] == 'vehicle'
     assert items['nhtsa-us-recalls']['target_kind'] == 'recall'
     assert items['eprel']['registered_status'] == 'configuration_required'

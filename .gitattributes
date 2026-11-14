@@ -84,6 +84,8 @@
 /apps/api/tests/test_continental.py text eol=lf
 /apps/api/tire_api/adapters/goodyear.py text eol=lf
 /apps/api/tests/test_goodyear.py text eol=lf
+/apps/api/tire_api/adapters/yokohama.py text eol=lf
+/apps/api/tests/test_yokohama.py text eol=lf
 /apps/api/tire_api/adapters/safety_gate.py text eol=lf
 /apps/api/tire_api/safety_gate.py text eol=lf
 /apps/api/tests/test_safety_gate.py text eol=lf

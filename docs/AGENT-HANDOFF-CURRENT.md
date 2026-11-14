@@ -2,12 +2,12 @@
 
 更新于 2026-11-14。完整 V1 持续进行。本轮接手先读[2026-11-14 交接卡](AGENT-HANDOFF-2026-11-14.md)，其中汇总需求、进度、运行角色阶段代码、未解决失败和接手顺序。历史实现与验收详见[阶段总表](AGENT-HANDOFF-2026-11-13.md)，需求以[原始规格](requirements/2026-09-26-tire-intelligence-original.md)为准。
 
-本次交付以已发布 `13c4c0e` 为基线，补齐原页面短时中断自动恢复。PG进程12项、Web单元59项通过，843公共输入及422构建输入匹配。断线至自动终态7.107秒，手动读取与新增分析POST均为0，预算保留47,444 tokens，重启合成Provider调用0次。14个服务记录、18个进程ID、8个端口及临时秘密已核对，隔离浏览器已关闭。接手先复用本次与此前Web／Webhook证据，再推进下文待验项。[短时自动恢复记录](assurance/evidence/web-ai-short-outage-2026-11-14.md)
+本轮以已发布 `0e67752` 为基线接入横滨欧洲ADVAN Sport V107，当前12个轮胎区域目录、8个厂商品牌、16项Parser。正常ASGI验收13项及实际HTTP／非拥有者PG／TLS进程12项通过，在线查询取得live与live_verified_304，原件、快照、版本与部署修订保持可核对。EPREL链接来自厂商页面，监管绑定仍待验。新API源码摘要为 `b14a29364b6b86fb29170d7ffa2245f4ee49b0d2d4f586bfc795835a490b8de3`，部署须重建并批准匹配@4合同。相关检查分批323项通过、5项可选夹具跳过，最后护栏参数专项34项通过。12个服务记录、15个进程ID、7个端口及临时秘密已核对，详见[横滨来源验收](assurance/evidence/yokohama-eu-source-2026-11-14.md)。
 
 ## 先看结论
 
 - 原规格按 **12 个核心模块、10 项发布 Gate、13 项 SLO、15 项待确认决策**组织；这些是不同维度，不能相加当作独立需求总数。12 个模块均有工程实现，完整发布验收仍未闭合，不能给出可靠的整体完成百分比。
-- 已有在线查询、精确身份与冲突、比较、测试事件、证据保存、监控、账户与偏好、AI 证据链及外部权限工程。当前参数来源覆盖 11 个区域目录、7 个厂商品牌，另有 NHTSA、EU Safety Gate 与小米车型来源；可信 Parser 目录 15 项。
+- 已有在线查询、精确身份与冲突、比较、测试事件、证据保存、监控、账户与偏好、AI 证据链及外部权限工程。当前参数来源覆盖 12 个区域目录、8 个厂商品牌，另有 NHTSA、EU Safety Gate 与小米车型来源；可信 Parser 目录 16 项。
 - 最近已交付 Safety Gate 周报证据、逐告警版本／变化历史、监控调度／应用内提醒／任务 SSE、独立的索引与周报持续回退权限。
 - 已接通 **Safety Gate 外部受许可读取与 AI 共享类型／SDK／页面／报告消费**，历史卡车轮胎告警与合成 Provider 流程已验。最新增加 **PostgreSQL 轮胎单事实／分页、Safety Gate 分页与冻结归属写入**；真实模型及 Native 宿主／设备继续待验。
 - 已补齐 Parser 逐文件期限检查及 Windows 本地规范归档长路径处理；对应阶段 105 项相关回归、58 项 PG 核心综合验收（含备份恢复）全部通过。历史间歇超时根因和生产 SLO 仍未确认。
@@ -259,4 +259,4 @@
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格和docs/assurance/evidence/web-ai-short-outage-2026-11-14.md，核对main、HEAD、工作区与实时远端。本次以13c4c0e为基线，PG进程12项、Web单元59项通过，843公共输入及422构建输入匹配。实际生产Web短时中断后自动读回同一持久终态，手动读取与恢复期间新增分析POST均为0，预算保留47,444 tokens，重启合成Provider调用0次。14个服务记录、18个进程ID、8个端口及临时秘密已核对。复用此前长停机手动／刷新恢复、本机Webhook HTTPS／自然30秒租约／60秒退避、权限反例和PG独立恢复证据。首个真实AI依用户选择采用OpenAI Responses，Gemini由此前agent提前实现为可选适配器。真实模型网络与语义仍待验，缺凭据时推进独立工程。接续公网Webhook及生产SLO、其他停机配置、Linux／服务管理器／远端部署、长期真实变化、ParserRunError错误码和Windows间歇延迟、精确SKU／人工Golden／专业许可／Native／无障碍。12模块、10Gate、13SLO、15决策分别跟踪。保留KIT C2与历史封存，沿main和PowerShell7工作，分支／worktree及代理遵循既有授权边界。每次发布后核对实时远端SHA与工作区。
+> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格与docs/assurance/evidence/yokohama-eu-source-2026-11-14.md，核对main、HEAD、工作区和实时远端。本轮以0e67752为基线新增横滨欧洲ADVAN Sport V107固定来源，当前12个轮胎区域目录、8品牌、16项Parser。原页114条规格及厂商EPREL链接，XL/RF与OE Info保留原文，产品代码未知、身份source_scoped，监管绑定待验。实际canary、ASGI13项、非拥有者PG/TLS与HTTP进程12项通过，live及304保持原快照和版本。相关328项分批323通过／5跳过，最后护栏参数专项34项通过，845输入稳定，12个服务记录、15个进程ID、7个端口及临时秘密已核对。新API源码需要重新生成并批准匹配@4合同。首个真实AI仍依用户选择采用OpenAI Responses，缺凭据时推进独立工程。复用Web长停机手动／刷新与短停机自动恢复、本机Webhook HTTPS／自然租约／退避及PG独立恢复证据，接续其他P0来源、精确SKU和监管绑定、人工Golden、专业许可、真实模型、长期监控、公网Webhook、Native／无障碍、Linux／服务管理器／生产部署与SLO。ParserRunError具体错误码和Windows间歇延迟仍待取证。12模块、10Gate、13SLO、15决策分别跟踪，保留KIT C2和历史封存。沿main和PowerShell7工作，分支／worktree及代理遵循既有授权边界，发布后核对实时远端SHA与工作区。

@@ -134,10 +134,7 @@ class QueryService:
     async def execute(self, source_id: str, request: LiveQueryRequest, session_id: str, *,
                       audience: str = 'internal', owner_actor=None) -> dict[str, Any]:
         from .telemetry import observe
-        source = source_id if source_id in {
-            'michelin-us', 'michelin-cn', 'michelin-uk', 'michelin-fr', 'michelin-de',
-            'toyo-us', 'hankook-us', 'pirelli-us'} else 'unknown'
-        with observe('source.query', component='crawler', source=source) as operation:
+        with observe('source.query', component='crawler', source=source_id) as operation:
             result = await self._execute(source_id, request, session_id, audience=audience, owner_actor=owner_actor)
             operation.finish(result['data_state'])
             return result

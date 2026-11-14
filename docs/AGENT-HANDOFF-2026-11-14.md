@@ -1,10 +1,10 @@
 # 胎迹 Agent 交接卡
 
-更新于2026-11-14。完整V1持续进行。本文交接需求全貌、已交付能力及PostgreSQL／Parser最新证据，补充真实Web停机自动恢复、Webhook HTTPS取消与自然租约验收。
+更新于2026-11-14。完整V1持续进行。本文交接需求全貌、已交付能力及PostgreSQL／Parser最新证据，补充横滨欧洲官方规格来源、真实Web停机自动恢复、Webhook HTTPS取消与自然租约验收。
 
 ## 接手基线
 
-- 既有分支为 `main`，活动HTTP／AI流验收已在 `f42e587` 发布，Provider及Parser诊断复核已在 `4a54531` 发布，真实Web恢复记录已在 `285a5f1` 发布，Webhook HTTPS验收已在 `13c4c0e` 发布。本轮短时自动恢复以 `13c4c0e` 为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
+- 既有分支为 `main`，活动HTTP／AI流验收已在 `f42e587` 发布，Provider及Parser诊断复核已在 `4a54531` 发布，真实Web恢复记录已在 `285a5f1` 发布，Webhook HTTPS验收已在 `13c4c0e` 发布。短时自动恢复已在 `0e67752` 发布，本轮横滨来源接入以 `0e67752` 为基线。最终交付提交通过 `git log -1` 核对，实时远端通过GitHub核对。
 - 用户已授权持续实施、复核优化、总结、提交、push 全部改动和编写交接文档。沿既有分支工作，新分支、worktree 及代理操作须另有明确授权。
 - [原始需求](requirements/2026-09-26-tire-intelligence-original.md)保持原字节。[当前入口](AGENT-HANDOFF-CURRENT.md)与[此前阶段总表](AGENT-HANDOFF-2026-11-13.md)保留历史验收范围。
 - `.artifacts/`、`data/`、原件、私库、凭据、依赖及构建产物留在 Git 忽略范围。新 clone 需要重建依赖、材料和隔离验收环境。
@@ -156,6 +156,14 @@
 
 预算保留47,444 tokens且pending=false，answer／usage为空，terminal=true、projection_only=false。PG进程12项和Web单元59项通过，843公共输入、422构建输入匹配。14个服务记录、18个进程ID、8个端口及临时秘密已核对，独立浏览器context已关闭。模型端采用合成Responses，真实OpenAI网络、其他停机配置和设备继续待验。[短时自动恢复记录](assurance/evidence/web-ai-short-outage-2026-11-14.md)
 
+### 横滨欧洲官方规格来源
+
+以已发布 `0e67752` 为基线，新增yokohama-eu固定ADVAN Sport V107来源。原页6张表、114条规格，显式HL3条，逐行保留厂商EPREL链接及标签声明，XL/RF与OE Info保留原文。独立XL、防爆及OE标记为null，产品代码未知，身份采用source_scoped。当前12个轮胎区域目录、8个厂商品牌及16项Parser。
+
+在线canary和重复读取通过。正常ASGI13项、实际HTTP／非拥有者PG／TLS进程12项通过，live及live_verified_304保持同一快照、版本与原始观察时间，证据重开、哈希和真实Parser回收通过。查询遥测复用现有固定来源校验。相关检查分批323项通过、5项可选夹具跳过，最后护栏参数专项34项通过。12个服务记录、15个进程ID、7个端口及临时秘密已核对。原目录断言、夹具和护栏参数失败均保留，详见[横滨来源验收](assurance/evidence/yokohama-eu-source-2026-11-14.md)。
+
+新API源码SHA-256为 `b14a29364b6b86fb29170d7ffa2245f4ee49b0d2d4f586bfc795835a490b8de3`，本批批准空参考@4合同SHA-256为 `ac5f25e56f7a12af4e4c09cefa4dc37b5edc38c3042c9448c8b464ff8c8bca1a`。部署需要重新生成并批准匹配源码的合同。EPREL监管核验、长期来源稳定性、开放再分发许可及人工Golden继续待验。
+
 ## 运行角色阶段验证
 
 此前运行角色阶段七模块受管回归124／124通过，841输入稳定、资源关闭、非自检拒绝0。真实PG／TLS结构与权限检查31项、拥有者核心兼容58项、旧许可操作员兼容9场景均通过。该阶段运行角色综合验收前37项后遇到HNSW失败，后续由上述显式维护处理。
@@ -193,4 +201,4 @@ pwsh -NoProfile -File scripts/verify-postgres.ps1 -PostgresBin <existing-postgre
 
 ## 可复制的接手指令
 
-> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格和docs/assurance/evidence/web-ai-short-outage-2026-11-14.md，核对main、HEAD、工作区与实时远端。本次以13c4c0e为基线，PG进程12项、Web单元59项通过，843公共输入及422构建输入匹配。实际生产Web短时中断后自动读回同一持久终态，手动读取与恢复期间新增分析POST均为0，预算保留47,444 tokens，重启合成Provider调用0次。14个服务记录、18个进程ID、8个端口及临时秘密已核对。复用此前长停机手动／刷新恢复、本机Webhook HTTPS／自然30秒租约／60秒退避、权限反例和PG独立恢复证据。首个真实AI依用户选择采用OpenAI Responses，Gemini由此前agent提前实现为可选适配器。真实模型网络与语义仍待验，缺凭据时推进独立工程。接续公网Webhook及生产SLO、其他停机配置、Linux／服务管理器／远端部署、长期真实变化、ParserRunError错误码和Windows间歇延迟、精确SKU／人工Golden／专业许可／Native／无障碍。12模块、10Gate、13SLO、15决策分别跟踪。保留KIT C2与历史封存，沿main和PowerShell7工作，分支／worktree及代理遵循既有授权边界。每次发布后核对实时远端SHA与工作区。
+> 继续实施胎迹完整V1。先读docs/AGENT-HANDOFF-2026-11-14.md、原规格与docs/assurance/evidence/yokohama-eu-source-2026-11-14.md，核对main、HEAD、工作区和实时远端。本轮以0e67752为基线新增横滨欧洲ADVAN Sport V107固定来源，当前12个轮胎区域目录、8品牌、16项Parser。原页114条规格及厂商EPREL链接，XL/RF与OE Info保留原文，产品代码未知、身份source_scoped，监管绑定待验。实际canary、ASGI13项、非拥有者PG/TLS与HTTP进程12项通过，live及304保持原快照和版本。相关328项分批323通过／5跳过，最后护栏参数专项34项通过，845输入稳定，12个服务记录、15个进程ID、7个端口及临时秘密已核对。新API源码需要重新生成并批准匹配@4合同。首个真实AI仍依用户选择采用OpenAI Responses，缺凭据时推进独立工程。复用Web长停机手动／刷新与短停机自动恢复、本机Webhook HTTPS／自然租约／退避及PG独立恢复证据，接续其他P0来源、精确SKU和监管绑定、人工Golden、专业许可、真实模型、长期监控、公网Webhook、Native／无障碍、Linux／服务管理器／生产部署与SLO。ParserRunError具体错误码和Windows间歇延迟仍待取证。12模块、10Gate、13SLO、15决策分别跟踪，保留KIT C2和历史封存。沿main和PowerShell7工作，分支／worktree及代理遵循既有授权边界，发布后核对实时远端SHA与工作区。

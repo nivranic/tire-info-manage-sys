@@ -141,7 +141,7 @@ def test_old_fourteen_entry_package_remains_executable(tmp_path, monkeypatch):
     from tire_api import parser_bundles
     installed = trusted_copy(tmp_path, monkeypatch)
     pre_safety_gate_install(installed)
-    catalog = {key: value for key, value in parser_runtime.source_catalog().items() if key != source.SOURCE_ID}
+    catalog = {key: value for key, value in parser_runtime.source_catalog().items() if key in parser_bundles._GOODYEAR_SOURCES}
     with monkeypatch.context() as patch:
         patch.setattr(parser_runtime, 'source_catalog', lambda: catalog)
         manifest = parser_bundles.seal_deployed_bundle()
