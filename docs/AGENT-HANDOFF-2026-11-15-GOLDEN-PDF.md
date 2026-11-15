@@ -138,7 +138,8 @@ apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.p
 2. 前阶段首批PDF失败及浏览器409根因已确认（环境性解析器墙钟超时），后续按串行运行纪律执行；如有新失败先取原始回执。
 3. Android instrumentation已完成构建修复与模拟器（Android 14）175项执行全过，offlineQa为必要变体；vivo真机待用户批准USB安装后重跑。见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。
 4. 真实Dunlop精确SKU身份案例已落地：绑定与live回执raw_hash一致的规范原件，两条真实SKU（543000/544985）经生产解析器全量核对，同尺寸错合并陷阱冻结。agent转录未复核，真人Golden继续待外部复核。见[真实SKU验收](assurance/evidence/professional-tire-identity-2026-11-15.md)。
-5. 完成真机instrumentation、Native宿主和跨设备E2E，再按实际条件推进Responses／Embeddings、EPREL、自然长周期监控、WCAG、生产恢复和SLO。
+5. Native桌面宿主真实E2E已通过：Rust基线192项，真实Tauri宿主经应用内UI完成双账户注册、会话重置、离线包保存与旧归属锁定/解锁九项检查；同账户在Web生产构建消费桌面创建的车库数据（跨设备桌面→Web）。见[Native宿主验收](assurance/evidence/native-desktop-host-e2e-2026-11-15.md)。
+6. 完成vivo真机instrumentation（待用户批准USB安装）、iOS/macOS/Linux矩阵与移动端跨设备，再按实际条件推进Responses／Embeddings、EPREL、自然长周期监控、WCAG、生产恢复和SLO。
 
 ## 可复制接手提示词
 
