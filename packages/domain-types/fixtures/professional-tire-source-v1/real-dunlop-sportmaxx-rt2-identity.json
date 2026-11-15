@@ -1,0 +1,78 @@
+{
+ "schema": "professional-tire-source-identity@1",
+ "case_id": "real-dunlop-sportmaxx-rt2-identity",
+ "source_id": "dunlop-eu",
+ "parser_version": "dunlop-eu-rt2-transfer-state@1.0.0",
+ "query": {"model": "SPORT MAXX RT2", "size": "235/55R19"},
+ "observation": {
+  "source_url": "https://www.dunloptyres.com/en/tyres/sport-maxx-rt2",
+  "observed_at": "2026-11-14T08:20:08.103680+00:00",
+  "raw_hash": "70deacb4f9c1f89023c8d7348888aaf272a18f14d88b6176f25d4e6b4f517fed",
+  "transcription": "agent_transcription_unverified",
+  "human_golden_review": "pending_external_review"
+ },
+ "original": {
+  "path": ".artifacts/professional-tire-source-20261115/dunlop-sportmaxx-rt2-page.html",
+  "byte_count": 520023,
+  "sha256": "70deacb4f9c1f89023c8d7348888aaf272a18f14d88b6176f25d4e6b4f517fed"
+ },
+ "rights": {
+  "rights_holder": "Dunlop Tyres (dunloptyres.com catalogue publisher)",
+  "basis": "Manufacturer public catalogue page; robots.txt allowed the normal HTTPS capture used for the archived observation. Open redistribution and professional-material reuse licensing remain unconfirmed; original retained for engineering verification only.",
+  "license_url": null,
+  "attribution": "Dunlop SPORT MAXX RT2 EU specification page, https://www.dunloptyres.com/en/tyres/sport-maxx-rt2, observed 2026-11-14. Agent transcription, human Golden review pending.",
+  "store_original": true,
+  "workspace_reopen": true,
+  "quote_identifiers": true,
+  "provider_use": false,
+  "export": false
+ },
+ "variants": [
+  {
+   "variant_label": "dunlop-543000-101y",
+   "manufacturer_product_code": "543000",
+   "product_code_type": "MATERIAL_CODE",
+   "gtin": "5452000703941",
+   "eprel_id": "612625",
+   "source_label_url": "https://eprel.ec.europa.eu/qr/612625",
+   "brand": "Dunlop",
+   "model": "SPORT MAXX RT2",
+   "size": "235/55R19",
+   "load_index": "101",
+   "xl": null,
+   "service_description": "101Y",
+   "region": "EU",
+   "source_catalog_status": "active",
+   "eu_fuel_class": "C",
+   "eu_wet_grip": "A",
+   "eu_noise_class": "B"
+  },
+  {
+   "variant_label": "dunlop-544985-105y-xl",
+   "manufacturer_product_code": "544985",
+   "product_code_type": "MATERIAL_CODE",
+   "gtin": "5452000725776",
+   "eprel_id": "612638",
+   "source_label_url": "https://eprel.ec.europa.eu/qr/612638",
+   "brand": "Dunlop",
+   "model": "SPORT MAXX RT2",
+   "size": "235/55R19",
+   "load_index": "105",
+   "xl": true,
+   "service_description": "105Y XL",
+   "region": "EU",
+   "source_catalog_status": "active",
+   "eu_fuel_class": "B",
+   "eu_wet_grip": "A",
+   "eu_noise_class": "B"
+  }
+ ],
+ "expected": {
+  "variant_count": 2,
+  "identity_status": "source_scoped",
+  "identity_keys_distinct": true,
+  "same_size_distinct_by": ["manufacturer_product_code", "gtin", "load_index", "xl", "eprel_id"],
+  "identity_fact_evidence_required": ["gtin", "eprel_id", "source_label_url", "service_description",
+    "eu_fuel_class", "eu_wet_grip", "eu_noise_class"]
+ }
+}

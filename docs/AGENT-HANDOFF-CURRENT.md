@@ -12,6 +12,7 @@
 - 本轮最终6模块243通过、0失败、0跳过、869输入稳定，25子进程全部回收，捕获库关闭。完整7案例观察器工程通过，发布Gate为inconclusive，代表性真实SKU正例与真人Golden均0。
 - 前阶段API专项239、Web69、PG／TLS6及浏览器复跑11项通过。首批6项PDF回归失败和浏览器409根因已确认为环境性解析器8秒墙钟超时（并行负载所致），见[根因确认](assurance/evidence/first-batch-pdf-failures-and-browser-409-2026-11-15.md)。
 - 本轮完成Android instrumentation构建修复（Kotlin对齐）与模拟器offlineQa变体175项执行全过；vivo真机待用户批准USB安装。Gradle发行包经镜像校验摘要后种子化，构建链路已可复现，见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。
+- 真实Dunlop精确SKU身份案例落地：规范原件与live回执raw_hash一致，两条真实SKU经生产解析器核对并冻结同尺寸错合并陷阱；agent转录未复核，真人Golden待外部复核，见[真实SKU验收](assurance/evidence/professional-tire-identity-2026-11-15.md)。
 - 数据库迁移为036，PG运行合同为postgres-runtime-schema@4。目标部署按实际catalog与当前API源码生成批准合同。
 - 上阶段已完成账户持久归属和个人Garage／保存比较。旧共享记录归创建者私有，该策略由agent依据创建证据制定。
 - 首个真实AI采用用户指定的OpenAI Responses API。EPREL尚无Key，真实模型与监管接口验收继续待外部条件。

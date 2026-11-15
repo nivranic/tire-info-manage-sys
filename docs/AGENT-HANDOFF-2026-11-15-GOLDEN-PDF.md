@@ -57,7 +57,7 @@ git status --short --branch
 | 模块 | 已有实现 | 主要余项 |
 | --- | --- | --- |
 | 轮胎查询 | 在线优先、筛选、授权回退、13区域目录 | 其余P0来源／地区及长期稳定性 |
-| 精确版本 | 代码、GTIN、OE、地区、冲突、Golden及SKU桥 | 代表性真实SKU、真人Golden及错合并指标 |
+| 精确版本 | 代码、GTIN、OE、地区、冲突、Golden、SKU桥及真实Dunlop SKU正例 | 真人Golden复核、错合并指标及更多来源 |
 | 车型适配 | SU7轴位、个人Garage、官方PDF与SKU桥 | 更多车型、OE及Native真实消费 |
 | 比较 | SKU、个人保存、混合尺寸、条件和真实选录值 | 精确SKU正例及推荐质量 |
 | 测评库 | TestEvent、逐胎尺寸、PDF引用、22条真实成绩及独立PDF合同 | 人工复核、更多真实来源及精确身份 |
@@ -137,7 +137,7 @@ apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.p
 1. 阅读本卡、原始规格、本轮验收和前阶段AI选择交接，核对main、HEAD、origin/main、工作区及发布回执。保护已有改动。
 2. 前阶段首批PDF失败及浏览器409根因已确认（环境性解析器墙钟超时），后续按串行运行纪律执行；如有新失败先取原始回执。
 3. Android instrumentation已完成构建修复与模拟器（Android 14）175项执行全过，offlineQa为必要变体；vivo真机待用户批准USB安装后重跑。见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。
-4. 推进代表性真实精确SKU与真人Golden，扩大来源、地区和身份覆盖。复用本轮PDF字面量与正常入口验收。
+4. 真实Dunlop精确SKU身份案例已落地：绑定与live回执raw_hash一致的规范原件，两条真实SKU（543000/544985）经生产解析器全量核对，同尺寸错合并陷阱冻结。agent转录未复核，真人Golden继续待外部复核。见[真实SKU验收](assurance/evidence/professional-tire-identity-2026-11-15.md)。
 5. 完成真机instrumentation、Native宿主和跨设备E2E，再按实际条件推进Responses／Embeddings、EPREL、自然长周期监控、WCAG、生产恢复和SLO。
 
 ## 可复制接手提示词
