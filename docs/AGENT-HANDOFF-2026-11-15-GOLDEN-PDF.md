@@ -50,7 +50,7 @@ git status --short --branch
 
 本轮API验收覆盖professional_golden_checks、professional_golden_bindings、professional_golden_review、professional_golden_corpus、professional_golden_cli与test_test_events。数据库迁移为036，PG运行合同postgres-runtime-schema@4，FTS为accepted-heads-fts@7。目标PG部署仍需依据实际catalog及当前API源码生成批准合同。
 
-前阶段API239、Web69、PG／TLS6及浏览器复跑11项的范围见前阶段验收。前阶段首批6项PDF回归失败和首次浏览器409原因仍待确认，其后复跑通过，历史失败回执已保留。[AI成绩选择交接](AGENT-HANDOFF-2026-11-15-AI-SELECTION.md)
+前阶段API239、Web69、PG／TLS6及浏览器复跑11项的范围见前阶段验收。前阶段首批6项PDF回归失败和首次浏览器409根因已于2026-11-15接续轮确认：首批回归与真实材料验收、PG/TLS验证、浏览器首跑并行导致解析器8.0秒墙钟预算（含排队、bundle拷贝、子进程启动）被超出，`parser_timeout`回执与失败窗口耗时对比见[根因确认](assurance/evidence/first-batch-pdf-failures-and-browser-409-2026-11-15.md)。环境性失败，产品合同行为不变。[AI成绩选择交接](AGENT-HANDOFF-2026-11-15-AI-SELECTION.md)
 
 ## 12模块进度与余项
 
@@ -135,9 +135,10 @@ apps/api/.venv/Scripts/python.exe -X utf8 -B scripts/run_api_worker_regression.p
 ## 用户明确接续后的顺序
 
 1. 阅读本卡、原始规格、本轮验收和前阶段AI选择交接，核对main、HEAD、origin/main、工作区及发布回执。保护已有改动。
-2. 从原始失败回执追踪前阶段首批PDF失败及浏览器409。当前根因待确认，已有复跑通过证据。
-3. 推进代表性真实精确SKU与真人Golden，扩大来源、地区和身份覆盖。复用本轮PDF字面量与正常入口验收。
-4. 完成Android instrumentation／设备、Native宿主和跨设备E2E，再按实际条件推进Responses／Embeddings、EPREL、自然长周期监控、WCAG、生产恢复和SLO。
+2. 前阶段首批PDF失败及浏览器409根因已确认（环境性解析器墙钟超时），后续按串行运行纪律执行；如有新失败先取原始回执。
+3. Android instrumentation已完成构建修复与模拟器（Android 14）175项执行全过，offlineQa为必要变体；vivo真机待用户批准USB安装后重跑。见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。
+4. 推进代表性真实精确SKU与真人Golden，扩大来源、地区和身份覆盖。复用本轮PDF字面量与正常入口验收。
+5. 完成真机instrumentation、Native宿主和跨设备E2E，再按实际条件推进Responses／Embeddings、EPREL、自然长周期监控、WCAG、生产恢复和SLO。
 
 ## 可复制接手提示词
 

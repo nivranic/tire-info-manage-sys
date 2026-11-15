@@ -24,6 +24,21 @@ allprojects {
     }
 }
 
+// Kotlin 1.8 merged stdlib-jdk7/jdk8 contents into kotlin-stdlib. Transitive
+// pins of the pre-1.8 split artifacts (e.g. kotlin-stdlib-jdk8 1.6.21) make the
+// androidTest duplicate-class checks fail on generated plugin modules. Aligning
+// every Kotlin stdlib artifact to one version keeps all variants consistent;
+// at 1.8.22 the jdk7/jdk8 coordinates are empty relocation shells.
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+            force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }

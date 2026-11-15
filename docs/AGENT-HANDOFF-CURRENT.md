@@ -10,7 +10,8 @@
 - 许可论文完整捕获及22条真实转录值已验，支持冻结捕获期限。AI显式成绩选择及10／12条两组真实报告已验，保留原成绩序号及PDF引用。整场单包61,421字节超过44,000字节上限，原失败保留。
 - 本轮独立PDF引用和出版物角色合同已落地，22条真实成绩经正常上传、保存及读取核对。R74三份缺失材料按冻结摘要恢复，9个外部绑定通过，旧54项条件用例全部执行通过。
 - 本轮最终6模块243通过、0失败、0跳过、869输入稳定，25子进程全部回收，捕获库关闭。完整7案例观察器工程通过，发布Gate为inconclusive，代表性真实SKU正例与真人Golden均0。
-- 前阶段API专项239、Web69、PG／TLS6及浏览器复跑11项通过。首批6项PDF回归和浏览器409首次根因尚未确认。
+- 前阶段API专项239、Web69、PG／TLS6及浏览器复跑11项通过。首批6项PDF回归失败和浏览器409根因已确认为环境性解析器8秒墙钟超时（并行负载所致），见[根因确认](assurance/evidence/first-batch-pdf-failures-and-browser-409-2026-11-15.md)。
+- 本轮完成Android instrumentation构建修复（Kotlin对齐）与模拟器offlineQa变体175项执行全过；vivo真机待用户批准USB安装。Gradle发行包经镜像校验摘要后种子化，构建链路已可复现，见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。
 - 数据库迁移为036，PG运行合同为postgres-runtime-schema@4。目标部署按实际catalog与当前API源码生成批准合同。
 - 上阶段已完成账户持久归属和个人Garage／保存比较。旧共享记录归创建者私有，该策略由agent依据创建证据制定。
 - 首个真实AI采用用户指定的OpenAI Responses API。EPREL尚无Key，真实模型与监管接口验收继续待外部条件。
@@ -19,8 +20,8 @@
 ## 用户明确接续后的优先事项
 
 1. 核对HEAD、origin/main、git status和本阶段发布回执。
-2. 从原始回执追踪前阶段首批PDF失败及浏览器409，保留根因待确认状态。
-3. 推进真实SKU、真人Golden、Android instrumentation／设备、Native及跨设备E2E，再按条件验收真实AI、长期监控、WCAG、部署恢复与SLO。
+2. 前阶段首批PDF失败及浏览器409根因已确认（环境性解析器墙钟超时，2026-11-15接续轮），按串行运行纪律继续。
+3. Android instrumentation构建修复与模拟器175项执行已完成；vivo真机需用户批准USB安装后重跑。推进真实SKU、真人Golden、真机instrumentation、Native及跨设备E2E，再按条件验收真实AI、长期监控、WCAG、部署恢复与SLO。
 
 ## 历史阶段
 
