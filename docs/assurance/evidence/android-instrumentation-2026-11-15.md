@@ -20,9 +20,9 @@ Gradle 8.14.3-all发行包在本机网络下多次于约10%处中断（前阶段
 
 offlineQa专用QA应用变体是全部instrumentation测试的既定要求（测试断言目标包名以`.offlineqa`结尾，不触碰正式应用别名）。19个测试类覆盖OfflinePackStore（23）、OfflineSyncPolicy（17）、OfflineFallbackPolicyStore（16）、NativeQueryDenials（15）、OfflineFallbackV2Store（13）、NativeSecurity（8）等离线包、回退策略、同步合同、原生HTTP桥与安全拒绝路径。测试网络仅绑定127.0.0.1 MockWebServer，无外部调用。
 
-## 真机余项
+## 真机余项（2026-11-20用户裁定后冻结）
 
-vivo V2606A（Android 17）两次`adb install`均停在厂商USB安装确认弹窗，属用户物理操作项：需机主在手机上批准安装（或开启开发者选项中的USB自动安装授权）后，以`ANDROID_SERIAL`指向该真机重跑`connectedOfflineQaAndroidTest`。模拟器执行链路与APK均已就绪，回执中的offlineQa APK可直接复用。未修改手机任何安全设置。
+用户2026-11-20明确裁定：**未经用户当次明确允许，一律只允许模拟器验证，禁止在任何真机上执行验证操作**。此前对该真机的安装尝试与前台轮询均属越权操作，已于当日停止：等待器终止、轮询日志与真机屏幕截图删除、设备侧确认无残留包与映射。模拟器instrumentation验收已完成（上表offlineQa 175项），真机instrumentation在获得用户逐次明确授权前保持冻结；如获授权，安装仍需机主在手机批准厂商USB安装确认（或开启USB自动安装），随后以`ANDROID_SERIAL`指向真机重跑`connectedOfflineQaAndroidTest`，回执中的offlineQa APK可直接复用。
 
 ## 实际验证
 

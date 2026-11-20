@@ -11,7 +11,7 @@
 - 本轮独立PDF引用和出版物角色合同已落地，22条真实成绩经正常上传、保存及读取核对。R74三份缺失材料按冻结摘要恢复，9个外部绑定通过，旧54项条件用例全部执行通过。
 - 本轮最终6模块243通过、0失败、0跳过、869输入稳定，25子进程全部回收，捕获库关闭。完整7案例观察器工程通过，发布Gate为inconclusive，代表性真实SKU正例与真人Golden均0。
 - 前阶段API专项239、Web69、PG／TLS6及浏览器复跑11项通过。首批6项PDF回归失败和浏览器409根因已确认为环境性解析器8秒墙钟超时（并行负载所致），见[根因确认](assurance/evidence/first-batch-pdf-failures-and-browser-409-2026-11-15.md)。
-- 本轮完成Android instrumentation构建修复（Kotlin对齐）与模拟器offlineQa变体175项执行全过；vivo真机待用户批准USB安装。Gradle发行包经镜像校验摘要后种子化，构建链路已可复现，见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。
+- 本轮完成Android instrumentation构建修复（Kotlin对齐）与模拟器offlineQa变体175项执行全过。Gradle发行包经镜像校验摘要后种子化，构建链路已可复现，见[Android验收](assurance/evidence/android-instrumentation-2026-11-15.md)。**用户2026-11-20裁定：未经当次明确允许一律仅限模拟器验证，真机（含vivo 10AG9K2P9S002J1）验证已冻结**，越权的真机操作已全部停止并清理。
 - 真实Dunlop精确SKU身份案例落地：规范原件与live回执raw_hash一致，两条真实SKU经生产解析器核对并冻结同尺寸错合并陷阱；agent转录未复核，真人Golden待外部复核，见[真实SKU验收](assurance/evidence/professional-tire-identity-2026-11-15.md)。
 - Native桌面宿主真实E2E通过：Rust基线192项；真实Tauri宿主应用内双账户、会话重置、离线包归属变化九项全过；同账户Web生产构建消费桌面车库数据（跨设备桌面→Web），见[Native宿主验收](assurance/evidence/native-desktop-host-e2e-2026-11-15.md)。
 - 移动端跨设备真实E2E通过：真实Android应用（offlineQa，模拟器Android 14）经ADB reverse本机调试通道与Web生产构建在同一账户下双向交换车库数据，九项检查三阶段全过（移动创建→Web消费并创建→移动消费），见[移动端跨设备验收](assurance/evidence/mobile-cross-device-2026-11-16.md)。
@@ -25,7 +25,7 @@
 
 1. 核对HEAD、origin/main、git status和本阶段发布回执。
 2. 前阶段首批PDF失败及浏览器409根因已确认（环境性解析器墙钟超时，2026-11-15接续轮），按串行运行纪律继续。
-3. Android模拟器instrumentation、Native桌面宿主E2E（含跨设备桌面→Web）、移动端跨设备（Android应用↔Web双向）与WCAG自动审计（axe+键盘，人工读屏项待验）已完成；vivo真机需用户批准USB安装后重跑。推进真人Golden、真机、iOS/macOS/Linux矩阵，再按条件验收真实AI、长期监控、WCAG人工项、部署恢复与SLO。
+3. Android模拟器instrumentation、Native桌面宿主E2E（含跨设备桌面→Web）、移动端跨设备（Android应用↔Web双向）与WCAG自动审计（axe+键盘，人工读屏项待验）已完成；真机验证未经用户当次明确允许一律不做（默认仅模拟器）。推进真人Golden、iOS/macOS/Linux矩阵，再按条件验收真实AI、长期监控、WCAG人工项、部署恢复与SLO。
 
 ## 历史阶段
 
