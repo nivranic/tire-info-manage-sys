@@ -15,7 +15,7 @@
 - 真实Dunlop精确SKU身份案例落地：规范原件与live回执raw_hash一致，两条真实SKU经生产解析器核对并冻结同尺寸错合并陷阱；agent转录未复核，真人Golden待外部复核，见[真实SKU验收](assurance/evidence/professional-tire-identity-2026-11-15.md)。
 - Native桌面宿主真实E2E通过：Rust基线192项；真实Tauri宿主应用内双账户、会话重置、离线包归属变化九项全过；同账户Web生产构建消费桌面车库数据（跨设备桌面→Web），见[Native宿主验收](assurance/evidence/native-desktop-host-e2e-2026-11-15.md)。
 - 移动端跨设备真实E2E通过：真实Android应用（offlineQa，模拟器Android 14）经ADB reverse本机调试通道与Web生产构建在同一账户下双向交换车库数据，九项检查三阶段全过（移动创建→Web消费并创建→移动消费），见[移动端跨设备验收](assurance/evidence/mobile-cross-device-2026-11-16.md)。
-- WCAG 2.2 AA核心流程自动审计建立：axe六视图0违规+键盘遍历6项通过，修复车库/车型适配标题层级及consent标题不一致（三端typecheck与测试全过）；读屏与全部交互状态人工项待验，见[WCAG验收](assurance/evidence/wcag-core-flows-2026-11-20.md)。
+- WCAG 2.2 AA核心流程自动审计建立（两轮）：axe六视图0违规+键盘遍历6项通过；仿真媒体与布局约束15项全过（reduced-motion生效、forced-colors切换且axe清洁、320px四状态无横向滚动且移动导航可操作、200%等效缩放无溢出）；修复车库/车型适配标题层级及consent标题不一致（三端typecheck与测试全过）。仅读屏与全部交互状态人工核对仍待验，见[WCAG验收](assurance/evidence/wcag-core-flows-2026-11-20.md)。
 - 数据库迁移为036，PG运行合同为postgres-runtime-schema@4。目标部署按实际catalog与当前API源码生成批准合同。
 - 上阶段已完成账户持久归属和个人Garage／保存比较。旧共享记录归创建者私有，该策略由agent依据创建证据制定。
 - 首个真实AI采用用户指定的OpenAI Responses API。EPREL尚无Key，真实模型与监管接口验收继续待外部条件。

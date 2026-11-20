@@ -31,9 +31,22 @@
 
 改动组件（garage/vehicle-fitments）被Web、桌面（Tauri）、移动（Capacitor）三端共同打包：web typecheck+69项测试、desktop typecheck+22项、mobile typecheck+24项全部通过；审计对生产重建包执行。
 
-## 待验范围（如实声明）
+## 第二轮：仿真媒体与布局约束（2026-11-21，run2-3167b1f1，15项全过）
 
-- 读屏讲解（Narrator/VoiceOver/TalkBack）、200%文本缩放、Reduced Motion、高对比模式、全部交互状态与完整流程人工核对：**本轮未做**，发布Gate该项仍为部分完成（自动半已建立）。
+对上一节"待验范围"中可程序化的四类条件建立证据（CDP仿真，生产构建）：
+
+| 条件 | 检查 | 结果 |
+| --- | --- | --- |
+| Reduced Motion（2.3.3方向） | 仿真`prefers-reduced-motion: reduce`后，全局降级块实际生效：spinner动画时长坍缩为0s、迭代次数=1 | 通过 |
+| 强制色彩 | 仿真`forced-colors: active`后媒体命中、调色板切换为系统色（CanvasText解析值），该模式下axe六标签复扫0违规 | 通过 |
+| 重排1.4.10 | 320 CSS px下查询/车型适配/车库/账号对话框四状态页面级横向溢出均为0px；导航按设计切换至固定底栏「移动导航」，7个按钮全部可见可操作 | 通过 |
+| 文本缩放1.4.4（200%等效） | 720px布局宽×2倍DPR（等效200%浏览器缩放）下查询/车库无横向溢出、导航控件7个可见、axe复扫0违规 | 通过 |
+
+判据修正记录：首轮判据误将≤767px下按设计隐藏的侧栏主导航当作唯一导航（该宽度导航切换为底栏），已改为按可见导航（主导航或移动导航）计数；移动导航7按钮计数曾误入溢出映射导致假失败，已分离。
+
+## 待验范围（更新于2026-11-21）
+
+- 读屏讲解（Narrator/VoiceOver/TalkBack）与全部交互状态、完整流程的人工核对：**仍待人工**，发布Gate该项剩余此部分。
 - axe为自动规则子集，不等于WCAG 2.2 AA全部成功准则的人工判定。
 
-回执位于`.artifacts/wcag-audit-20261120/`：run-40e0d1d1为通过批完整报告（含键盘focus轨迹与对话框trace），run-9aed12fc为首轮发现批，dialog-focus-diag.mjs为对话框焦点诊断脚本，wcag-audit.mjs为可复跑编排器（axe-core以`npm install --no-save`安装，未写入package.json）。[本轮交接](../../AGENT-HANDOFF-2026-11-15-GOLDEN-PDF.md)
+回执位于`.artifacts/wcag-audit-20261120/`：run-40e0d1d1（第一轮通过批）、run2-3167b1f1（第二轮通过批）为完整报告，run-9aed12fc为首轮发现批，dialog-focus-diag.mjs为对话框焦点诊断脚本，wcag-audit.mjs/wcag-audit2.mjs为可复跑编排器（axe-core以`npm install --no-save`安装，未写入package.json）。[本轮交接](../../AGENT-HANDOFF-2026-11-15-GOLDEN-PDF.md)
