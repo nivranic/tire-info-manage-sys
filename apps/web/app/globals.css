@@ -132,7 +132,8 @@ h1 { font-size: clamp(22px, 1.8vw, 30px); letter-spacing: -.8px; font-weight: 55
 .query-panel, .source-result, .comparison-section, .watch-section, .sources-section, .changes-section { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; box-shadow: var(--shadow); }
 .query-panel { padding: 19px 21px 0; }
 .panel-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 13px; font-weight: 550; min-height: 24px; }
-.panel-title > span:first-child { display: flex; align-items: center; gap: 8px; }
+.panel-title > span:first-child, .panel-title > h2:first-child { display: flex; align-items: center; gap: 8px; }
+.panel-title > h2:first-child { margin: 0; font-size: inherit; font-weight: inherit; }
 .panel-title > .mono { font-size: 9px; color: var(--muted); font-weight: 400; }
 kbd { color: var(--muted); border: 1px solid var(--border); background: var(--paper); font-size: 9px; border-radius: 3px; padding: 3px 5px; font-weight: 400; }
 .query-fields { display: grid; grid-template-columns: 1fr 1.15fr auto; gap: 12px; margin-top: 22px; align-items: end; }
@@ -275,7 +276,7 @@ input:not([type="checkbox"]):focus, select:focus { border-color: var(--accent); 
 @keyframes spin { to { transform: rotate(360deg); } }
 .consent-card { display: flex; gap: 13px; background: var(--accent-soft); padding: 20px; }
 .consent-symbol { color: var(--accent); padding-top: 2px; }
-.consent-card h4 { font-size: 12px; margin: 0 0 9px; font-weight: 550; }
+.consent-card h3, .consent-card h4 { font-size: 12px; margin: 0 0 9px; font-weight: 550; }
 .consent-card p { font-size: 10px; line-height: 1.9; color: var(--muted); margin: 5px 0; overflow-wrap: anywhere; }
 .consent-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 15px; }
 .result-explanation { color: var(--muted); font-size: 11px; line-height: 1.9; padding: 23px 20px; overflow-wrap: anywhere; }
@@ -565,7 +566,7 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
   .source-result-heading > .tag { margin-left: 40px; }
   .source-result-heading small { overflow-wrap: anywhere; }
   .consent-card { padding: 17px 14px; gap: 10px; }
-  .consent-card h4 { line-height: 1.8; font-size: 11px; }
+  .consent-card h3, .consent-card h4 { line-height: 1.8; font-size: 11px; }
   .consent-card p { font-size: 10px; }
   .consent-actions { flex-direction: column; }
   .consent-actions button { width: 100%; }
@@ -611,7 +612,7 @@ summary { cursor: pointer; min-height: 44px; padding: 12px 0; font-size: 11px; l
   .content-footer .mono, .mobile-nav button, .breadcrumb strong, .connection { font-size: 12px; }
   .panel-title, .query-fields label > span, .primary-button, .secondary-button,
   .results-heading h2, .principles-row strong, .evidence-panel-heading > span:first-child,
-  .evidence-placeholder h3, .source-result-heading h3, .consent-card h4, .notice,
+  .evidence-placeholder h3, .source-result-heading h3, .consent-card h3, .consent-card h4, .notice,
   .inline-error, .run-loading, .result-explanation, .fact-button strong,
   .comparison-table, .source-directory-head h3, .method-note h3, summary { font-size: 14px; }
   .results-heading { flex-wrap: wrap; gap: 7px; }

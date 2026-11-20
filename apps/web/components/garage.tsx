@@ -168,7 +168,7 @@ function OwnerGarageWorkspace({ sessionReady, onQuerySize, onVehicleEvidence, on
   }
   return <div className="garage-workspace">
     <div className="snapshot-banner"><strong>个人车库</strong><span>记录保存在当前服务，重启后可恢复；登录账户内共享本人车库，匿名按会话隔离。车辆与当前轮胎由你确认，不等于官方适配认证。</span></div>
-    <section className="vehicle-query-panel"><div className="panel-title"><span><Icon name="vehicle" size={18} />{archived ? "归档车辆" : "我的车辆"}</span><button className="primary-button compact" disabled={!sessionReady || !!busy} onClick={() => setEditor("new")}>添加车辆</button></div>
+    <section className="vehicle-query-panel"><div className="panel-title"><h2><Icon name="vehicle" size={18} />{archived ? "归档车辆" : "我的车辆"}</h2><button className="primary-button compact" disabled={!sessionReady || !!busy} onClick={() => setEditor("new")}>添加车辆</button></div>
       <div className="quarantine-filter"><label><span>记录范围</span><select value={archived ? "archived" : "active"} disabled={!!busy} onChange={event => { pageRequest.current?.abort(); setArchived(event.target.value === "archived"); }}><option value="active">使用中的车辆</option><option value="archived">已归档车辆</option></select></label><button className="secondary-button" disabled={!!busy || !sessionReady} onClick={() => setRevision(value => value + 1)}>刷新车库</button></div>
       {error ? <div className="inline-error" role="alert">{error} 请刷新后核对当前记录。</div> : null}
       {!records ? !error ? <p className="quality-empty" role="status">正在读取车库…</p> : null : !records.length ? <div className="vehicle-empty"><Icon name="vehicle" size={30} /><h3>{archived ? "暂无归档车辆" : "把车辆与前后轴规格放在一起"}</h3><p>{archived ? "移入归档的车辆可在这里恢复。" : "可手工添加，也可从车型适配中的已核验配置保存。查询轮胎后，选择「记入车库」记录当前轮胎。"}</p></div> : <>
