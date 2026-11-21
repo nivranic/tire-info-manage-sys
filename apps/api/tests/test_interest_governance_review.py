@@ -491,8 +491,8 @@ def test_review_017_preserves_predecessor_schema_rows_and_has_no_notification_ba
     from tire_api.interest_catalog_models import TireCatalogRevision
     from test_ai_stream_migration import snapshot
     from version_registry import EXPECTED_SCHEMA_VERSIONS
-    from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
-        assert_trigger_contract, initialize_observing_version)
+    from historical_migration_support import (FTS_TABLES, assert_full_chain_preserved,
+        assert_target_delta, assert_trigger_contract, initialize_observing_version)
     before = snapshot(pre017)
     assert_trigger_contract(before, device=True, candidate=False)
     stage = initialize_observing_version(pre017, '017_interest_governance_catalog')
@@ -502,7 +502,7 @@ def test_review_017_preserves_predecessor_schema_rows_and_has_no_notification_ba
     pre017.initialize()
     after = snapshot(pre017)
     assert after == first
-    assert after['tables'] - before['tables'] == {TireCatalogRevision.__tablename__}
+    assert after['tables'] - before['tables'] == {TireCatalogRevision.__tablename__} | FTS_TABLES
     assert not before['tables'] - after['tables']
     assert_full_chain_preserved(before, after)
     for table in before['tables'] - {'tire_schema_versions'}:

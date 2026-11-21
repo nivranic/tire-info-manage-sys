@@ -10,6 +10,12 @@ import re
 
 from sqlalchemy import event, inspect, text
 
+# Migrations 033/034 register FTS5 virtual tables that only migrations create
+# (they are not SQLAlchemy models), so any full initialize() past 032 also adds
+# these virtual and shadow tables to the observed table delta.
+FTS_TABLES = frozenset(prefix + '_text_fts' + suffix for prefix in ('source', 'document')
+                       for suffix in ('', '_data', '_content', '_docsize', '_config', '_idx'))
+
 from version_registry import EXPECTED_SCHEMA_VERSIONS
 
 

@@ -537,8 +537,8 @@ def pre018(tmp_path, monkeypatch):
 def test_review_018_preserves_all_predecessor_rows_schema_and_does_not_backfill_or_repeat(pre018):
     from test_ai_stream_migration import snapshot
     from version_registry import EXPECTED_SCHEMA_VERSIONS
-    from historical_migration_support import (assert_full_chain_preserved, assert_target_delta,
-        assert_trigger_contract, initialize_observing_version)
+    from historical_migration_support import (FTS_TABLES, assert_full_chain_preserved,
+        assert_target_delta, assert_trigger_contract, initialize_observing_version)
     before = snapshot(pre018)
     assert TABLE not in before['tables']
     assert_trigger_contract(before, device=True, candidate=False)
@@ -549,7 +549,7 @@ def test_review_018_preserves_all_predecessor_rows_schema_and_does_not_backfill_
     pre018.initialize()
     after = snapshot(pre018)
     assert first == after
-    assert after['tables'] - before['tables'] == {TABLE}
+    assert after['tables'] - before['tables'] == {TABLE} | FTS_TABLES
     assert not before['tables'] - after['tables']
     assert_full_chain_preserved(before, after)
     for table in before['tables'] - {'tire_schema_versions'}:

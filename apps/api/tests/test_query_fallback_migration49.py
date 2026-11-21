@@ -21,6 +21,10 @@ from historical_migration_support import (assert_full_chain_preserved, assert_ta
     assert_trigger_contract, initialize_observing_version)
 
 NEW_TABLES = {'query_fallback_previews', 'query_fallback_policy_revisions', 'query_fallback_uses'}
+# 033/034 register FTS5 virtual tables that only migrations create (not SQLAlchemy
+# models), so a full initialize() also adds their virtual and shadow tables.
+FTS_TABLES = {prefix + '_text_fts' + suffix for prefix in ('source', 'document')
+              for suffix in ('', '_data', '_content', '_docsize', '_config', '_idx')}
 VERSIONS = [*OLD_VERSIONS, '009_ai_streaming', '010_offline_packs']
 
 
@@ -62,7 +66,7 @@ def test_three_additive_tables_and_011_preserve_every_predecessor_schema_and_row
     predecessor.initialize()
     after = snapshot(predecessor)
     assert after == first
-    assert after['tables'] - before['tables'] == NEW_TABLES and not before['tables'] - after['tables']
+    assert after['tables'] - before['tables'] == NEW_TABLES | FTS_TABLES and not before['tables'] - after['tables']
     assert_full_chain_preserved(before, after)
     assert all(before['rows'][table] == after['rows'][table] for table in before['tables'] - {'tire_schema_versions'})
     assert len(after['rows']['tire_schema_versions']) == len(EXPECTED_SCHEMA_VERSIONS)
@@ -85,7 +89,7 @@ def test_011_ddl_and_version_rollback_together(predecessor, monkeypatch):
             predecessor.initialize()
     assert snapshot(predecessor) == before
     predecessor.initialize()
-    assert snapshot(predecessor)['tables'] - before['tables'] == NEW_TABLES
+    assert snapshot(predecessor)['tables'] - before['tables'] == NEW_TABLES | FTS_TABLES
 
 
 def test_011_models_compile_for_postgresql():

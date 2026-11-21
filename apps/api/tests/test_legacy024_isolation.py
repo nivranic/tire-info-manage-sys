@@ -42,6 +42,10 @@ VERSION_029 = '029_source_page_monitoring'
 VERSION_030 = '030_interest_source_quality'
 VERSION_031 = '031_source_material_stops'
 VERSION_032 = '032_source_page_url_moves'
+VERSION_033 = '033_source_text_index'
+VERSION_034 = '034_document_text_index'
+VERSION_035 = '035_text_embedding_authorizations'
+VERSION_036 = '036_session_data_ownership'
 TABLES_025 = {'external_fact_license_evidence', 'external_fact_grant_revisions'}
 TABLES_026 = {'query_run_owner_receipts'}
 TABLES_027 = {'test_event_golden_cases', 'test_event_golden_case_revisions',
@@ -50,9 +54,14 @@ TABLES_028 = {'ai_price_versions'}
 TABLES_029 = {'source_page_changes', 'source_page_notifications'}
 TABLES_031 = {'source_material_stops'}
 TABLES_032 = {'source_page_url_moves', 'source_page_url_move_notifications'}
+TABLES_033 = {'source_text_chunks', 'source_text_indexes'}
+TABLES_034 = {'document_text_chunks', 'document_text_indexes', 'document_text_pages'}
+TABLES_035 = {'text_embedding_authorizations'}
 # 030 adds no table; it appends one boolean column to interest_revisions.
-CURRENT_TAIL_TABLES = TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029 | TABLES_031 | TABLES_032
-TAIL_VERSIONS = (VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032)
+# 036 adds no table; it appends owner columns to local_sessions.
+CURRENT_TAIL_TABLES = (TABLES_025 | TABLES_026 | TABLES_027 | TABLES_028 | TABLES_029
+                       | TABLES_031 | TABLES_032 | TABLES_033 | TABLES_034 | TABLES_035)
+TAIL_VERSIONS = (VERSION_025, VERSION_026, VERSION_027, VERSION_028, VERSION_029, VERSION_030, VERSION_031, VERSION_032, VERSION_033, VERSION_034, VERSION_035, VERSION_036)
 CUSTOM = 'synthetic_r109_external_table'
 FUTURE = 'synthetic_r109_future026'
 
@@ -172,9 +181,12 @@ class Legacy024IsolationTests(unittest.TestCase):
             assert_025_native_schema(connection)
             assert_026_native_schema(connection)
             self.assertEqual(set(after025['tables']) - set(before025['tables']), CURRENT_TAIL_TABLES)
+            # interest_revisions (030) and local_sessions (036) get explicit tail
+            # treatment below; the 036 owner index is additive and checked there.
+            tail_names = ('interest_revisions', 'local_sessions', 'ix_local_sessions_owner_user_id')
             self.assertEqual([item for item in after025['schema_objects']
-                              if item['table'] not in CURRENT_TAIL_TABLES and item['name'] != 'interest_revisions'],
-                             [item for item in before025['schema_objects'] if item['name'] != 'interest_revisions'])
+                              if item['table'] not in CURRENT_TAIL_TABLES and item['name'] not in tail_names],
+                             [item for item in before025['schema_objects'] if item['name'] not in tail_names])
             # 030 rebuilds interest_revisions' DDL by appending exactly one column.
             new_interest = next(item for item in after025['schema_objects'] if item['name'] == 'interest_revisions')
             old_interest = next(item for item in before025['schema_objects'] if item['name'] == 'interest_revisions')
@@ -197,6 +209,14 @@ class Legacy024IsolationTests(unittest.TestCase):
                     # 030 appends exactly one interest boolean column with default false.
                     self.assertEqual(actual_table['columns'][:-1], expected_table['columns'])
                     self.assertEqual(actual_table['columns'][-1], [len(expected_table['columns']), 'source_quality_notifications', 'BOOLEAN', 1, 'false', 0, 0])
+                    self.assertEqual(actual_table['foreign_keys'], expected_table['foreign_keys'])
+                    self.assertEqual(actual_table['row_count'], expected_table['row_count'])
+                elif table == 'local_sessions':
+                    # 036 appends exactly the two ownership columns and one owner index.
+                    self.assertEqual(actual_table['columns'][:-2], expected_table['columns'])
+                    self.assertEqual([column[1] for column in actual_table['columns'][-2:]],
+                                     ['owner_user_id', 'anonymous_claimable'])
+                    self.assertEqual([column[2] for column in actual_table['columns'][-2:]], ['VARCHAR(64)', 'BOOLEAN'])
                     self.assertEqual(actual_table['foreign_keys'], expected_table['foreign_keys'])
                     self.assertEqual(actual_table['row_count'], expected_table['row_count'])
                 else:

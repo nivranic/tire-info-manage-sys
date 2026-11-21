@@ -406,7 +406,8 @@ class PostgresRuntimeRoleTests(unittest.TestCase):
         plan = runtime.runtime_role_sql('synthetic_runtime', 'synthetic_db')
         self.assertTrue(plan.startswith('BEGIN;'))
         self.assertTrue(plan.rstrip().endswith('COMMIT;'))
-        self.assertIn('GRANT UPDATE (expires_at,user_id) ON public.local_sessions', plan)
+        # 036_session_data_ownership extended the audited column set.
+        self.assertIn('GRANT UPDATE (expires_at,user_id,owner_user_id,anonymous_claimable) ON public.local_sessions', plan)
         self.assertIn('GRANT EXECUTE ON FUNCTION public.tire_lock_external_reader()', plan)
         insert = next(line for line in plan.splitlines() if line.startswith('GRANT INSERT ON '))
         for table in (*runtime.GOVERNANCE_TABLES, 'tire_schema_versions'):

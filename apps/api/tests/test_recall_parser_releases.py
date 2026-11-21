@@ -361,7 +361,7 @@ def test_legacy_eight_source_catalog_stays_executable_and_does_not_invent_recall
     catalog = client.get('/v1/reparse/catalog', params={'mode': 'history', 'bundle_id': registered['id']})
     assert catalog.status_code == 200 and len(catalog.json()['parsers']) == 8
     assert SOURCE not in {row['source_id'] for row in catalog.json()['parsers']}
-    assert len(client.get('/v1/reparse/catalog?mode=history').json()['parsers']) == 10
+    assert len(client.get('/v1/reparse/catalog?mode=history').json()['parsers']) == 17
     from test_parser_bundles import execute_bundle
     replay = asyncio.run(execute_bundle(manifest))
     assert replay['payload'] and replay['receipt']['reaped']

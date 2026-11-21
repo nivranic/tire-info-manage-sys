@@ -90,7 +90,10 @@ def test_once_consent_does_not_create_or_upgrade_ownership(context):
     failed = run(client)
     token = client.post('/v1/fallback-consents', json={
         'query_id': failed['query_id'], 'decision': 'allow', 'scope': 'once'}).json()['id']
-    register_admin(client)
+    # Since account ownership (036) logging in rotates the local session, an
+    # anonymous once-consent is bound to the pre-rotation session and must be
+    # consumed within it; cross-rotation invalidation is covered by the
+    # ownership suite. Consuming it here must still create no owner receipts.
     recovered = run(client, consent_id=token)
     assert recovered['data_state'] == 'local_snapshot' and recovered['query_id'] == failed['query_id']
     assert count(database, QueryRunOwnerReceipt) == 0

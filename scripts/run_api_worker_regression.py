@@ -181,6 +181,7 @@ TEST_MODULES = (
     'apps/api/tests/test_professional_golden_cli.py',
     'apps/api/tests/test_professional_golden_corpus.py',
     'apps/api/tests/test_professional_golden_review.py',
+    'apps/api/tests/test_professional_tire_identity.py',
     'apps/api/tests/test_quality.py',
     'apps/api/tests/test_quarantine_review.py',
     'apps/api/tests/test_query_fallback_migration49.py',

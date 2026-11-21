@@ -222,9 +222,13 @@ def test_cursor_continues_across_same_owner_session_but_not_cookie_rebind(factor
             422, 'api_key_history_cursor_invalid')
         with case.database.sessions.begin() as db:
             db.get(UserSession, case.client.cookies['tire_local_session']).user_id = other.actor['id']
-        error(read(case, params={'limit': 1, 'cursor': first['next_cursor']}), 409, 'api_key_owner_changed')
+        # Since account ownership (036) a raw user_id rebind leaves the session
+        # inconsistent (user_id != owner_user_id), so it is rejected as invalid
+        # before any cursor continuity can be considered. The invalid session
+        # also rejects explicitly owner-scoped reads the same way.
+        error(read(case, params={'limit': 1, 'cursor': first['next_cursor']}), 401, 'api_key_login_required')
         error(read(case, owner=other.actor['id'], params={'limit': 1, 'cursor': first['next_cursor']}),
-            422, 'api_key_history_cursor_invalid')
+            401, 'api_key_login_required')
     finally:
         other.client.close()
 

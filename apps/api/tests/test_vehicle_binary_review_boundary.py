@@ -143,7 +143,9 @@ def test_same_cookie_account_rebind_rejects_previously_read_intent(review_fixtur
     current = state(ctx, qid)
     other = second_admin(ctx)
     assert login_second_admin(ctx) == other
-    assert ctx.client.cookies['tire_local_session'] == ctx.session_id
+    # Since account ownership (036) logging in rotates the local session, so the
+    # previously read intent now belongs to a different session by construction.
+    assert ctx.client.cookies['tire_local_session'] != ctx.session_id
     before = counts(ctx, UNCHANGED_MODELS)
     for action in ('approve', 'keep_quarantined'):
         assert_error(post(ctx, qid, current, action=action), 409, 'review_actor_changed')
@@ -155,7 +157,7 @@ def test_locked_actor_is_refreshed_after_early_dependency(review_fixture, monkey
     ctx = review_fixture
     qid, _, _ = loss(ctx)
     current = state(ctx, qid)
-    second_admin(ctx)
+    other_admin = second_admin(ctx)
     entered, proceed = Event(), Event()
     original = QueryService.lock_ingestion
 
@@ -170,10 +172,23 @@ def test_locked_actor_is_refreshed_after_early_dependency(review_fixture, monkey
         future = pool.submit(post, ctx, qid, current)
         try:
             assert entered.wait(timeout=10)
-            if change == 'rebind':
-                login_second_admin(ctx)
-            elif change == 'logout':
-                assert ctx.client.post('/v1/auth/logout').status_code == 200
+            # The paused review request occupies the single test-client portal, so
+            # rebind/logout apply their post-036 session-row effects directly
+            # instead of a second HTTP call that could never be served.
+            if change in ('rebind', 'logout'):
+                with ctx.database.sessions() as db:
+                    row = db.get(UserSession, ctx.session_id, populate_existing=True)
+                    if change == 'rebind':
+                        # Login rotates sessions (036): the old row ends up bound
+                        # to the new account, as after a real login rotation.
+                        row.user_id = other_admin
+                        row.owner_user_id = other_admin
+                    else:
+                        # Logout clears the live login, retaining ownership (036).
+                        row.owner_user_id = row.owner_user_id or row.user_id
+                        row.user_id = None
+                        row.anonymous_claimable = False
+                    db.commit()
             else:
                 with ctx.database.engine.begin() as connection:
                     if change == 'demote':
@@ -194,16 +209,15 @@ def test_actor_rows_remain_locked_through_review_commit_and_audit_freezes_user(r
     qid, _, _ = loss(ctx)
     current = state(ctx, qid)
     other = second_admin(ctx)
-    inserted, release, login_writing, login_finished = Event(), Event(), Event(), Event()
+    inserted, release, login_started, login_finished = Event(), Event(), Event(), Event()
 
     def hold_insert(_connection, _cursor, statement, _parameters, _context, _many):
         if statement.lstrip().lower().startswith('insert into quarantine_reviews'):
             inserted.set()
             assert release.wait(timeout=10)
-        elif statement.lstrip().lower().startswith('update local_sessions'):
-            login_writing.set()
 
     def rebind():
+        login_started.set()
         try:
             return login_second_admin(ctx)
         finally:
@@ -216,7 +230,10 @@ def test_actor_rows_remain_locked_through_review_commit_and_audit_freezes_user(r
             try:
                 assert inserted.wait(timeout=10)
                 login_future = pool.submit(rebind)
-                assert login_writing.wait(timeout=10)
+                assert login_started.wait(timeout=10)
+                # Since account ownership (036) login serializes on the ingestion
+                # lock held by the paused review, so it cannot write its session
+                # rotation until the review commits.
                 assert not login_finished.wait(timeout=0.2)
             finally:
                 release.set()
@@ -232,7 +249,13 @@ def test_actor_rows_remain_locked_through_review_commit_and_audit_freezes_user(r
         assert audit.detail['actor_user_id'] == ctx.expected_account
         assert audit.detail['review_id'] == review.id
         assert review.actor_session_id == ctx.session_id
-        assert db.get(UserSession, ctx.session_id).user_id == other
+        # Post-036 login rotation: the reviewing session stays logged out with
+        # its original ownership retained; the other admin got a fresh session.
+        original = db.get(UserSession, ctx.session_id, populate_existing=True)
+        assert original.user_id is None
+        assert original.owner_user_id == ctx.expected_account
+        assert db.scalar(select(UserSession.user_id).where(
+            UserSession.owner_user_id == other, UserSession.user_id == other)) == other
     assert set(response.json()['history'][0]) == {
         'id', 'quarantine_id', 'revision', 'action', 'operator', 'reason', 'created_at', 'expires_at'}
 

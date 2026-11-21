@@ -134,7 +134,14 @@ def test_historical_experiment_freezes_baseline_and_never_writes_formal_tables(s
 def test_deployment_catalog_bounded_and_all_routes_require_history(setup):
     client, database, _ = setup
     catalog = client.get('/v1/reparse/catalog?mode=history').json()
-    assert len(catalog['parsers']) == 10 and catalog['accepted_as_facts'] is False
+    # The deployment catalog stays bounded to the deployed source adapters
+    # (workspace PDF extraction is not a site parser and never appears here).
+    assert len(catalog['parsers']) == 17 and catalog['accepted_as_facts'] is False
+    assert {row['source_id'] for row in catalog['parsers']} == {
+        'bridgestone-jp', 'continental-cn', 'dunlop-eu', 'eu-safety-gate', 'goodyear-sg',
+        'hankook-us', 'michelin-cn', 'michelin-de', 'michelin-fr', 'michelin-uk', 'michelin-us',
+        'nhtsa-us-recalls', 'pirelli-us', 'samr-cn-recalls', 'toyo-us', 'xiaomi-cn-vehicles',
+        'yokohama-eu'}
     assert catalog['limits']['timeout_seconds'] == 8
     assert 'eprel' not in {row['source_id'] for row in catalog['parsers']}
     for route in ('catalog', 'status', 'runs', 'runs/missing'):
@@ -154,7 +161,7 @@ def test_unsupported_platform_catalog_does_not_claim_execution_available(setup, 
     monkeypatch.setattr(reparse, 'HOST_PLATFORM', 'darwin')
     result = client.get('/v1/reparse/catalog?mode=history').json()
     assert result['available'] is False and result['availability_reason'] == 'parser_platform_not_supported'
-    assert len(result['parsers']) == 10 and client.get('/health').status_code == 200
+    assert len(result['parsers']) == 17 and client.get('/health').status_code == 200
 
 
 @pytest.mark.parametrize('field,value', [('parser_version', 'old@0'), ('parser_digest', '0' * 64)])
